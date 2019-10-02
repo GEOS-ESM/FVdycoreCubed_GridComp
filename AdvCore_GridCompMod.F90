@@ -936,7 +936,4 @@ subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
 
 end subroutine global_integral
 
-!EOC
-!------------------------------------------------------------------------------
-
 end module AdvCore_GridCompMod
