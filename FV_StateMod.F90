@@ -2913,7 +2913,7 @@ subroutine fv_computeMassFluxes_r8(ucI, vcI, ple, mfx, mfy, cx, cy, dt)
   integer     :: it, nsplt
 
 ! Fill Ghosted arrays and update halos
-  uc = MAPL_UNDEF
+  uc = MAPL_UNDEF 
   vc = MAPL_UNDEF
   uc(is:ie,js:je,:) = ucI
   vc(is:ie,js:je,:) = vcI
