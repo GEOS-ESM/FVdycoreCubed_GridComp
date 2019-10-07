@@ -2855,7 +2855,7 @@ subroutine Run(gc, import, export, clock, rc)
     logical                             :: adjustTracers
     type(ESMF_Alarm)                    :: predictorAlarm
     type(ESMF_Grid)                     :: bgrid
-    integer                             :: j
+    integer                             :: j,pos
     integer                             :: nqt
     logical                             :: tend
     logical                             :: exclude
@@ -3209,8 +3209,9 @@ subroutine Run(gc, import, export, clock, rc)
 !-----------------------------
 
       do k=1,size(names)
-         if    (names(k)=='OX') then
-            ooo = vars%tracer(k)
+         pos = index(names(k),'::')
+         if(pos > 0) then
+           if( (names(k)(pos+2:))=='OX' ) ooo = vars%tracer(k)
          elseif(names(k)=='Q') then
             qqq = vars%tracer(k)
          end if
@@ -3366,7 +3367,9 @@ subroutine Run(gc, import, export, clock, rc)
     if (.not. ADIABATIC) then
        do k=1,size(names)
 
-         if( trim(names(k))=='OX' ) then
+         pos = index(names(k),'::')
+         if(pos > 0) then
+           if( (names(k)(pos+2:))=='OX' ) then
              if ( (ooo%is_r4) .and. associated(ooo%content_r4) ) then
                 if (size(ox)==size(ooo%content_r4)) then
                    ox = ooo%content_r4
@@ -3376,6 +3379,7 @@ subroutine Run(gc, import, export, clock, rc)
                    ox = ooo%content
                 endif
              endif
+           endif
          endif
 
          if( trim(names(k))=='Q'  ) then
@@ -3739,12 +3743,15 @@ subroutine Run(gc, import, export, clock, rc)
 !--------------------------------------------------------------------
 
       do k=1,size(names)
-         if( trim(names(k))=='OX' ) then
+         pos = index(names(k),'::')
+         if(pos > 0) then
+           if( (names(k)(pos+2:))=='OX' ) then
              if ( ooo%is_r4 ) then
                   ox = ooo%content_r4
              else
                   ox = ooo%content
              endif
+           endif
          endif
          if( trim(names(k))=='Q'  ) then
              if ( qqq%is_r4 ) then
@@ -3952,7 +3959,9 @@ subroutine Run(gc, import, export, clock, rc)
       if( associated(doxdt) ) then
           doxdt = 0.0
           do k = 1,size(names)
-             if( trim(names(k)).eq.'OX' ) then
+             pos = index(names(k),'::')
+             if(pos > 0) then
+               if( (names(k)(pos+2:))=='OX' ) then
                  if( state%vars%tracer(k)%is_r4 ) then 
                      if (size(doxdt)==size(state%vars%tracer(k)%content_r4)) &
                               doxdt = doxdt - state%vars%tracer(k)%content_r4
@@ -3960,6 +3969,7 @@ subroutine Run(gc, import, export, clock, rc)
                      if (size(doxdt)==size(state%vars%tracer(k)%content)) &
                               doxdt = doxdt - state%vars%tracer(k)%content
                  endif
+               endif
              endif
           enddo
       endif
@@ -4022,7 +4032,9 @@ subroutine Run(gc, import, export, clock, rc)
       if( associated(temp2D) ) then
           temp2d = 0.0
           do N = 1,size(names)
-             if( trim(names(N)).eq.'OX' ) then
+             pos = index(names(N),'::')
+             if(pos > 0) then
+               if( (names(N)(pos+2:))=='OX' ) then
                  if( state%vars%tracer(N)%is_r4 ) then 
                      do k=1,km
                      temp2d = temp2d - state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
@@ -4032,6 +4044,7 @@ subroutine Run(gc, import, export, clock, rc)
                      temp2d = temp2d - state%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
                      enddo
                  endif
+               endif
              endif
           enddo
       endif
@@ -4397,12 +4410,15 @@ subroutine Run(gc, import, export, clock, rc)
 
       if( associated(doxdt) ) then
           do N = 1,size(names)
-             if( trim(names(N)).eq.'OX' ) then
+             pos = index(names(N),'::')
+             if(pos > 0) then
+               if( (names(N)(pos+2:))=='OX' ) then
                  if( state%vars%tracer(N)%is_r4 ) then 
                      doxdt = doxdt + state%vars%tracer(N)%content_r4
                  else
                      doxdt = doxdt + state%vars%tracer(N)%content
                  endif
+               endif
              endif
           enddo
           doxdt = doxdt/dt
@@ -4464,7 +4480,9 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if( associated(temp2D) ) then
           do N = 1,size(names)
-             if( trim(names(N)).eq.'OX' ) then
+             pos = index(names(N),'::')
+             if(pos > 0) then
+               if( (names(N)(pos+2:))=='OX' ) then
                  if( state%vars%tracer(N)%is_r4 ) then 
                      do k=1,km
                      temp2d = temp2d + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
@@ -4474,6 +4492,7 @@ subroutine Run(gc, import, export, clock, rc)
                      temp2d = temp2d + state%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
                      enddo
                  endif
+               endif
              endif
           enddo
           temp2d = temp2d * (MAPL_O3MW/MAPL_AIRMW) / (MAPL_GRAV*DT)
