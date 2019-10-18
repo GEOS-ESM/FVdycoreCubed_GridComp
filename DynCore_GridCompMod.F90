@@ -2316,6 +2316,13 @@ contains
     if (FV3_STANDALONE /=0) then
         call MAPL_GridCreate(GC, rc=status) 
         VERIFY_(STATUS)
+        call MAPL_AddExportSpec( gc,                              &
+            SHORT_NAME = 'TRADVEX',                                    &
+            LONG_NAME  = 'advected_quantities',                        &
+            UNITS      = 'unknown',                                    &
+            DATATYPE   = MAPL_BundleItem,               &
+            RC=STATUS  )
+        VERIFY_(STATUS)
     endif
 
 ! Generic SetServices
@@ -2391,6 +2398,8 @@ contains
   integer                            :: jfirst
   integer                            :: jlast
   integer                            :: km
+  type(ESMF_FieldBundle)             :: tradv, tradvex
+  integer                            :: i,numTracers,fv3_standalone
 
 ! Begin
 !------
@@ -2563,6 +2572,23 @@ contains
     VERIFY_(STATUS)
     call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, RC=STATUS)
     VERIFY_(STATUS)
+
+    call MAPL_GetResource ( MAPL, FV3_STANDALONE, Label="FV3_STANDALONE:", default=0, RC=STATUS)
+    VERIFY_(STATUS)
+    if (FV3_STANDALONE /=0) then
+       call ESMF_StateGet(import,'TRADV',tradv,rc=status)
+       VERIFY_(STATUS)
+       call ESMF_StateGet(export,'TRADVEX',tradvex,rc=status)
+       VERIFY_(STATUS)
+       call ESMF_FieldBundleGet(tradv,fieldCount=numTracers,rc=status)
+       VERIFY_(STATUS)
+       do i=1,numTracers
+         call ESMF_FieldBundleGet(tradv,fieldIndex=i,field=field,rc=status)
+         VERIFY_(status)
+         call MAPL_FieldBundleAdd(tradvex,field,rc=status)
+         VERIFY_(status)
+       enddo
+    end if
 
 !=====Begin intemittent replay=======================
 
@@ -3123,8 +3149,8 @@ subroutine Run(gc, import, export, clock, rc)
                  (TRIM(fieldname) /= 'QRAIN'   ) .and. &
                  (TRIM(fieldname) /= 'QSNOW'   ) .and. &
                  (TRIM(fieldname) /= 'QGRAUPEL') ) then
-                   ! write(STRING,'(A,A)') "FV3+ADV is excluding ", TRIM(fieldname)
-                   ! call WRITE_PARALLEL( trim(STRING)   )
+                    write(STRING,'(A,A)') "FV3+ADV is excluding ", TRIM(fieldname)
+                    call WRITE_PARALLEL( trim(STRING)   )
                      n = n + 1
                      if (n > size(xlist)) then
                         allocate( biggerlist(2*n), stat=status )
@@ -8237,6 +8263,10 @@ subroutine addTracer_r8(state, bundle, var, grid, fieldname)
 
       field = ESMF_FieldCreate(GRID, var, datacopyflag=ESMF_DATACOPY_VALUE, name=fieldname, RC=STATUS )
       VERIFY_(STATUS)
+      call ESMF_AttributeSet(field,name='VLOCATION',value=MAPL_VLocationCenter,rc=status)
+      VERIFY_(STATUS)
+      call ESMF_AttributeSet(field,name='DIMS',value=MAPL_DimsHorzVert,rc=status)
+      VERIFY_(STATUS)
       call MAPL_FieldBundleAdd ( bundle, field, rc=STATUS )
       VERIFY_(STATUS)
 
@@ -8288,6 +8318,10 @@ subroutine addTracer_r4(state, bundle, var, grid, fieldname)
       NQ = NQ + 1 
                
       field = ESMF_FieldCreate(GRID, var, datacopyflag=ESMF_DATACOPY_VALUE, name=fieldname, RC=STATUS ) 
+      VERIFY_(STATUS)
+      call ESMF_AttributeSet(field,name='VLOCATION',value=MAPL_VLocationCenter,rc=status)
+      VERIFY_(STATUS)
+      call ESMF_AttributeSet(field,name='DIMS',value=MAPL_DimsHorzVert,rc=status)
       VERIFY_(STATUS)
       call MAPL_FieldBundleAdd ( bundle, field, rc=STATUS )
       VERIFY_(STATUS)

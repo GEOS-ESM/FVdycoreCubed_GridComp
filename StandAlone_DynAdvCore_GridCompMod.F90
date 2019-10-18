@@ -85,9 +85,8 @@ contains
       call MAPL_GridCompSetEntryPoint ( GC, ESMF_METHOD_FINALIZE,    Finalize,   RC=status )
       VERIFY_(STATUS)
 
-      ! Create childrens gridded components and invoke their SetServices
+      ! Creat childrens gridded components and invoke their SetServices
       !-----------------------------------------------------------------
-
       DynCore = MAPL_AddChild(GC, NAME='DYN',   SS=DynCoreSetServices, RC=status)
       VERIFY_(STATUS)
 
@@ -173,13 +172,7 @@ contains
       real                          :: cdt         ! time step in secs
 
       character(len=ESMF_MAXSTR)    :: comp_name
-      type (ESMF_FieldBundle)             :: BUNDLE1, BUNDLE2
-      type (ESMF_GridComp),      pointer  :: GCS(:)
-      type (ESMF_State),         pointer  :: GIM(:)
-      type (ESMF_State),         pointer  :: GEX(:)
       type (MAPL_MetaComp), pointer :: MAPL
-      INTEGER :: numTracers, I
-      type (ESMF_Field)            :: field
 !-------------------------------------------------------------------------
 !BOC
       Iam = 'Initialize'
@@ -190,7 +183,7 @@ contains
       VERIFY_(STATUS)
       Iam = trim(comp_name) // trim(Iam)
 
-     !if ( MAPL_AM_I_ROOT() ) print *, trim(Iam) // ':  Generic Init...'
+     if ( MAPL_AM_I_ROOT() ) print *, trim(Iam) // ':  Generic Init...'
 
       !  Create grid for this GC
       !  ------------------------
@@ -205,35 +198,6 @@ contains
 
       call MAPL_GenericInitialize ( gc, IMPORT, EXPORT, clock,  RC=status )
       VERIFY_(STATUS)
-
-      ! Get children and their im/ex states from my generic state.
-      !----------------------------------------------------------
-
-      call MAPL_Get ( MAPL, GCS=GCS, GIM=GIM, GEX=GEX, RC=STATUS )
-      VERIFY_(STATUS)
-
-      call ESMF_StateGet  (GIM(DynCore), 'TRADV', BUNDLE1, RC=STATUS )
-      VERIFY_(STATUS)
-
-      call ESMF_FieldBundleGet(BUNDLE1, fieldCount=numTracers,  rc=STATUS)
-      VERIFY_(STATUS)
-
-      IF ( MAPL_AM_I_ROOT() ) PRINT*, 'Number of tracers: ', numTracers
-
-      call ESMF_StateGet  (GIM(AdvCore), 'TRADV', BUNDLE2, RC=STATUS )
-      VERIFY_(STATUS)
-
-      if (numTracers > 0) then
-         do I=1, numTracers
-            call ESMF_FieldBundleGet (BUNDLE1, fieldIndex=I, field=FIELD, RC=STATUS)
-            VERIFY_(STATUS)
-
-            call MAPL_FieldBundleAdd ( BUNDLE2, field, rc=STATUS )
-            VERIFY_(STATUS)
-
-         end do
-      end if
-
 
 !  All done
 !  --------
