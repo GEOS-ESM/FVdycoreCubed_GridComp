@@ -1,4 +1,4 @@
-#define _VERIFY(A)   if((A)/=0) then; PRINT *, 'Interp_restarts.x', __LINE__; call MPI_Abort(A); endif
+#define VERIFY_(A)   if((A)/=0) then; PRINT *, 'Interp_restarts.x', __LINE__; call MPI_Abort(A); endif
 
 program interp_restarts
 
@@ -457,7 +457,7 @@ program interp_restarts
 
    if (scale_rst) then
       call scale_drymass(fv_atm,tracer_names,rc=status)
-      _VERIFY(status)
+      VERIFY_(status)
    end if
 
    if (FV_Atm(1)%flagstruct%Make_NH) then
@@ -497,12 +497,12 @@ program interp_restarts
          !if (AmWriter) open(OUNIT,file=TRIM(fname1),access='sequential',form='unformatted')
          if (n_writers==1) then
             OUNIT=getfile(TRIM(fname1),form='unformatted',rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          else
             if (AmWriter) then
                call MPI_FILE_OPEN(arrdes%writers_comm, fname1, MPI_MODE_WRONLY+MPI_MODE_CREATE, &
                                    info, OUNIT, STATUS)
-               _VERIFY(STATUS)
+               VERIFY_(STATUS)
             end if
          end if
 
@@ -510,7 +510,7 @@ program interp_restarts
          read (IUNIT, IOSTAT=status) header 
          if(n_writers > 1) then
             call Write_Parallel(HEADER, OUNIT, ARRDES=ARRDES, RC=status)
-            _VERIFY(STATUS)
+            VERIFY_(STATUS)
          else
             if (amwriter) write(OUNIT) header
          endif
@@ -524,7 +524,7 @@ program interp_restarts
 
          if(n_writers > 1) then
             call Write_Parallel(HEADER(1:5), OUNIT, ARRDES=ARRDES, RC=status)
-            _VERIFY(STATUS)
+            VERIFY_(STATUS)
          else
             if (amwriter) write(OUNIT) header(1:5)
          endif
@@ -566,7 +566,7 @@ program interp_restarts
             if (AmWriter) write(OUNIT) r8_akbk
          else
             call write_parallel(r8_akbk,ounit,arrdes=arrdes,rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          end if
       else 
          write(*,*)'bma writing ak'
@@ -578,7 +578,7 @@ program interp_restarts
             if (AmWriter) write(OUNIT) r8_akbk
          else
             call write_parallel(r8_akbk,ounit,arrdes=arrdes,rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          end if
       else  
          write(*,*)'bma writing bk'
@@ -594,15 +594,15 @@ program interp_restarts
       if (isBinFV) then
          if (n_writers==1) then
             call MAPL_VarWrite(OUNIT,grid,r8_local(is:ie,js:je,1:npz),rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          else
             call MAPL_VarWrite(OUNIT,grid,r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          end if
       else
          write(*,*)'bma writing u'
          call MAPL_VarWrite(OutFmt,"U",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-         _VERIFY(status)
+         VERIFY_(status)
       end if   
 ! V
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' V'
@@ -610,14 +610,14 @@ program interp_restarts
       if (isBinFV) then
          if (n_writers==1) then
             call MAPL_VarWrite(OUNIT,grid,r8_local(is:ie,js:je,1:npz),rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          else
             call MAPL_VarWrite(OUNIT,grid,r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          end if
       else
          call MAPL_VarWrite(OutFmt,"V",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
       end if   
 ! PT
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PT'
@@ -625,14 +625,14 @@ program interp_restarts
       if (isBinFV) then
          if (n_writers==1) then
             call MAPL_VarWrite(OUNIT,grid,pt_local(is:ie,js:je,1:npz),rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          else
             call MAPL_VarWrite(OUNIT,grid,pt_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          end if
       else
          call MAPL_VarWrite(OutFmt,"PT",pt_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-         _VERIFY(status)
+         VERIFY_(status)
       end if
 
 ! PE
@@ -643,14 +643,14 @@ program interp_restarts
       if (isBinFV) then
          if (n_writers==1) then
             call MAPL_VarWrite(OUNIT,grid,r8_local(is:ie,js:je,1:npz+1),rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          else
             call MAPL_VarWrite(OUNIT,grid,r8_local(is:ie,js:je,1:npz+1),arrdes=arrdes,rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          end if
       else
          call MAPL_VarWrite(OutFmt,"PE",r8_local(is:ie,js:je,1:npz+1),arrdes=arrdes,rc=status)
-         _VERIFY(status)
+         VERIFY_(status)
       end if
 ! PKZ
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PKZ'
@@ -658,14 +658,14 @@ program interp_restarts
       if (isBinFV) then
          if (n_writers==1) then
             call MAPL_VarWrite(OUNIT,grid,r8_local(is:ie,js:je,1:npz),rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          else
             call MAPL_VarWrite(OUNIT,grid,r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          end if
       else
          call MAPL_VarWrite(OutFmt,"PKZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-         _VERIFY(status)
+         VERIFY_(status)
       end if
 
       if (.not. fv_atm(1)%flagstruct%hydrostatic) then
@@ -675,14 +675,14 @@ program interp_restarts
          if (isBinFV) then
             if (n_writers==1) then
                call MAPL_VarWrite(OUNIT,grid,r8_local(is:ie,js:je,1:npz),rc=status)
-               _VERIFY(status)
+               VERIFY_(status)
             else
                call MAPL_VarWrite(OUNIT,grid,r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-               _VERIFY(status)
+               VERIFY_(status)
             end if
          else
             call MAPL_VarWrite(OutFmt,"DZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          end if
 
 ! W
@@ -692,14 +692,14 @@ program interp_restarts
          if (isBinFV) then
             if (n_writers==1) then
                call MAPL_VarWrite(OUNIT,grid,r8_local(is:ie,js:je,1:npz),rc=status)
-               _VERIFY(status)
+               VERIFY_(status)
             else
                call MAPL_VarWrite(OUNIT,grid,r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-               _VERIFY(status)
+               VERIFY_(status)
             end if
          else
             call MAPL_VarWrite(OutFmt,"W",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-            _VERIFY(status)
+            VERIFY_(status)
          end if
       endif
 
@@ -707,7 +707,7 @@ program interp_restarts
          if (n_writers > 1) then
             if (AmWriter) then
                call MPI_FILE_CLOSE(OUNIT,status)
-               _VERIFY(status)
+               VERIFY_(status)
             end if
          else
             close (OUNIT)
@@ -736,11 +736,11 @@ program interp_restarts
                if (AmWriter) then
                   call MPI_FILE_OPEN(arrdes%writers_comm, fname1, MPI_MODE_WRONLY+MPI_MODE_CREATE, &
                                       info, OUNIT, STATUS)
-                  _VERIFY(STATUS)
+                  VERIFY_(STATUS)
                end if
             else
                ounit = getfile(trim(fname1),form='unformatted',rc=status)
-               _VERIFY(status)
+               VERIFY_(status)
             end if
          else
             imc = npx-1
@@ -766,10 +766,10 @@ program interp_restarts
             r4_local(is:ie,js:je,1:npz) = FV_Atm(1)%q(is:ie,js:je,:,iq0)
             if (n_writers == 1) then
                call MAPL_VarWrite(OUNIT,grid,r4_local(is:ie,js:je,1:npz),rc=status)
-               _VERIFY(status)
+               VERIFY_(status)
             else
                call MAPL_VarWrite(OUNIT,grid,r4_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-               _VERIFY(status)
+               VERIFY_(status)
             end if
          end do
          if (n_writers == 1) then
@@ -777,7 +777,7 @@ program interp_restarts
          else
             if (AmWriter) then
                call MPI_FILE_CLOSE(OUNIT,status)
-               _VERIFY(status)
+               VERIFY_(status)
             end if
          end if
       else
@@ -796,7 +796,7 @@ program interp_restarts
             if (ndims==2) then
                r4_local2d(is:ie,js:je)=0.0
                call MAPL_VarWrite(OutFmt,trim(var_name),r4_local2d(is:ie,js:je),arrdes=arrdes,rc=status)
-               _VERIFY(status)
+               VERIFY_(status)
             else if (ndims==3) then
                if (trim(var_name)=='Q') then
                   iq0=1
@@ -806,7 +806,7 @@ program interp_restarts
                end if
                r4_local(is:ie,js:je,1:npz) = FV_Atm(1)%q(is:ie,js:je,:,iq0)
                call MAPL_VarWrite(OutFmt,triM(var_name),r4_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-               _VERIFY(status)
+               VERIFY_(status)
             end if
             call siter%next()
          end do
@@ -831,11 +831,11 @@ program interp_restarts
                if (AmWriter) then
                   call MPI_FILE_OPEN(arrdes%writers_comm, fname1, MPI_MODE_WRONLY+MPI_MODE_CREATE, &
                                       info, ounit, STATUS)
-                  _VERIFY(STATUS)
+                  VERIFY_(STATUS)
                end if
             else
                ounit=getfile(trim(fname1),form='unformatted',rc=status)
-               _VERIFY(status)
+               VERIFY_(status)
             end if
          else
             if (AmWriter) then
@@ -861,19 +861,19 @@ program interp_restarts
                   r4_local(is:ie,js:je,1:nlev)=rst_files(ifile)%vars(iq)%ptr3d(is:ie,js:je,1:nlev)
                   if (n_writers == 1) then
                      call MAPL_VarWrite(ounit,grid,r4_local(is:ie,js:je,1:nlev),rc=status)
-                     _VERIFY(status)
+                     VERIFY_(status)
                   else
                      call MAPL_VarWrite(ounit,grid,r4_local(is:ie,js:je,1:nlev),arrdes=arrdes,rc=status)
-                     _VERIFY(status)
+                     VERIFY_(status)
                   end if
                else
                   r4_local2d(is:ie,js:je)=rst_files(ifile)%vars(iq)%ptr2d(is:ie,js:je)
                   if (n_writers == 1) then
                      call MAPL_VarWrite(ounit,grid,r4_local2d(is:ie,js:je),rc=status)
-                     _VERIFY(status)
+                     VERIFY_(status)
                   else
                      call MAPL_VarWrite(ounit,grid,r4_local2d(is:ie,js:je),arrdes=arrdes,rc=status)
-                     _VERIFY(status)
+                     VERIFY_(status)
                   end if
                end if
             else
@@ -893,7 +893,7 @@ program interp_restarts
            else
               if (AmWriter) then
                  call MPI_FILE_CLOSE(ounit,status)
-                 _VERIFY(status)
+                 VERIFY_(status)
               end if
            end if
          else

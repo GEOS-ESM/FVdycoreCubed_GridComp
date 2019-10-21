@@ -118,14 +118,14 @@ subroutine AppCSEdgeCreateF(IM_WORLD, LonEdge,LatEdge, LonCenter, LatCenter, rc)
 
    deallocate( grid_global )
 
-   _RETURN(ESMF_SUCCESS)
+   RETURN_(ESMF_SUCCESS)
 end subroutine AppCSEdgeCreateF
 
 
 !!!!!!!!!!!!!!!%%%%%%%%%%%%%%%%%%%%%%%!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
 #include "MAPL_Generic.h"
-#define DEALLOCGLOB_(A) if(associated(A))then;A=0;if(MAPL_ShmInitialized)then; call MAPL_DeAllocNodeArray(A,rc=STATUS);else; deallocate(A,stat=STATUS);endif;_VERIFY(STATUS);NULLIFY(A);endif
+#define DEALLOCGLOB_(A) if(associated(A))then;A=0;if(MAPL_ShmInitialized)then; call MAPL_DeAllocNodeArray(A,rc=STATUS);else; deallocate(A,stat=STATUS);endif;VERIFY_(STATUS);NULLIFY(A);endif
 
    use ESMF
    use MAPL_Mod
@@ -196,7 +196,7 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
 
    AppGridStandAlone = .false.
    call ESMF_VMGetCurrent(vm, rc=STATUS)
-   _VERIFY(STATUS)            
+   VERIFY_(STATUS)            
 
    ! Check FV3 grid_type
    ! -------------------
@@ -243,21 +243,21 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
          coordDep1 = (/1,2/),           &
          coordDep2 = (/1,2/),           &
          rc=status)
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    ! Allocate coords at default stagger location
    call ESMF_GridAddCoord(esmfgrid, rc=status)
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    call ESMF_AttributeSet(esmfgrid, name='GRID_LM', value=LM, rc=status)
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    if (grid_type <= 3) then
       call ESMF_AttributeSet(esmfgrid, 'GridType', 'Cubed-Sphere', rc=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
    else
       call ESMF_AttributeSet(esmfgrid, 'GridType', 'Doubly-Periodic', rc=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
    endif
 
    ! -------------
@@ -282,14 +282,14 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
       print*, 'Error npts /= npx', npts, npx
       STATUS=1
    endif
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    if (.not.allocated(FV_Atm)) then 
 
       AppGridStandAlone = .true.
       if(MAPL_ShmInitialized) then
          call MAPL_AllocNodeArray(grid_global,Shp=(/npts+1,npts+1,ndims,ntiles/),rc=status)
-         _VERIFY(STATUS)
+         VERIFY_(STATUS)
       else
          allocate( grid_global(npts+1,npts+1,ndims,ntiles) )
       end if
@@ -364,19 +364,19 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
    call ESMF_GridGetCoord(esmfgrid, coordDim=1, localDE=0, &
          staggerloc=ESMF_STAGGERLOC_CENTER, &
          farrayPtr=lons, rc=status)
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    call ESMF_GridGetCoord(esmfgrid, coordDim=2, localDE=0, &
          staggerloc=ESMF_STAGGERLOC_CENTER, &
          farrayPtr=lats, rc=status)
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    ! Save corners into the esmfgrid
    !---------------------------
    allocate(gridCornerLons((size(lons,1)+1)*(size(lons,2)+1)), stat=status)
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
    allocate(gridCornerLats((size(lats,1)+1)*(size(lats,2)+1)), stat=status)
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    idx = 0
    do jg=jsg,jeg+1
@@ -396,15 +396,15 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
 
    call ESMF_AttributeSet(esmfgrid, name='GridCornerLons:', &
          itemCount = idx, valueList=gridCornerLons, rc=status)
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
    call ESMF_AttributeSet(esmfgrid, name='GridCornerLats:', &
          itemCount = idx, valueList=gridCornerLats, rc=status)
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    deallocate(gridCornerLats, stat=status)
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
    deallocate(gridCornerLons, stat=status)
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    do jg=jsg,jeg
       do ig=isg,ieg
@@ -432,9 +432,9 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
       DEALLOCGLOB_(grid_global)
    end if
    call MAPL_MemUtilsWrite(VM, trim(Iam), RC=STATUS )
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
-   _RETURN(ESMF_SUCCESS)
+   RETURN_(ESMF_SUCCESS)
 end function AppGridCreateF
 
 subroutine AppGridCreate (META, esmfgrid, RC)
@@ -487,23 +487,23 @@ subroutine AppGridCreate (META, esmfgrid, RC)
 
    ! !RESOURCE_ITEM: none :: Processing elements in 1st dimension
    call MAPL_GetResource( META, NX,       label ='NX:', default=1, rc = status )
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
    ! !RESOURCE_ITEM: none :: Processing elements in 2nd dimension
    call MAPL_GetResource( META, NY,       label ='NY:', default=1, rc = status )
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    ! Get World problem size from CF
    !-------------------------------
 
    ! !RESOURCE_ITEM: none :: Grid size in 1st dimension
    call MAPL_GetResource( META, IM_WORLD, 'AGCM_IM:',            rc = status )
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
    ! !RESOURCE_ITEM: none :: Grid size in 2nd dimension
    call MAPL_GetResource( META, JM_WORLD, 'AGCM_JM:',            rc = status )
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
    ! !RESOURCE_ITEM: none :: Grid size in 3rd dimension
    call MAPL_GetResource( META, LM,       'AGCM_LM:', default=1, rc = status )
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    ! The grid's name is optional
    !----------------------------
@@ -514,12 +514,12 @@ subroutine AppGridCreate (META, esmfgrid, RC)
    write(tmpname,trim(FMT)) 'PE',IM_WORLD,'x',JM_WORLD,'-CF'
    ! !RESOURCE_ITEM: none :: Optional grid name
    call MAPL_GetResource( META, GRIDNAME, 'AGCM_GRIDNAME:', default=trim(tmpname), rc = status )
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    esmfgrid = AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, STATUS)
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
-   _RETURN(ESMF_SUCCESS)
+   RETURN_(ESMF_SUCCESS)
 
 end subroutine AppGridCreate
 

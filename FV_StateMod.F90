@@ -330,41 +330,41 @@ contains
 ! BEGIN
 
   call ESMF_VMGetCurrent(VM, rc=STATUS)
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
     call MAPL_MemUtilsWrite(VM, trim(IAm), RC=STATUS )
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
 
   call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
     call MAPL_TimerOn(MAPL,"--FMS_INIT")
     call ESMF_VMGet(VM,mpiCommunicator=comm,rc=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
     call fms_init(comm)
     call MAPL_TimerOff(MAPL,"--FMS_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FMS_INIT', RC=STATUS )
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 ! Start up FV                   
     call MAPL_TimerOn(MAPL,"--FV_INIT")
     call fv_init1(FV_Atm, DT, grids_on_this_pe, p_split)
     call MAPL_TimerOff(MAPL,"--FV_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
   if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
 
 
 ! FV grid dimensions setup from MAPL
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'AGCM_IM:', default= 32, RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npy, 'AGCM_JM:', default=192, RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'AGCM_LM:', default= 72, RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 ! FV likes npx;npy in terms of cell vertices
       if (FV_Atm(1)%flagstruct%npy == 6*FV_Atm(1)%flagstruct%npx) then
          FV_Atm(1)%flagstruct%ntiles = 6
@@ -377,13 +377,13 @@ contains
       endif
 ! Check for Doubly Periodic Domain Info
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%deglat, label='FIXED_LATS:', default=FV_Atm(1)%flagstruct%deglat, rc=status )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 ! MPI decomp setup
       call MAPL_GetResource( MAPL, nx, 'NX:', default=0, RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       FV_Atm(1)%layout(1) = nx
       call MAPL_GetResource( MAPL, ny, 'NY:', default=0, RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       if (FV_Atm(1)%flagstruct%grid_type == 4) then
          FV_Atm(1)%layout(2) = ny 
       else
@@ -394,13 +394,13 @@ contains
 ! -----------------
 
   call MAPL_GetResource( MAPL, ndt, 'RUN_DT:', default=0, RC=STATUS )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
   DT = ndt
 
 ! Advect tracers within DynCore(AdvCore_Advection=.false.)
 !             or within AdvCore(AdvCore_Advection=.true.)
   call MAPL_GetResource( MAPL, AdvCore_Advection, label='AdvCore_Advection:', default=AdvCore_Advection, rc=status )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
   call MAPL_GetResource( MAPL, INT_fix_mass,    label='fix_mass:'    , default=INT_fix_mass, rc=status )
   call MAPL_GetResource( MAPL, INT_check_mass,  label='check_mass:'  , default=INT_check_mass, rc=status )
@@ -574,7 +574,7 @@ contains
     call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
     call MAPL_TimerOff(MAPL,"--FV_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
 !! Setup GFDL microphysics module
     call gfdl_cloud_microphys_init()
@@ -601,9 +601,9 @@ contains
   prt_minmax     = FV_Atm(1)%flagstruct%fv_debug
 
   call MAPL_MemUtilsWrite(VM, trim(Iam), RC=STATUS )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
-  _RETURN(ESMF_SUCCESS)
+  RETURN_(ESMF_SUCCESS)
 
 contains
 
@@ -731,10 +731,10 @@ contains
 ! ---------------------------------
 
   call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
   call MAPL_GetResource( MAPL, ndt, 'RUN_DT:', default=0, RC=STATUS )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
   DT = ndt
 
   STATE%GRID%FVgenstate => MAPL
@@ -754,7 +754,7 @@ contains
   gid = mpp_pe()
 
   call ESMF_GridCompGet(gc, grid=GRID%GRID, VM=VM, rc=STATUS)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
   call WRITE_PARALLEL(' ')
   call WRITE_PARALLEL(STATE%DT,format='("Dynamics time step : ",(F10.4))')
@@ -762,30 +762,30 @@ contains
 
 ! Get pointers to internal state vars
   call MAPL_GetPointer(internal, ak, "AK",rc=status)
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
   call MAPL_GetPointer(internal, bk, "BK",rc=status)
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
   call MAPL_GetPointer(internal, u, "U",rc=status)
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
   call MAPL_GetPointer(internal, v, "V",rc=status)
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
   call MAPL_GetPointer(internal, pt, "PT",rc=status)
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
   call MAPL_GetPointer(internal, pe, "PE",rc=status)
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
   call MAPL_GetPointer(internal, pkz, "PKZ",rc=status)
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
   call MAPL_GetPointer(internal, dz, "DZ",rc=status)
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
   call MAPL_GetPointer(internal, w, "W",rc=status)
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
   call CREATE_VARS ( FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec,     &
                      1, FV_Atm(1)%flagstruct%npz, FV_Atm(1)%flagstruct%npz+1,            &
                      U, V, PT, PE, PKZ, DZ, W, &
                      STATE%VARS )
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: CREATE_VARS', RC=STATUS )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
   GRID%IS     = FV_Atm(1)%bd%isc
   GRID%IE     = FV_Atm(1)%bd%iec
@@ -855,18 +855,18 @@ contains
        LONS          = LONS,           & ! These are in radians
        INTERNAL_ESMF_STATE=INTERNAL,   &
                              RC=STATUS )
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
   STATE%CLOCK => CLOCK
   call ESMF_TimeIntervalSet(Time2Run, &
                             S=nint(STATE%DT), rc=status)
-  _VERIFY(status)
+  VERIFY_(status)
 
   STATE%ALARMS(TIME_TO_RUN) = ESMF_AlarmCreate(name="Time2Run", clock=clock, &
                               ringInterval=Time2Run, &
-                              Enabled=.TRUE., rc=status) ; _VERIFY(status)
-  call ESMF_AlarmEnable(STATE%ALARMS(TIME_TO_RUN), rc=status); _VERIFY(status)
-  call ESMF_AlarmRingerOn(STATE%ALARMS(TIME_TO_RUN), rc=status); _VERIFY(status)
+                              Enabled=.TRUE., rc=status) ; VERIFY_(status)
+  call ESMF_AlarmEnable(STATE%ALARMS(TIME_TO_RUN), rc=status); VERIFY_(status)
+  call ESMF_AlarmRingerOn(STATE%ALARMS(TIME_TO_RUN), rc=status); VERIFY_(status)
 
   call WRITE_PARALLEL(' ')
   call WRITE_PARALLEL(STATE%DT, &
@@ -878,9 +878,9 @@ contains
   STATE%NUM_CALLS = 0
 
   call ESMF_ClockGet( CLOCK, currTime=fv_time, rc=STATUS )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
   call ESMF_TimeGet( fv_time, dayOfYear=days, s=seconds, rc=STATUS )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
   ! ---------------------------------------
   ! Create alarm for dry mass fix reporting
@@ -889,7 +889,7 @@ contains
   ! Set an interval for printing. Currently hard-coded to
   ! six hours, but could be a MAPL_GetResource value 
   call ESMF_TimeIntervalSet(MassAlarmInt, H=6, rc=STATUS)
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
   ! Create the alarm with the above interval
   MASSALARM = ESMF_AlarmCreate(CLOCK = CLOCK, &
@@ -900,10 +900,10 @@ contains
      Enabled      = .true.,                   &
      sticky       = .false.,                  &
      RC           = STATUS                    )
-  _VERIFY(STATUS) 
+  VERIFY_(STATUS) 
 
   call MAPL_GetPointer ( import, phis, 'PHIS', RC=STATUS )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
  ! Set FV3 surface geopotential
   FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=REAL8)
@@ -1036,9 +1036,9 @@ contains
   endif
 
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV Initialize', RC=STATUS )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
-  _RETURN(ESMF_SUCCESS)
+  RETURN_(ESMF_SUCCESS)
 
 end subroutine FV_InitState
 
@@ -1123,12 +1123,12 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
 ! ---------------------------------
 
   call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
   call ESMF_ClockGet( CLOCK, currTime=fv_time, rc=STATUS ) 
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
   call ESMF_TimeGet( fv_time, dayOfYear=days, s=seconds, rc=STATUS )
-  _VERIFY(STATUS)
+  VERIFY_(STATUS)
 
   time_total = days*86400. + seconds
 
@@ -1528,7 +1528,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
 
     ! Query for PSDRY from AGCM.rc and set to MAPL_PSDRY if not found
     call MAPL_GetResource( MAPL, massD0, 'PSDRY:', default=MAPL_PSDRY, RC=STATUS )
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
     FV_Atm(1)%flagstruct%dry_mass = massD0
 
     if (fv_first_run) then
@@ -1974,7 +1974,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
 
     if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
 
-    _RETURN(ESMF_SUCCESS)
+    RETURN_(ESMF_SUCCESS)
 
 end subroutine FV_Run
 

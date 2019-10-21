@@ -2,19 +2,19 @@
 
 #include "MAPL_ErrLog.h"
 
-#define DEALLOCGLOB_(A) call deallocGlob(A,status);_VERIFY(status)
+#define DEALLOCGLOB_(A) call deallocGlob(A,status);VERIFY_(status)
 
-#define DEALLOCLOCL_(A) if(associated(A)) then; deallocate(A, stat=STATUS); _VERIFY(STATUS); NULLIFY(A); endif
+#define DEALLOCLOCL_(A) if(associated(A)) then; deallocate(A, stat=STATUS); VERIFY_(STATUS); NULLIFY(A); endif
 
 #ifdef TAU_PROFILE
 #undef _ASSERT
 #define _ASSERT(A,'needs informative message')
 
-#undef _VERIFY
-#define _VERIFY(A)
+#undef VERIFY_
+#define VERIFY_(A)
 
-#undef _RETURN
-#define _RETURN(A)
+#undef RETURN_
+#define RETURN_(A)
 #endif
 
 Module CubeLatLonTransformMod
@@ -219,7 +219,7 @@ contains
     integer :: status
 
     call MAPL_SyncSharedMemory(rc=STATUS)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
     DEALLOCGLOB_(Tr%index)
     DEALLOCGLOB_(Tr%weight)
     DEALLOCGLOB_(Tr%l2c)
@@ -249,7 +249,7 @@ contains
 !     unfortunately MAPL does not destroy LocationStreams yet 
     end if
 
-    _RETURN(_SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine CubeLatLonDestroy
 
   logical function CubeLatLonIsCreated(Tr)
@@ -347,45 +347,45 @@ contains
     else
        allocate(Tr%index(3,nlon,nlat),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%weight,(/4,nlon,nlat/),rc=STATUS)
     else
        allocate(Tr%weight(4,nlon,nlat),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%l2c,(/4,npx,npy/),rc=STATUS)
     else
        allocate(Tr%l2c(4,npx,npy),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%id1,(/npx,npy/),rc=STATUS)
     else
        allocate(Tr%id1(npx,npy),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%id2,(/npx,npy/),rc=STATUS)
     else
        allocate(Tr%id2(npx,npy),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%jdc,(/npx,npy/),rc=STATUS)
     else
        allocate(Tr%jdc(npx,npy),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     allocate(Tr%elon(size(lons),size(lats),3),stat=STATUS)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if (present(local_ij)) then
       i0 = local_ij(1,1)
@@ -402,7 +402,7 @@ contains
     tr%elon_local => tr%elon(i0:i1,j0:j1,:)
 
     allocate(Tr%elat(size(lons),size(lats),3),stat=STATUS)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
     tr%elat_local => tr%elat(i0:i1,j0:j1,:)
 
     if(MAPL_ShmInitialized) then
@@ -410,42 +410,42 @@ contains
     else
        allocate(Tr%ee1(npx,npy,3),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%ee2,(/npx,npy,3/),rc=STATUS)
     else
        allocate(Tr%ee2(npx,npy,3),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%ff1,(/npx,npy,3/),rc=STATUS)
     else
        allocate(Tr%ff1(npx,npy,3),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%ff2,(/npx,npy,3/),rc=STATUS)
     else
        allocate(Tr%ff2(npx,npy,3),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%gg1,(/npx,npy,3/),rc=STATUS)
     else
        allocate(Tr%gg1(npx,npy,3),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%gg2,(/npx,npy,3/),rc=STATUS)
     else
        allocate(Tr%gg2(npx,npy,3),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
 ! Argument AmNodeRoot passed to GetWeights identifies if we're using SHMEM
 ! and then only the NodeRoot gets weights, otherwise everyone does
@@ -463,7 +463,7 @@ contains
 ! Deallocate large global vector rotation transforms
 
     call MAPL_SyncSharedMemory(rc=STATUS)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
 !    DEALLOCGLOB_(Tr%ee1)
 !    DEALLOCGLOB_(Tr%ee2)
@@ -502,7 +502,7 @@ contains
 
     Tr%Created=.true.
 
-    _RETURN(_SUCCESS)
+    RETURN_(_SUCCESS)
   end function CubeLatLonCreate
 
   subroutine CubeCubeDestroy( Tr, rc)
@@ -520,7 +520,7 @@ contains
 
     Tr%Created = .false.
 
-    _RETURN(_SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine CubeCubeDestroy
 
   logical function CubeCubeIsCreated(Tr)
@@ -578,14 +578,14 @@ contains
     else
        allocate(Tr%weight(4,npxout,npyout/6,6),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%index,(/3,npxout,npyout/6,6/),rc=STATUS)
     else
        allocate(Tr%index(3,npxout,npyout/6,6),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     ! ALT: ff1 and ff2 are allocated at the input grid resolution
     if(MAPL_ShmInitialized) then
@@ -593,14 +593,14 @@ contains
     else
        allocate(Tr%ff1(npx,npy,3),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%ff2,(/npx,npy,3/),rc=STATUS)
     else
        allocate(Tr%ff2(npx,npy,3),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     ! ALT: ee1 and ee2 are allocated at the output grid resolution
     if(MAPL_ShmInitialized) then
@@ -608,26 +608,26 @@ contains
     else
        allocate(Tr%ee1(npxout,npyout,3),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if(MAPL_ShmInitialized) then
        call MAPL_AllocNodeArray(Tr%ee2,(/npxout,npyout,3/),rc=STATUS)
     else
        allocate(Tr%ee2(npxout,npyout,3),stat=status)
     end if
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if (MAPL_AmNodeRoot .or. (.not. MAPL_ShmInitialized)) then
        call GetWeightsC2C(npx, npy, npxout, npyout, Tr%index, Tr%weight, &
             Tr%ee1, Tr%ee2, Tr%ff1, Tr%ff2)
     end if
     call MAPL_SyncSharedMemory(rc=STATUS)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
        
     Tr%Created=.true.
 
-    _RETURN(_SUCCESS)
+    RETURN_(_SUCCESS)
   end function CubeCubeCreate
 
   subroutine CubeToCube(Tr, data_cs_in, data_cs_out, rc)
@@ -652,7 +652,7 @@ contains
     !--------------------------------------------------------------------!
 
     allocate ( var_cs_in(0:nx+1,0:nx+1,ntiles),stat=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     var_cs_in=0.0
 
@@ -664,7 +664,7 @@ contains
 
     nx   = Tr%npxout
     allocate ( var_cs_out(0:nx+1,0:nx+1,ntiles),stat=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
     var_cs_out=0.0
 
     call C2CInterp(var_cs_in, var_cs_out, Tr%index, Tr%weight)
@@ -676,9 +676,9 @@ contains
     end do
        
     deallocate ( var_cs_in, var_cs_out, stat=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
-    _RETURN(_SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine CubeToCube
 
   subroutine C2CInterp(var_in, var_out, index_c2c, weight_c2c)
@@ -820,7 +820,7 @@ contains
     !--------------------------------------------------------------------!
 
     allocate ( var_cs(0:nx+1,0:nx+1,ntiles),stat=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     _ASSERT(.not. (transpose .and. present(misval)),'needs informative message')
 
@@ -847,9 +847,9 @@ contains
     end if
 
     deallocate ( var_cs ,stat=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
-    _RETURN(_SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine CubeToLatLonr8
 
   subroutine CubeToLatLonr4( Tr, data_cs, data_ll, transpose, misval, rc)
@@ -880,13 +880,13 @@ contains
     !--------------------------------------------------------------------!
 
     allocate ( var_cs(0:nx+1,0:nx+1,ntiles),stat=status )
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
     allocate ( data_ll8(size(data_ll,1),size(data_ll,2)),stat=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if (DO_CONSERVATIVE) then
        allocate ( data_cs8(size(data_cs,1),size(data_cs,2)),stat=status )
-       _VERIFY(STATUS)
+       VERIFY_(STATUS)
     endif
 
     _ASSERT(.not. (transpose .and. present(misval)),'needs informative message')
@@ -936,7 +936,7 @@ contains
 
     deallocate ( var_cs, data_ll8 )
 
-    _RETURN(_SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine CubeToLatLonr4
 
   subroutine LatLonToCuber8( Tr, data_ll, data_cs, transpose, misval, rc)
@@ -963,7 +963,7 @@ contains
     !--------------------------------------------------------------------!
 
     allocate ( var_cs(0:nx+1,0:nx+1,ntiles),stat=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     var_cs=0.
 
@@ -988,9 +988,9 @@ contains
     end if
 
     deallocate ( var_cs ,STAT=STATUS)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
-    _RETURN(_SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine LatLonToCuber8
 
   subroutine LatLonToCuber4( Tr, data_ll, data_cs, transpose, misval, rc)
@@ -1017,13 +1017,13 @@ contains
     nx   = Tr%npx
 
     allocate ( data_ll8(size(data_ll,1),size(data_ll,2)),stat=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
     allocate ( data_cs8(0:nx+1,0:nx+1,ntiles),stat=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if (DO_CONSERVATIVE) then   !JK for conservative interp--------------
       allocate ( cs8_data(size(data_cs,1),size(data_cs,2)),stat=status )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
     endif
 
     !--------------------------------------------------------------------!
@@ -1085,7 +1085,7 @@ contains
     deallocate ( data_cs8 )
     deallocate ( data_ll8 )
 
-    _RETURN(_SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine LatLonToCuber4
 
   subroutine C2LInterp(cubsph, latlon, index, weight, misval, subset, transpose)
@@ -1473,7 +1473,7 @@ contains
        end where
     end do
 
-    _RETURN(ESMF_SUCCESS)
+    RETURN_(ESMF_SUCCESS)
   end subroutine SphericalToCartesianR4
 
   subroutine SphericalToCartesianREAL64(Tr, U, V, Uxyz, Transpose, SphIsLL, Rotate, RC)
@@ -1546,7 +1546,7 @@ contains
        end where
     end do
 
-    _RETURN(ESMF_SUCCESS)
+    RETURN_(ESMF_SUCCESS)
   end subroutine SphericalToCartesianREAL64
 
   subroutine CartesianToSphericalR4(Tr, Uxyz, U, V, Transpose, SphIsLL, Rotate, RC)
@@ -1624,7 +1624,7 @@ contains
        end where
     end do
 
-    _RETURN(ESMF_SUCCESS)
+    RETURN_(ESMF_SUCCESS)
   end subroutine CartesianToSphericalR4
 
   subroutine CartesianToSphericalREAL64(Tr, Uxyz, U, V, Transpose, SphIsLL, Rotate, RC)
@@ -1702,7 +1702,7 @@ contains
        end where
     end do
 
-    _RETURN(ESMF_SUCCESS)
+    RETURN_(ESMF_SUCCESS)
   end subroutine CartesianToSphericalREAL64
 
 ! create LS and grindIn
@@ -1724,37 +1724,37 @@ contains
 
 
     call ESMF_GridGet(GridIn, DistGrid=distgrid, rc=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
     call ESMF_DistGridGet(distGRID, deLayout=layout, RC=STATUS)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
     call MAPL_LocStreamCreate(locStIn, LAYOUT=layout, FILENAME=TILINGFILE, &
                               NAME='LocStIn',                           &
                               grid=GridIn, RC=STATUS)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
     call MAPL_LocStreamCreate(locStOut, LAYOUT=layout, FILENAME=TILINGFILE, &
                               NAME='LocStOut',                           &
                               grid=GridOut, RC=STATUS)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
    call MAPL_LocStreamCreateXform ( XFORM=TR%XFORMinout, &
                                     LocStreamOut=locStOut, &
                                     LocStreamIn=locstIn, &
                                     NAME='XFORM_InOut', &
                                     RC=STATUS )
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    call MAPL_LocStreamCreateXform ( XFORM=TR%XFORMoutin, &
                                     LocStreamOut=locStIn, &
                                     LocStreamIn=locstOut, &
                                     NAME='XFORM_OutIn', &
                                     RC=STATUS )
-   _VERIFY(STATUS)
+   VERIFY_(STATUS)
 
    TR%lsCreated = .true.
    TR%locStIn = locStIn
    TR%locStOut = locStOut
 
-   _RETURN(ESMF_SUCCESS)
+   RETURN_(ESMF_SUCCESS)
   end subroutine MAPL_RegridLSCreate
 
 
@@ -1781,45 +1781,45 @@ contains
 
 ! query ntiles
     call MAPL_LocStreamGet(LS_In, NT_LOCAL = ntiles_in, rc=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
     call MAPL_LocStreamGet(LS_Out, NT_LOCAL = ntiles_out, rc=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     allocate(tile_in (ntiles_in ), stat=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
     allocate(tile_out(ntiles_out), stat=status)
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
     if (.not.transpose) then
 ! forward run
 ! G2T
        call MAPL_LocStreamTransform(LS_IN, TILE_IN, PTR2d_IN, RC=STATUS)
-       _VERIFY(STATUS)
+       VERIFY_(STATUS)
 ! T2T
        call MAPL_LocStreamTransform(tile_out, XFORM, tile_in, RC=STATUS ) 
-       _VERIFY(STATUS)
+       VERIFY_(STATUS)
 ! T2G
        call MAPL_LocStreamTransform(LS_OUT, PTR2d_OUT, TILE_OUT, RC=STATUS)
-       _VERIFY(STATUS)
+       VERIFY_(STATUS)
     else 
 ! adjoint run
 ! T2G adj
        call MAPL_LocStreamTransform(LS_IN, PTR2d_IN, TILE_IN, &
             TRANSPOSE=transpose, RC=STATUS)
-       _VERIFY(STATUS)
+       VERIFY_(STATUS)
 ! T2T adj
        call MAPL_LocStreamTransform(tile_out, XFORM, tile_in, RC=STATUS ) 
-       _VERIFY(STATUS)
+       VERIFY_(STATUS)
 ! G2T adj
        call MAPL_LocStreamTransform(LS_OUT, TILE_OUT, PTR2d_OUT, &
             TRANSPOSE=transpose, RC=STATUS)
-       _VERIFY(STATUS)
+       VERIFY_(STATUS)
     endif
 
     deallocate(tile_out)
     deallocate(tile_in )
 
-    _RETURN(ESMF_SUCCESS)
+    RETURN_(ESMF_SUCCESS)
   end subroutine RunTileTransform
 
   subroutine TileTransformTranspose(TR, RC)
@@ -1839,7 +1839,7 @@ contains
     TR%xformInOut = TR%xformOutIn
     TR%xformOutIn = xform
 
-    _RETURN(ESMF_SUCCESS)
+    RETURN_(ESMF_SUCCESS)
   end subroutine TileTransformTranspose
 
 subroutine LToC_interp(CS_data, LL_data, NT_Tiles, nlat, nlon, nxg, nyg)

@@ -138,7 +138,7 @@ contains
       ! ---------------------------------------
     
       call ESMF_GridCompGet( GC, NAME=COMP_NAME, vm=vm, RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       Iam = trim(COMP_NAME) // 'SetServices'
 
 !BOS
@@ -152,7 +152,7 @@ contains
          PRECISION  = ESMF_KIND_R8,                                &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-     _VERIFY(STATUS)
+     VERIFY_(STATUS)
 
     call MAPL_AddImportSpec ( gc,                                  &
          SHORT_NAME = 'MFY',                                       &
@@ -161,7 +161,7 @@ contains
          PRECISION  = ESMF_KIND_R8,                                &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-     _VERIFY(STATUS)
+     VERIFY_(STATUS)
 
     call MAPL_AddImportSpec ( gc,                                  &
          SHORT_NAME = 'CX',                                        &
@@ -170,7 +170,7 @@ contains
          PRECISION  = ESMF_KIND_R8,                                &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-     _VERIFY(STATUS)
+     VERIFY_(STATUS)
 
     call MAPL_AddImportSpec ( gc,                                  &
          SHORT_NAME = 'CY',                                        &
@@ -179,7 +179,7 @@ contains
          PRECISION  = ESMF_KIND_R8,                                &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-     _VERIFY(STATUS)
+     VERIFY_(STATUS)
 
     call MAPL_AddImportSpec ( gc,                                  &
          SHORT_NAME = 'PLE0',                                      &
@@ -188,7 +188,7 @@ contains
          PRECISION  = ESMF_KIND_R8,                                &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationEdge,             RC=STATUS  )
-     _VERIFY(STATUS)
+     VERIFY_(STATUS)
 
     call MAPL_AddImportSpec ( gc,                                  &
          SHORT_NAME = 'PLE1',                                      &
@@ -197,7 +197,7 @@ contains
          PRECISION  = ESMF_KIND_R8,                                &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationEdge,             RC=STATUS  )
-     _VERIFY(STATUS)
+     VERIFY_(STATUS)
 
     call MAPL_AddImportSpec( gc,                              &
         SHORT_NAME = 'TRADV',                                        &
@@ -205,7 +205,7 @@ contains
         UNITS      = 'unknown',                                    &
         DATATYPE   = MAPL_BundleItem,               &
         RC=STATUS  )
-    _VERIFY(STATUS)
+    VERIFY_(STATUS)
 
   !EXPORT STATE:
      call MAPL_AddExportSpec ( gc,                                  &
@@ -214,7 +214,7 @@ contains
           UNITS      = 'm+2'  ,                                     &
           DIMS       = MAPL_DimsHorzOnly,                           &
           VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
-     _VERIFY(STATUS)
+     VERIFY_(STATUS)
  
 
 ! 3D Tracers
@@ -226,7 +226,7 @@ contains
              UNITS      = '1',                                    &
              DIMS       = MAPL_DimsHorzVert,                      &
              VLOCATION  = MAPL_VLocationCenter,               RC=STATUS  )
-        _VERIFY(STATUS)
+        VERIFY_(STATUS)
      enddo
 
 !EOS
@@ -234,43 +234,43 @@ contains
       ! Set the Profiling timers
       !-------------------------
       call MAPL_TimerAdd(GC,    name="INITIALIZE"  ,RC=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call MAPL_TimerAdd(GC,    name="RUN"         ,RC=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call MAPL_TimerAdd(GC,    name="FINALIZE"    ,RC=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call MAPL_TimerAdd(GC,    name="TOTAL"       ,RC=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 
 
 ! Register methods with MAPL
 ! --------------------------
 
       call MAPL_GridCompSetEntryPoint ( GC, ESMF_METHOD_INITIALIZE,  Initialize, RC=status )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call MAPL_GridCompSetEntryPoint ( GC, ESMF_METHOD_RUN,          Run,       RC=status )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_FINALIZE,     Finalize,  RC=status)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 
       ! Check if AdvCore is running without FV3_DynCoreIsRunning, if yes then setup the MAPL Grid 
       ! ----------------------------------------------------------------------------
       call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call MAPL_GetResource(MAPL, DYCORE, 'DYCORE:', default="", RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call MAPL_GetResource(MAPL, AdvCore_Advection , label='AdvCore_Advection:', &
                                   default=AdvCore_Advection, RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       if(adjustl(DYCORE)=="FV3") FV3_DynCoreIsRunning = .true.
       if(adjustl(DYCORE)=="FV3+ADV") FV3_DynCoreIsRunning = .true.
 
       ! Start up FMS/MPP
       !-------------------------------------------
       call ESMF_VMGet(VM,mpiCommunicator=comm,rc=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call fms_init(comm)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 
       if (.NOT. FV3_DynCoreIsRunning) then
       ! Make sure FV3 is setup
@@ -280,10 +280,10 @@ contains
       ! Get Domain decomposition
       !-------------------------
          call MAPL_GetResource( MAPL, nx, 'NX:', default=0, RC=STATUS )
-         _VERIFY(STATUS)
+         VERIFY_(STATUS)
          FV_Atm(1)%layout(1) = nx
          call MAPL_GetResource( MAPL, ny, 'NY:', default=0, RC=STATUS )
-         _VERIFY(STATUS)
+         VERIFY_(STATUS)
          if (FV_Atm(1)%flagstruct%grid_type == 4) then
             FV_Atm(1)%layout(2) = ny
          else
@@ -293,11 +293,11 @@ contains
       !---------------------------
       ! FV grid dimensions setup from MAPL
          call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'IM:', default= 32, RC=STATUS )
-         _VERIFY(STATUS)
+         VERIFY_(STATUS)
          call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npy, 'JM:', default=192, RC=STATUS )
-         _VERIFY(STATUS)
+         VERIFY_(STATUS)
          call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'LM:', default= 72, RC=STATUS )
-         _VERIFY(STATUS)
+         VERIFY_(STATUS)
       ! FV likes npx;npy in terms of cell vertices
          if (FV_Atm(1)%flagstruct%npy == 6*FV_Atm(1)%flagstruct%npx) then
             FV_Atm(1)%flagstruct%ntiles = 6
@@ -311,7 +311,7 @@ contains
       endif
 
       call MAPL_GetResource( MAPL, ndt, 'RUN_DT:', default=0, RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       DT = ndt
 
       ! Start up FV if AdvCore is running without FV3_DynCoreIsRunning
@@ -323,9 +323,9 @@ contains
       ! Ending with a Generic SetServices call is a MAPL requirement 
       !-------------------------------------------------------------
       call MAPL_GenericSetServices    ( GC, rc=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 
-      _RETURN(ESMF_SUCCESS)
+      RETURN_(ESMF_SUCCESS)
 
       end subroutine SetServices
 
@@ -375,20 +375,20 @@ contains
 
       Iam = "Initialize"
       call ESMF_GridCompGet ( GC, name=COMP_NAME, config=CF, vm=VM, RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       Iam = trim(COMP_NAME) // trim(Iam)
 
       ! Retrieve the pointer to the state
       ! ---------------------------------
       call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 
       call MAPL_TimerOn(MAPL,"TOTAL")
       call MAPL_TimerOn(MAPL,"INITIALIZE")
 
       gridCreated=.false.
       call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call ESMF_GridCompGet(GC,grid=grid,rc=status)
       if (status == ESMF_SUCCESS) then
          call ESMF_GridValidate(grid,rc=status)
@@ -397,11 +397,11 @@ contains
 
       if (.not.GridCreated) then
          call MAPL_GridCreate(GC, rc=status)
-         _VERIFY(STATUS)
+         VERIFY_(STATUS)
       endif
 
       call MAPL_GenericInitialize(GC, IMPORT, EXPORT, CLOCK, RC=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       ! Compute Grid-Cell Area
       ! ----------------------
       if (.NOT. FV3_DynCoreIsRunning) then
@@ -410,14 +410,14 @@ contains
          JS = FV_Atm(1)%bd%jsc
          JE = FV_Atm(1)%bd%jec
          call MAPL_GetPointer(EXPORT, temp2d, 'AREA', ALLOC=.TRUE., rc=status)
-         _VERIFY(STATUS)
+         VERIFY_(STATUS)
          temp2d = FV_Atm(1)%gridstruct%area(IS:IE,JS:JE)
       endif
 
       call MAPL_TimerOff(MAPL,"INITIALIZE")
       call MAPL_TimerOff(MAPL,"TOTAL")
 
-      _RETURN(ESMF_SUCCESS)
+      RETURN_(ESMF_SUCCESS)
 
       end subroutine Initialize
 !EOC
@@ -512,7 +512,7 @@ contains
 
       Iam = 'Run'
       call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       Iam = trim(COMP_NAME) // Iam
 
 !WMP  if (AdvCore_Advection>0) then
@@ -520,11 +520,11 @@ contains
 ! Get parameters from generic state.
 !-----------------------------------
       call MAPL_GetObjectFromGC ( GC, MAPL, RC=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call MAPL_Get( MAPL, IM=IM, JM=JM, LM=LM,   &
                                 RUNALARM = ALARM, &
                                       RC = STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 
       call MAPL_TimerOn(MAPL,"TOTAL")
       call MAPL_TimerOn(MAPL,"RUN")
@@ -532,13 +532,13 @@ contains
 ! Get AKs and BKs for vertical grid
 !----------------------------------
       AllOCATE( AK(LM+1) ,stat=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       AllOCATE( BK(LM+1) ,stat=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       AllOCATE( AK_r8(LM+1) ,stat=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       AllOCATE( BK_r8(LM+1) ,stat=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       call set_eta(LM,LS,ptop_r8,pint_r8,ak_r8,bk_r8)
       ptop=ptop_r8
       pint=pint_r8
@@ -546,17 +546,17 @@ contains
       bk=bk_r8
 
       CALL MAPL_GetPointer(IMPORT, iPLE0, 'PLE0', ALLOC = .TRUE., RC=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       CALL MAPL_GetPointer(IMPORT, iPLE1, 'PLE1', ALLOC = .TRUE., RC=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       CALL MAPL_GetPointer(IMPORT, iMFX,   'MFX', ALLOC = .TRUE., RC=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       CALL MAPL_GetPointer(IMPORT, iMFY,   'MFY', ALLOC = .TRUE., RC=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       CALL MAPL_GetPointer(IMPORT, iCX,     'CX', ALLOC = .TRUE., RC=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       CALL MAPL_GetPointer(IMPORT, iCY,     'CY', ALLOC = .TRUE., RC=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 
       ALLOCATE( PLE0(IM,JM,LM+1) )
       ALLOCATE( PLE1(IM,JM,LM+1) )
@@ -577,7 +577,7 @@ contains
       !--------------------------------------------------------------
 
       call ESMF_StateGet(IMPORT, "TRADV", TRADV, rc=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 
       !-------------------------------------------------------------------
       ! ALT: this section attempts to limit the amount of advected tracers
@@ -586,7 +586,7 @@ contains
       call MAPL_GetResource ( MAPL, adjustTracerMode, &
            'EXCLUDE_ADVECTION_TRACERS:', &
            default='ALWAYS', rc=status )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       if (adjustTracerMode == 'ALWAYS') then
          adjustTracers = .true.
       else if (adjustTracerMode == 'PREDICTOR') then
@@ -612,39 +612,39 @@ contains
 
                tend  = .false.
                allocate(xlist(XLIST_MAX), stat=status)
-               _VERIFY(STATUS)
+               VERIFY_(STATUS)
                do while (.not.tend)
                   call ESMF_ConfigGetAttribute (CF,value=tmpstring,default='',rc=STATUS) !ALT: we don't check return status!!!
                   if (tmpstring /= '')  then
                      n = n + 1
                      if (n > size(xlist)) then
                         allocate( biggerlist(2*n), stat=status )
-                        _VERIFY(STATUS)
+                        VERIFY_(STATUS)
                         biggerlist(1:n-1)=xlist
                         call move_alloc(from=biggerlist, to=xlist)
                      end if
                      xlist(n) = tmpstring
                   end if
                   call ESMF_ConfigNextLine(CF,tableEnd=tend,rc=STATUS )
-                  _VERIFY(STATUS)
+                  VERIFY_(STATUS)
                enddo
             end if
 
             ! Count the number of tracers
             !---------------------
             call ESMF_FieldBundleGet(TRADV, grid=bgrid,fieldCount=nqt,  RC=STATUS)
-            _VERIFY(STATUS)
+            VERIFY_(STATUS)
             BundleAdv = ESMF_FieldBundleCreate ( name='xTRADV', rc=STATUS )
-            _VERIFY(STATUS)
+            VERIFY_(STATUS)
             call ESMF_FieldBundleSet ( BundleAdv, grid=bgrid, rc=STATUS )
-            _VERIFY(STATUS)
+            VERIFY_(STATUS)
             !loop over NQ in TRADV
             do i = 1, nqt
                !get field from TRADV and its name
                call ESMF_FieldBundleGet(TRADV, fieldIndex=i, field=field, rc=status)
-               _VERIFY(STATUS)
+               VERIFY_(STATUS)
                call ESMF_FieldGet(FIELD, name=fieldname, RC=STATUS)
-               _VERIFY(STATUS)
+               VERIFY_(STATUS)
                !exclude everything that is not cloud/water species
                if ( (FV3_DynCoreIsRunning      ) .and. &
                    ( (TRIM(fieldname) == 'Q'       ) .or. &
@@ -664,7 +664,7 @@ contains
                      n = n + 1
                      if (n > size(xlist)) then
                         allocate( biggerlist(2*n), stat=status )
-                        _VERIFY(STATUS)
+                        VERIFY_(STATUS)
                         biggerlist(1:n-1)=xlist
                         call move_alloc(from=biggerlist, to=xlist)
                      end if
@@ -680,7 +680,7 @@ contains
                end do
                if (.not. exclude) then
                   call MAPL_FieldBundleAdd(BundleAdv, FIELD, RC=STATUS)
-                  _VERIFY(STATUS)
+                  VERIFY_(STATUS)
                end if
             end do
 
@@ -689,7 +689,7 @@ contains
            !   if (n > 0) then
            !      call ESMF_FieldBundleRemove(TRADV, fieldNameList=xlist, &
            !         relaxedFlag=.true., rc=status)
-           !      _VERIFY(STATUS)
+           !      VERIFY_(STATUS)
            !   end if
                deallocate(xlist)
             end if
@@ -699,15 +699,15 @@ contains
       end if ! adjustTracers
 
       call ESMF_FieldBundleGet(TRADV, fieldCount=NQ,    rc=STATUS)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 
       if (NQ > 0) then
          ! We allocate a list of tracers big enough to hold all items in the bundle
          !-------------------------------------------------------------------------
          ALLOCATE( TRACERS(IM,JM,LM,NQ),stat=STATUS )
-         _VERIFY(STATUS)
+         VERIFY_(STATUS)
          ALLOCATE( advTracers(NQ),stat=STATUS )
-         _VERIFY(STATUS)
+         VERIFY_(STATUS)
 
          if (NQ /= NQ_SAVED) then
             write(STRING,'(A,I5,A)') "AdvCore is Advecting the following ", nq, " tracers in FV3:"
@@ -718,11 +718,11 @@ contains
          !-------------------------------------------------------------------------
          do N=1,NQ
             call ESMF_FieldBundleGet (TRADV, fieldIndex=N, field=FIELD, RC=STATUS)
-            _VERIFY(STATUS)
+            VERIFY_(STATUS)
             call ESMF_FieldGet  (field, array=array, name=fieldName, RC=STATUS)
-            _VERIFY(STATUS)
+            VERIFY_(STATUS)
             call ESMF_ArrayGet(array,typekind=kind, rc=status )
-            _VERIFY(STATUS)
+            VERIFY_(STATUS)
             advTracers(N)%is_r4 = (kind == ESMF_TYPEKIND_R4)   ! Is real*4?
             advTracers(N)%tName = fieldName
 
@@ -732,12 +732,12 @@ contains
 
             if (advTracers(N)%is_r4) then
                call ESMF_ArrayGet(array,farrayptr=tracer_r4, rc=status )
-               _VERIFY(STATUS)
+               VERIFY_(STATUS)
                advTracers(N)%content_r4 => tracer_r4
                TRACERS(:,:,:,N) = advTracers(N)%content_r4
             else
                call ESMF_ArrayGet(array,farrayptr=tracer_r8, rc=status )
-               _VERIFY(STATUS)
+               VERIFY_(STATUS)
                advTracers(N)%content => tracer_r8
                TRACERS(:,:,:,N) = advTracers(N)%content
             end if
@@ -813,7 +813,7 @@ contains
 ! Fill Export States
             write(myTracer, "('TEST_TRACER',i1.1)") N-1
             call MAPL_GetPointer(EXPORT, temp3D, TRIM(myTracer), rc=status)
-            _VERIFY(STATUS)
+            VERIFY_(STATUS)
             if ((associated(temp3D)) .and. (N<=ntracers)) then
                temp3D = TRACERS(:,:,:,N)
             endif
@@ -822,16 +822,16 @@ contains
          ! Deallocate the list of tracers
          !-------------------------------------------------------------------------
          DEALLOCATE( TRACERS,stat=STATUS )
-         _VERIFY(STATUS)
+         VERIFY_(STATUS)
 
       end if ! NQ > 0
 
       deallocate( advTracers, stat=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       DEALLOCATE( AK ,stat=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       DEALLOCATE( BK ,stat=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 
       DEALLOCATE( PLE0 )
       DEALLOCATE( PLE1 )
@@ -845,7 +845,7 @@ contains
 
 !WMP  end if ! AdvCore_Advection
 
-      _RETURN(ESMF_SUCCESS)
+      RETURN_(ESMF_SUCCESS)
 
       end subroutine Run
 !EOC
@@ -885,7 +885,7 @@ contains
 
       Iam = 'Finalize'
       call ESMF_GridCompGet( GC, NAME=COMP_NAME, RC=STATUS )
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
       Iam = trim(COMP_NAME) // TRIM(Iam)
 
       ! Clean up FV if AdvCore is running without FV3_DynCoreIsRunning
@@ -895,9 +895,9 @@ contains
       endif
 
       call MAPL_GenericFinalize(GC, IMPORT, EXPORT, CLOCK, RC)
-      _VERIFY(STATUS)
+      VERIFY_(STATUS)
 
-      _RETURN(ESMF_SUCCESS)
+      RETURN_(ESMF_SUCCESS)
       end subroutine Finalize
 
 
