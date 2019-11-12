@@ -3556,17 +3556,27 @@ end subroutine fv_getDivergence
 subroutine fv_getUpdraftHelicity(uh25)
    use constants_mod, only: fms_grav=>grav
    use fv_diagnostics_mod, only: get_vorticity, updraft_helicity
-   real(FVPRC), intent(OUT) :: uh25(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+   real(REAL4), intent(OUT) :: uh25(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+   real(FVPRC) :: uh25_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
    integer :: sphum=1
    real(FVPRC) :: vort(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,FV_Atm(1)%npz)
+   real(FVPRC) :: z_bot, z_top
+
+   z_bot = 2.e3
+   z_top = 5.e3
    call get_vorticity(FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, &
                       FV_Atm(1)%bd%isd, FV_Atm(1)%bd%ied, FV_Atm(1)%bd%jsd, FV_Atm(1)%bd%jed, &
                       FV_Atm(1)%npz, FV_Atm(1)%u, FV_Atm(1)%v, vort, &
                       FV_Atm(1)%gridstruct%dx, FV_Atm(1)%gridstruct%dy, FV_Atm(1)%gridstruct%rarea)
+
+! call this with uh25_tmp which is of FVPRC
    call updraft_helicity(FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, FV_Atm(1)%ng, FV_Atm(1)%npz, &
-                     zvir, sphum, uh25, &
+                     zvir, sphum, uh25_tmp, &
                      FV_Atm(1)%w, vort, FV_Atm(1)%delz, FV_Atm(1)%q,   &
-                     FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, 2.e3, 5.e3)
+                     FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
+
+! cast back to r4
+   uh25 = uh25_tmp
 end subroutine fv_getUpdraftHelicity
 
 subroutine fv_getEPV(pt, vort, ua, va, epv)
