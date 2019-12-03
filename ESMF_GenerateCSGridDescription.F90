@@ -7,7 +7,7 @@
 ! ESMF Framework module
     use NetCDF
     use ESMF
-    use MAPL_Mod
+    use MAPL
     use fv_grid_utils_mod, only: gnomonic_grids, cell_center2,get_area, direct_transform
     use fv_grid_tools_mod, only: mirror_grid
     use, intrinsic :: iso_fortran_env, only: REAL64,REAL32

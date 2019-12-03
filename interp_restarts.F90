@@ -21,14 +21,8 @@ program interp_restarts
 ! use fv_eta_mod,     only: set_eta
    use m_set_eta,     only: set_eta
    use memutils_mod, only: print_memuse_stats
-   use MAPL_IOMod
-   use MAPL_ShmemMod
-   use MAPL_ConstantsMod
+   use MAPL
    use rs_scaleMod
-   use MAPL_GridManagerMod
-   use MAPL_RegridderManagerMod
-   use MAPL_CubedSphereGridFactoryMod
-   use pFIO
 
    implicit none
 

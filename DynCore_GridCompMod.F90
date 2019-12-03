@@ -18,7 +18,7 @@
 ! !USES:
 
    use ESMF                ! ESMF base class
-   use MAPL_Mod            ! GEOS base class
+   use MAPL                ! GEOS base class
    use m_set_eta,       only: set_eta
 
 ! FV Specific Module
@@ -55,10 +55,6 @@
                            fv_getUpdraftHelicity,                    &
                            ADIABATIC, SW_DYNAMICS, AdvCore_Advection
    use m_topo_remap, only: dyn_topo_remap
-   use MAPL_GridManagerMod
-   use MAPL_RegridderManagerMod
-   use MAPL_AbstractRegridderMod
-   use MAPL_RegridderSpecMod
    use CubeGridPrototype, only: register_grid_and_regridders
 
 ! !PUBLIC MEMBER FUNCTIONS:

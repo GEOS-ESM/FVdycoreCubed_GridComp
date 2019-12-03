@@ -1,7 +1,5 @@
       program  main
-      use MAPL_IOMod
-      use MAPL_ConstantsMod, only: MAPL_PSDRY
-      use pFIO
+      use MAPL
       implicit none
 
 ! ************************************************************************

@@ -8,7 +8,7 @@ module FV_StateMod
 ! !USES:
 #if defined( MAPL_MODE )
    use ESMF                ! ESMF base class
-   use MAPL_Mod            ! MAPL base class
+   use MAPL                ! MAPL base class
 #endif
 
    use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS, &

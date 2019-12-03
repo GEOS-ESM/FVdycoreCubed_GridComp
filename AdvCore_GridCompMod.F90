@@ -56,7 +56,7 @@ module AdvCore_GridCompMod
 ! !USES:
 
       use ESMF
-      use MAPL_Mod
+      use MAPL
       use m_set_eta,       only: set_eta
       use fv_arrays_mod,   only: fv_atmos_type, FVPRC, REAL4, REAL8
       use fms_mod,         only: fms_init, set_domain, nullify_domain

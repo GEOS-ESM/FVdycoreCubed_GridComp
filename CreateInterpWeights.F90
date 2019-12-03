@@ -4,7 +4,7 @@ program CreateInterpWeights
   !--------------------------------------------------------------------!
   ! purpose: driver for MPI-IO test module                             !
   !--------------------------------------------------------------------!
-  use MAPL_Mod
+  use MAPL
   use CreateInterpWeights_GridCompMod,      only: SetServices
 
   implicit none

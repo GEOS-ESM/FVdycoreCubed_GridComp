@@ -17,12 +17,8 @@
 module CubedSphereGridFactoryMod
    use fv_grid_utils_mod, only: gnomonic_grids, cell_center2
    use fv_grid_tools_mod, only: mirror_grid
-   use MAPL_AbstractGridFactoryMod
-   use MAPL_MinMaxMod
-   use MAPL_KeywordEnforcerMod
+   use MAPL
    use ESMF
-   use MAPL_CommsMod
-   use MAPL_IOMod, only : GETFILE, FREE_FILE 
    use fms_mod, only: fms_init
    use mpp_domains_mod,   only: domain2d, mpp_update_domains
    use mpp_mod,           only: mpp_error, FATAL, NOTE
@@ -473,7 +469,7 @@ contains
 
 
    subroutine check_and_fill_consistency(this, unusable, rc)
-      use MAPL_BaseMod, only: MAPL_DecomposeDim
+      use MAPL, only: MAPL_DecomposeDim
       class (CubedSphereGridFactory), intent(inout) :: this
       class (KeywordEnforcer), optional, intent(in) :: unusable
       integer, optional, intent(out) :: rc

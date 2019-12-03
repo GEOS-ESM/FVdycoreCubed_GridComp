@@ -3,7 +3,7 @@ subroutine cube2latlon(npx, npy, nlon, nlat, data_cs, data_ll)
 #define REAL8 8
 
  use ESMF
- use MAPL_Mod, only : MAPL_UNDEF
+ use MAPL, only : MAPL_UNDEF
  use MAPL_IOMod, only : GETFILEUNIT, FREE_FILE
  use CUB2LATLON_mod,    only : init_latlon_grid, &
                            read_c2l_weight,  write_c2l_weight,         &

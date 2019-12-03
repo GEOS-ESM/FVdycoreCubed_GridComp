@@ -14,7 +14,7 @@
 program gmao_regrid
 
   use ESMF
-  use MAPL_Mod
+  use MAPL
   use, intrinsic :: iso_fortran_env
 
   implicit none
@@ -384,7 +384,7 @@ program gmao_regrid
 
     subroutine GuessFileType(filename, filetype, rc)
       use ESMF
-      use MAPL_Mod
+      use MAPL
 
       implicit none
 
@@ -457,8 +457,7 @@ program gmao_regrid
 
     subroutine GetGridInfo(gi, filetype, filename, ncinfo, rc)
       use ESMF
-      use MAPL_Mod
-      use MAPL_IOMod
+      use MAPL
 
       implicit none
 

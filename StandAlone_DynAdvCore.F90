@@ -3,7 +3,7 @@
 #include "MAPL_Generic.h"
 
 program StandAlone_DynAdvCore
-   use MAPL_Mod
+   use MAPL
   use StandAlone_DynAdvCore_GridCompMod, only: SetServices
    use MPI
 
