@@ -16,7 +16,7 @@ set (srcs
   CubeGridPrototype.F90
   )
 
-set(dependencies MAPL GMAO_hermes GEOS_Shared)
+set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared)
 
 if (FV_PRECISION STREQUAL R4)
    set (GFDL fms_r4)

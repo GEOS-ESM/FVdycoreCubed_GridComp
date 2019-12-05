@@ -22,6 +22,8 @@ program interp_restarts
    use m_set_eta,     only: set_eta
    use memutils_mod, only: print_memuse_stats
    use MAPL
+   use gFTL_StringVector
+   use gFTL_StringIntegerMap
    use rs_scaleMod
 
    implicit none
