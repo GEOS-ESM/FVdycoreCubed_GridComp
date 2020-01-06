@@ -3556,10 +3556,14 @@ end subroutine fv_getDivergence
 subroutine fv_getUpdraftHelicity(uh25)
    use constants_mod, only: fms_grav=>grav
    use fv_diagnostics_mod, only: get_vorticity, updraft_helicity
+! made this REAL4
    real(REAL4), intent(OUT) :: uh25(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+
+! made an intermediate output of FVPRC
    real(FVPRC) :: uh25_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
    integer :: sphum=1
    real(FVPRC) :: vort(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,FV_Atm(1)%npz)
+   ! introduced these two variables for the literals
    real(FVPRC) :: z_bot, z_top
 
    z_bot = 2.e3
