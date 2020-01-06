@@ -20,7 +20,7 @@
    Program c2l_CFIO_offline
 
    use ESMF
-   use MAPL_Mod
+   use MAPL
 
    implicit NONE
 

@@ -4,10 +4,8 @@
 #define _RC rc=status); _VERIFY(status
 
 program StandAlone_FV3_Dycore
-   use MAPL_Mod
+   use MAPL
    use FVdycoreCubed_GridComp,      only: SetServices
-   use MAPL_CapOptionsMod
-   use MAPL_FlapCapOptionsMod
    implicit none
 
 !EOP

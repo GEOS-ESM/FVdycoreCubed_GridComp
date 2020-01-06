@@ -50,9 +50,7 @@
          ee1, ee2, ff1, ff2, gg1, gg2, e1, e2, f1, f2, g1, g2, sublons, sublats, AmNodeRoot, WriteNetcdf) 
 #include "MAPL_Generic.h"
 
-      use MAPL_BaseMod
-      use MAPL_GenericMod
-      use MAPL_ShmemMod
+      use MAPL
       use fv_grid_utils_mod, only : gnomonic_grids, cell_center2, mid_pt_sphere
       use fv_grid_tools_mod, only : mirror_grid
       use fv_grid_tools_mod, only : get_unit_vector
@@ -368,7 +366,7 @@
       if(.not. allocated(FV_Atm)) return
 
       call MAPL_SyncSharedMemory(rc=STATUS)
-      VERIFY_(STATUS)
+      _VERIFY(STATUS)
       allocate(e1(is:ie,js:je,3))
       allocate(e2(is:ie,js:je,3))
       allocate(f1(is:ie,js:je,3))

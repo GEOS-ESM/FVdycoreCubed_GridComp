@@ -1,17 +1,14 @@
 !  $Id$
 
-#define SUCCESS 0
-#define VERIFY_(A) if((A)/=0) then; if(present(rc)) rc=A; PRINT *, Iam, __LINE__; return; endif
-#define ASSERT_(A) if(.not.(A)) then; if(present(rc)) rc=1; PRINT *, Iam, __LINE__; return; endif
-#define RETURN_(A) if(present(rc)) rc=A; return
+#include "MAPL_ErrLog.h"
 
 #define DEALLOCGLOB_(A) call deallocGlob(A,status);VERIFY_(status)
 
 #define DEALLOCLOCL_(A) if(associated(A)) then; deallocate(A, stat=STATUS); VERIFY_(STATUS); NULLIFY(A); endif
 
 #ifdef TAU_PROFILE
-#undef ASSERT_
-#define ASSERT_(A)
+#undef _ASSERT
+#define _ASSERT(A,'needs informative message')
 
 #undef VERIFY_
 #define VERIFY_(A)
@@ -23,11 +20,7 @@
 Module CubeLatLonTransformMod
   
   use ESMF
-  use MAPL_BaseMod
-  use MAPL_LocStreamMod
-  use MAPL_IOMod
-  use MAPL_CommsMod
-  use MAPL_ShmemMod
+  use MAPL
   use, intrinsic :: iso_fortran_env, only: REAL64
 
   implicit none
@@ -251,7 +244,7 @@ contains
 !     unfortunately MAPL does not destroy LocationStreams yet 
     end if
 
-    RETURN_(SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine CubeLatLonDestroy
 
   logical function CubeLatLonIsCreated(Tr)
@@ -313,7 +306,7 @@ contains
 ! Begin
 !------
 
-    ASSERT_(.not.Tr%Created)
+    _ASSERT(.not.Tr%Created,'needs informative message')
 
     npts = npx + 1
 
@@ -344,28 +337,46 @@ contains
     DEALLOCLOCL_(Tr%g1)
     DEALLOCLOCL_(Tr%g2)
 
-    call MAPL_AllocNodeArray(Tr%index,(/3,nlon,nlat/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%index(3,nlon,nlat),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%index,(/3,nlon,nlat/),rc=STATUS)
+    else
+       allocate(Tr%index(3,nlon,nlat),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%weight,(/4,nlon,nlat/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%weight(4,nlon,nlat),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%weight,(/4,nlon,nlat/),rc=STATUS)
+    else
+       allocate(Tr%weight(4,nlon,nlat),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%l2c,(/4,npx,npy/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%l2c(4,npx,npy),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%l2c,(/4,npx,npy/),rc=STATUS)
+    else
+       allocate(Tr%l2c(4,npx,npy),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%id1,(/npx,npy/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%id1(npx,npy),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%id1,(/npx,npy/),rc=STATUS)
+    else
+       allocate(Tr%id1(npx,npy),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%id2,(/npx,npy/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%id2(npx,npy),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%id2,(/npx,npy/),rc=STATUS)
+    else
+       allocate(Tr%id2(npx,npy),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%jdc,(/npx,npy/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%jdc(npx,npy),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%jdc,(/npx,npy/),rc=STATUS)
+    else
+       allocate(Tr%jdc(npx,npy),stat=status)
+    end if
     VERIFY_(STATUS)
 
     allocate(Tr%elon(size(lons),size(lats),3),stat=STATUS)
@@ -389,28 +400,46 @@ contains
     VERIFY_(STATUS)
     tr%elat_local => tr%elat(i0:i1,j0:j1,:)
 
-    call MAPL_AllocNodeArray(Tr%ee1,(/npx,npy,3/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%ee1(npx,npy,3),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%ee1,(/npx,npy,3/),rc=STATUS)
+    else
+       allocate(Tr%ee1(npx,npy,3),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%ee2,(/npx,npy,3/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%ee2(npx,npy,3),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%ee2,(/npx,npy,3/),rc=STATUS)
+    else
+       allocate(Tr%ee2(npx,npy,3),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%ff1,(/npx,npy,3/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%ff1(npx,npy,3),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%ff1,(/npx,npy,3/),rc=STATUS)
+    else
+       allocate(Tr%ff1(npx,npy,3),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%ff2,(/npx,npy,3/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%ff2(npx,npy,3),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%ff2,(/npx,npy,3/),rc=STATUS)
+    else
+       allocate(Tr%ff2(npx,npy,3),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%gg1,(/npx,npy,3/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%gg1(npx,npy,3),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%gg1,(/npx,npy,3/),rc=STATUS)
+    else
+       allocate(Tr%gg1(npx,npy,3),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%gg2,(/npx,npy,3/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%gg2(npx,npy,3),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%gg2,(/npx,npy,3/),rc=STATUS)
+    else
+       allocate(Tr%gg2(npx,npy,3),stat=status)
+    end if
     VERIFY_(STATUS)
 
 ! Argument AmNodeRoot passed to GetWeights identifies if we're using SHMEM
@@ -468,7 +497,7 @@ contains
 
     Tr%Created=.true.
 
-    RETURN_(SUCCESS)
+    RETURN_(_SUCCESS)
   end function CubeLatLonCreate
 
   subroutine CubeCubeDestroy( Tr, rc)
@@ -486,7 +515,7 @@ contains
 
     Tr%Created = .false.
 
-    RETURN_(SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine CubeCubeDestroy
 
   logical function CubeCubeIsCreated(Tr)
@@ -516,7 +545,7 @@ contains
 ! Begin
 !------
 
-    ASSERT_(.not.Tr%Created)
+    _ASSERT(.not.Tr%Created,'needs informative message')
 
 !ALT    npts = npx + 1
     npts = npxout ! + 1
@@ -539,30 +568,48 @@ contains
     DEALLOCGLOB_(Tr%ff2)
     
     ! ALT: index and weight are allocated at the output grid resolution
-    call MAPL_AllocNodeArray(Tr%weight,(/4,npxout,npyout/6,6/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%weight(4,npxout,npyout/6,6),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%weight,(/4,npxout,npyout/6,6/),rc=STATUS)
+    else
+       allocate(Tr%weight(4,npxout,npyout/6,6),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%index,(/3,npxout,npyout/6,6/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%index(3,npxout,npyout/6,6),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%index,(/3,npxout,npyout/6,6/),rc=STATUS)
+    else
+       allocate(Tr%index(3,npxout,npyout/6,6),stat=status)
+    end if
     VERIFY_(STATUS)
 
     ! ALT: ff1 and ff2 are allocated at the input grid resolution
-    call MAPL_AllocNodeArray(Tr%ff1,(/npx,npy,3/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%ff1(npx,npy,3),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%ff1,(/npx,npy,3/),rc=STATUS)
+    else
+       allocate(Tr%ff1(npx,npy,3),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%ff2,(/npx,npy,3/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%ff2(npx,npy,3),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%ff2,(/npx,npy,3/),rc=STATUS)
+    else
+       allocate(Tr%ff2(npx,npy,3),stat=status)
+    end if
     VERIFY_(STATUS)
 
     ! ALT: ee1 and ee2 are allocated at the output grid resolution
-    call MAPL_AllocNodeArray(Tr%ee1,(/npxout,npyout,3/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%ee1(npxout,npyout,3),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%ee1,(/npxout,npyout,3/),rc=STATUS)
+    else
+       allocate(Tr%ee1(npxout,npyout,3),stat=status)
+    end if
     VERIFY_(STATUS)
 
-    call MAPL_AllocNodeArray(Tr%ee2,(/npxout,npyout,3/),rc=STATUS)
-    if(STATUS==MAPL_NoShm) allocate(Tr%ee2(npxout,npyout,3),stat=status)
+    if(MAPL_ShmInitialized) then
+       call MAPL_AllocNodeArray(Tr%ee2,(/npxout,npyout,3/),rc=STATUS)
+    else
+       allocate(Tr%ee2(npxout,npyout,3),stat=status)
+    end if
     VERIFY_(STATUS)
 
     if (MAPL_AmNodeRoot .or. (.not. MAPL_ShmInitialized)) then
@@ -575,7 +622,7 @@ contains
        
     Tr%Created=.true.
 
-    RETURN_(SUCCESS)
+    RETURN_(_SUCCESS)
   end function CubeCubeCreate
 
   subroutine CubeToCube(Tr, data_cs_in, data_cs_out, rc)
@@ -591,7 +638,7 @@ contains
     integer               :: nx,j1,j2,status,itile
     real(REAL64), allocatable :: var_cs_in(:,:,:), var_cs_out(:,:,:)
 
-    ASSERT_(Tr%Created)
+    _ASSERT(Tr%Created,'needs informative message')
 
     nx   = Tr%npx
 
@@ -626,7 +673,7 @@ contains
     deallocate ( var_cs_in, var_cs_out, stat=status)
     VERIFY_(STATUS)
 
-    RETURN_(SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine CubeToCube
 
   subroutine C2CInterp(var_in, var_out, index_c2c, weight_c2c)
@@ -759,7 +806,7 @@ contains
     integer               :: nx,j1,j2,status,itile
     real(REAL64), allocatable :: var_cs(:,:,:)
     
-    ASSERT_(Tr%Created)
+    _ASSERT(Tr%Created,'needs informative message')
 
     nx   = Tr%npx
 
@@ -770,7 +817,7 @@ contains
     allocate ( var_cs(0:nx+1,0:nx+1,ntiles),stat=status)
     VERIFY_(STATUS)
 
-    ASSERT_(.not. (transpose .and. present(misval)))
+    _ASSERT(.not. (transpose .and. present(misval)),'needs informative message')
 
     var_cs=0.0
 
@@ -797,7 +844,7 @@ contains
     deallocate ( var_cs ,stat=status)
     VERIFY_(STATUS)
 
-    RETURN_(SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine CubeToLatLonr8
 
   subroutine CubeToLatLonr4( Tr, data_cs, data_ll, transpose, misval, rc)
@@ -819,7 +866,7 @@ contains
     real(REAL64), allocatable :: data_cs8(:,:)
 
 
-    ASSERT_(Tr%Created)
+    _ASSERT(Tr%Created,'needs informative message')
 
     nx   = Tr%npx
 
@@ -837,7 +884,7 @@ contains
        VERIFY_(STATUS)
     endif
 
-    ASSERT_(.not. (transpose .and. present(misval)))
+    _ASSERT(.not. (transpose .and. present(misval)),'needs informative message')
 
     var_cs=0.0
 
@@ -884,7 +931,7 @@ contains
 
     deallocate ( var_cs, data_ll8 )
 
-    RETURN_(SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine CubeToLatLonr4
 
   subroutine LatLonToCuber8( Tr, data_ll, data_cs, transpose, misval, rc)
@@ -902,7 +949,7 @@ contains
     integer               :: nx,j1,j2,status,itile
     real(REAL64), allocatable :: var_cs(:,:,:)
 
-    ASSERT_(Tr%Created)
+    _ASSERT(Tr%Created,'needs informative message')
 
     nx   = Tr%npx
 
@@ -938,7 +985,7 @@ contains
     deallocate ( var_cs ,STAT=STATUS)
     VERIFY_(STATUS)
 
-    RETURN_(SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine LatLonToCuber8
 
   subroutine LatLonToCuber4( Tr, data_ll, data_cs, transpose, misval, rc)
@@ -960,7 +1007,7 @@ contains
 !JK for conservative interp--------------
 
 
-    ASSERT_(Tr%Created)
+    _ASSERT(Tr%Created,'needs informative message')
 
     nx   = Tr%npx
 
@@ -1033,7 +1080,7 @@ contains
     deallocate ( data_cs8 )
     deallocate ( data_ll8 )
 
-    RETURN_(SUCCESS)
+    RETURN_(_SUCCESS)
   end subroutine LatLonToCuber4
 
   subroutine C2LInterp(cubsph, latlon, index, weight, misval, subset, transpose)
@@ -1364,7 +1411,7 @@ contains
     real(REAL64), pointer :: e1(:,:,:), e2(:,:,:) 
 
     if(.not.Rotate) then
-       ASSERT_(.not.Transpose .and. .not.SphIsLL)
+       _ASSERT(.not.Transpose .and. .not.SphIsLL,'needs informative message')
     end if
 
     if(SphIsLL) then
@@ -1437,7 +1484,7 @@ contains
     real(REAL64), pointer :: e1(:,:,:), e2(:,:,:) 
 
     if(.not.Rotate) then
-       ASSERT_(.not.Transpose .and. .not.SphIsLL)
+       _ASSERT(.not.Transpose .and. .not.SphIsLL,'needs informative message')
     end if
 
     if(SphIsLL) then
@@ -1510,7 +1557,7 @@ contains
     real(REAL64), pointer :: e1(:,:,:), e2(:,:,:) 
 
     if(.not.Rotate) then
-       ASSERT_(.not.Transpose .and. .not.SphIsLL)
+       _ASSERT(.not.Transpose .and. .not.SphIsLL,'needs informative message')
     end if
 
     if(SphIsLL) then
@@ -1588,7 +1635,7 @@ contains
     real(REAL64), pointer :: e1(:,:,:), e2(:,:,:) 
 
     if(.not.Rotate) then
-       ASSERT_(.not.Transpose .and. .not.SphIsLL)
+       _ASSERT(.not.Transpose .and. .not.SphIsLL,'needs informative message')
     end if
 
     if(SphIsLL) then
@@ -2094,8 +2141,11 @@ end subroutine ReStaggerWindsCube
 
      if (associated(a)) then
         a=0
-        call MAPL_DeAllocNodeArray(a, rc=status)
-        if (status==MAPL_NoShm) deallocate(a, stat=status)
+        if(MAPL_ShmInitialized) then
+           call MAPL_DeAllocNodeArray(a, rc=status)
+        else
+           deallocate(a, stat=status)
+        end if
         if (status /= 0) return
         nullify(a)
      else
@@ -2110,8 +2160,11 @@ end subroutine ReStaggerWindsCube
 
      if (associated(a)) then
         a=0
-        call MAPL_DeAllocNodeArray(a, rc=status)
-        if (status==MAPL_NoShm) deallocate(a, stat=status)
+        if(MAPL_ShmInitialized) then
+           call MAPL_DeAllocNodeArray(a, rc=status)
+        else
+           deallocate(a, stat=status)
+        end if
         if (status /= 0) return
         nullify(a)
      else
@@ -2126,8 +2179,11 @@ end subroutine ReStaggerWindsCube
      
      if (associated(a)) then
         a=0
-        call MAPL_DeAllocNodeArray(a, rc=status)
-        if (status==MAPL_NoShm) deallocate(a, stat=status)
+        if(MAPL_ShmInitialized) then
+           call MAPL_DeAllocNodeArray(a, rc=status)
+        else
+           deallocate(a, stat=status)
+        end if
         if (status /= 0) return
         nullify(a)
      else
@@ -2142,8 +2198,11 @@ end subroutine ReStaggerWindsCube
      
      if (associated(a)) then
         a=0
-        call MAPL_DeAllocNodeArray(a, rc=status)
-        if (status==MAPL_NoShm) deallocate(a, stat=status)
+        if(MAPL_ShmInitialized) then
+           call MAPL_DeAllocNodeArray(a, rc=status)
+        else
+           deallocate(a, stat=status)
+        end if
         if (status /= 0) return
         nullify(a)
      else
@@ -2158,8 +2217,11 @@ end subroutine ReStaggerWindsCube
 
      if (associated(a)) then
         a=0
-        call MAPL_DeAllocNodeArray(a, rc=status)
-        if (status==MAPL_NoShm) deallocate(a, stat=status)
+        if(MAPL_ShmInitialized) then
+           call MAPL_DeAllocNodeArray(a, rc=status)
+        else
+           deallocate(a, stat=status)
+        end if
         if (status /= 0) return
         nullify(a)
      else
