@@ -14,6 +14,7 @@ set (srcs
   CubeToCubeRegridder.F90
   CubeToLatLon.F90 
   CubeGridPrototype.F90
+  GEOS_FV3_Utilities.F90
   )
 
 set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared)
