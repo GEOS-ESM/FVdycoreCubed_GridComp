@@ -8,7 +8,7 @@ module FV_StateMod
 ! !USES:
 #if defined( MAPL_MODE )
    use ESMF                ! ESMF base class
-   use MAPL_Mod            ! MAPL base class
+   use MAPL                ! MAPL base class
 #endif
 
    use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS, &
@@ -165,8 +165,8 @@ private
                                                        ! lat-lon      = 1
                                                        ! cubed-sphere = 6
 
-    real(REAL8), allocatable           :: DXC(:,:)     ! local C-Gird DeltaX
-    real(REAL8), allocatable           :: DYC(:,:)     ! local C-Gird DeltaY 
+    real(REAL8), allocatable           :: DXC(:,:)     ! local C-Grid DeltaX
+    real(REAL8), allocatable           :: DYC(:,:)     ! local C-Grid DeltaY 
 
     real(REAL8), allocatable           :: AREA(:,:)    ! local cell area
     real(REAL8)                        :: GLOBALAREA   ! global area
@@ -579,7 +579,7 @@ contains
 !! Setup GFDL microphysics module
     call gfdl_cloud_microphys_init()
 
- ASSERT_(DT > 0.0)
+ _ASSERT(DT > 0.0, 'needs informative message')
 
   call WRITE_PARALLEL("Dynamics PE Layout ")
   call WRITE_PARALLEL(FV_Atm(1)%layout(1)    ,format='("NPES_X  : ",(   I3))')
@@ -592,7 +592,7 @@ contains
                     !      if needed, we could compute, ks by count(BK==0.0)
                     !      then FV will try to run slightly more efficient code
                     !      So far, GEOS-5 has used ks = 0
-  ASSERT_(ks <= FV_Atm(1)%flagstruct%NPZ+1)
+  _ASSERT(ks <= FV_Atm(1)%flagstruct%NPZ+1,'needs informative message')
   call WRITE_PARALLEL(ks                          , &
      format='("Number of true pressure levels =", I5)'   )
 
@@ -1159,7 +1159,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          if (TRIM(state%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
        enddo
       ! We must have these first 5 at a minimum
-       ASSERT_(nwat_tracers == 5)
+       _ASSERT(nwat_tracers == 5, 'needs informative message')
       ! Check for CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'CLLS'    ) nwat_tracers = nwat_tracers + 1
@@ -1176,7 +1176,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          endif
        endif
        if (FV_Atm(1)%flagstruct%do_sat_adj) then
-          ASSERT_(FV_Atm(1)%flagstruct%nwat == 6)
+          _ASSERT(FV_Atm(1)%flagstruct%nwat == 6, 'needs informative message')
        endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
@@ -1190,7 +1190,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
                    (FV_Atm(1)%flagstruct%nwat == 1) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 3) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 6) )
-     ASSERT_( NWAT_TEST )
+     _ASSERT( NWAT_TEST , 'needs informative message')
      select case ( FV_Atm(1)%flagstruct%nwat )
      case (6) 
           FV_Atm(1)%ncnst = STATE%GRID%NQ + 3 ! NQ + Combined QLIQ,QICE,QCLD
@@ -1245,16 +1245,16 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
   if (.not. ADIABATIC) then
     select case ( FV_Atm(1)%flagstruct%nwat )
     case (0)
-       ASSERT_(FV_Atm(1)%ncnst == STATE%GRID%NQ)
+       _ASSERT(FV_Atm(1)%ncnst == STATE%GRID%NQ, 'needs informative message')
     case (1)
-       ASSERT_(FV_Atm(1)%ncnst >= 5)
-       ASSERT_(FV_Atm(1)%ncnst == STATE%GRID%NQ)
+       _ASSERT(FV_Atm(1)%ncnst >= 5, 'needs informative message')
+       _ASSERT(FV_Atm(1)%ncnst == STATE%GRID%NQ, 'needs informative message')
     case (3)
-       ASSERT_(FV_Atm(1)%ncnst >= 7)
-       ASSERT_(FV_Atm(1)%ncnst == STATE%GRID%NQ + 2)
+       _ASSERT(FV_Atm(1)%ncnst >= 7, 'needs informative message')
+       _ASSERT(FV_Atm(1)%ncnst == STATE%GRID%NQ + 2, 'needs informative message')
     case (6)
-       ASSERT_(FV_Atm(1)%ncnst >= 13)
-       ASSERT_(FV_Atm(1)%ncnst == STATE%GRID%NQ + 3)
+       _ASSERT(FV_Atm(1)%ncnst >= 13, 'needs informative message')
+       _ASSERT(FV_Atm(1)%ncnst == STATE%GRID%NQ + 3, 'needs informative message')
     end select
     FV_Atm(1)%q(:,:,:,:) = 0.0
     if (FV_Atm(1)%flagstruct%nwat > 0) then
@@ -1410,36 +1410,36 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
    ! Verify
     select case (FV_Atm(1)%flagstruct%nwat)
     case (6)
-      ASSERT_(nn == 13) ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
-      ASSERT_(SPHU_FILLED)
-      ASSERT_(QLIQ_FILLED)
-      ASSERT_(QICE_FILLED)
-      ASSERT_(RAIN_FILLED)
-      ASSERT_(SNOW_FILLED)
-      ASSERT_(GRPL_FILLED)
-      ASSERT_(QCLD_FILLED)
-      ASSERT_(QLCN_FILLED)
-      ASSERT_(QLLS_FILLED)
-      ASSERT_(QICN_FILLED)
-      ASSERT_(QILS_FILLED)
-      ASSERT_(CLCN_FILLED)
-      ASSERT_(CLLS_FILLED)
+      _ASSERT(nn == 13, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
+      _ASSERT(SPHU_FILLED, 'needs informative message')
+      _ASSERT(QLIQ_FILLED, 'needs informative message')
+      _ASSERT(QICE_FILLED, 'needs informative message')
+      _ASSERT(RAIN_FILLED, 'needs informative message')
+      _ASSERT(SNOW_FILLED, 'needs informative message')
+      _ASSERT(GRPL_FILLED, 'needs informative message')
+      _ASSERT(QCLD_FILLED, 'needs informative message')
+      _ASSERT(QLCN_FILLED, 'needs informative message')
+      _ASSERT(QLLS_FILLED, 'needs informative message')
+      _ASSERT(QICN_FILLED, 'needs informative message')
+      _ASSERT(QILS_FILLED, 'needs informative message')
+      _ASSERT(CLCN_FILLED, 'needs informative message')
+      _ASSERT(CLLS_FILLED, 'needs informative message')
     case (3)
-      ASSERT_(nn == 7) ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
-      ASSERT_(SPHU_FILLED)
-      ASSERT_(QLIQ_FILLED)
-      ASSERT_(QICE_FILLED)
-      ASSERT_(QLCN_FILLED)
-      ASSERT_(QLLS_FILLED)
-      ASSERT_(QICN_FILLED)
-      ASSERT_(QILS_FILLED)
+      _ASSERT(nn == 7, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
+      _ASSERT(SPHU_FILLED, 'needs informative message')
+      _ASSERT(QLIQ_FILLED, 'needs informative message')
+      _ASSERT(QICE_FILLED, 'needs informative message')
+      _ASSERT(QLCN_FILLED, 'needs informative message')
+      _ASSERT(QLLS_FILLED, 'needs informative message')
+      _ASSERT(QICN_FILLED, 'needs informative message')
+      _ASSERT(QILS_FILLED, 'needs informative message')
     case (1)
-      ASSERT_(nn == 5) ! Q, QLCN, QLLS, QICN, QILS
-      ASSERT_(SPHU_FILLED)
-      ASSERT_(QLCN_FILLED)
-      ASSERT_(QLLS_FILLED)
-      ASSERT_(QICN_FILLED)
-      ASSERT_(QILS_FILLED)
+      _ASSERT(nn == 5, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS
+      _ASSERT(SPHU_FILLED, 'needs informative message')
+      _ASSERT(QLCN_FILLED, 'needs informative message')
+      _ASSERT(QLLS_FILLED, 'needs informative message')
+      _ASSERT(QICN_FILLED, 'needs informative message')
+      _ASSERT(QILS_FILLED, 'needs informative message')
     end select
     endif !nwat > 0
       select case (FV_Atm(1)%flagstruct%nwat)
@@ -1503,7 +1503,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          endif
        enddo
       end select
-      ASSERT_(nn == FV_Atm(1)%ncnst)
+      _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
   else
     if (mpp_pe()==0) print*, 'Running In Adiabatic Mode'
       do n=1,STATE%GRID%NQ
@@ -1514,7 +1514,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
          endif
       enddo
-      ASSERT_(nn == FV_Atm(1)%ncnst)
+      _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
   endif
 
     myDT = state%dt
@@ -1866,36 +1866,36 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
    ! Verify
     select case (FV_Atm(1)%flagstruct%nwat)
     case (6)
-      ASSERT_(nn == 13) ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
-      ASSERT_(SPHU_FILLED)
-      ASSERT_(QLIQ_FILLED)
-      ASSERT_(QICE_FILLED)
-      ASSERT_(RAIN_FILLED)
-      ASSERT_(SNOW_FILLED)
-      ASSERT_(GRPL_FILLED)
-      ASSERT_(QCLD_FILLED)
-      ASSERT_(QLCN_FILLED)
-      ASSERT_(QLLS_FILLED)
-      ASSERT_(QICN_FILLED)
-      ASSERT_(QILS_FILLED)
-      ASSERT_(CLCN_FILLED)
-      ASSERT_(CLLS_FILLED)
+      _ASSERT(nn == 13, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
+      _ASSERT(SPHU_FILLED, 'needs informative message')
+      _ASSERT(QLIQ_FILLED, 'needs informative message')
+      _ASSERT(QICE_FILLED, 'needs informative message')
+      _ASSERT(RAIN_FILLED, 'needs informative message')
+      _ASSERT(SNOW_FILLED, 'needs informative message')
+      _ASSERT(GRPL_FILLED, 'needs informative message')
+      _ASSERT(QCLD_FILLED, 'needs informative message')
+      _ASSERT(QLCN_FILLED, 'needs informative message')
+      _ASSERT(QLLS_FILLED, 'needs informative message')
+      _ASSERT(QICN_FILLED, 'needs informative message')
+      _ASSERT(QILS_FILLED, 'needs informative message')
+      _ASSERT(CLCN_FILLED, 'needs informative message')
+      _ASSERT(CLLS_FILLED, 'needs informative message')
     case (3)
-      ASSERT_(nn == 7) ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
-      ASSERT_(SPHU_FILLED)
-      ASSERT_(QLIQ_FILLED)
-      ASSERT_(QICE_FILLED)
-      ASSERT_(QLCN_FILLED)
-      ASSERT_(QLLS_FILLED)
-      ASSERT_(QICN_FILLED)
-      ASSERT_(QILS_FILLED)
+      _ASSERT(nn == 7, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
+      _ASSERT(SPHU_FILLED, 'needs informative message')
+      _ASSERT(QLIQ_FILLED, 'needs informative message')
+      _ASSERT(QICE_FILLED, 'needs informative message')
+      _ASSERT(QLCN_FILLED, 'needs informative message')
+      _ASSERT(QLLS_FILLED, 'needs informative message')
+      _ASSERT(QICN_FILLED, 'needs informative message')
+      _ASSERT(QILS_FILLED, 'needs informative message')
     case (1)
-      ASSERT_(nn == 5) ! Q, QLCN, QLLS, QICN, QILS
-      ASSERT_(SPHU_FILLED)
-      ASSERT_(QLCN_FILLED)
-      ASSERT_(QLLS_FILLED)
-      ASSERT_(QICN_FILLED)
-      ASSERT_(QILS_FILLED)
+      _ASSERT(nn == 5, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS
+      _ASSERT(SPHU_FILLED, 'needs informative message')
+      _ASSERT(QLCN_FILLED, 'needs informative message')
+      _ASSERT(QLLS_FILLED, 'needs informative message')
+      _ASSERT(QICN_FILLED, 'needs informative message')
+      _ASSERT(QILS_FILLED, 'needs informative message')
     end select
 
       select case(FV_Atm(1)%flagstruct%nwat)
@@ -1959,7 +1959,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
         endif
        enddo
       end select
-      ASSERT_(nn == FV_Atm(1)%ncnst)
+      _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
   else
       do n=1,STATE%GRID%NQ
          nn=nn+1
@@ -1969,7 +1969,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
             state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
          endif
       enddo
-      ASSERT_(nn == FV_Atm(1)%ncnst)
+      _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
   endif
 
     if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
@@ -3572,10 +3572,14 @@ subroutine fv_getUpdraftHelicity(uh25)
                       FV_Atm(1)%bd%isd, FV_Atm(1)%bd%ied, FV_Atm(1)%bd%jsd, FV_Atm(1)%bd%jed, &
                       FV_Atm(1)%npz, FV_Atm(1)%u, FV_Atm(1)%v, vort, &
                       FV_Atm(1)%gridstruct%dx, FV_Atm(1)%gridstruct%dy, FV_Atm(1)%gridstruct%rarea)
+
+! call this with uh25_tmp which is of FVPRC
    call updraft_helicity(FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, FV_Atm(1)%ng, FV_Atm(1)%npz, &
                      zvir, sphum, uh25_tmp, &
                      FV_Atm(1)%w, vort, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                      FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
+
+! cast back to r4
    uh25 = uh25_tmp
 end subroutine fv_getUpdraftHelicity
 

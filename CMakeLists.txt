@@ -9,15 +9,15 @@ set (srcs
   AdvCore_GridCompMod.F90
   DynCore_GridCompMod.F90 CreateInterpWeights_GridCompMod.F90
   StandAlone_DynAdvCore_GridCompMod.F90
-  CubedSphereGridFactory.F90
   CubeToLatLonRegridder.F90 
   LatLonToCubeRegridder.F90 
   CubeToCubeRegridder.F90
-  CubeToLatLon.F90
-#***DAS***#  CubeGridPrototype.F90
+  CubeToLatLon.F90 
+  CubeGridPrototype.F90
+  GEOS_FV3_Utilities.F90
   )
 
-set(dependencies MAPL_Base GMAO_hermes GEOS_Shared)
+set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared)
 
 if (FV_PRECISION STREQUAL R4)
    set (GFDL fms_r4)
@@ -63,7 +63,7 @@ set_target_properties (StandAlone_FV3_Dycore.x PROPERTIES LINK_FLAGS "${OpenMP_F
 ecbuild_add_executable (
   TARGET rs_scale.x
   SOURCES rs_scale.F90
-  LIBS ${this} GMAO_pFIO)
+  LIBS ${this})
 set_target_properties (rs_scale.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
 
 ecbuild_add_executable (

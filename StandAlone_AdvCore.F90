@@ -3,7 +3,7 @@
 #include "MAPL_Generic.h"
 
 program StandAlone_AdvCore
-   use MAPL_Mod
+   use MAPL
    use AdvCore_GridCompMod, only: SetServices
    use MPI
 
