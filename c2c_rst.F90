@@ -1,6 +1,6 @@
 
 #define VERIFY_(A) if(MAPL_VRFY(A,Iam,__LINE__))call exit(-1)
-#define ASSERT_(A) if(MAPL_ASRT(A,Iam,__LINE__))call exit(-1)
+#define _ASSERT(A) if(MAPL_ASRT(A,Iam,__LINE__))call exit(-1,'needs informative message')
 
  
 #if defined(__INTEL_COMPILER)
@@ -14,7 +14,7 @@
 program gmao_regrid
 
   use ESMF
-  use MAPL_Mod
+  use MAPL
   use, intrinsic :: iso_fortran_env
 
   implicit none
@@ -118,7 +118,7 @@ program gmao_regrid
      print *,''
      print *,'ERROR: currently PARALLEL jobs not supported'
      print *,''
-     ASSERT_(.false.)
+     _ASSERT(.false.,'needs informative message')
   end if
 
   if (MAPL_AM_I_Root(vm)) then
@@ -162,7 +162,7 @@ program gmao_regrid
   else if (str(1:1) == 'C') then
      if (str(2:2) /= ' ') then 
         ic = ichar(str(2:2))
-        ASSERT_(ic >= i0 .and. ic <= i9) ! Must be a number
+        _ASSERT(ic >= i0 .and. ic <= i9,'needs informative message') ! Must be a number
         read(str(2:),*) im
         gout%gridtype = GridType_CubedSphere
         gout%IM = im
@@ -186,7 +186,7 @@ program gmao_regrid
 
   changeResolution =  gi%im /= gout%im .or. gi%jm /= gout%jm
   if (gout%gridtype /= GridType_CubedSphere .and. gi%gridtype /= GridType_CubedSphere) then
-     ASSERT_(.false.)
+     _ASSERT(.false.,'needs informative message')
   end if
   call MAPL_GenGridName(gi%im, gi%jm, gridname=gridnamef, geos_style=.false.)
   call MAPL_GenGridName(gout%im, gout%jm, gridname=gridnameo, geos_style=.false.)
@@ -348,7 +348,7 @@ program gmao_regrid
               RecEnd = _FTELL(unit_r)
               backspace(unit_r)
               RecStart = _FTELL(unit_r)
-              ASSERT_(4*((LM+1)+2) == RecEnd-RecStart)
+              _ASSERT(4*((LM+1)+2) == RecEnd-RecStart,'needs informative message')
               print *,'WARNING: encoutered shorter record, assuming PREF'
               read (unit_r) pref
               write(unit_w) pref
@@ -374,7 +374,7 @@ program gmao_regrid
   VERIFY_(STATUS)
 
 #undef VERIFY_
-#undef ASSERT_
+#undef _ASSERT
 
 #include "MAPL_Generic.h"
 
@@ -384,7 +384,7 @@ program gmao_regrid
 
     subroutine GuessFileType(filename, filetype, rc)
       use ESMF
-      use MAPL_Mod
+      use MAPL
 
       implicit none
 
@@ -457,8 +457,7 @@ program gmao_regrid
 
     subroutine GetGridInfo(gi, filetype, filename, ncinfo, rc)
       use ESMF
-      use MAPL_Mod
-      use MAPL_IOMod
+      use MAPL
 
       implicit none
 
@@ -486,8 +485,8 @@ program gmao_regrid
                gi%jm = ncinfo%dims(i)%len
             end if
          enddo
-         ASSERT_(gi%im /= -1)
-         ASSERT_(gi%jm /= -1)
+         _ASSERT(gi%im /= -1,'needs informative message')
+         _ASSERT(gi%jm /= -1,'needs informative message')
          if (gi%jm == gi%im*6) then
             gi%gridtype = GridType_CubedSphere
          else

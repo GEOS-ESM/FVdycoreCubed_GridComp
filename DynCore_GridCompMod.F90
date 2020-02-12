@@ -18,9 +18,8 @@
 ! !USES:
 
    use ESMF                ! ESMF base class
-   use MAPL_Mod            ! GEOS base class
+   use MAPL                ! GEOS base class
    use m_set_eta,       only: set_eta
-   use m_chars,         only: uppercase
 
 ! FV Specific Module
    use fv_arrays_mod,  only: REAL4, REAL8, FVPRC
@@ -56,10 +55,7 @@
                            fv_getUpdraftHelicity,                    &
                            ADIABATIC, SW_DYNAMICS, AdvCore_Advection
    use m_topo_remap, only: dyn_topo_remap
-   use MAPL_GridManagerMod
-   use MAPL_RegridderManagerMod
-   use MAPL_AbstractRegridderMod
-   use MAPL_RegridderSpecMod
+   use CubeGridPrototype, only: register_grid_and_regridders
 
 ! !PUBLIC MEMBER FUNCTIONS:
 
@@ -2891,6 +2887,7 @@ subroutine Run(gc, import, export, clock, rc)
     character(len=ESMF_MAXSTR), allocatable :: xlist(:)
     character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
     integer, parameter                  :: XLIST_MAX = 60
+    logical                             :: isPresent
     
   Iam = "Run"
   call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
@@ -3097,8 +3094,9 @@ subroutine Run(gc, import, export, clock, rc)
             firstime=.false.
             ! get the list of excluded tracers from resource
             n = 0
-            call ESMF_ConfigFindLabel ( CF,'EXCLUDE_ADVECTION_TRACERS_LIST:',rc=STATUS )
-            if(STATUS==ESMF_SUCCESS) then
+            call ESMF_ConfigFindLabel ( CF,'EXCLUDE_ADVECTION_TRACERS_LIST:',isPresent=isPresent,rc=STATUS )
+            VERIFY_(STATUS)
+            if(isPresent) then
 
                tend  = .false.
                allocate(xlist(XLIST_MAX), stat=status)
@@ -3412,12 +3410,12 @@ subroutine Run(gc, import, export, clock, rc)
              if ( (qqq%is_r4) .and. associated(qqq%content_r4) ) then
                 if (size(qv)==size(qqq%content_r4)) then
                    qv = qqq%content_r4
-                   ASSERT_(all(qv >= 0.0))
+                   _ASSERT(all(qv >= 0.0),'needs informative message')
                 endif
              elseif (associated(qqq%content)) then
                 if (size(qv)==size(qqq%content)) then
                    qv = qqq%content
-                   ASSERT_(all(qv >= 0.0))
+                   _ASSERT(all(qv >= 0.0),'needs informative message')
                 endif
              endif
          endif
@@ -3628,9 +3626,9 @@ subroutine Run(gc, import, export, clock, rc)
 
       call MAPL_GetResource(MAPL, ANA_IS_WEIGHTED, Label="ANA_IS_WEIGHTED:", default='NO', RC=STATUS)
       VERIFY_(STATUS)
-           ANA_IS_WEIGHTED = uppercase(ANA_IS_WEIGHTED)
+           ANA_IS_WEIGHTED = ESMF_UtilStringUpperCase(ANA_IS_WEIGHTED)
                IS_WEIGHTED =   adjustl(ANA_IS_WEIGHTED)=="YES" .or. adjustl(ANA_IS_WEIGHTED)=="NO"
-      ASSERT_( IS_WEIGHTED )
+      _ASSERT( IS_WEIGHTED ,'needs informative message')
                IS_WEIGHTED =   adjustl(ANA_IS_WEIGHTED)=="YES"
 
       ! Add Analysis Tendencies
@@ -6779,7 +6777,7 @@ end subroutine RunAddIncs
          if (TRIM(state%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
        enddo
       ! We must have these first 5 at a minimum
-       ASSERT_(nwat_tracers == 5)
+       _ASSERT(nwat_tracers == 5, 'needs informative message')
       ! Check for QRAIN, QSNOW, QGRAUPEL
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'QRAIN'   ) nwat_tracers = nwat_tracers + 1
@@ -7338,7 +7336,7 @@ end subroutine FINALIZE
     km   = size(ple,3)-1
     edge = size(v3,3)==km+1
 
-    ASSERT_(edge .or. size(v3,3)==km)
+    _ASSERT(edge .or. size(v3,3)==km,'needs informative message')
 
     v2   = MAPL_UNDEF
 
@@ -7447,6 +7445,8 @@ subroutine Coldstart(gc, import, export, clock, rc)
     type (DynState), pointer :: STATE
     type (DynGrid),  pointer :: GRID
 
+    logical :: isPresent
+
 ! Tracer Stuff
     real(r4), pointer                :: TRACER(:,:,:)
     real(REAL8), allocatable            :: Q5(:,:,:)
@@ -7554,8 +7554,9 @@ subroutine Coldstart(gc, import, export, clock, rc)
     U(IS:IE,JS:JE,KE) = .001*abs(lats(:,:))
     V = 0.0
 
-    call ESMF_ConfigFindLabel( cf, 'AK:', rc = status )
-    if (STATUS == 0) then
+    call ESMF_ConfigFindLabel( cf, 'AK:', isPresent=isPresent, rc = status )
+    VERIFY_(STATUS)
+    if (isPresent) then
        do L = 0, SIZE(AK)-1
           call ESMF_ConfigNextLine  ( CF, rc=STATUS )
           call ESMF_ConfigGetAttribute( cf, AK(L), rc = status )
@@ -7565,8 +7566,9 @@ subroutine Coldstart(gc, import, export, clock, rc)
        ak_is_missing = .true.
     endif
 
-    call ESMF_ConfigFindLabel( cf, 'BK:', rc = status )
-    if (STATUS == 0) then
+    call ESMF_ConfigFindLabel( cf, 'BK:', isPresent=isPresent, rc = status )
+    VERIFY_(STATUS)
+    if (isPresent) then
        do L = 0, SIZE(bk)-1
           call ESMF_ConfigNextLine  ( CF, rc=STATUS )
           call ESMF_ConfigGetAttribute( cf, BK(L), rc = status )
@@ -7578,7 +7580,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
 
     if (ak_is_missing .or. bk_is_missing) call set_eta(km, ls, ptop, pint, AK, BK)
 
-    ASSERT_(ANY(AK /= 0.0) .or. ANY(BK /= 0.0))
+    _ASSERT(ANY(AK /= 0.0) .or. ANY(BK /= 0.0),'needs informative message')
     do L=lbound(PE,3),ubound(PE,3)
        PE(:,:,L) = AK(L) + BK(L)*MAPL_P00
     enddo
@@ -8603,30 +8605,5 @@ end subroutine freeTracers
            enddo
         enddo
   end function
-
-  subroutine register_grid_and_regridders()
-    use MAPL_GridManagerMod, only: grid_manager
-    use CubedSphereGridFactoryMod, only: CubedSphereGridFactory
-    use MAPL_RegridderManagerMod, only: regridder_manager
-    use MAPL_RegridderSpecMod, only: REGRID_METHOD_BILINEAR
-    use LatLonToCubeRegridderMod
-    use CubeToLatLonRegridderMod
-    use CubeToCubeRegridderMod
-
-    type (CubedSphereGridFactory) :: factory
-
-    type (CubeToLatLonRegridder) :: cube_to_latlon_prototype
-    type (LatLonToCubeRegridder) :: latlon_to_cube_prototype
-    type (CubeToCubeRegridder) :: cube_to_cube_prototype
-
-    call grid_manager%add_prototype('Cubed-Sphere',factory)
-    associate (method => REGRID_METHOD_BILINEAR, mgr => regridder_manager)
-      call mgr%add_prototype('Cubed-Sphere', 'LatLon', method, cube_to_latlon_prototype)
-      call mgr%add_prototype('LatLon', 'Cubed-Sphere', method, latlon_to_cube_prototype)
-      call mgr%add_prototype('Cubed-Sphere', 'Cubed-Sphere', method, cube_to_cube_prototype)
-    end associate
-
-  end subroutine register_grid_and_regridders
-
 
 end module FVdycoreCubed_GridComp

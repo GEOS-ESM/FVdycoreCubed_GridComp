@@ -13,7 +13,7 @@
 ! !USES:
 
    use ESMF                ! ESMF base class
-   use MAPL_Mod            ! GEOS base class
+   use MAPL                ! GEOS base class
 
 ! !PUBLIC MEMBER FUNCTIONS:
 

@@ -14,7 +14,7 @@
 ! !USES:
 
       use ESMF
-      use MAPL_Mod
+      use MAPL
       use AdvCore_GridCompMod,    only : AdvCoreSetServices   => SetServices
       use FVdycoreCubed_GridComp, only : DynCoreSetServices   => SetServices
 
