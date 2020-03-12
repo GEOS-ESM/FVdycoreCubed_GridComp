@@ -54,7 +54,7 @@
                            HYDROSTATIC     => FV_HYDROSTATIC,        &
                            fv_getUpdraftHelicity,                    &
                            ADIABATIC, SW_DYNAMICS, AdvCore_Advection
-   use m_topo_remap, only: dyn_topo_remap
+   use shared_topo_remap, only: dyn_topo_remap
    use CubeGridPrototype, only: register_grid_and_regridders
 
 ! !PUBLIC MEMBER FUNCTIONS:
