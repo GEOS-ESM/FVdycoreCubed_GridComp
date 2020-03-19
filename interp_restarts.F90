@@ -78,6 +78,7 @@ program interp_restarts
    integer :: p_split, npx, npy, npz, ivar, lcnt_var, iq0
    integer :: n_args,n_files,nlevs,nedges,ifile,nlev,n_output,nfv_vars
    character(len=ESMF_MAXPATHLEN), allocatable :: extra_files(:),extra_output(:)
+   character(len=ESMF_MAXPATHLEN) :: eta_rc_file
    type(fv_rst), pointer :: rst_files(:) => null()
    type(ArrDescr) :: ArrDes
    integer        :: info
@@ -114,6 +115,7 @@ program interp_restarts
    n_readers=1
    ihydro = 1
    scale_rst = .true.
+   eta_rc_file = 'None'
    do i=1,n_args
      call get_command_argument(i,str)
      select case(trim(str))
@@ -177,6 +179,8 @@ program interp_restarts
         read(astr,*)schmidt_parameters(2)
         call get_command_argument(i+3,astr)
         read(astr,*)schmidt_parameters(3)
+     case('-eta_file')
+        call get_command_argument(i+1,eta_rc_file)
      end select
    end do
 
@@ -326,7 +330,11 @@ program interp_restarts
 
    allocate ( r8_ak(npz+1) )
    allocate ( r8_bk(npz+1) )
-   call set_eta(npz,ks,ptop,pint,r8_ak,r8_bk)
+   if (trim(eta_rc_file) == 'None') then
+      call set_eta(npz,ks,ptop,pint,r8_ak,r8_bk)
+   else
+      call get_eta(trim(eta_rc_file), ptop,pint,r8_ak,r8_bk)
+   endif
    FV_Atm(1)%ak = r8_ak
    FV_Atm(1)%bk = r8_bk
    deallocate ( r8_ak,r8_bk )

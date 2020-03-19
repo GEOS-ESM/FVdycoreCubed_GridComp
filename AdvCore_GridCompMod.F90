@@ -503,6 +503,7 @@ contains
       logical                             :: exclude
       character(len=ESMF_MAXSTR)          :: tmpstring
       character(len=ESMF_MAXSTR)          :: adjustTracerMode
+      character(len=ESMF_MAXSTR)          :: eta_rc_file
       character(len=ESMF_MAXSTR), allocatable :: xlist(:)
       character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
       integer, parameter                  :: XLIST_MAX = 60
@@ -539,7 +540,12 @@ contains
       VERIFY_(STATUS)
       AllOCATE( BK_r8(LM+1) ,stat=STATUS )
       VERIFY_(STATUS)
-      call set_eta(LM,LS,ptop_r8,pint_r8,ak_r8,bk_r8)
+      call MAPL_GetResource(MAPL, eta_rc_file, label='ETA_RC_FILE:', default = 'None', rc = status)
+      if( trim(eta_rc_file) == 'None' ) then
+         call set_eta(LM,LS,ptop_r8,pint_r8,ak_r8,bk_r8)
+      else
+         call get_eta(trim(eta_rc_file), ptop_r8,pint_r8,ak_r8,bk_r8)
+      endif
       ptop=ptop_r8
       pint=pint_r8
       ak=ak_r8
