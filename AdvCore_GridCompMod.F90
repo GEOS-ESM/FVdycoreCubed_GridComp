@@ -404,7 +404,7 @@ contains
       VERIFY_(STATUS)
       ! Compute Grid-Cell Area
       ! ----------------------
-      if (.NOT. FV3_DynCoreIsRunning) then
+      ! if (.NOT. FV3_DynCoreIsRunning) then
          IS = FV_Atm(1)%bd%isc
          IE = FV_Atm(1)%bd%iec
          JS = FV_Atm(1)%bd%jsc
@@ -412,7 +412,7 @@ contains
          call MAPL_GetPointer(EXPORT, temp2d, 'AREA', ALLOC=.TRUE., rc=status)
          VERIFY_(STATUS)
          temp2d = FV_Atm(1)%gridstruct%area(IS:IE,JS:JE)
-      endif
+      ! endif 
 
       call MAPL_TimerOff(MAPL,"INITIALIZE")
       call MAPL_TimerOff(MAPL,"TOTAL")
