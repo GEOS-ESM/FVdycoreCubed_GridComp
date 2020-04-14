@@ -23,7 +23,6 @@
 
 ! FV Specific Module
    use fv_arrays_mod,  only: REAL4, REAL8, FVPRC
-   use fv_control_mod, only: comm_timer, dyn_timer
    !use fv_grid_tools_mod, only: grid_type
    use FV_StateMod, only : FV_Atm,                                   &
                            FV_To_State, State_To_FV, DEBUG_FV_STATE, &
@@ -61,6 +60,9 @@
 
   implicit none
   private
+
+  ! Include the MPI library definitons:
+  include 'mpif.h'
 
   type(ESMF_FieldBundle), save :: bundleAdv
   integer :: NXQ = 0
@@ -276,6 +278,9 @@
      module procedure Write_Profile_2d_R4
      module procedure Write_Profile_2d_R8
   end interface
+
+  real(kind=8) :: t1, t2
+  real(kind=8) :: dyn_run_timer
 
 contains
 
@@ -2100,15 +2105,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'DYNTIMER',                            &
-       LONG_NAME          = 'timer_in_the_dynamics',               &
-       UNITS              = 'seconds',                             &
-       DIMS               = MAPL_DimsHorzOnly,                     &
-       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
-    VERIFY_(STATUS)
-
-    call MAPL_AddExportSpec ( gc,                                  &
-       SHORT_NAME         = 'COMMTIMER',                           &
-       LONG_NAME          = 'communication_timer_in_the_dynamics', &
+       LONG_NAME          = 'timer_for_main_dynamics_run',         &
        UNITS              = 'seconds',                             &
        DIMS               = MAPL_DimsHorzOnly,                     &
        VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
@@ -3410,12 +3407,12 @@ subroutine Run(gc, import, export, clock, rc)
              if ( (qqq%is_r4) .and. associated(qqq%content_r4) ) then
                 if (size(qv)==size(qqq%content_r4)) then
                    qv = qqq%content_r4
-                   _ASSERT(all(qv >= 0.0),'needs informative message')
+                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              elseif (associated(qqq%content)) then
                 if (size(qv)==size(qqq%content)) then
                    qv = qqq%content
-                   _ASSERT(all(qv >= 0.0),'needs informative message')
+                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              endif
          endif
@@ -4139,9 +4136,21 @@ subroutine Run(gc, import, export, clock, rc)
 !-------------------------------------------------------
 
       call MAPL_TimerOn(MAPL,"-DYN_CORE")
+      t1 = MPI_Wtime(status)
       call DynRun (STATE, CLOCK, GC, RC=STATUS)
       VERIFY_(STATUS)
+      t2 = MPI_Wtime(status)
+      dyn_run_timer = t2-t1
       call MAPL_TimerOff(MAPL,"-DYN_CORE")
+
+! Computational diagnostics
+! --------------------------
+    call MAPL_GetPointer(export,temp2d,'DYNTIMER',rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) temp2d = dyn_run_timer
+    call MAPL_GetPointer(export,temp2d,'PID',rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) temp2d = 0 !WMP need to get from MAPL gid
 
 !#define DEBUG_WINDS
 #if defined(DEBUG_WINDS)         
@@ -6637,20 +6646,6 @@ end subroutine RUN
        DEALLOCATE(slp,H1000,H850,H500)
     end if
 
-! Computational diagnostics
-! --------------------------
-    call MAPL_GetPointer(export,temp2d,'DYNTIMER',rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = dyn_timer
-
-    call MAPL_GetPointer(export,temp2d,'COMMTIMER',rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = comm_timer
-
-    call MAPL_GetPointer(export,temp2d,'PID',rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = 0 !WMP need to get from MAPL gid
-
 ! Deallocate Memory
 ! -----------------
 
@@ -6777,7 +6772,7 @@ end subroutine RunAddIncs
          if (TRIM(state%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
        enddo
       ! We must have these first 5 at a minimum
-       _ASSERT(nwat_tracers == 5, 'needs informative message')
+       _ASSERT(nwat_tracers == 5, 'expecting 5 water species: Q QLCN QLLS QICN QILS')
       ! Check for QRAIN, QSNOW, QGRAUPEL
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'QRAIN'   ) nwat_tracers = nwat_tracers + 1
