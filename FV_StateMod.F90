@@ -455,13 +455,33 @@ contains
   ! when reading the tracer bundle in fv_first_run 
    FV_Atm(1)%flagstruct%nwat = 0
   ! Veritical resolution dependencies
-   if (FV_Atm(1)%flagstruct%npz == 72) then
-     FV_Atm(1)%flagstruct%n_sponge = 9 ! ~0.2mb
+   if (FV_Atm(1)%flagstruct%npz >= 70) then
+     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
+     FV_Atm(1)%flagstruct%n_zfilter = 18 ! ~10mb
+   endif
+   if (FV_Atm(1)%flagstruct%npz >= 72) then
+     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 25 ! ~10mb
    endif
-   if (FV_Atm(1)%flagstruct%npz == 132) then
-     FV_Atm(1)%flagstruct%n_sponge = 9 ! ~0.2mb
+   if (FV_Atm(1)%flagstruct%npz >= 90) then
+     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
+     FV_Atm(1)%flagstruct%n_zfilter = 25 ! ~10mb
+   endif
+   if (FV_Atm(1)%flagstruct%npz >= 126) then
+     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
+     FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~10mb
+   endif
+   if (FV_Atm(1)%flagstruct%npz >= 132) then
+     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
+   endif
+   if (FV_Atm(1)%flagstruct%npz >= 136) then
+     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
+     FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
+   endif
+   if (FV_Atm(1)%flagstruct%npz >= 180) then
+     FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
+     FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
    FV_Atm(1)%flagstruct%tau = 0.
    FV_Atm(1)%flagstruct%rf_cutoff = 7.5e2
@@ -579,7 +599,7 @@ contains
 !! Setup GFDL microphysics module
     call gfdl_cloud_microphys_init()
 
- _ASSERT(DT > 0.0, 'needs informative message')
+ _ASSERT(DT > 0.0, 'DT must be greater than zero')
 
   call WRITE_PARALLEL("Dynamics PE Layout ")
   call WRITE_PARALLEL(FV_Atm(1)%layout(1)    ,format='("NPES_X  : ",(   I3))')
@@ -592,7 +612,7 @@ contains
                     !      if needed, we could compute, ks by count(BK==0.0)
                     !      then FV will try to run slightly more efficient code
                     !      So far, GEOS-5 has used ks = 0
-  _ASSERT(ks <= FV_Atm(1)%flagstruct%NPZ+1,'needs informative message')
+  _ASSERT(ks <= FV_Atm(1)%flagstruct%NPZ+1,'ks must be smaller than NPZ+1')
   call WRITE_PARALLEL(ks                          , &
      format='("Number of true pressure levels =", I5)'   )
 
@@ -1159,7 +1179,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          if (TRIM(state%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
        enddo
       ! We must have these first 5 at a minimum
-       _ASSERT(nwat_tracers == 5, 'needs informative message')
+       _ASSERT(nwat_tracers == 5, 'expecting 5 water species: Q QLCN QLLS QICN QILS')
       ! Check for CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'CLLS'    ) nwat_tracers = nwat_tracers + 1
@@ -1176,7 +1196,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          endif
        endif
        if (FV_Atm(1)%flagstruct%do_sat_adj) then
-          _ASSERT(FV_Atm(1)%flagstruct%nwat == 6, 'needs informative message')
+          _ASSERT(FV_Atm(1)%flagstruct%nwat == 6, 'when using fv saturation adjustment NWAT must equal 6')
        endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
@@ -1190,7 +1210,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
                    (FV_Atm(1)%flagstruct%nwat == 1) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 3) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 6) )
-     _ASSERT( NWAT_TEST , 'needs informative message')
+     _ASSERT( NWAT_TEST , 'NWAT must be either 0, 1, 3 or 6')
      select case ( FV_Atm(1)%flagstruct%nwat )
      case (6) 
           FV_Atm(1)%ncnst = STATE%GRID%NQ + 3 ! NQ + Combined QLIQ,QICE,QCLD

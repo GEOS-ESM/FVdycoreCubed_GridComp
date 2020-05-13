@@ -800,7 +800,14 @@ program interp_restarts
                   iq0=lcnt_var
                   lcnt_var=lcnt_var+1
                end if
-               r4_local(is:ie,js:je,1:npz) = FV_Atm(1)%q(is:ie,js:je,:,iq0)
+            !  r4_local(is:ie,js:je,1:npz) = FV_Atm(1)%q(is:ie,js:je,:,iq0)
+               do k=1,npz
+                 do j=js,je
+                   do i=is,ie
+                     r4_local(i,j,k) = MAX(0.0,FV_Atm(1)%q(i,j,k,iq0))
+                   enddo
+                 enddo
+               enddo
                call MAPL_VarWrite(OutFmt,triM(var_name),r4_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
                VERIFY_(status)
             end if

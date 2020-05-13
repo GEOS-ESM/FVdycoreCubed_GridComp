@@ -4522,34 +4522,6 @@ subroutine Run(gc, import, export, clock, rc)
           temp2d = temp2d * (MAPL_O3MW/MAPL_AIRMW) / (MAPL_GRAV*DT)
       endif
 
-! Fill Surface and Near-Surface Variables
-! ---------------------------------------
-
-      call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d =  vars%pe(:,:,km+1)    
-
-      call MAPL_GetPointer(export,temp2d,'US',  rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d =       ua(:,:,km)      
-
-      call MAPL_GetPointer(export,temp2d,'VS'   ,rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d =       va(:,:,km)      
-
-      call MAPL_GetPointer(export,temp2d,'TA'   ,rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d =   tempxy(:,:,km)      
-
-      call MAPL_GetPointer(export,temp2d,'QA'   ,rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d =       qv(:,:,km)      
-
-      call MAPL_GetPointer(export,temp2d,'SPEED',rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d = sqrt( ua(:,:,km)**2 + va(:,:,km)**2 ) 
-
-
 ! Virtual temperature
 ! -------------------
 
@@ -4756,10 +4728,6 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3d)) temp3d = zle
 
-      call MAPL_GetPointer(export,temp2d,'DZ', rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d = 0.5*( zle(:,:,km)-zle(:,:,km+1) )
-
       call MAPL_GetPointer(export,temp3d,'ZL' ,rc=status)
       VERIFY_(STATUS)
       if(associated(temp3d)) temp3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
@@ -4767,6 +4735,62 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp3d,'S'  ,rc=status)
       VERIFY_(STATUS)
       if(associated(temp3d)) temp3d = temp3d + grav*(0.5*( zle(:,:,:km)+zle(:,:,2:) ))
+
+! Fill Surface and Near-Surface (~50m) Variables
+! ----------------------------------------------
+ 
+      call MAPL_GetPointer(export,temp2d,'DZ', rc=status)
+      VERIFY_(STATUS)
+     !if(associated(temp2d)) temp2d = 0.5*( zle(:,:,km)-zle(:,:,km+1) )
+      if(associated(temp2d)) temp2d = 50.0
+
+      do k=1,km+1
+         zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
+      enddo
+
+      call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) temp2d =  vars%pe(:,:,km+1)
+
+      call MAPL_GetPointer(export,temp2d,'US',  rc=status)
+      VERIFY_(STATUS)
+     !if(associated(temp2d)) temp2d =       ua(:,:,km)
+      if(associated(temp2d)) then
+         call VertInterp(temp2d,ua,-zle,-50., status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'VS'   ,rc=status)
+      VERIFY_(STATUS)
+     !if(associated(temp2d)) temp2d =       va(:,:,km)
+      if(associated(temp2d)) then
+         call VertInterp(temp2d,va,-zle,-50., status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'TA'   ,rc=status)
+      VERIFY_(STATUS)
+     !if(associated(temp2d)) temp2d =   tempxy(:,:,km)
+      if(associated(temp2d)) then
+         call VertInterp(temp2d,tempxy,-zle,-50., status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'QA'   ,rc=status)
+      VERIFY_(STATUS)
+     !if(associated(temp2d)) temp2d =       qv(:,:,km)
+      if(associated(temp2d)) then
+         call VertInterp(temp2d,qv,-zle,-50., status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'SPEED',rc=status)
+      VERIFY_(STATUS)
+     !if(associated(temp2d)) temp2d = sqrt( ua(:,:,km)**2 + va(:,:,km)**2 )
+      if(associated(temp2d)) then
+         call VertInterp(temp2d,sqrt(ua**2 + va**2),-zle,-50., status)
+         VERIFY_(STATUS)
+      end if
 
 ! Fluxes: UPHI & VPHI
 ! -------------------
@@ -6777,7 +6801,7 @@ end subroutine RunAddIncs
          if (TRIM(state%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
        enddo
       ! We must have these first 5 at a minimum
-       _ASSERT(nwat_tracers == 5, 'needs informative message')
+       _ASSERT(nwat_tracers == 5, 'expecting 5 water species: Q QLCN QLLS QICN QILS')
       ! Check for QRAIN, QSNOW, QGRAUPEL
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'QRAIN'   ) nwat_tracers = nwat_tracers + 1
