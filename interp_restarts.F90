@@ -22,6 +22,7 @@ program interp_restarts
    use m_set_eta,     only: set_eta
    use memutils_mod, only: print_memuse_stats
    use MAPL
+   use pflogger, only: pfl_initialize => initialize
    use gFTL_StringVector
    use gFTL_StringIntegerMap
    use rs_scaleMod
@@ -203,6 +204,7 @@ program interp_restarts
    if (n_files > 0) allocate(rst_files(n_files)) 
 
 ! Initialize SHMEM in MAPL
+   call pfl_initialize()
    call MAPL_GetNodeInfo (comm=MPI_COMM_WORLD, rc=status)
    call MAPL_InitializeShmem (rc=status)
 
