@@ -56,9 +56,10 @@ set JOB_SGMT = '00000001 000000'
 #             Experiment Specific Environment Variables
 #######################################################################
 
-set TAG = `cat $GEOSETC/.FV3_VERSION`
 setenv GEOSBIN @GEOSBIN
+setenv GEOSETC @GEOSETC
 
+set TAG = `cat $GEOSETC/.FV3_VERSION`
 set RUN_CMD = "$GEOSBIN/esma_mpirun"
 
 setenv ARCH `uname`
