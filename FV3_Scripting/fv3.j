@@ -52,6 +52,9 @@ set BEG_DATE = '18910301 000000'
 set END_DATE = '29990311 000000'
 set JOB_SGMT = '00000001 000000'
 
+set USE_SHMEM    = @USE_SHMEM
+set USE_IOSERVER = @USE_IOSERVER
+
 #######################################################################
 #             Experiment Specific Environment Variables
 #######################################################################
@@ -60,7 +63,7 @@ setenv GEOSBIN @GEOSBIN
 setenv GEOSETC @GEOSETC
 
 set TAG = `cat $GEOSETC/.FV3_VERSION`
-set RUN_CMD = "$GEOSBIN/esma_mpirun"
+set RUN_CMD = "$GEOSBIN/esma_mpirun -np "
 
 setenv ARCH `uname`
 source $GEOSBIN/g5_modules
@@ -118,8 +121,8 @@ END_DATE:     ${END_DATE}
 JOB_SGMT:     ${JOB_SGMT}
 NUM_SGMT:     1
 HEARTBEAT_DT: ${RUN_DT}
-USE_SHMEM: 1
-USE_IOSERVER: 0
+USE_SHMEM: ${USE_SHMEM}
+USE_IOSERVER: ${USE_IOSERVER}
 MAPL_ENABLE_TIMERS: YES
 MAPL_ENABLE_MEMUTILS: NO
 PRINTSPEC: 0  # (0: OFF, 1: IMPORT & EXPORT, 2: IMPORT, 3: EXPORT)
@@ -267,24 +270,17 @@ if ($N_OMP > 1) then
    setenv KMP_AFFINITY compact
    setenv KMP_STACKSIZE 16m
 endif
-env | grep MPI
+#env | grep MPI
 
 #######################################################################
 #                          Run the Model
 #######################################################################
 echo "  "
-pwd
+#pwd
 echo "***** USING **** $EXE *********************"
-#ls -l $EXE
-#ls -l ./StandAlone_FV3_Dycore.x
-$GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
-#echo $PSM2_PATH_SELECTION
-#mpirun -genv PSM2_PATH_SELECTION adaptive -np $NPES aps ./StandAlone_FV3_Dycore.x |& tee ${SCRDIR}.log
+if( $USE_SHMEM == 0 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 mpirun -np $NPES ./StandAlone_FV3_Dycore.x |& tee ${SCRDIR}.log
-#echo $PSM2_PATH_SELECTION
-$GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
-
-#/bin/rm -rf ${SCRDIR}
+if( $USE_SHMEM == 0 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 
 set rc =  $status
 echo       Status = $rc
