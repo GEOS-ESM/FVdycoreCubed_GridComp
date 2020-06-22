@@ -565,7 +565,6 @@ program interp_restarts
             VERIFY_(status)
          end if
       else 
-         write(*,*)'bma writing ak'
          if (AmWriter) call MAPL_VarWrite(OutFmt,"AK",r8_akbk)
       end if
       r8_akbk = FV_Atm(1)%bk
@@ -577,7 +576,6 @@ program interp_restarts
             VERIFY_(status)
          end if
       else  
-         write(*,*)'bma writing bk'
          if (AmWriter) call MAPL_VarWrite(OutFmt,"BK",r8_akbk)
       end if
       deallocate ( r8_akbk )
@@ -596,7 +594,6 @@ program interp_restarts
             VERIFY_(status)
          end if
       else
-         write(*,*)'bma writing u'
          call MAPL_VarWrite(OutFmt,"U",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
          VERIFY_(status)
       end if   
