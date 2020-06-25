@@ -23,7 +23,6 @@
 
 ! FV Specific Module
    use fv_arrays_mod,  only: REAL4, REAL8, FVPRC
-   use fv_control_mod, only: comm_timer, dyn_timer
    !use fv_grid_tools_mod, only: grid_type
    use FV_StateMod, only : FV_Atm,                                   &
                            FV_To_State, State_To_FV, DEBUG_FV_STATE, &
@@ -61,6 +60,9 @@
 
   implicit none
   private
+
+  ! Include the MPI library definitons:
+  include 'mpif.h'
 
   type(ESMF_FieldBundle), save :: bundleAdv
   integer :: NXQ = 0
@@ -276,6 +278,9 @@
      module procedure Write_Profile_2d_R4
      module procedure Write_Profile_2d_R8
   end interface
+
+  real(kind=8) :: t1, t2
+  real(kind=8) :: dyn_run_timer
 
 contains
 
@@ -2100,15 +2105,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'DYNTIMER',                            &
-       LONG_NAME          = 'timer_in_the_dynamics',               &
-       UNITS              = 'seconds',                             &
-       DIMS               = MAPL_DimsHorzOnly,                     &
-       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
-    VERIFY_(STATUS)
-
-    call MAPL_AddExportSpec ( gc,                                  &
-       SHORT_NAME         = 'COMMTIMER',                           &
-       LONG_NAME          = 'communication_timer_in_the_dynamics', &
+       LONG_NAME          = 'timer_for_main_dynamics_run',         &
        UNITS              = 'seconds',                             &
        DIMS               = MAPL_DimsHorzOnly,                     &
        VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
@@ -2863,6 +2860,8 @@ subroutine Run(gc, import, export, clock, rc)
     real                  :: sclinc
     integer               :: rc_blend
 
+    real                  :: HGT_SURFACE
+
     character(len=ESMF_MAXSTR) :: ANA_IS_WEIGHTED
     logical                    ::     IS_WEIGHTED
 
@@ -3410,12 +3409,12 @@ subroutine Run(gc, import, export, clock, rc)
              if ( (qqq%is_r4) .and. associated(qqq%content_r4) ) then
                 if (size(qv)==size(qqq%content_r4)) then
                    qv = qqq%content_r4
-                   _ASSERT(all(qv >= 0.0),'needs informative message')
+                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              elseif (associated(qqq%content)) then
                 if (size(qv)==size(qqq%content)) then
                    qv = qqq%content
-                   _ASSERT(all(qv >= 0.0),'needs informative message')
+                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              endif
          endif
@@ -4139,9 +4138,21 @@ subroutine Run(gc, import, export, clock, rc)
 !-------------------------------------------------------
 
       call MAPL_TimerOn(MAPL,"-DYN_CORE")
+      t1 = MPI_Wtime(status)
       call DynRun (STATE, CLOCK, GC, RC=STATUS)
       VERIFY_(STATUS)
+      t2 = MPI_Wtime(status)
+      dyn_run_timer = t2-t1
       call MAPL_TimerOff(MAPL,"-DYN_CORE")
+
+! Computational diagnostics
+! --------------------------
+    call MAPL_GetPointer(export,temp2d,'DYNTIMER',rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) temp2d = dyn_run_timer
+    call MAPL_GetPointer(export,temp2d,'PID',rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) temp2d = 0 !WMP need to get from MAPL gid
 
 !#define DEBUG_WINDS
 #if defined(DEBUG_WINDS)         
@@ -4522,34 +4533,6 @@ subroutine Run(gc, import, export, clock, rc)
           temp2d = temp2d * (MAPL_O3MW/MAPL_AIRMW) / (MAPL_GRAV*DT)
       endif
 
-! Fill Surface and Near-Surface Variables
-! ---------------------------------------
-
-      call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d =  vars%pe(:,:,km+1)    
-
-      call MAPL_GetPointer(export,temp2d,'US',  rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d =       ua(:,:,km)      
-
-      call MAPL_GetPointer(export,temp2d,'VS'   ,rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d =       va(:,:,km)      
-
-      call MAPL_GetPointer(export,temp2d,'TA'   ,rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d =   tempxy(:,:,km)      
-
-      call MAPL_GetPointer(export,temp2d,'QA'   ,rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d =       qv(:,:,km)      
-
-      call MAPL_GetPointer(export,temp2d,'SPEED',rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d = sqrt( ua(:,:,km)**2 + va(:,:,km)**2 ) 
-
-
 ! Virtual temperature
 ! -------------------
 
@@ -4756,10 +4739,6 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3d)) temp3d = zle
 
-      call MAPL_GetPointer(export,temp2d,'DZ', rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d = 0.5*( zle(:,:,km)-zle(:,:,km+1) )
-
       call MAPL_GetPointer(export,temp3d,'ZL' ,rc=status)
       VERIFY_(STATUS)
       if(associated(temp3d)) temp3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
@@ -4789,7 +4768,96 @@ subroutine Run(gc, import, export, clock, rc)
          enddo
       end if
 
-      zle = log(vars%pe)
+      call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT= 50.0, RC=STATUS)
+      VERIFY_(STATUS)
+
+! Fill Surface and Near-Surface Variables
+! ----------------------------------------------
+   if ( (KM .ne. 72) .and. (HGT_SURFACE .gt. 0.0) ) then
+     ! Near surface height for surface
+     ! -------------------------------
+      call MAPL_GetPointer(export,temp2d,'DZ', rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) temp2d = HGT_SURFACE
+
+    ! Get the height above the surface
+      do k=1,km+1
+         zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
+      enddo
+
+      call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) temp2d =  vars%pe(:,:,km+1)
+
+      call MAPL_GetPointer(export,temp2d,'US',  rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         call VertInterp(temp2d,ua,-zle,-HGT_SURFACE, status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'VS'   ,rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         call VertInterp(temp2d,va,-zle,-HGT_SURFACE, status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'TA'   ,rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         tempxy  = vars%pt * vars%pkz
+         call VertInterp(temp2d,tempxy,-zle,-HGT_SURFACE, status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'QA'   ,rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         call VertInterp(temp2d,qv,-zle,-HGT_SURFACE, status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'SPEED',rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         call VertInterp(temp2d,sqrt(ua**2 + va**2),-zle,-HGT_SURFACE, status)
+         VERIFY_(STATUS)
+      end if
+    else
+! Fill Surface with Lowest Model Level Variables
+! ----------------------------------------------
+      call MAPL_GetPointer(export,temp2d,'DZ', rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) temp2d = 0.5*( zle(:,:,km)-zle(:,:,km+1) )
+
+      call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) temp2d =  vars%pe(:,:,km+1)
+
+      call MAPL_GetPointer(export,temp2d,'US',  rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) temp2d =       ua(:,:,km)
+
+      call MAPL_GetPointer(export,temp2d,'VS'   ,rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) temp2d =       va(:,:,km)
+
+      call MAPL_GetPointer(export,temp2d,'TA'   ,rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+        tempxy  = vars%pt * vars%pkz
+        temp2d =   tempxy(:,:,km)
+      endif
+
+      call MAPL_GetPointer(export,temp2d,'QA'   ,rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) temp2d =       qv(:,:,km)
+
+      call MAPL_GetPointer(export,temp2d,'SPEED',rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) temp2d = sqrt( ua(:,:,km)**2 + va(:,:,km)**2 )
+   endif
 
 ! Updraft Helicty Export
 
@@ -4801,6 +4869,8 @@ subroutine Run(gc, import, export, clock, rc)
       endif
 
 ! Divergence Exports
+
+      zle = log(vars%pe)
 
       call getDivergence(uc, vc, tmp3d)
 
@@ -6637,20 +6707,6 @@ end subroutine RUN
        DEALLOCATE(slp,H1000,H850,H500)
     end if
 
-! Computational diagnostics
-! --------------------------
-    call MAPL_GetPointer(export,temp2d,'DYNTIMER',rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = dyn_timer
-
-    call MAPL_GetPointer(export,temp2d,'COMMTIMER',rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = comm_timer
-
-    call MAPL_GetPointer(export,temp2d,'PID',rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = 0 !WMP need to get from MAPL gid
-
 ! Deallocate Memory
 ! -----------------
 
@@ -6777,7 +6833,7 @@ end subroutine RunAddIncs
          if (TRIM(state%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
        enddo
       ! We must have these first 5 at a minimum
-       _ASSERT(nwat_tracers == 5, 'needs informative message')
+       _ASSERT(nwat_tracers == 5, 'expecting 5 water species: Q QLCN QLLS QICN QILS')
       ! Check for QRAIN, QSNOW, QGRAUPEL
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'QRAIN'   ) nwat_tracers = nwat_tracers + 1
