@@ -455,20 +455,40 @@ contains
   ! when reading the tracer bundle in fv_first_run 
    FV_Atm(1)%flagstruct%nwat = 0
   ! Veritical resolution dependencies
-   if (FV_Atm(1)%flagstruct%npz == 72) then
-     FV_Atm(1)%flagstruct%n_sponge = 9 ! ~0.2mb
+   FV_Atm(1)%flagstruct%external_eta = .true.
+   if (FV_Atm(1)%flagstruct%npz >= 70) then
+     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
+     FV_Atm(1)%flagstruct%n_zfilter = 18 ! ~10mb
+   endif
+   if (FV_Atm(1)%flagstruct%npz >= 72) then
+     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 25 ! ~10mb
    endif
-   if (FV_Atm(1)%flagstruct%npz == 132) then
-     FV_Atm(1)%flagstruct%n_sponge = 9 ! ~0.2mb
+   if (FV_Atm(1)%flagstruct%npz >= 90) then
+     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
+     FV_Atm(1)%flagstruct%n_zfilter = 25 ! ~10mb
+   endif
+   if (FV_Atm(1)%flagstruct%npz >= 126) then
+     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
+     FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~10mb
+   endif
+   if (FV_Atm(1)%flagstruct%npz >= 132) then
+     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
+   endif
+   if (FV_Atm(1)%flagstruct%npz >= 136) then
+     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
+     FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
+   endif
+   if (FV_Atm(1)%flagstruct%npz >= 180) then
+     FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
+     FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
    FV_Atm(1)%flagstruct%tau = 0.
    FV_Atm(1)%flagstruct%rf_cutoff = 7.5e2
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
    FV_Atm(1)%flagstruct%remap_option = 0
-   FV_Atm(1)%flagstruct%fv_sg_adj = DT
    FV_Atm(1)%flagstruct%kord_tm =  9
    FV_Atm(1)%flagstruct%kord_mt =  9
    FV_Atm(1)%flagstruct%kord_wz =  9
@@ -491,6 +511,11 @@ contains
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%n_split = 0
    FV_Atm(1)%flagstruct%k_split = 1
+  ! default NonHydrostatic settings (irrelavent to Hydrostatic)
+   FV_Atm(1)%flagstruct%beta = 0.0
+   FV_Atm(1)%flagstruct%a_imp = 1.0
+   FV_Atm(1)%flagstruct%p_fac = 0.1
+  ! Cubed-Sphere Global Resolution Specific adjustments
    if (FV_Atm(1)%flagstruct%ntiles == 6) then
      ! Cubed-sphere grid resolution and DT dependence 
      !              based on ideal remapping DT
@@ -510,21 +535,16 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 112.5   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1440) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  56.25  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 2880) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75  )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  14.0625)
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
       endif
-   endif
-  ! default NonHydrostatic settings (irrelavent to Hydrostatic)
-   FV_Atm(1)%flagstruct%beta = 0.0
-   FV_Atm(1)%flagstruct%a_imp = 1.0
-   FV_Atm(1)%flagstruct%p_fac = 0.1
-  ! Resolution dependence (only on full cube, not doubly periodic)
-   if (FV_Atm(1)%flagstruct%ntiles == 6) then
+      if (FV_Atm(1)%flagstruct%npz == 72) then
+       FV_Atm(1)%flagstruct%fv_sg_adj = DT
      ! Monotonic Hydrostatic defaults
        FV_Atm(1)%flagstruct%hydrostatic = .true.
        FV_Atm(1)%flagstruct%make_nh = .false.
@@ -535,6 +555,7 @@ contains
        FV_Atm(1)%flagstruct%hord_vt =  10
        FV_Atm(1)%flagstruct%hord_tm =  10
        FV_Atm(1)%flagstruct%hord_dp =  10
+      ! This is the best/fastest option for tracers
        FV_Atm(1)%flagstruct%hord_tr =  8
      ! NonMonotonic defaults for c360 (~25km) and finer
        if (FV_Atm(1)%flagstruct%npx >= 360) then
@@ -545,19 +566,39 @@ contains
          FV_Atm(1)%flagstruct%hord_vt =  6
          FV_Atm(1)%flagstruct%hord_tm =  6
          FV_Atm(1)%flagstruct%hord_dp = -6
-       ! This is the best/fastest option for tracers
-         FV_Atm(1)%flagstruct%hord_tr =  8
        ! Must now include explicit vorticity damping
          FV_Atm(1)%flagstruct%d_con = 1.
          FV_Atm(1)%flagstruct%do_vort_damp = .true.
          FV_Atm(1)%flagstruct%vtdm4 = 0.02
        endif
-     ! NonHydrostatuic defaults for c1440 (~6km) and finer
-     !    and continue to adjust vorticity damping with
-     !    increasing resolution
+      else
+       FV_Atm(1)%flagstruct%fv_sg_adj = DT
+     ! Monotonic Hydrostatic defaults
+       FV_Atm(1)%flagstruct%hydrostatic = .false.
+       FV_Atm(1)%flagstruct%make_nh = .false.
+       FV_Atm(1)%flagstruct%vtdm4 = 0.0
+       FV_Atm(1)%flagstruct%do_vort_damp = .false.
+       FV_Atm(1)%flagstruct%d_con = 0.
+       FV_Atm(1)%flagstruct%hord_mt =  10
+       FV_Atm(1)%flagstruct%hord_vt =  10
+       FV_Atm(1)%flagstruct%hord_tm =  10
+       FV_Atm(1)%flagstruct%hord_dp =  10
+      ! This is the best/fastest option for tracers
+       FV_Atm(1)%flagstruct%hord_tr =  8
+     ! NonMonotonic defaults for c360 (~25km) and finer
+       if (FV_Atm(1)%flagstruct%npx >= 360) then
+         FV_Atm(1)%flagstruct%hord_mt =  6
+         FV_Atm(1)%flagstruct%hord_vt =  6
+         FV_Atm(1)%flagstruct%hord_tm =  6
+         FV_Atm(1)%flagstruct%hord_dp = -6
+       ! Must now include explicit vorticity damping
+         FV_Atm(1)%flagstruct%d_con = 1.
+         FV_Atm(1)%flagstruct%do_vort_damp = .true.
+         FV_Atm(1)%flagstruct%vtdm4 = 0.02
+       endif
+     ! continue to adjust vorticity damping with
+     ! increasing resolution
        if (FV_Atm(1)%flagstruct%npx >= 1440) then
-         FV_Atm(1)%flagstruct%hydrostatic = .false.
-         FV_Atm(1)%flagstruct%make_nh = .false.
          FV_Atm(1)%flagstruct%vtdm4 = 0.04
        endif
        if (FV_Atm(1)%flagstruct%npx >= 2880) then
@@ -566,7 +607,7 @@ contains
        if (FV_Atm(1)%flagstruct%npx >= 5760) then
          FV_Atm(1)%flagstruct%vtdm4 = 0.08
        endif
-
+      endif
    endif
 
 !! Start up FV                   
@@ -579,7 +620,7 @@ contains
 !! Setup GFDL microphysics module
     call gfdl_cloud_microphys_init()
 
- _ASSERT(DT > 0.0, 'needs informative message')
+ _ASSERT(DT > 0.0, 'DT must be greater than zero')
 
   call WRITE_PARALLEL("Dynamics PE Layout ")
   call WRITE_PARALLEL(FV_Atm(1)%layout(1)    ,format='("NPES_X  : ",(   I3))')
@@ -592,7 +633,7 @@ contains
                     !      if needed, we could compute, ks by count(BK==0.0)
                     !      then FV will try to run slightly more efficient code
                     !      So far, GEOS-5 has used ks = 0
-  _ASSERT(ks <= FV_Atm(1)%flagstruct%NPZ+1,'needs informative message')
+  _ASSERT(ks <= FV_Atm(1)%flagstruct%NPZ+1,'ks must be smaller than NPZ+1')
   call WRITE_PARALLEL(ks                          , &
      format='("Number of true pressure levels =", I5)'   )
 
@@ -1159,7 +1200,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          if (TRIM(state%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
        enddo
       ! We must have these first 5 at a minimum
-       _ASSERT(nwat_tracers == 5, 'needs informative message')
+       _ASSERT(nwat_tracers == 5, 'expecting 5 water species: Q QLCN QLLS QICN QILS')
       ! Check for CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'CLLS'    ) nwat_tracers = nwat_tracers + 1
@@ -1176,7 +1217,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          endif
        endif
        if (FV_Atm(1)%flagstruct%do_sat_adj) then
-          _ASSERT(FV_Atm(1)%flagstruct%nwat == 6, 'needs informative message')
+          _ASSERT(FV_Atm(1)%flagstruct%nwat == 6, 'when using fv saturation adjustment NWAT must equal 6')
        endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
@@ -1190,7 +1231,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
                    (FV_Atm(1)%flagstruct%nwat == 1) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 3) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 6) )
-     _ASSERT( NWAT_TEST , 'needs informative message')
+     _ASSERT( NWAT_TEST , 'NWAT must be either 0, 1, 3 or 6')
      select case ( FV_Atm(1)%flagstruct%nwat )
      case (6) 
           FV_Atm(1)%ncnst = STATE%GRID%NQ + 3 ! NQ + Combined QLIQ,QICE,QCLD
@@ -1727,24 +1768,18 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
             do i=isc,iec
               ! LIQUID
                FQC = 0.0
-               if ( FV_Atm(1)%q(i,j,k,qlcn)+FV_Atm(1)%q(i,j,k,qlls) > 0.0 ) then
-                  FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qlcn)) / (FV_Atm(1)%q(i,j,k,qlcn)+FV_Atm(1)%q(i,j,k,qlls)))
-               endif
+               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qlcn)) / MAX(FV_Atm(1)%q(i,j,k,qlcn)+FV_Atm(1)%q(i,j,k,qlls),1.e-5))
                FV_Atm(1)%q(i,j,k,qlcn) = FV_Atm(1)%q(i,j,k,qliq)*(    FQC)
                FV_Atm(1)%q(i,j,k,qlls) = FV_Atm(1)%q(i,j,k,qliq)*(1.0-FQC)
               ! ICE
                FQC = 0.0
-               if ( FV_Atm(1)%q(i,j,k,qicn)+FV_Atm(1)%q(i,j,k,qils) > 0.0 ) then
-                  FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qicn)) / (FV_Atm(1)%q(i,j,k,qicn)+FV_Atm(1)%q(i,j,k,qils)))
-               endif
+               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qicn)) / MAX(FV_Atm(1)%q(i,j,k,qicn)+FV_Atm(1)%q(i,j,k,qils),1.e-8))
                FV_Atm(1)%q(i,j,k,qicn) = FV_Atm(1)%q(i,j,k,qice)*(    FQC)
                FV_Atm(1)%q(i,j,k,qils) = FV_Atm(1)%q(i,j,k,qice)*(1.0-FQC)
               ! CLOUD
                if (FV_Atm(1)%flagstruct%nwat == 6) then
                   FQC = 0.0
-                  if ( FV_Atm(1)%q(i,j,k,clcn)+FV_Atm(1)%q(i,j,k,clls) > 0.0 ) then
-                     FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,clcn)) / (FV_Atm(1)%q(i,j,k,clcn)+FV_Atm(1)%q(i,j,k,clls)))
-                  endif
+                  FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,clcn)) / MAX(FV_Atm(1)%q(i,j,k,clcn)+FV_Atm(1)%q(i,j,k,clls),1.e-8))
                   FV_Atm(1)%q(i,j,k,clcn) = FV_Atm(1)%q(i,j,k,qcld)*(    FQC)
                   FV_Atm(1)%q(i,j,k,clls) = FV_Atm(1)%q(i,j,k,qcld)*(1.0-FQC)
                endif
@@ -4244,6 +4279,7 @@ subroutine echo_fv3_setup()
 !   logical :: dwind_2d = .false.
 !   logical :: breed_vortex_inline = .false.
 !   logical :: range_warn = .false.
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%external_eta ,format='("FV3 external_eta: ",(A))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%fill ,format='("FV3 fill: ",(A))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%fill_dp ,format='("FV3 fill_dp: ",(A))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%fill_wz ,format='("FV3 fill_wz: ",(A))' )
