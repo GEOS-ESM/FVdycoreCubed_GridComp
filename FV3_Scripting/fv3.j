@@ -176,8 +176,8 @@ VERSION: 1
 EXPID:  ${EXPID}
 EXPDSC: ${EXPDSC}
 
-#COLLECTIONS:  'inst3_3d_diag'
-COLLECTIONS: 
+COLLECTIONS:  'inst3_3d_diag'
+              'inst1_2d_diag'
               ::
 
 GRID_LABELS: PC@HIST_IMx@HIST_JM-DC
@@ -207,8 +207,8 @@ PC@HIST_IMx@HIST_JM-DC.LM: @AGCM_LM
   inst3_3d_diag.format:    'CFIO',
   inst3_3d_diag.template:  '%y4%m2%d2_%h2%n2z.nc4',
   inst3_3d_diag.mode:      'instantaneous',
-  inst3_3d_diag.frequency:  010000,
-  inst3_3d_diag.duration:   010000,
+  inst3_3d_diag.frequency:  030000,
+  inst3_3d_diag.duration:   030000,
   inst3_3d_diag.vscale:     100.0,
   inst3_3d_diag.vunit:      'hPa',
   inst3_3d_diag.vvars:      'log(PLE)' , 'DYN'          ,
