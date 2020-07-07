@@ -460,7 +460,7 @@ else
 
               setenv    RUN_Q   "DELETE"
               setenv    RUN_P   "SBATCH --ntasks=${MODEL_NPES}" # PE Configuration for fv3.j
-              setenv NCPUS_PER_NODE = NULL # sed needs something
+              setenv NCPUS_PER_NODE NULL # sed needs something
 
               setenv WRKDIR     /home/$LOGNAME                                         # user work directory
               setenv CPEXEC     /bin/cp                                                # Copy utility for large copies
