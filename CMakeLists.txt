@@ -94,4 +94,4 @@ ecbuild_add_executable (
    LIBS ${this})
 set_target_properties (interp_restarts.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
 
-add_subdirectory(FV3_Scripting)
+add_subdirectory(scripts)
