@@ -93,3 +93,5 @@ ecbuild_add_executable (
    SOURCES interp_restarts.F90
    LIBS ${this})
 set_target_properties (interp_restarts.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+
+add_subdirectory(scripts)
