@@ -15,6 +15,8 @@ set (srcs
   CubeToLatLon.F90 
   CubeGridPrototype.F90
   GEOS_FV3_Utilities.F90
+  SSI_FineToCoarseMod.F90
+  SSI_CoarseToFineMod.F90
   )
 
 set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared)
