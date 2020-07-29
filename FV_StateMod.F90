@@ -35,6 +35,9 @@ module FV_StateMod
 
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
 
+   use SSI_FineToCoarse, only: SSI_CopyFineToCoarse
+   use SSI_CoarseToFine, only: SSI_CopyCoarseToFine
+
 implicit none
 private
 
@@ -194,7 +197,7 @@ private
 #if defined( MAPL_MODE )
     type (ESMF_Clock), pointer           :: CLOCK
     type (ESMF_Alarm)                    :: ALARMS(NUM_FVDYCORE_ALARMS)
-
+    type (ESMF_GridComp)         :: fineGC
 #endif
     integer(kind=8)                      :: RUN_TIMES(4,NUM_TIMES)
     logical                              :: DOTIME, DODYN
@@ -216,6 +219,7 @@ private
     real(FVPRC)                             :: zvir     ! RWV/RAIR-1
 
   real(kind=4), pointer             :: phis(:,:)
+  real(kind=4), pointer             :: phis_temp(:,:)
 
   logical :: fv_first_run = .true.
 
@@ -303,12 +307,13 @@ contains
  end subroutine FV_RESET_CONSTANTS
 !
 !-----------------------------------------------------------------------
- subroutine FV_Setup(GC,LAYOUT_FILE, RC)
+! subroutine FV_Setup(GC,LAYOUT_FILE, RC)
+ subroutine FV_Setup(GC, RC)
 
   use test_cases_mod, only : test_case
 
   type (ESMF_GridComp)         , intent(INOUT) :: GC
-  character(LEN=*)             , intent(IN   ) :: LAYOUT_FILE
+!  character(LEN=*)             , intent(IN   ) :: LAYOUT_FILE
   integer, optional            , intent(OUT  ) :: RC
 ! Local
    character(len=ESMF_MAXSTR)       :: IAm='FV_StateMod:FV_Setup'
@@ -326,6 +331,7 @@ contains
 
   integer :: comm
   integer :: p_split=1
+  integer :: localPet, nthreads
 
 ! BEGIN
 
@@ -339,6 +345,7 @@ contains
 ! ---------------------------------
 
   call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
+  !print *, __FILE__, __LINE__, "status ", trim(IAm), status
   VERIFY_(STATUS)
 
     call MAPL_TimerOn(MAPL,"--FMS_INIT")
@@ -379,9 +386,14 @@ contains
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%deglat, label='FIXED_LATS:', default=FV_Atm(1)%flagstruct%deglat, rc=status )
       VERIFY_(STATUS)
 ! MPI decomp setup
+      call ESMF_VMGet(vm, localPet=localPet, rc=status)
+      VERIFY_(STATUS)
+      call ESMF_VMGet(vm, pet=localPet, peCount=nthreads, rc=status)
+      VERIFY_(STATUS)
+      print *, __FILE__, __LINE__, "nthreads: ", localPet, nthreads, FV_Atm(1)%flagstruct%grid_type
       call MAPL_GetResource( MAPL, nx, 'NX:', default=0, RC=STATUS )
       VERIFY_(STATUS)
-      FV_Atm(1)%layout(1) = nx
+      FV_Atm(1)%layout(1) = nx/nthreads
       call MAPL_GetResource( MAPL, ny, 'NY:', default=0, RC=STATUS )
       VERIFY_(STATUS)
       if (FV_Atm(1)%flagstruct%grid_type == 4) then
@@ -455,40 +467,20 @@ contains
   ! when reading the tracer bundle in fv_first_run 
    FV_Atm(1)%flagstruct%nwat = 0
   ! Veritical resolution dependencies
-   FV_Atm(1)%flagstruct%external_eta = .true.
-   if (FV_Atm(1)%flagstruct%npz >= 70) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 18 ! ~10mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 72) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
+   if (FV_Atm(1)%flagstruct%npz == 72) then
+     FV_Atm(1)%flagstruct%n_sponge = 9 ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 25 ! ~10mb
    endif
-   if (FV_Atm(1)%flagstruct%npz >= 90) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 25 ! ~10mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 126) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~10mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 132) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
+   if (FV_Atm(1)%flagstruct%npz == 132) then
+     FV_Atm(1)%flagstruct%n_sponge = 9 ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 136) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 180) then
-     FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
    FV_Atm(1)%flagstruct%tau = 0.
    FV_Atm(1)%flagstruct%rf_cutoff = 7.5e2
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
    FV_Atm(1)%flagstruct%remap_option = 0
+   FV_Atm(1)%flagstruct%fv_sg_adj = DT
    FV_Atm(1)%flagstruct%kord_tm =  9
    FV_Atm(1)%flagstruct%kord_mt =  9
    FV_Atm(1)%flagstruct%kord_wz =  9
@@ -511,11 +503,6 @@ contains
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%n_split = 0
    FV_Atm(1)%flagstruct%k_split = 1
-  ! default NonHydrostatic settings (irrelavent to Hydrostatic)
-   FV_Atm(1)%flagstruct%beta = 0.0
-   FV_Atm(1)%flagstruct%a_imp = 1.0
-   FV_Atm(1)%flagstruct%p_fac = 0.1
-  ! Cubed-Sphere Global Resolution Specific adjustments
    if (FV_Atm(1)%flagstruct%ntiles == 6) then
      ! Cubed-sphere grid resolution and DT dependence 
      !              based on ideal remapping DT
@@ -535,16 +522,21 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 112.5   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1440) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  56.25  )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 2880) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125 )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  14.0625)
       endif
-      if (FV_Atm(1)%flagstruct%npz == 72) then
-       FV_Atm(1)%flagstruct%fv_sg_adj = DT
+   endif
+  ! default NonHydrostatic settings (irrelavent to Hydrostatic)
+   FV_Atm(1)%flagstruct%beta = 0.0
+   FV_Atm(1)%flagstruct%a_imp = 1.0
+   FV_Atm(1)%flagstruct%p_fac = 0.1
+  ! Resolution dependence (only on full cube, not doubly periodic)
+   if (FV_Atm(1)%flagstruct%ntiles == 6) then
      ! Monotonic Hydrostatic defaults
        FV_Atm(1)%flagstruct%hydrostatic = .true.
        FV_Atm(1)%flagstruct%make_nh = .false.
@@ -555,7 +547,6 @@ contains
        FV_Atm(1)%flagstruct%hord_vt =  10
        FV_Atm(1)%flagstruct%hord_tm =  10
        FV_Atm(1)%flagstruct%hord_dp =  10
-      ! This is the best/fastest option for tracers
        FV_Atm(1)%flagstruct%hord_tr =  8
      ! NonMonotonic defaults for c360 (~25km) and finer
        if (FV_Atm(1)%flagstruct%npx >= 360) then
@@ -566,39 +557,19 @@ contains
          FV_Atm(1)%flagstruct%hord_vt =  6
          FV_Atm(1)%flagstruct%hord_tm =  6
          FV_Atm(1)%flagstruct%hord_dp = -6
+       ! This is the best/fastest option for tracers
+         FV_Atm(1)%flagstruct%hord_tr =  8
        ! Must now include explicit vorticity damping
          FV_Atm(1)%flagstruct%d_con = 1.
          FV_Atm(1)%flagstruct%do_vort_damp = .true.
          FV_Atm(1)%flagstruct%vtdm4 = 0.02
        endif
-      else
-       FV_Atm(1)%flagstruct%fv_sg_adj = DT
-     ! Monotonic Hydrostatic defaults
-       FV_Atm(1)%flagstruct%hydrostatic = .false.
-       FV_Atm(1)%flagstruct%make_nh = .false.
-       FV_Atm(1)%flagstruct%vtdm4 = 0.0
-       FV_Atm(1)%flagstruct%do_vort_damp = .false.
-       FV_Atm(1)%flagstruct%d_con = 0.
-       FV_Atm(1)%flagstruct%hord_mt =  10
-       FV_Atm(1)%flagstruct%hord_vt =  10
-       FV_Atm(1)%flagstruct%hord_tm =  10
-       FV_Atm(1)%flagstruct%hord_dp =  10
-      ! This is the best/fastest option for tracers
-       FV_Atm(1)%flagstruct%hord_tr =  8
-     ! NonMonotonic defaults for c360 (~25km) and finer
-       if (FV_Atm(1)%flagstruct%npx >= 360) then
-         FV_Atm(1)%flagstruct%hord_mt =  6
-         FV_Atm(1)%flagstruct%hord_vt =  6
-         FV_Atm(1)%flagstruct%hord_tm =  6
-         FV_Atm(1)%flagstruct%hord_dp = -6
-       ! Must now include explicit vorticity damping
-         FV_Atm(1)%flagstruct%d_con = 1.
-         FV_Atm(1)%flagstruct%do_vort_damp = .true.
-         FV_Atm(1)%flagstruct%vtdm4 = 0.02
-       endif
-     ! continue to adjust vorticity damping with
-     ! increasing resolution
+     ! NonHydrostatuic defaults for c1440 (~6km) and finer
+     !    and continue to adjust vorticity damping with
+     !    increasing resolution
        if (FV_Atm(1)%flagstruct%npx >= 1440) then
+         FV_Atm(1)%flagstruct%hydrostatic = .false.
+         FV_Atm(1)%flagstruct%make_nh = .false.
          FV_Atm(1)%flagstruct%vtdm4 = 0.04
        endif
        if (FV_Atm(1)%flagstruct%npx >= 2880) then
@@ -607,7 +578,7 @@ contains
        if (FV_Atm(1)%flagstruct%npx >= 5760) then
          FV_Atm(1)%flagstruct%vtdm4 = 0.08
        endif
-      endif
+
    endif
 
 !! Start up FV                   
@@ -617,10 +588,30 @@ contains
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
+    !block
+    !   character(len=128) :: fv_file
+    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
+    !   VERIFY_(STATUS)
+    !   write(fv_file,'(A,i2.2)') "fv_file_",localPet
+    !   open(unit=55,file=trim(fv_file),form='formatted',status='new')
+    !   write(55,'(A,i6)') 'fv_atm(1)%bd%is ', fv_atm(1)%bd%is
+    !   write(55,'(A,i6)') 'fv_atm(1)%bd%ie ', fv_atm(1)%bd%ie
+    !   write(55,'(A,i6)') 'fv_atm(1)%bd%js ', fv_atm(1)%bd%js
+    !   write(55,'(A,i6)') 'fv_atm(1)%bd%je ', fv_atm(1)%bd%je
+    !   write(55,'(A,i6)') 'fv_atm(1)%bd%isd ', fv_atm(1)%bd%isd
+    !   write(55,'(A,i6)') 'fv_atm(1)%bd%ied ', fv_atm(1)%bd%ied
+    !   write(55,'(A,i6)') 'fv_atm(1)%bd%jsd ', fv_atm(1)%bd%jsd
+    !   write(55,'(A,i6)') 'fv_atm(1)%bd%jed ', fv_atm(1)%bd%jed
+    !   write(55,'(A,i6)') 'fv_atm(1)%flagstruct%npx ', fv_atm(1)%flagstruct%npx
+    !   write(55,'(A,i6)') 'fv_atm(1)%flagstruct%npy ', fv_atm(1)%flagstruct%npy
+    !   write(55,'(A,i6)') 'fv_atm(1)%flagstruct%npz ', fv_atm(1)%flagstruct%npz
+    !   close(55)
+    !end block
+
 !! Setup GFDL microphysics module
     call gfdl_cloud_microphys_init()
 
- _ASSERT(DT > 0.0, 'DT must be greater than zero')
+ _ASSERT(DT > 0.0, 'needs informative message')
 
   call WRITE_PARALLEL("Dynamics PE Layout ")
   call WRITE_PARALLEL(FV_Atm(1)%layout(1)    ,format='("NPES_X  : ",(   I3))')
@@ -633,7 +624,7 @@ contains
                     !      if needed, we could compute, ks by count(BK==0.0)
                     !      then FV will try to run slightly more efficient code
                     !      So far, GEOS-5 has used ks = 0
-  _ASSERT(ks <= FV_Atm(1)%flagstruct%NPZ+1,'ks must be smaller than NPZ+1')
+  _ASSERT(ks <= FV_Atm(1)%flagstruct%NPZ+1,'needs informative message')
   call WRITE_PARALLEL(ks                          , &
      format='("Number of true pressure levels =", I5)'   )
 
@@ -736,6 +727,7 @@ contains
   integer   :: isc,iec, jsc,jec   !  Local dims
   integer   :: isd,ied, jsd,jed   !  Local dims
   integer   :: k                  !  Vertical loop index
+  integer   :: npz                !  Number vertical levels
   integer   :: ng
   integer   :: ndt
 
@@ -801,46 +793,6 @@ contains
   call WRITE_PARALLEL(STATE%DT,format='("Dynamics time step : ",(F10.4))')
   call WRITE_PARALLEL(' ')
 
-! Get pointers to internal state vars
-  call MAPL_GetPointer(internal, ak, "AK",rc=status)
-  VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, bk, "BK",rc=status)
-  VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, u, "U",rc=status)
-  VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, v, "V",rc=status)
-  VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, pt, "PT",rc=status)
-  VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, pe, "PE",rc=status)
-  VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, pkz, "PKZ",rc=status)
-  VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, dz, "DZ",rc=status)
-  VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, w, "W",rc=status)
-  VERIFY_(STATUS)
-
-  call CREATE_VARS ( FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec,     &
-                     1, FV_Atm(1)%flagstruct%npz, FV_Atm(1)%flagstruct%npz+1,            &
-                     U, V, PT, PE, PKZ, DZ, W, &
-                     STATE%VARS )
-  call MAPL_MemUtilsWrite(VM, 'FV_StateMod: CREATE_VARS', RC=STATUS )
-  VERIFY_(STATUS)
-
-  GRID%IS     = FV_Atm(1)%bd%isc
-  GRID%IE     = FV_Atm(1)%bd%iec
-  GRID%JS     = FV_Atm(1)%bd%jsc
-  GRID%JE     = FV_Atm(1)%bd%jec
-  GRID%isd    = FV_Atm(1)%bd%isd
-  GRID%ied    = FV_Atm(1)%bd%ied
-  GRID%jsd    = FV_Atm(1)%bd%jsd
-  GRID%jed    = FV_Atm(1)%bd%jed
-  if(.not.associated(GRID%AK)) allocate(GRID%AK(size(ak)))
-  if(.not.associated(GRID%BK)) allocate(GRID%BK(size(bk)))
-  GRID%AK     = ak
-  GRID%BK     = bk
-
 ! Local Copy of dimensions
 
   IS     = FV_Atm(1)%bd%isc
@@ -855,6 +807,97 @@ contains
   IED    = FV_Atm(1)%bd%ied
   JSD    = FV_Atm(1)%bd%jsd
   JED    = FV_Atm(1)%bd%jed
+  NPZ    = FV_Atm(1)%flagstruct%npz
+
+! Get pointers to internal state vars
+  call MAPL_GetPointer(internal, ak, "AK",rc=status)
+  VERIFY_(STATUS)
+  call MAPL_GetPointer(internal, bk, "BK",rc=status)
+  VERIFY_(STATUS)
+!  call MAPL_GetPointer(internal, u, "U",rc=status)
+!  VERIFY_(STATUS)
+!  call MAPL_GetPointer(internal, v, "V",rc=status)
+!  VERIFY_(STATUS)
+!  call MAPL_GetPointer(internal, pt, "PT",rc=status)
+!  VERIFY_(STATUS)
+!  call MAPL_GetPointer(internal, pe, "PE",rc=status)
+!  VERIFY_(STATUS)
+!  call MAPL_GetPointer(internal, pkz, "PKZ",rc=status)
+!  VERIFY_(STATUS)
+!  call MAPL_GetPointer(internal, dz, "DZ",rc=status)
+!  VERIFY_(STATUS)
+!  call MAPL_GetPointer(internal, w, "W",rc=status)
+!  VERIFY_(STATUS)
+
+! Allocate coarse decomp internal state
+  if(.not.associated(u)) allocate(u(is:ie,js:je,npz), stat=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, u, 'U', rc=status)
+  VERIFY_(STATUS)
+
+  if(.not.associated(v)) allocate(v(is:ie,js:je,npz), stat=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, v, 'V', rc=status)
+  VERIFY_(STATUS)
+
+  if(.not.associated(pt)) allocate(pt(is:ie,js:je,npz), stat=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, pt, 'PT', rc=status)
+  VERIFY_(STATUS)
+
+  if(.not.associated(pe)) allocate(pe(is:ie,js:je,npz+1), stat=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, pe, 'PE', rc=status)
+  VERIFY_(STATUS)
+
+  if(.not.associated(pkz)) allocate(pkz(is:ie,js:je,npz), stat=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, pkz, 'PKZ', rc=status)
+  VERIFY_(STATUS)
+
+  if(.not.associated(dz)) allocate(dz(is:ie,js:je,npz), stat=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, dz, 'DZ', rc=status)
+  VERIFY_(STATUS)
+
+  if(.not.associated(w)) allocate(w(is:ie,js:je,npz), stat=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, w, 'W', rc=status)
+  VERIFY_(STATUS)
+
+  call CREATE_VARS ( FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec,     &
+                     1, FV_Atm(1)%flagstruct%npz, FV_Atm(1)%flagstruct%npz+1,            &
+                     U, V, PT, PE, PKZ, DZ, W, &
+                     STATE%VARS )
+  call MAPL_MemUtilsWrite(VM, 'FV_StateMod: CREATE_VARS', RC=STATUS )
+  VERIFY_(STATUS)
+
+    !block
+    !   type(ESMF_VM) :: vm
+    !   integer :: localPet
+    !   integer :: rc, status
+    !   call ESMF_VMGetCurrent(vm, rc=status)
+    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
+    !   if(localPet == 0) then
+    !      write(100,*) shape(STATE%VARS%U)
+    !      write(100,*) STATE%VARS%U
+    !      write(102,*) shape(U)
+    !      write(102,*) U
+    !   endif
+    !end block
+
+  GRID%IS     = FV_Atm(1)%bd%isc
+  GRID%IE     = FV_Atm(1)%bd%iec
+  GRID%JS     = FV_Atm(1)%bd%jsc
+  GRID%JE     = FV_Atm(1)%bd%jec
+  GRID%isd    = FV_Atm(1)%bd%isd
+  GRID%ied    = FV_Atm(1)%bd%ied
+  GRID%jsd    = FV_Atm(1)%bd%jsd
+  GRID%jed    = FV_Atm(1)%bd%jed
+  if(.not.associated(GRID%AK)) allocate(GRID%AK(size(ak)))
+  if(.not.associated(GRID%BK)) allocate(GRID%BK(size(bk)))
+  GRID%AK     = ak
+  GRID%BK     = bk
 
   allocate( GRID%DXC(IS:IE,JS:JE) )
   GRID%DXC = fv_atm(1)%gridstruct%dxc(IS:IE,JS:JE)
@@ -912,6 +955,7 @@ contains
   call WRITE_PARALLEL(' ')
   call WRITE_PARALLEL(STATE%DT, &
     format='("INITIALIZED ALARM: DYN_TIME_TO_RUN EVERY ",F9.1," secs.")')
+  !print *, __FILE__, __LINE__, "state%dt ", STATE%DT
 
 !  Clear wall clock time clocks and global budgets
 
@@ -943,7 +987,12 @@ contains
      RC           = STATUS                    )
   VERIFY_(STATUS) 
 
-  call MAPL_GetPointer ( import, phis, 'PHIS', RC=STATUS )
+  !call MAPL_GetPointer ( import, phis, 'PHIS', RC=STATUS )
+  !VERIFY_(STATUS)
+
+  if(.not.associated(phis)) allocate(phis(isc:iec,jsc:jec), stat=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(import, phis, 'PHIS', rc=status)
   VERIFY_(STATUS)
 
  ! Set FV3 surface geopotential
@@ -972,7 +1021,7 @@ contains
                                  FV_Atm(1)%flagstruct%moist_phys, FV_Atm(1)%flagstruct%hydrostatic, hybrid, FV_Atm(1)%delz, FV_Atm(1)%ze0, &
                                  FV_Atm(1)%ks, FV_Atm(1)%ptop, FV_Atm(1)%domain, tile_in, FV_Atm(1)%bd)
      ! Copy FV to internal State
-       call FV_To_State ( STATE )
+       call FV_To_State ( STATE, internal )
        if( gid==masterproc ) write(*,*) 'Doubly Periodic IC generated LAT:', FV_Atm(1)%flagstruct%deglat
    else
      ALLOCATE( UA(isc:iec  ,jsc:jec  ,1:FV_Atm(1)%npz) )
@@ -995,7 +1044,7 @@ contains
         call fv_getDELZ(DZ,PT,PE)
         PT = PT/PKZ
      endif
-     call State_To_FV( STATE )
+     call State_To_FV( STATE, internal )
    endif ! doubly-periodic
 
   else ! COLDSTART
@@ -1007,7 +1056,7 @@ contains
     !   call fv_getDELZ(DZ,PT,PE)
     !   PT = PT/PKZ
     !endif
-     call State_To_FV( STATE )
+     call State_To_FV( STATE, internal )
 
   endif
 
@@ -1083,12 +1132,14 @@ contains
 
 end subroutine FV_InitState
 
-subroutine FV_Run (STATE, CLOCK, GC, RC)
+subroutine FV_Run (STATE, CLOCK, internal, import, GC, RC)
 
   type (T_FVDYCORE_STATE),pointer              :: STATE
 
   type (ESMF_Clock), target,     intent(IN   ) :: CLOCK
   type (ESMF_GridComp)         , intent(INOUT) :: GC
+  type (ESMF_State)         , intent(INOUT) :: internal
+  type (ESMF_State)         , intent(IN   ) :: import
   integer, optional            , intent(OUT  ) :: RC
 
 ! Local variables
@@ -1189,6 +1240,23 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
 
   ! Be sure we have the correct PHIS and number of tracers for this run
    if (fv_first_run) then
+
+     call SSI_CopyFineToCoarse(import, phis, 'PHIS', rc=status)
+     VERIFY_(STATUS)
+    !block
+    !   type(ESMF_VM) :: vm
+    !   integer :: localPet
+    !   integer :: rc, status
+    !   call ESMF_VMGetCurrent(vm, rc=status)
+    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
+    !   if(localPet == 0) then
+    !      write(105,*) shape(phis)
+    !      write(105,*) phis
+    !      !write(106,*) shape(phis_temp)
+    !      !write(106,*) phis_temp
+    !   endif
+    !end block
+
     ! Determine how many water species we have
      nwat_tracers = 0
      if (.not. ADIABATIC) then
@@ -1200,7 +1268,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          if (TRIM(state%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
        enddo
       ! We must have these first 5 at a minimum
-       _ASSERT(nwat_tracers == 5, 'expecting 5 water species: Q QLCN QLLS QICN QILS')
+       _ASSERT(nwat_tracers == 5, 'needs informative message')
       ! Check for CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'CLLS'    ) nwat_tracers = nwat_tracers + 1
@@ -1217,7 +1285,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          endif
        endif
        if (FV_Atm(1)%flagstruct%do_sat_adj) then
-          _ASSERT(FV_Atm(1)%flagstruct%nwat == 6, 'when using fv saturation adjustment NWAT must equal 6')
+          _ASSERT(FV_Atm(1)%flagstruct%nwat == 6, 'needs informative message')
        endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
@@ -1231,7 +1299,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
                    (FV_Atm(1)%flagstruct%nwat == 1) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 3) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 6) )
-     _ASSERT( NWAT_TEST , 'NWAT must be either 0, 1, 3 or 6')
+     _ASSERT( NWAT_TEST , 'needs informative message')
      select case ( FV_Atm(1)%flagstruct%nwat )
      case (6) 
           FV_Atm(1)%ncnst = STATE%GRID%NQ + 3 ! NQ + Combined QLIQ,QICE,QCLD
@@ -1565,7 +1633,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     if (DEBUG) call debug_fv_state('Before Dynamics Execution',STATE)
 
 ! Update FV with Internal State
-    call State_To_FV( STATE )
+    call State_To_FV( STATE, internal )
 
     ! Query for PSDRY from AGCM.rc and set to MAPL_PSDRY if not found
     call MAPL_GetResource( MAPL, massD0, 'PSDRY:', default=MAPL_PSDRY, RC=STATUS )
@@ -1741,7 +1809,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     call MAPL_TimerOff(MAPL,"--FV_DYNAMICS")
 
 ! Copy FV to internal State
-   call FV_To_State ( STATE )
+   call FV_To_State ( STATE, internal )
 
   SPHU_FILLED = .FALSE.
   QLIQ_FILLED = .FALSE.
@@ -1768,18 +1836,24 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
             do i=isc,iec
               ! LIQUID
                FQC = 0.0
-               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qlcn)) / MAX(FV_Atm(1)%q(i,j,k,qlcn)+FV_Atm(1)%q(i,j,k,qlls),1.e-5))
+               if ( FV_Atm(1)%q(i,j,k,qlcn)+FV_Atm(1)%q(i,j,k,qlls) > 0.0 ) then
+                  FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qlcn)) / (FV_Atm(1)%q(i,j,k,qlcn)+FV_Atm(1)%q(i,j,k,qlls)))
+               endif
                FV_Atm(1)%q(i,j,k,qlcn) = FV_Atm(1)%q(i,j,k,qliq)*(    FQC)
                FV_Atm(1)%q(i,j,k,qlls) = FV_Atm(1)%q(i,j,k,qliq)*(1.0-FQC)
               ! ICE
                FQC = 0.0
-               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qicn)) / MAX(FV_Atm(1)%q(i,j,k,qicn)+FV_Atm(1)%q(i,j,k,qils),1.e-8))
+               if ( FV_Atm(1)%q(i,j,k,qicn)+FV_Atm(1)%q(i,j,k,qils) > 0.0 ) then
+                  FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qicn)) / (FV_Atm(1)%q(i,j,k,qicn)+FV_Atm(1)%q(i,j,k,qils)))
+               endif
                FV_Atm(1)%q(i,j,k,qicn) = FV_Atm(1)%q(i,j,k,qice)*(    FQC)
                FV_Atm(1)%q(i,j,k,qils) = FV_Atm(1)%q(i,j,k,qice)*(1.0-FQC)
               ! CLOUD
                if (FV_Atm(1)%flagstruct%nwat == 6) then
                   FQC = 0.0
-                  FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,clcn)) / MAX(FV_Atm(1)%q(i,j,k,clcn)+FV_Atm(1)%q(i,j,k,clls),1.e-8))
+                  if ( FV_Atm(1)%q(i,j,k,clcn)+FV_Atm(1)%q(i,j,k,clls) > 0.0 ) then
+                     FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,clcn)) / (FV_Atm(1)%q(i,j,k,clcn)+FV_Atm(1)%q(i,j,k,clls)))
+                  endif
                   FV_Atm(1)%q(i,j,k,clcn) = FV_Atm(1)%q(i,j,k,qcld)*(    FQC)
                   FV_Atm(1)%q(i,j,k,clls) = FV_Atm(1)%q(i,j,k,qcld)*(1.0-FQC)
                endif
@@ -2065,11 +2139,12 @@ end subroutine FV_Run
 
  end subroutine FV_Finalize
 
-subroutine State_To_FV ( STATE )
+subroutine State_To_FV ( STATE, internal )
 
 ! !INPUT PARAMETERS:
 
    type(T_FVDYCORE_STATE),      pointer   :: STATE
+   type(ESMF_State),            intent(inout) :: internal
 
     integer               :: ISC,IEC, JSC,JEC
     integer               :: ISD,IED, JSD,JED 
@@ -2086,6 +2161,10 @@ subroutine State_To_FV ( STATE )
     real(FVPRC) :: sbuffer(state%grid%is:state%grid%ie,state%grid%npz)
     real(FVPRC) :: ebuffer(state%grid%js:state%grid%je,state%grid%npz)
     real(FVPRC) :: nbuffer(state%grid%is:state%grid%ie,state%grid%npz)
+
+    !real(REAL8), dimension(:,:,:), pointer :: U     => NULL()
+    character(len=ESMF_MAXSTR) :: Iam = "FV:State_To_FV"
+    integer :: status, rc
 
     ISC = state%grid%is
     IEC = state%grid%ie
@@ -2104,6 +2183,33 @@ subroutine State_To_FV ( STATE )
 !------------
 ! Update Winds
 !------------
+  !U => STATE%VARS%U
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%U, 'U', rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%V, 'V', rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%PT, 'PT', rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%PE, 'PE', rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%PKZ, 'PKZ', rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%DZ, 'DZ', rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%W, 'W', rc=status)
+  VERIFY_(STATUS)
+
+    !block
+    !   type(ESMF_VM) :: vm
+    !   integer :: localPet
+    !   integer :: rc, status
+    !   call ESMF_VMGetCurrent(vm, rc=status)
+    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
+    !   if(localPet == 0) then
+    !      write(103,*) shape(STATE%VARS%U)
+    !      write(103,*) STATE%VARS%U
+    !   endif
+    !end block
 
 ! D-Grid
   FV_Atm(1)%u(:,:,:) = tiny_number
@@ -2215,15 +2321,20 @@ subroutine State_To_FV ( STATE )
 
 end subroutine State_To_FV
 
-subroutine FV_To_State ( STATE )
+subroutine FV_To_State ( STATE, internal )
 
 !
 ! !INPUT PARAMETERS:
 
    type(T_FVDYCORE_STATE),      pointer   :: STATE
+   type(ESMF_State),           intent(inout) :: internal
 
     integer               :: ISC,IEC, JSC,JEC, KM
     integer               :: I,J
+
+    !real(REAL8), dimension(:,:,:), pointer :: U     => NULL()
+    character(len=ESMF_MAXSTR)  :: Iam = "FV:FV_To_State"
+    integer :: status, rc
 
     ISC = state%grid%is
     IEC = state%grid%ie
@@ -2267,6 +2378,23 @@ subroutine FV_To_State ( STATE )
        STATE%VARS%PT  = STATE%VARS%PT/STATE%VARS%PKZ
     endif
 
+    !U => STATE%VARS%U
+
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%U, 'U', rc=status)
+    VERIFY_(status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%V, 'V', rc=status)
+    VERIFY_(status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%PT, 'PT', rc=status)
+    VERIFY_(status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%PE, 'PE', rc=status)
+    VERIFY_(STATUS)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%PKZ, 'PKZ', rc=status)
+    VERIFY_(STATUS)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%DZ, 'DZ', rc=status)
+    VERIFY_(STATUS)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%W, 'W', rc=status)
+    VERIFY_(STATUS)
+    
    return
 
 end subroutine FV_To_State
@@ -3591,14 +3719,10 @@ end subroutine fv_getDivergence
 subroutine fv_getUpdraftHelicity(uh25)
    use constants_mod, only: fms_grav=>grav
    use fv_diagnostics_mod, only: get_vorticity, updraft_helicity
-! made this REAL4
    real(REAL4), intent(OUT) :: uh25(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
-
-! made an intermediate output of FVPRC
    real(FVPRC) :: uh25_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
    integer :: sphum=1
    real(FVPRC) :: vort(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,FV_Atm(1)%npz)
-   ! introduced these two variables for the literals
    real(FVPRC) :: z_bot, z_top
 
    z_bot = 2.e3
@@ -4279,7 +4403,6 @@ subroutine echo_fv3_setup()
 !   logical :: dwind_2d = .false.
 !   logical :: breed_vortex_inline = .false.
 !   logical :: range_warn = .false.
-   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%external_eta ,format='("FV3 external_eta: ",(A))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%fill ,format='("FV3 fill: ",(A))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%fill_dp ,format='("FV3 fill_dp: ",(A))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%fill_wz ,format='("FV3 fill_wz: ",(A))' )
