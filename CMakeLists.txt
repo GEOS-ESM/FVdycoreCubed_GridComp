@@ -49,7 +49,8 @@ elseif (FV_PRECISION MATCHES R4R8) # FV is R4 but FMS is R8
 endif ()
 
 
-set (CMAKE_Fortran_FLAGS_RELEASE "${GEOS_Fortran_FLAGS_VECT}")
+set (CMAKE_Fortran_FLAGS_RELEASE "${GEOS_Fortran_FLAGS_VECT} ${OpenMP_Fortran_FLAGS}")
+set (CMAKE_Fortran_FLAGS_DEBUG "${GEOS_Fortran_FLAGS_DEBUG} ${OpenMP_Fortran_FLAGS}")
 
 if (CRAY_POINTER)
   set_target_properties (${this} PROPERTIES COMPILE_FLAGS ${CRAY_POINTER})
