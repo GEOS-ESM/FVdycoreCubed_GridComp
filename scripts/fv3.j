@@ -83,7 +83,7 @@ module list
          setenv EXPDIR  @EXPDIR
          setenv SCRDIR  $EXPDIR/scratch_${EXPID}_${EXETAG}-${FV3EXE}
 if ($NH) setenv SCRDIR  ${SCRDIR}_NH.$$
-         setenv EXE     $GEOSBIN/StandAlone_FV3_Dycore.x
+         setenv EXE     $EXPDIR/StandAlone_FV3_Dycore.x
 
 #######################################################################
 #                 Create Experiment Scratch-Directory
@@ -163,8 +163,6 @@ NUM_READERS: @NUM_READERS
 NUM_WRITERS: @NUM_WRITERS
 # AGCM Model Restart Files
 # ------------------------
-#DYN_INTERNAL_RESTART_FILE:    fvcore_internal_rst
-#DYN_INTERNAL_RESTART_TYPE:    pbinary
 DYN_INTERNAL_CHECKPOINT_FILE: fvcore_internal_checkpoint
 DYN_INTERNAL_CHECKPOINT_TYPE: pnc4
 DYN_INTERNAL_HEADER:          1
@@ -252,7 +250,7 @@ cat >      input.nml << EOF
 
 &test_case_nml
        test_case = 5
- /
+/
 
 &fms_io_nml
 /
@@ -278,9 +276,9 @@ endif
 echo "  "
 #pwd
 echo "***** USING **** $EXE *********************"
-if( $USE_SHMEM == 0 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
+if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 mpirun -np $NPES ./StandAlone_FV3_Dycore.x |& tee ${SCRDIR}.log
-if( $USE_SHMEM == 0 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
+if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 
 set rc =  $status
 echo       Status = $rc
