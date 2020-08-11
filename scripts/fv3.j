@@ -277,7 +277,7 @@ echo "  "
 #pwd
 echo "***** USING **** $EXE *********************"
 if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
-mpirun -np $NPES ./StandAlone_FV3_Dycore.x |& tee ${SCRDIR}.log
+$RUN_CMD $NPES ./StandAlone_FV3_Dycore.x |& tee ${SCRDIR}.log
 if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 
 set rc =  $status
