@@ -175,7 +175,7 @@ contains
           ! do not maximize PEs on fewer PETs if SSI shared memory not supported
           nthreads=1
         endif
-        nthreads=2
+        nthreads=1
         call ESMF_GridCompSetVMMaxPEs(gc, maxPeCountPerPet=nthreads, rc=status)
         VERIFY_(STATUS)
       endif
@@ -243,8 +243,6 @@ contains
     allocate( state, stat=status )
     VERIFY_(STATUS)
     wrap%dyn_state => state
-
-    !call omp_set_num_threads(nthreads)
 
 ! Save pointer to the wrapped internal state in the GC
 ! ----------------------------------------------------
@@ -386,7 +384,8 @@ contains
   type(ESMF_FieldBundle)             :: tradv, tradvex
   integer                            :: i,numTracers,fv3_standalone
   type(ESMF_VM) :: vm
-  integer :: localPet
+  integer :: localPet, peCount
+  integer :: omp_get_num_threads
 
 ! Begin
 !------
@@ -402,8 +401,20 @@ contains
     !call MAPL_GenericInitialize ( GC, IMPORT, EXPORT, CLOCK,  RC=STATUS)
     !VERIFY_(STATUS)
 
+    call ESMF_VMGet(vm, localPet=localPet, rc=status)
+    VERIFY_(STATUS)
+    call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
+    VERIFY_(STATUS)
+!set OMP_NUM_THREADS to local PeCount
+!$ call omp_set_num_threads(peCount)
+
+!$omp parallel
+!$ print *, 'Initialize ', omp_get_num_threads(), peCount
+!$omp end parallel
+
 ! Get the private internal state
 !-------------------------------
+
 
     call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, status)
     VERIFY_(STATUS)
@@ -988,7 +999,9 @@ subroutine Run(gc, import, export, clock, rc)
     logical  :: uphi_associated=.false., vphi_associated=.false.
     logical  :: uke_associated=.false. , vke_associated=.false.
 
-    !type(ESMF_State) :: internal
+    type(ESMF_VM) :: vm
+    integer :: localPet, peCount
+    integer :: omp_get_num_threads
     
   Iam = "CoarseRun"
 
@@ -999,13 +1012,21 @@ subroutine Run(gc, import, export, clock, rc)
   VERIFY_(STATUS)
   state => wrap%dyn_state
 
-  call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
+  call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, vm=vm, grid=ESMFGRID, RC=STATUS )
   VERIFY_(STATUS)
   Iam = trim(COMP_NAME) // trim(Iam)
 
   call ESMF_GridValidate(ESMFGRID,RC=STATUS)
   VERIFY_(STATUS)
 
+!    call ESMF_VMGet(vm, localPet=localPet, rc=status)
+!    VERIFY_(STATUS)
+!    call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
+!    VERIFY_(STATUS)
+!!!!set OMP_NUM_THREADS to local PeCount
+!!!!$ call omp_set_num_threads(peCount)
+
+!!!!$ print *, 'Run ', omp_get_num_threads()
 ! Retrieve the pointer to the generic state
 ! -----------------------------------------
 
@@ -4557,13 +4578,23 @@ end subroutine RUN
     integer i,j,k
 
     character(len=ESMF_MAXSTR) :: COMP_NAME
-    !type (ESMF_State) :: internal
+    type (ESMF_VM) :: vm
+    integer :: localPet, peCount
+    integer :: omp_get_num_threads
 
     Iam = "CoarseRunAddIncs"
-    call ESMF_GridCompGet( GC, name=COMP_NAME, RC=STATUS )
+    call ESMF_GridCompGet( GC, name=COMP_NAME, vm=vm, RC=STATUS )
     VERIFY_(STATUS)
     Iam = trim(COMP_NAME) // trim(Iam)
 
+!!!    call ESMF_VMGet(vm, localPet=localPet, rc=status)
+!!!    VERIFY_(STATUS)
+!!!    call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
+!!!    VERIFY_(STATUS)
+!!!!set OMP_NUM_THREADS to local PeCount
+!!!!$ call omp_set_num_threads(peCount)
+
+!!!!$ print *, 'RunaddIncs ', omp_get_num_threads(), peCount
 ! Retrieve the pointer to the internal state
 ! ------------------------------------------
 
