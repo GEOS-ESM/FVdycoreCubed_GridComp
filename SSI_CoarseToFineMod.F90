@@ -5,6 +5,8 @@ module SSI_CoarseToFine
    use ESMF
    use MAPL
 
+   use SSI_TypeMod, only : SSI_Type
+
    interface SSI_CopyCoarseToFine
       module procedure SSI_CopyCoarseToFine_R4_2 
       module procedure SSI_CopyCoarseToFine_R8_2 
@@ -17,6 +19,13 @@ module SSI_CoarseToFine
       module procedure SSI_BundleCopyCoarseToFine_R8_3 
    end interface
 
+   interface SSI_copy_ptr_c2f
+      module procedure SSI_copy_ptr_c2f_R4_2
+      module procedure SSI_copy_ptr_c2f_R8_2
+      module procedure SSI_copy_ptr_c2f_R4_3
+      module procedure SSI_copy_ptr_c2f_R8_3
+   end interface
+
    contains
 
 #define IDENTITY(x)x
@@ -24,7 +33,8 @@ module SSI_CoarseToFine
 #define SUB___(N,A) IDENTITY(N)IDENTITY(_)IDENTITY(A)
 #define NAME_ SSI_CopyCoarseToFine
 #define NAME_BUNDLE_ SSI_BundleCopyCoarseToFine
-#define COPY____(P,C,R) IDENTITY(P)IDENTITY(=)IDENTITY(C)IDENTITY(R)
+#define NAME_COPY_ SSI_copy_ptr_c2f
+#define COPY____(P,C,R) IDENTITY(P),IDENTITY(C)IDENTITY(R)
 
 !--------------------------
 #undef TKR_
@@ -39,6 +49,9 @@ module SSI_CoarseToFine
 #define    SUB_           SUB__(NAME_,TKR_)
 #define COPY_ COPY____(farrayPtr,coarse_Array,RANGE_)
 #include "SSI_CopyCoarseToFine.H"
+#undef SUB_
+#define SUB_ SUB__(NAME_COPY_,TKR_)
+#include "SSI_copy_ptr_c2f.H"
 
 !--------------------------
 #undef TKR_
@@ -53,6 +66,9 @@ module SSI_CoarseToFine
 #define    SUB_           SUB__(NAME_,TKR_)
 #define COPY_ COPY____(farrayPtr,coarse_Array,RANGE_)
 #include "SSI_CopyCoarseToFine.H"
+#undef SUB_
+#define SUB_ SUB__(NAME_COPY_,TKR_)
+#include "SSI_copy_ptr_c2f.H"
 
 !--------------------------
 #undef TKR_
@@ -67,6 +83,9 @@ module SSI_CoarseToFine
 #define    SUB_           SUB__(NAME_,TKR_)
 #define COPY_ COPY____(farrayPtr,coarse_Array,RANGE_)
 #include "SSI_CopyCoarseToFine.H"
+#undef SUB_
+#define SUB_ SUB__(NAME_COPY_,TKR_)
+#include "SSI_copy_ptr_c2f.H"
 
 !--------------------------
 #undef TKR_
@@ -81,6 +100,9 @@ module SSI_CoarseToFine
 #define    SUB_           SUB__(NAME_,TKR_)
 #define COPY_ COPY____(farrayPtr,coarse_Array,RANGE_)
 #include "SSI_CopyCoarseToFine.H"
+#undef SUB_
+#define SUB_ SUB__(NAME_COPY_,TKR_)
+#include "SSI_copy_ptr_c2f.H"
 
 !-----BUNDLE---------------------
 !--------------------------

@@ -126,7 +126,7 @@ Module CoarseFVdycoreCubed_GridComp
      module procedure Write_Profile_2d_R8
   end interface
 
-  !type(ESMF_State) :: internal
+  type(ESMF_State) :: internal
 
 contains
 
@@ -150,9 +150,9 @@ contains
       !call ESMF_LogWrite("Executing 'userm2_setvm'", ESMF_LOGMSG_INFO, rc=rc)
       !if (rc/=ESMF_SUCCESS) return ! bail out
       nthreads = 1
-!$omp parallel
-!$      nthreads = omp_get_num_threads()
-!$omp end parallel
+!!!$omp parallel
+!!!$      nthreads = omp_get_num_threads()
+!!!$omp end parallel
 
       ! The following call will give each PET as many PEs as nthreads.
       ! This will reduce the number of PETs that are
@@ -166,8 +166,8 @@ contains
         ssiSharedMemoryEnabledFlag=ssiSharedMemoryEnabled, rc=status)
       VERIFY_(STATUS)
       !print *, __FILE__, __LINE__, "ssiSharedMemoryEnabled: ", petCount, localPet, ssiSharedMemoryEnabled, pthreadsEnabled
-      call ESMF_VMBarrier(vm, rc=status)
-      VERIFY_(STATUS)
+      !call ESMF_VMBarrier(vm, rc=status)
+      !VERIFY_(STATUS)
       if (pthreadsEnabled) then
         !call ESMF_VMGet(vm, ssiMaxPetCount=ssiMaxPetCount, rc=rc)
         !if (rc/=ESMF_SUCCESS) return ! bail out
@@ -175,10 +175,11 @@ contains
           ! do not maximize PEs on fewer PETs if SSI shared memory not supported
           nthreads=1
         endif
+        nthreads=2
         call ESMF_GridCompSetVMMaxPEs(gc, maxPeCountPerPet=nthreads, rc=status)
         VERIFY_(STATUS)
       endif
-      print *, __FILE__, __LINE__, "ssiSharedMemoryEnabled: ", ssiSharedMemoryEnabled, nthreads, pthreadsEnabled
+      !print *, __FILE__, __LINE__, "ssiSharedMemoryEnabled: ", ssiSharedMemoryEnabled, nthreads, pthreadsEnabled
         !write(msg,*) "user2_setvm: OpenMP num thread:", nthreads
         !call ESMF_LogWrite(msg, ESMF_LOGMSG_INFO, rc=rc)
         !call ESMF_LogFlush(rc=rc)
@@ -253,12 +254,16 @@ contains
     call ESMF_UserCompSetInternalState ( GC,'DYNstate',wrap,status )
     VERIFY_(STATUS)
 
-    !call ESMF_GridCompSetEntryPoint (gc, ESMF_METHOD_INITIALIZE, &
-    !   userRoutine=set_esmf_internal_state, PHASE=1, rc=status)
-    !VERIFY_(STATUS)
+    call ESMF_GridCompSetEntryPoint (gc, ESMF_METHOD_INITIALIZE, &
+       userRoutine=set_esmf_internal_state, PHASE=1, rc=status)
+    VERIFY_(STATUS)
 
     call ESMF_GridCompSetEntryPoint (gc, ESMF_METHOD_INITIALIZE, &
-       userRoutine=Initialize, PHASE=1, rc=status)
+       userRoutine=Initialize, PHASE=2, rc=status)
+    VERIFY_(STATUS)
+
+    call ESMF_GridCompSetEntryPoint (gc, ESMF_METHOD_INITIALIZE, &
+       userRoutine=get_esmf_internal_state, PHASE=3, rc=status)
     VERIFY_(STATUS)
 
     call ESMF_GridCompSetEntryPoint (gc, ESMF_METHOD_RUN, &
@@ -280,18 +285,41 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  !subroutine set_esmf_internal_state(gc, import, export, clock, rc)
-  !   type(ESMF_GridComp), intent(inout) :: gc       !  gridded component 
-  !   type(ESMF_State),    intent(inout) :: import   ! import state
-  !   type(ESMF_State),    intent(inout) :: export   ! export state
-  !   type(ESMF_Clock),    intent(inout) :: clock    ! the clock
+  subroutine set_esmf_internal_state(gc, import, export, clock, rc)
+     type(ESMF_GridComp) :: gc       !  gridded component 
+     type(ESMF_State)    :: import   ! import state
+     type(ESMF_State)    :: export   ! export state
+     type(ESMF_Clock)    :: clock    ! the clock
 
+     integer, intent(out)     :: rc       ! Error code:
+     character(len=ESMF_MAXSTR)         :: IAm 
 
-  !    internal = import
+     IAm = 'set_esmf_internal_state'
 
-  !    return(ESMF_SUCCESS)
+     internal = import
 
-  !end subroutine set_esmf_internal_state
+     RETURN_(ESMF_SUCCESS)
+
+  end subroutine set_esmf_internal_state
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine get_esmf_internal_state(gc, import, export, clock, rc)
+     type(ESMF_GridComp) :: gc       !  gridded component 
+     type(ESMF_State)    :: import   ! import state
+     type(ESMF_State)    :: export   ! export state
+     type(ESMF_Clock)    :: clock    ! the clock
+
+     integer, intent(out)     :: rc       ! Error code:
+     character(len=ESMF_MAXSTR)         :: IAm 
+
+     IAm = 'get_esmf_internal_state'
+
+     export = internal
+
+     RETURN_(ESMF_SUCCESS)
+
+  end subroutine get_esmf_internal_state
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -312,7 +340,7 @@ contains
   type (DYN_wrap)                    :: wrap
   type (DynState),  pointer  :: STATE
 
-  type (MAPL_MetaComp),      pointer :: mapl 
+  !type (MAPL_MetaComp),      pointer :: mapl 
 
   character (len=ESMF_MAXSTR)        :: layout_file
 
@@ -321,14 +349,14 @@ contains
 
   !real(r8), pointer                  ::  ak(:)
   !real(r8), pointer                  ::  bk(:)
-  !real(r8), pointer                  ::  ud(:,:,:)
-  !real(r8), pointer                  ::  vd(:,:,:)
-  !real(r8), pointer                  ::  pe(:,:,:)
-  !real(r8), pointer                  ::  pt(:,:,:)
-  !real(r8), pointer                  ::  pk(:,:,:)
+  real(r8), pointer                  ::  ud(:,:,:)
+  real(r8), pointer                  ::  vd(:,:,:)
+  real(r8), pointer                  ::  pe(:,:,:)
+  real(r8), pointer                  ::  pt(:,:,:)
+  real(r8), pointer                  ::  pk(:,:,:)
 
-  !real(r8), allocatable              ::  ua(:,:,:)
-  !real(r8), allocatable              ::  va(:,:,:)
+  real(r8), allocatable              ::  ua(:,:,:)
+  real(r8), allocatable              ::  va(:,:,:)
 
   real(r4), pointer                  :: ple(:,:,:)
   real(r4), pointer                  ::   u(:,:,:)
@@ -345,9 +373,10 @@ contains
   character(len=ESMF_MAXSTR)         :: IAm
   character(len=ESMF_MAXSTR)         :: COMP_NAME
 
-  type (ESMF_State)                  :: INTERNAL
+  !type (ESMF_State)                  :: INTERNAL
   type (DynGrid),  pointer           :: DycoreGrid
   real, pointer                      :: temp2d(:,:)
+  real, pointer                      :: temp3d(:,:,:)
   
   integer                            :: ifirst
   integer                            :: ilast
@@ -356,12 +385,14 @@ contains
   integer                            :: km
   type(ESMF_FieldBundle)             :: tradv, tradvex
   integer                            :: i,numTracers,fv3_standalone
+  type(ESMF_VM) :: vm
+  integer :: localPet
 
 ! Begin
 !------
 
     Iam = "CoarseInitialize"
-    call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, RC=STATUS )
+    call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, vm=vm, RC=STATUS )
     VERIFY_(STATUS)
     Iam = trim(COMP_NAME) // Iam
 
@@ -381,13 +412,15 @@ contains
     DycoreGrid  => state%grid   ! direct handle to grid
 
 ! move DynSetup here to be able to use the fine GC
-    call DynSetup(state%fineGC)
+    !call DynSetup(state%fineGC)
+    call DynSetup(GC, state, rc=status)
+    VERIFY_(STATUS)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
 
-    call MAPL_GetObjectFromGC (state%fineGC, MAPL,  RC=STATUS )
-    VERIFY_(STATUS)
+    !call MAPL_GetObjectFromGC (state%fineGC, MAPL,  RC=STATUS )
+    !VERIFY_(STATUS)
 
 ! Start the timers
 !-----------------
@@ -400,13 +433,15 @@ contains
 
 !BOR
 ! !RESOURCE_ITEM: none :: name of layout file
-    call MAPL_GetResource ( MAPL, layout_file, 'LAYOUT:', default='fvcore_layout.rc', rc=status )
+    !call MAPL_GetResource ( MAPL, layout_file, 'LAYOUT:', default='fvcore_layout.rc', rc=status )
+    call ESMF_ConfigGetAttribute ( CF, layout_file, label='LAYOUT:', default='fvcore_layout.rc', rc=status )
 !EOR
     VERIFY_(STATUS)
 
 ! Check for ColdStart from the configuration 
 !--------------------------------------
-    call MAPL_GetResource ( MAPL, ColdRestart, 'COLDSTART:', default=0, rc=status )
+    !call MAPL_GetResource ( MAPL, ColdRestart, 'COLDSTART:', default=0, rc=status )
+    call ESMF_ConfigGetAttribute ( CF, ColdRestart, label='COLDSTART:', default=0, rc=status )
     VERIFY_(STATUS)
     if (ColdRestart /=0 ) then
       call Coldstart( gc, import, export, clock, rc=STATUS )
@@ -416,12 +451,14 @@ contains
 ! Set Private Internal State from Restart File
 ! --------------------------------------------
 
-    call MAPL_Get ( MAPL, INTERNAL_ESMF_STATE=INTERNAL, RC=STATUS )
-    VERIFY_(STATUS)
+    !call MAPL_Get ( MAPL, INTERNAL_ESMF_STATE=INTERNAL, RC=STATUS )
+    !VERIFY_(STATUS)
 
     !call MAPL_TimerOn(MAPL,"-DYN_INIT")
-    call DynInit ( STATE, CLOCK, INTERNAL, IMPORT, state%fineGC, status)
+    !call DynInit ( STATE, CLOCK, INTERNAL, IMPORT, state%fineGC, status)
+    call DynInit ( GC, STATE, CLOCK, INTERNAL, IMPORT, status)
     VERIFY_(STATUS)
+
     !call MAPL_TimerOff(MAPL,"-DYN_INIT")
 
 ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
@@ -452,16 +489,16 @@ contains
     !call MAPL_GetPointer(EXPORT,T,  'T',  RC=STATUS)
     !VERIFY_(STATUS)
 
-    !call MAPL_GetPointer(INTERNAL,UD,'U'  ,RC=STATUS)
-    !VERIFY_(STATUS)
-    !call MAPL_GetPointer(INTERNAL,VD,'V'  ,RC=STATUS)
-    !VERIFY_(STATUS)
-    !call MAPL_GetPointer(INTERNAL,PE,'PE' ,RC=STATUS)
-    !VERIFY_(STATUS)
-    !call MAPL_GetPointer(INTERNAL,PT,'PT' ,RC=STATUS)
-    !VERIFY_(STATUS)
-    !call MAPL_GetPointer(INTERNAL,PK,'PKZ',RC=STATUS)
-    !VERIFY_(STATUS)
+!    call MAPL_GetPointer(INTERNAL,UD,'U'  ,RC=STATUS)
+!    VERIFY_(STATUS)
+!    call MAPL_GetPointer(INTERNAL,VD,'V'  ,RC=STATUS)
+!    VERIFY_(STATUS)
+!    call MAPL_GetPointer(INTERNAL,PE,'PE' ,RC=STATUS)
+!    VERIFY_(STATUS)
+!    call MAPL_GetPointer(INTERNAL,PT,'PT' ,RC=STATUS)
+!    VERIFY_(STATUS)
+!    call MAPL_GetPointer(INTERNAL,PK,'PKZ',RC=STATUS)
+!    VERIFY_(STATUS)
 
 ! Cr!eate A-Grid Winds
 ! --!-----------------
@@ -471,16 +508,62 @@ contains
     jlast  = DycoreGrid%je
     km     = DycoreGrid%npz
 
+    if(.not.associated(UD)) allocate(UD(ifirst:ilast,jfirst:jlast,1:km), stat=status)
+    VERIFY_(STATUS)
+      call SSI_CopyFineToCoarse(INTERNAL, UD, 'U', STATE%f2c_SSI_arr_map, rc=status)
+      VERIFY_(STATUS)
+    if(.not.associated(VD)) allocate(VD(ifirst:ilast,jfirst:jlast,1:km), stat=status)
+    VERIFY_(STATUS)
+      call SSI_CopyFineToCoarse(INTERNAL, VD, 'V', STATE%f2c_SSI_arr_map, rc=status)
+      VERIFY_(STATUS)
+    if(.not.associated(PE)) allocate(PE(ifirst:ilast,jfirst:jlast,1:km+1), stat=status)
+    VERIFY_(STATUS)
+      call SSI_CopyFineToCoarse(INTERNAL, PE, 'PE', STATE%f2c_SSI_arr_map, rc=status)
+      VERIFY_(STATUS)
+    if(.not.associated(PT)) allocate(PT(ifirst:ilast,jfirst:jlast,1:km), stat=status)
+    VERIFY_(STATUS)
+      call SSI_CopyFineToCoarse(INTERNAL, PT, 'PT', STATE%f2c_SSI_arr_map, rc=status)
+      VERIFY_(STATUS)
+    if(.not.associated(PK)) allocate(PK(ifirst:ilast,jfirst:jlast,1:km), stat=status)
+    VERIFY_(STATUS)
+      call SSI_CopyFineToCoarse(INTERNAL, PK, 'PKZ', STATE%f2c_SSI_arr_map, rc=status)
+      VERIFY_(STATUS)
 
-    !allocate( UA(ifirst:ilast,jfirst:jlast,km) )
-    !allocate( VA(ifirst:ilast,jfirst:jlast,km) )
 
-    !call getAgridWinds( UD, VD, UA, VA, rotate=.true.)
+    allocate( UA(ifirst:ilast,jfirst:jlast,km) )
+    allocate( VA(ifirst:ilast,jfirst:jlast,km) )
 
-    !  U = UA
-    !  V = VA
-    !  T = PT*PK
+    call getAgridWinds( UD, VD, UA, VA, rotate=.true.)
+
+    !U = UA
+    if(.not.associated(temp3d)) allocate(temp3d(ifirst:ilast,jfirst:jlast,1:km), stat=status)
+    VERIFY_(STATUS)
+    temp3d = UA
+    call SSI_CopyCoarseToFine(export, temp3d, 'U', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
+    !V = VA
+    temp3d = VA
+    call SSI_CopyCoarseToFine(export, temp3d, 'V', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
+    !T = PT*PK
+    temp3d = PT*PK
+    call SSI_CopyCoarseToFine(export, temp3d, 'T', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
     !PLE = PE
+    !print *, __FILE__, __LINE__, shape(PE)
+    if (associated(temp3d)) then
+       deallocate(temp3d)
+    endif
+    if(.not.associated(temp3d)) allocate(temp3d(ifirst:ilast,jfirst:jlast,1:km+1), stat=status)
+    VERIFY_(STATUS)
+    temp3d = PE
+    !call ESMF_VMGet(VM, localPet=localPet, rc=status)
+    !VERIFY_(STATUS)
+    !if (localPet == 0) then
+    !   write(218,*) temp3d
+    !endif
+    call SSI_CopyCoarseToFine(export, temp3d, 'PLE', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
 
     !block
     !   type(ESMF_Field) :: field
@@ -572,20 +655,36 @@ contains
     if(.not.associated(temp2d)) allocate(temp2d(ifirst:ilast,jfirst:jlast), stat=status)
     VERIFY_(STATUS)
 
+    !call ESMF_VMGet(VM, localPet=localPet, rc=status)
+    !VERIFY_(STATUS)
+    !if (localPet == 11) then
+    !   print *, __FILE__, __LINE__, STATE%f2c_SSI_arr_map%nth_x
+    !   print *, STATE%f2c_SSI_arr_map%nth_y
+    !   print *, STATE%f2c_SSI_arr_map%nnx
+    !   print *, STATE%f2c_SSI_arr_map%nny
+    !   print *, STATE%f2c_SSI_arr_map%npet_x
+    !   print *, STATE%f2c_SSI_arr_map%npet_y
+    !   print *, STATE%f2c_SSI_arr_map%pet_id_x
+    !   print *, STATE%f2c_SSI_arr_map%pet_id_y
+    !   print *, STATE%f2c_SSI_arr_map%is
+    !   print *, __FILE__, __LINE__, STATE%f2c_SSI_arr_map%js
+    !end if
+    !call ESMF_VMBarrier(VM, rc=status)
+    !VERIFY_(STATUS)
     temp2d = DycoreGrid%dxc
-    call SSI_CopyCoarseToFine(export, temp2d, 'DXC', rc=status)
+    call SSI_CopyCoarseToFine(export, temp2d, 'DXC', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
 
     !call MAPL_GetPointer(export, temp2d, 'DYC', rc=status)
     !VERIFY_(STATUS)
     temp2d = DycoreGrid%dyc
-    call SSI_CopyCoarseToFine(export, temp2d, 'DYC', rc=status)
+    call SSI_CopyCoarseToFine(export, temp2d, 'DYC', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
 
     !call MAPL_GetPointer(export, temp2d, 'AREA', rc=status)
     !VERIFY_(STATUS)
     temp2d = DycoreGrid%area
-    call SSI_CopyCoarseToFine(export, temp2d, 'AREA', rc=status)
+    call SSI_CopyCoarseToFine(export, temp2d, 'AREA', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
 
     !block
@@ -667,7 +766,7 @@ subroutine Run(gc, import, export, clock, rc)
     class (AbstractRegridder), pointer :: L2C
     class (AbstractRegridder), pointer :: C2L
 
-    type (MAPL_MetaComp), pointer :: mapl 
+    !type (MAPL_MetaComp), pointer :: mapl 
 
     type (DYN_wrap) :: wrap
     type (DynState), pointer :: STATE
@@ -889,7 +988,7 @@ subroutine Run(gc, import, export, clock, rc)
     logical  :: uphi_associated=.false., vphi_associated=.false.
     logical  :: uke_associated=.false. , vke_associated=.false.
 
-    type(ESMF_State) :: internal
+    !type(ESMF_State) :: internal
     
   Iam = "CoarseRun"
 
@@ -900,7 +999,7 @@ subroutine Run(gc, import, export, clock, rc)
   VERIFY_(STATUS)
   state => wrap%dyn_state
 
-  call ESMF_GridCompGet( state%fineGC, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
+  call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
   VERIFY_(STATUS)
   Iam = trim(COMP_NAME) // trim(Iam)
 
@@ -910,8 +1009,8 @@ subroutine Run(gc, import, export, clock, rc)
 ! Retrieve the pointer to the generic state
 ! -----------------------------------------
 
-  call MAPL_GetObjectFromGC (state%fineGC, MAPL,  RC=STATUS )
-  VERIFY_(STATUS)
+  !call MAPL_GetObjectFromGC (state%fineGC, MAPL,  RC=STATUS )
+  !VERIFY_(STATUS)
 
   !call MAPL_TimerOn(MAPL,"TOTAL")
   !call MAPL_TimerOn(MAPL,"RUN")
@@ -949,8 +1048,8 @@ subroutine Run(gc, import, export, clock, rc)
   !if( associated(temp2D) ) temp2d = LATS
 
 
-  call MAPL_Get ( MAPL, INTERNAL_ESMF_STATE=INTERNAL, RC=STATUS )
-  VERIFY_(STATUS)
+  !call MAPL_Get ( MAPL, INTERNAL_ESMF_STATE=INTERNAL, RC=STATUS )
+  !VERIFY_(STATUS)
  
 
   vars  => state%vars   ! direct handle to control variables
@@ -1129,7 +1228,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(.not.associated(phis))  &
          allocate(phis(ifirstxy:ilastxy,jfirstxy:jlastxy), stat=status)
       VERIFY_(STATUS)
-      call SSI_CopyFineToCoarse(import, phis, 'PHIS', rc=status)
+      call SSI_CopyFineToCoarse(import, phis, 'PHIS', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
       phisxy = real(phis,kind=r8)
@@ -1367,43 +1466,43 @@ subroutine Run(gc, import, export, clock, rc)
       if(.not.associated(dqvana))  &
          allocate(dqvana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
       VERIFY_(STATUS)
-      call SSI_CopyFineToCoarse(import, dqvana, 'DQVANA', rc=status)
+      call SSI_CopyFineToCoarse(import, dqvana, 'DQVANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
       if(.not.associated(dqlana))  &
          allocate(dqlana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
       VERIFY_(STATUS)
-      call SSI_CopyFineToCoarse(import, dqlana, 'DQLANA', rc=status)
+      call SSI_CopyFineToCoarse(import, dqlana, 'DQLANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
       if(.not.associated(dqiana))  &
          allocate(dqiana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
       VERIFY_(STATUS)
-      call SSI_CopyFineToCoarse(import, dqiana, 'DQIANA', rc=status)
+      call SSI_CopyFineToCoarse(import, dqiana, 'DQIANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
       if(.not.associated(dqrana))  &
          allocate(dqrana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
       VERIFY_(STATUS)
-      call SSI_CopyFineToCoarse(import, dqrana, 'DQRANA', rc=status)
+      call SSI_CopyFineToCoarse(import, dqrana, 'DQRANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
       if(.not.associated(dqsana))  &
          allocate(dqsana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
       VERIFY_(STATUS)
-      call SSI_CopyFineToCoarse(import, dqsana, 'DQSANA', rc=status)
+      call SSI_CopyFineToCoarse(import, dqsana, 'DQSANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
       if(.not.associated(dqgana))  &
          allocate(dqgana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
       VERIFY_(STATUS)
-      call SSI_CopyFineToCoarse(import, dqgana, 'DQGANA', rc=status)
+      call SSI_CopyFineToCoarse(import, dqgana, 'DQGANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
       if(.not.associated(doxana))  &
          allocate(doxana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
       VERIFY_(STATUS)
-      call SSI_CopyFineToCoarse(import, doxana, 'DOXANA', rc=status)
+      call SSI_CopyFineToCoarse(import, doxana, 'DOXANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
 
@@ -1489,7 +1588,7 @@ subroutine Run(gc, import, export, clock, rc)
       if( associated(temp3d) ) then !dudtana = ua
          dudtana = ua
          dummy3d = dudtana
-         call SSI_CopyCoarseToFine(export, dummy3d, 'DUDTANA', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'DUDTANA', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       endif
 
@@ -1500,7 +1599,7 @@ subroutine Run(gc, import, export, clock, rc)
       if( associated(temp3d) ) then !dvdtana = va
          dvdtana = va
          dummy3d = dvdtana
-         call SSI_CopyCoarseToFine(export, dummy3d, 'DVDTANA', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'DVDTANA', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       endif
 
@@ -1511,7 +1610,7 @@ subroutine Run(gc, import, export, clock, rc)
       if( associated(temp3d) ) then !dtdtana = vars%pt * vars%pkz
          dtdtana = vars%pt * vars%pkz
          dummy3d = dtdtana
-         call SSI_CopyCoarseToFine(export, dummy3d, 'DTDTANA', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'DTDTANA', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       endif
 
@@ -1522,7 +1621,7 @@ subroutine Run(gc, import, export, clock, rc)
       if( associated(temp3d) ) then !ddpdtana = delp
          ddpdtana = delp
          dummy3d = ddpdtana
-         call SSI_CopyCoarseToFine(export, dummy3d, 'DDELPDTANA', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'DDELPDTANA', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       endif
 
@@ -1624,7 +1723,8 @@ subroutine Run(gc, import, export, clock, rc)
       allocate( trsum1(nq) )
       allocate( trsum2(nq) )
 
-      call MAPL_GetResource(MAPL, ANA_IS_WEIGHTED, Label="ANA_IS_WEIGHTED:", default='NO', RC=STATUS)
+      !call MAPL_GetResource(MAPL, ANA_IS_WEIGHTED, Label="ANA_IS_WEIGHTED:", default='NO', RC=STATUS)
+      call ESMF_ConfigGetAttribute(CF, ANA_IS_WEIGHTED, label="ANA_IS_WEIGHTED:", default='NO', RC=STATUS)
       VERIFY_(STATUS)
            ANA_IS_WEIGHTED = ESMF_UtilStringUpperCase(ANA_IS_WEIGHTED)
                IS_WEIGHTED =   adjustl(ANA_IS_WEIGHTED)=="YES" .or. adjustl(ANA_IS_WEIGHTED)=="NO"
@@ -1793,7 +1893,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if( associated(temp2D) ) then
          temp2D = ( (vars%pe(:,:,km+1)-vars%pe(:,:,1)) - dmdt )/(grav*dt)
-         !call SSI_CopyCoarseToFine(export, temp2D, 'DMDTANA', rc=status)
+         !call SSI_CopyCoarseToFine(export, temp2D, 'DMDTANA', STATE%f2c_SSI_arr_map, rc=status)
          !VERIFY_(STATUS)
       endif
 
@@ -1809,7 +1909,7 @@ subroutine Run(gc, import, export, clock, rc)
          !dummy   =  ua
          dudtana = (ua-dudtana)/dt
          dummy3d = dudtana
-         call SSI_CopyCoarseToFine(export, dummy3d, 'DUDTANA', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'DUDTANA', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       endif
 
@@ -1821,7 +1921,7 @@ subroutine Run(gc, import, export, clock, rc)
          !dummy   =  va
          dvdtana = (va-dvdtana)/dt
          dummy3d = dvdtana
-         call SSI_CopyCoarseToFine(export, dummy3d, 'DVDTANA', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'DVDTANA', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       endif
 
@@ -1833,7 +1933,7 @@ subroutine Run(gc, import, export, clock, rc)
          dummy   =  vars%pt*vars%pkz
          dtdtana = (dummy-dtdtana)/dt
          dummy3d = dtdtana
-         call SSI_CopyCoarseToFine(export, dummy3d, 'DTDTANA', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'DTDTANA', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       endif
 
@@ -1845,7 +1945,7 @@ subroutine Run(gc, import, export, clock, rc)
          !dummy   =  delp
          ddpdtana = (delp-ddpdtana)/dt
          dummy3d = ddpdtana
-         call SSI_CopyCoarseToFine(export, dummy3d, 'DDELPDTANA', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'DDELPDTANA', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       endif
 
@@ -1860,7 +1960,7 @@ subroutine Run(gc, import, export, clock, rc)
           dthdtanaint2 = dthdtanaint2 + tempxy(:,:,k)*delp(:,:,k)
           enddo
           dummy2d       = (dthdtanaint2-dthdtanaint1) * MAPL_P00**MAPL_KAPPA / (MAPL_GRAV*DT)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DTHVDTANAINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DTHVDTANAINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -1875,7 +1975,7 @@ subroutine Run(gc, import, export, clock, rc)
           dqvdtanaint2 = dqvdtanaint2 + tempxy(:,:,k)*delp(:,:,k)
           enddo
           dummy2d       = (dqvdtanaint2-dqvdtanaint1) / (MAPL_GRAV*DT)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DQVDTANAINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DQVDTANAINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -1898,7 +1998,7 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
           dummy2d = (dqldtanaint2-dqldtanaint1) / (MAPL_GRAV*DT)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DQLDTANAINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DQLDTANAINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -1921,7 +2021,7 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
           dummy2d = (dqidtanaint2-dqidtanaint1) / (MAPL_GRAV*DT)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DQIDTANAINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DQIDTANAINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -1936,7 +2036,7 @@ subroutine Run(gc, import, export, clock, rc)
           doxdtanaint2 = doxdtanaint2 + tempxy(:,:,k)*delp(:,:,k)
           enddo
           dummy2d = (doxdtanaint2-doxdtanaint1) * (MAPL_O3MW/MAPL_AIRMW) / (MAPL_GRAV*DT)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DOXDTANAINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DOXDTANAINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -1956,11 +2056,11 @@ subroutine Run(gc, import, export, clock, rc)
       dqdt   =     qv       ! Specific Humidity  Tendency
       dthdt  = vars%pt*(1.0+eps*qv)*delp
 
-      call FILLOUT3 (export,  'QV_DYN_IN',      qv, rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export,   'T_DYN_IN',  tempxy, rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export,   'U_DYN_IN',      ua, rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export,   'V_DYN_IN',      va, rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'PLE_DYN_IN', vars%pe, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export,  'QV_DYN_IN',      qv, STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export,   'T_DYN_IN',  tempxy, STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export,   'U_DYN_IN',      ua, STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export,   'V_DYN_IN',      va, STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'PLE_DYN_IN', vars%pe, STATE, rc=status); VERIFY_(STATUS)
 
 ! Initialize 3-D Tracer Dynamics Tendencies
 ! -----------------------------------------
@@ -1985,7 +2085,7 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
           dummy3d = dqldt
-          call SSI_CopyCoarseToFine(export, dummy3d, 'DQLDTDYN', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy3d, 'DQLDTDYN', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2006,7 +2106,7 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
           dummy3d = dqidt
-          call SSI_CopyCoarseToFine(export, dummy3d, 'DQIDTDYN', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy3d, 'DQIDTDYN', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2029,7 +2129,7 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
           dummy3d = doxdt
-          call SSI_CopyCoarseToFine(export, dummy3d, 'DOXDTDYN', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy3d, 'DOXDTDYN', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
     endif
@@ -2044,7 +2144,7 @@ subroutine Run(gc, import, export, clock, rc)
           do k=1,km
           dummy2d = dummy2d - qv(:,:,k)*delp(:,:,k)
           enddo
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DQVDTDYNINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DQVDTDYNINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2066,7 +2166,7 @@ subroutine Run(gc, import, export, clock, rc)
                  endif
              endif
           enddo
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DQLDTDYNINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DQLDTDYNINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2088,7 +2188,7 @@ subroutine Run(gc, import, export, clock, rc)
                  endif
              endif
           enddo
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DQIDTDYNINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DQIDTDYNINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2112,7 +2212,7 @@ subroutine Run(gc, import, export, clock, rc)
                endif
              endif
           enddo
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DOXDTDYNINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DOXDTDYNINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2128,9 +2228,9 @@ subroutine Run(gc, import, export, clock, rc)
     penrg = (penrg0-penrg)/DT
     tenrg = (tenrg0-tenrg)/DT
 
-    call FILLOUT2 (export, 'KEANA', kenrg, rc=status); VERIFY_(STATUS)
-    call FILLOUT2 (export, 'PEANA', penrg, rc=status); VERIFY_(STATUS)
-    call FILLOUT2 (export, 'TEANA', tenrg, rc=status); VERIFY_(STATUS)
+    call FILLOUT2 (export, 'KEANA', kenrg, STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT2 (export, 'PEANA', penrg, STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT2 (export, 'TEANA', tenrg, STATE, rc=status); VERIFY_(STATUS)
 
 ! Add Passive Tracers for KE, CPT, and PHI
 ! ----------------------------------------
@@ -2166,9 +2266,11 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Call Wrapper (DynRun) for FVDycore
 ! ----------------------------------
-      call MAPL_GetResource( MAPL, CONSV, 'CONSV:', default=1, RC=STATUS )
+      !call MAPL_GetResource( MAPL, CONSV, 'CONSV:', default=1, RC=STATUS )
+      call ESMF_ConfigGetAttribute( CF, CONSV, label='CONSV:', default=1, RC=STATUS )
       VERIFY_(STATUS)
-      call MAPL_GetResource( MAPL,  FILL,  'FILL:', default=0, RC=STATUS )
+      !call MAPL_GetResource( MAPL,  FILL,  'FILL:', default=0, RC=STATUS )
+      call ESMF_ConfigGetAttribute( CF,  FILL,  label='FILL:', default=0, RC=STATUS )
       VERIFY_(STATUS)
 
       LCONSV = CONSV.eq.1
@@ -2178,11 +2280,12 @@ subroutine Run(gc, import, export, clock, rc)
 !-------------------------------------------------------
       call getAgridWinds(vars%u, vars%v, ua, va, uc0, vc0)
       pe0=vars%pe
-      call FILLOUT3r8 (export, 'PLE0', pe0, rc=status); VERIFY_(STATUS)
+      call FILLOUT3r8 (export, 'PLE0', pe0, STATE, rc=status); VERIFY_(STATUS)
 !-------------------------------------------------------
 
       !call MAPL_TimerOn(MAPL,"-DYN_CORE")
-      call DynRun (STATE, CLOCK, internal, import, STATE%fineGC, RC=STATUS)
+      !call DynRun (STATE, CLOCK, internal, import, STATE%fineGC, RC=STATUS)
+      call DynRun (GC, STATE, CLOCK, internal, import, RC=STATUS)
       VERIFY_(STATUS)
       !call MAPL_TimerOff(MAPL,"-DYN_CORE")
 
@@ -2202,7 +2305,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
           dummy2d = phisxy
-          call SSI_CopyCoarseToFine(export, dummy2d, 'PHIS', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'PHIS', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2210,21 +2313,21 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
           dummy2d =  vars%pe(:,:,km+1)/GRAV
-          call SSI_CopyCoarseToFine(export, dummy2d, 'PS', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'PS', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
       call getAgridWinds(vars%u, vars%v, ua, va, uc, vc)
-      call FILLOUT3 (export, 'U_DGRID', vars%u  , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'V_DGRID', vars%v  , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'U_CGRID', uc      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'V_CGRID', vc      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'U_AGRID', ua      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'V_AGRID', va      , rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'U_DGRID', vars%u  , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'V_DGRID', vars%v  , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'U_CGRID', uc      , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'V_CGRID', vc      , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'U_AGRID', ua      , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'V_AGRID', va      , STATE, rc=status); VERIFY_(STATUS)
 
       call getAgridWinds(vars%u, vars%v, ua, va, rotate=.true.)
-      call FILLOUT3 (export, 'U'      , ua      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'V'      , va      , rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'U'      , ua      , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'V'      , va      , STATE, rc=status); VERIFY_(STATUS)
 
     else               ! .not. SW_DYNAMICS
 
@@ -2254,7 +2357,7 @@ subroutine Run(gc, import, export, clock, rc)
          qsum1 = qsum1 + dthdt(:,:,k)
       enddo
          dummy2d = qsum1 * (MAPL_P00**MAPL_KAPPA) / grav
-         call SSI_CopyCoarseToFine(export, dummy2d, 'DTHVDTDYNINT', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'DTHVDTDYNINT', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2277,7 +2380,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3d)) then
          dummy3d = epvxyz*(p00**kappa)
-         call SSI_CopyCoarseToFine(export, dummy3d, 'EPV', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'EPV', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       endif
 
@@ -2296,7 +2399,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2D)) then
          dummy2d = tropp1
-         call SSI_CopyCoarseToFine(export, dummy2d, 'TROPP_THERMAL', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'TROPP_THERMAL', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2304,7 +2407,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2D)) then
          dummy2d = tropp2
-         call SSI_CopyCoarseToFine(export, dummy2d, 'TROPP_EPV', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'TROPP_EPV', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2312,7 +2415,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2D)) then
          dummy2d = tropp3
-         call SSI_CopyCoarseToFine(export, dummy2d, 'TROPP_BLENDED', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'TROPP_BLENDED', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2320,7 +2423,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2D)) then
          dummy2d = tropt
-         call SSI_CopyCoarseToFine(export, dummy2d, 'TROPT', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'TROPT', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2328,19 +2431,19 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2D)) then
          dummy2d = tropq
-         call SSI_CopyCoarseToFine(export, dummy2d, 'TROPQ', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'TROPQ', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
 ! Get Cubed-Sphere Wind Exports
 ! -----------------------------
       call getAgridWinds(vars%u, vars%v, ua, va, uc, vc)
-      call FILLOUT3 (export, 'U_DGRID', vars%u  , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'V_DGRID', vars%v  , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'U_CGRID', uc      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'V_CGRID', vc      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'U_AGRID', ua      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'V_AGRID', va      , rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'U_DGRID', vars%u  , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'V_DGRID', vars%v  , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'U_CGRID', uc      , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'V_CGRID', vc      , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'U_AGRID', ua      , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'V_AGRID', va      , STATE, rc=status); VERIFY_(STATUS)
 
 ! Compute A-Grid Winds
 ! --------------------
@@ -2361,16 +2464,16 @@ subroutine Run(gc, import, export, clock, rc)
       ddpdt = ( delp - ddpdt )/dt ! Pressure Thickness Tendency
 
 
-      call FILLOUT3 (export, 'DELP'      ,delp , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'DUDTDYN'   ,dudt , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'DVDTDYN'   ,dvdt , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'DTDTDYN'   ,dtdt , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'DQVDTDYN'  ,dqdt , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'DDELPDTDYN',ddpdt, rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'DPLEDTDYN' ,dpedt, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'DELP'      ,delp , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'DUDTDYN'   ,dudt , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'DVDTDYN'   ,dvdt , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'DTDTDYN'   ,dtdt , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'DQVDTDYN'  ,dqdt , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'DDELPDTDYN',ddpdt, STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'DPLEDTDYN' ,dpedt, STATE, rc=status); VERIFY_(STATUS)
 
       pe1=vars%pe
-      call FILLOUT3r8 (export, 'PLE1', pe1    , rc=status); VERIFY_(STATUS)
+      call FILLOUT3r8 (export, 'PLE1', pe1    , STATE, rc=status); VERIFY_(STATUS)
 
       if (AdvCore_Advection==2) then
       ! Compute time-centered C-Grid Courant Numbers and Mass Fluxes on Cubed Orientation
@@ -2392,38 +2495,38 @@ subroutine Run(gc, import, export, clock, rc)
        ! truncate precision to R4 and back to R8
 
         call computeMassFluxes(uc0, vc0, gze, mfxxyz, mfyxyz, cxxyz, cyxyz, dt)
-        call FILLOUT3r8 (export, 'CX'  , cxxyz  , rc=status); VERIFY_(STATUS)
-        call FILLOUT3r8 (export, 'CY'  , cyxyz  , rc=status); VERIFY_(STATUS)
-        call FILLOUT3r8 (export, 'MFX' , mfxxyz , rc=status); VERIFY_(STATUS)
-        call FILLOUT3r8 (export, 'MFY' , mfyxyz , rc=status); VERIFY_(STATUS)
+        call FILLOUT3r8 (export, 'CX'  , cxxyz  , STATE, rc=status); VERIFY_(STATUS)
+        call FILLOUT3r8 (export, 'CY'  , cyxyz  , STATE, rc=status); VERIFY_(STATUS)
+        call FILLOUT3r8 (export, 'MFX' , mfxxyz , STATE, rc=status); VERIFY_(STATUS)
+        call FILLOUT3r8 (export, 'MFY' , mfyxyz , STATE, rc=status); VERIFY_(STATUS)
       else
       ! Fill Advection C-Grid Courant Numbers and Mass Fluxes on Cubed Orientation from FV3 DynCore
         call fillMassFluxes(mfxxyz, mfyxyz, cxxyz, cyxyz)
-        call FILLOUT3r8 (export, 'CX'  , cxxyz  , rc=status); VERIFY_(STATUS)
-        call FILLOUT3r8 (export, 'CY'  , cyxyz  , rc=status); VERIFY_(STATUS)
-        call FILLOUT3r8 (export, 'MFX' , mfxxyz , rc=status); VERIFY_(STATUS)
-        call FILLOUT3r8 (export, 'MFY' , mfyxyz , rc=status); VERIFY_(STATUS)
+        call FILLOUT3r8 (export, 'CX'  , cxxyz  , STATE, rc=status); VERIFY_(STATUS)
+        call FILLOUT3r8 (export, 'CY'  , cyxyz  , STATE, rc=status); VERIFY_(STATUS)
+        call FILLOUT3r8 (export, 'MFX' , mfxxyz , STATE, rc=status); VERIFY_(STATUS)
+        call FILLOUT3r8 (export, 'MFY' , mfyxyz , STATE, rc=status); VERIFY_(STATUS)
       endif
 
-      call FILLOUT3 (export, 'CU' ,  cxxyz , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'CV' ,  cyxyz , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'MX' , mfxxyz , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'MY' , mfyxyz , rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'CU' ,  cxxyz , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'CV' ,  cyxyz , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'MX' , mfxxyz , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'MY' , mfyxyz , STATE, rc=status); VERIFY_(STATUS)
 
 ! Compute and return the vertical mass flux
       call getVerticalMassFlux(mfxxyz, mfyxyz, mfzxyz, dt)
-      call FILLOUT3r8 (export, 'MFZ' , mfzxyz , rc=status); VERIFY_(STATUS)
+      call FILLOUT3r8 (export, 'MFZ' , mfzxyz , STATE, rc=status); VERIFY_(STATUS)
 
-      call FILLOUT3 (export, 'U'      , ua      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'V'      , va      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'T'      , tempxy  , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'Q'      , qv      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'PL'     , pl      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'PLE'    , vars%pe , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'PLK'    , vars%pkz, rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'PKE'    , pkxy    , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'PT'     , vars%pt , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'PE'     , vars%pe , rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'U'      , ua      , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'V'      , va      , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'T'      , tempxy  , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'Q'      , qv      , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'PL'     , pl      , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'PLE'    , vars%pe , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'PLK'    , vars%pkz, STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'PKE'    , pkxy    , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'PT'     , vars%pt , STATE, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'PE'     , vars%pe , STATE, rc=status); VERIFY_(STATUS)
 
 
       do ntracer=1,ntracers
@@ -2436,7 +2539,7 @@ subroutine Run(gc, import, export, clock, rc)
             else
                dummy3d = state%vars%tracer(ntracer)%content
             endif
-            call SSI_CopyCoarseToFine(export, dummy3d, TRIM(myTracer), rc=status)
+            call SSI_CopyCoarseToFine(export, dummy3d, TRIM(myTracer), STATE%f2c_SSI_arr_map, rc=status)
             VERIFY_(STATUS)
          endif
       enddo
@@ -2445,7 +2548,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3d)) then
          dummy3d = epvxyz/vars%pt
-         call SSI_CopyCoarseToFine(export, dummy3d, 'PV', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'PV', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
  
@@ -2453,7 +2556,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3d)) then
          dummy3d = tempxy*cp
-         call SSI_CopyCoarseToFine(export, dummy3d, 'S', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'S', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2462,7 +2565,7 @@ subroutine Run(gc, import, export, clock, rc)
   !   if(associated(temp3d)) temp3d = vars%pt*(p00**kappa)
       if(associated(temp3d)) then
          dummy3d = (tempxy)*(p00/(0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1))))**kappa
-         call SSI_CopyCoarseToFine(export, dummy3d, 'TH', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'TH', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2470,7 +2573,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
          dummy2d = dmdt
-         call SSI_CopyCoarseToFine(export, dummy2d, 'DMDTDYN', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'DMDTDYN', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2497,7 +2600,7 @@ subroutine Run(gc, import, export, clock, rc)
                  endif
              endif
           enddo
-          call SSI_CopyCoarseToFine(export, dummy3d, 'QC', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy3d, 'QC', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2517,7 +2620,7 @@ subroutine Run(gc, import, export, clock, rc)
           enddo
           dqldt = dqldt/dt
           dummy3d = dqldt
-          call SSI_CopyCoarseToFine(export, dummy3d, 'DQLDTDYN', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy3d, 'DQLDTDYN', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2536,7 +2639,7 @@ subroutine Run(gc, import, export, clock, rc)
           enddo
           dqidt = dqidt/dt
           dummy3d = dqidt
-          call SSI_CopyCoarseToFine(export, dummy3d, 'DQIDTDYN', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy3d, 'DQIDTDYN', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2557,7 +2660,7 @@ subroutine Run(gc, import, export, clock, rc)
           enddo
           doxdt = doxdt/dt
           dummy3d = doxdt
-          call SSI_CopyCoarseToFine(export, dummy3d, 'DOXDTDYN', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy3d, 'DOXDTDYN', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2572,7 +2675,7 @@ subroutine Run(gc, import, export, clock, rc)
           dummy2d = dummy2d + qv(:,:,k)*delp(:,:,k)
           enddo
           dummy2d = dummy2d/(grav*dt)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DQVDTDYNINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DQVDTDYNINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2595,7 +2698,7 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
           dummy2d = dummy2d/(grav*dt)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DQLDTDYNINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DQLDTDYNINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2618,7 +2721,7 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
           dummy2d = dummy2d/(grav*dt)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DQIDTDYNINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DQIDTDYNINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2643,7 +2746,7 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
           dummy2d = dummy2d * (MAPL_O3MW/MAPL_AIRMW) / (MAPL_GRAV*DT)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'DOXDTDYNINT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DOXDTDYNINT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2654,7 +2757,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
           dummy2d =  vars%pe(:,:,km+1)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'PS', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'PS', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2662,7 +2765,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
           dummy2d =       ua(:,:,km)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'US', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'US', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2670,7 +2773,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
           dummy2d =       va(:,:,km)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'VS', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'VS', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2678,7 +2781,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
           dummy2d =   tempxy(:,:,km)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'TA', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'TA', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2686,7 +2789,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
           dummy2d =       qv(:,:,km)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'QA', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'QA', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2694,7 +2797,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
           dummy2d = sqrt( ua(:,:,km)**2 + va(:,:,km)**2 )
-          call SSI_CopyCoarseToFine(export, dummy2d, 'SPEED', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'SPEED', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2707,7 +2810,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3D)) then
           dummy3d = tempxy
-          call SSI_CopyCoarseToFine(export, dummy3d, 'TV', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy3d, 'TV', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2721,7 +2824,7 @@ subroutine Run(gc, import, export, clock, rc)
             dummy2d = dummy2d + ua(:,:,k)*tempxy(:,:,k)*delp(:,:,k)
          enddo
          dummy2d = dummy2d*(cp/grav)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'UCPT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'UCPT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       end if
 
@@ -2733,7 +2836,7 @@ subroutine Run(gc, import, export, clock, rc)
             dummy2d = dummy2d + va(:,:,k)*tempxy(:,:,k)*delp(:,:,k)
          enddo
          dummy2d = dummy2d*(cp/grav)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'VCPT', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'VCPT', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       end if
 
@@ -2746,7 +2849,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3d)) then
           dummy3d = tempxy
-          call SSI_CopyCoarseToFine(export, dummy3d, 'THV', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy3d, 'THV', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2760,7 +2863,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
           dummy2d = kedyn
-          call SSI_CopyCoarseToFine(export, dummy2d, 'KEDYN', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'KEDYN', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2768,7 +2871,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
           dummy2d = pedyn
-          call SSI_CopyCoarseToFine(export, dummy2d, 'PEDYN', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'PEDYN', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2776,7 +2879,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
           dummy2d = tedyn
-          call SSI_CopyCoarseToFine(export, dummy2d, 'TEDYN', rc=status)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'TEDYN', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -2806,7 +2909,7 @@ subroutine Run(gc, import, export, clock, rc)
             dummy2d = dummy2d + ua(:,:,k)*ke(:,:,k)*delp(:,:,k)
          enddo
          dummy2d = dummy2d / grav
-         call SSI_CopyCoarseToFine(export, dummy2d, 'UKE', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'UKE', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2816,7 +2919,7 @@ subroutine Run(gc, import, export, clock, rc)
             dummy2d = dummy2d + va(:,:,k)*ke(:,:,k)*delp(:,:,k)
          enddo
          dummy2d = dummy2d / grav
-         call SSI_CopyCoarseToFine(export, dummy2d, 'VKE', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'VKE', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2830,7 +2933,7 @@ subroutine Run(gc, import, export, clock, rc)
             dummy2d = dummy2d + ua(:,:,k)*QV(:,:,k)*delp(:,:,k)
          enddo
          dummy2d = dummy2d / grav
-         call SSI_CopyCoarseToFine(export, dummy2d, 'UQV', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'UQV', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2842,7 +2945,7 @@ subroutine Run(gc, import, export, clock, rc)
             dummy2d = dummy2d + va(:,:,k)*QV(:,:,k)*delp(:,:,k)
          enddo
          dummy2d = dummy2d / grav
-         call SSI_CopyCoarseToFine(export, dummy2d, 'VQV', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'VQV', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2865,7 +2968,7 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
          dummy2d = dummy2d / grav
-         call SSI_CopyCoarseToFine(export, dummy2d, 'UQL', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'UQL', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2886,7 +2989,7 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
          dummy2d = dummy2d / grav
-         call SSI_CopyCoarseToFine(export, dummy2d, 'VQL', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'VQL', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2909,7 +3012,7 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
          dummy2d = dummy2d / grav
-         call SSI_CopyCoarseToFine(export, dummy2d, 'UQI', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'UQI', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2930,7 +3033,7 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
          dummy2d = dummy2d / grav
-         call SSI_CopyCoarseToFine(export, dummy2d, 'VQI', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'VQI', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2946,7 +3049,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3d)) then
          dummy3d_kmplus1 = zle
-         call SSI_CopyCoarseToFine(export, dummy3d_kmplus1, 'ZLE', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d_kmplus1, 'ZLE', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2954,7 +3057,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
          dummy2d = 0.5*( zle(:,:,km)-zle(:,:,km+1) )
-         call SSI_CopyCoarseToFine(export, dummy2d, 'DZ', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'DZ', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2962,7 +3065,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3d)) then
          dummy3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
-         call SSI_CopyCoarseToFine(export, dummy3d, 'ZL', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'ZL', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2970,7 +3073,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3d)) then
          dummy3d = temp3d + grav*(0.5*( zle(:,:,:km)+zle(:,:,2:) ))
-         call SSI_CopyCoarseToFine(export, dummy3d, 'S', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'S', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2988,7 +3091,7 @@ subroutine Run(gc, import, export, clock, rc)
          do k=1,km
             dummy2d = dummy2d + ua(:,:,k)*zl(:,:,k)*delp(:,:,k)
          enddo
-         call SSI_CopyCoarseToFine(export, dummy2d, 'UPHI', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'UPHI', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -2997,7 +3100,7 @@ subroutine Run(gc, import, export, clock, rc)
          do k=1,km
             dummy2d = dummy2d + va(:,:,k)*zl(:,:,k)*delp(:,:,k)
          enddo
-         call SSI_CopyCoarseToFine(export, dummy2d, 'VPHI', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'VPHI', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3009,7 +3112,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
          call fv_getUpdraftHelicity(dummy2d)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'UH25', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'UH25', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       endif
 
@@ -3021,7 +3124,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3d)) then
          dummy3d = tmp3d
-         call SSI_CopyCoarseToFine(export, dummy3d, 'DIVG', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'DIVG', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       endif
 
@@ -3030,7 +3133,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,dble(tmp3d),zle,log(20000.)  ,  status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'DIVG200', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'DIVG200', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3039,7 +3142,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,dble(tmp3d),zle,log(50000.)  ,  status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'DIVG500', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'DIVG500', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3048,7 +3151,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,dble(tmp3d),zle,log(70000.)  ,  status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'DIVG700', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'DIVG700', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3057,7 +3160,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,dble(tmp3d),zle,log(85000.)  ,  status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'DIVG850', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'DIVG850', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
        end if
 
@@ -3069,7 +3172,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3d)) then
          dummy3d = tmp3d
-         call SSI_CopyCoarseToFine(export, dummy3d, 'VORT', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy3d, 'VORT', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
        end if
   
@@ -3078,7 +3181,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,dble(tmp3d),zle,log(20000.)  ,  status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'VORT200', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'VORT200', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3087,7 +3190,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,dble(tmp3d),zle,log(50000.)  ,  status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'VORT500', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'VORT500', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
  
@@ -3096,7 +3199,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,dble(tmp3d),zle,log(70000.)  ,  status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'VORT700', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'VORT700', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3105,13 +3208,13 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,dble(tmp3d),zle,log(85000.)  ,  status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'VORT850', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'VORT850', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
        end if
 
 ! Vertical Velocity Exports
 
-      call FILLOUT3 (export, 'OMEGA'  , omaxyz     , rc=status)
+      call FILLOUT3 (export, 'OMEGA'  , omaxyz     , STATE, rc=status)
       VERIFY_(STATUS)
 
       call MAPL_GetPointer(export,temp2d,'OMEGA850', rc=status)
@@ -3119,7 +3222,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,omaxyz,zle,log(85000.)  , status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA850', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA850', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3128,7 +3231,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,omaxyz,zle,log(70000.)  , status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA700', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA700', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3137,7 +3240,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,omaxyz,zle,log(50000.)  , status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA500', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA500', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3146,7 +3249,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,omaxyz,zle,log(20000.)  , status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA200', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA200', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3155,12 +3258,12 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,omaxyz,zle,log(1000.)  , status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA10', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA10', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
       if (.not. HYDROSTATIC) then
-      call FILLOUT3 (export, 'W'  , vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:)     , rc=status)
+      call FILLOUT3 (export, 'W'  , vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:)     , STATE, rc=status)
       VERIFY_(STATUS)
 
       call MAPL_GetPointer(export,temp2d,'W850', rc=status)
@@ -3168,7 +3271,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(85000.)  , status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'W850', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'W850', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3177,7 +3280,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(50000.)  , status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'W500', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'W500', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3186,7 +3289,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(20000.)  , status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'W200', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'W200', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
 
@@ -3195,7 +3298,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(1000.)  , status)
          VERIFY_(STATUS)
-         call SSI_CopyCoarseToFine(export, dummy2d, 'W10', rc=status)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'W10', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
       endif
@@ -3206,11 +3309,11 @@ subroutine Run(gc, import, export, clock, rc)
     call PUSH_Q(STATE, import, rc=status)
     VERIFY_(STATUS)
   
-    !call SSI_CopyCoarseToFine(internal, STATE%VARS%U, 'U', rc=status)
+    !call SSI_CopyCoarseToFine(internal, STATE%VARS%U, 'U', STATE%f2c_SSI_arr_map, rc=status)
     !VERIFY_(status)
-    !call SSI_CopyCoarseToFine(internal, STATE%VARS%V, 'V', rc=status)
+    !call SSI_CopyCoarseToFine(internal, STATE%VARS%V, 'V', STATE%f2c_SSI_arr_map, rc=status)
     !VERIFY_(status)
-    !call SSI_CopyCoarseToFine(internal, STATE%VARS%PT, 'PT', rc=status)
+    !call SSI_CopyCoarseToFine(internal, STATE%VARS%PT, 'PT', STATE%f2c_SSI_arr_map, rc=status)
     !VERIFY_(status)
 
     !block
@@ -4281,7 +4384,7 @@ end subroutine RUN
           !      i1,in,j1,jn, 1, km)
           
           call SSI_BundleCopyFineToCoarse(bundle, &
-                    state%vars%tracer(n)%content_r4, n, rc=status)
+                    state%vars%tracer(n)%content_r4, n, STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
 
           if (fieldname == QFieldName) then
@@ -4296,7 +4399,7 @@ end subroutine RUN
           !state%vars%tracer(n)%content => PTR_R8
 
           call SSI_BundleCopyFineToCoarse(bundle, &
-                    state%vars%tracer(n)%content, n, rc=status)
+                    state%vars%tracer(n)%content, n, STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
 
           if (fieldname == QFieldName) then 
@@ -4341,13 +4444,13 @@ end subroutine RUN
        if ( STATE%VARS%TRACER(N)%IS_R4 ) then
           
           call SSI_BundleCopyCoarseToFine(bundle, &
-                    state%vars%tracer(n)%content_r4, n, rc=status)
+                    state%vars%tracer(n)%content_r4, n, STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
 
        else
 
           call SSI_BundleCopyCoarseToFine(bundle, &
-                    state%vars%tracer(n)%content, n, rc=status)
+                    state%vars%tracer(n)%content, n, STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
 
        endif
@@ -4393,7 +4496,7 @@ end subroutine RUN
     integer                                          :: status
     character(len=ESMF_MAXSTR) :: IAm
 
-    type (MAPL_MetaComp), pointer :: genstate 
+    !type (MAPL_MetaComp), pointer :: genstate 
 
     type (DYN_wrap) :: wrap
     type (DynState), pointer :: STATE
@@ -4437,7 +4540,9 @@ end subroutine RUN
 
     real(r4), pointer     :: QOLD(:,:,:)
     real(r4), pointer     :: temp3d(:,:,:)
+    real(r4), pointer     :: dummy3d(:,:,:)
     real(r4), pointer     :: temp2d(:,:  )
+    real(r4), pointer     :: dummy2d(:,:  )
 
     integer ifirstxy, ilastxy
     integer jfirstxy, jlastxy
@@ -4452,7 +4557,7 @@ end subroutine RUN
     integer i,j,k
 
     character(len=ESMF_MAXSTR) :: COMP_NAME
-    type (ESMF_State) :: internal
+    !type (ESMF_State) :: internal
 
     Iam = "CoarseRunAddIncs"
     call ESMF_GridCompGet( GC, name=COMP_NAME, RC=STATUS )
@@ -4469,15 +4574,15 @@ end subroutine RUN
 ! Retrieve the pointer to the generic state
 ! -----------------------------------------
 
-    call MAPL_GetObjectFromGC (state%fineGC, GENSTATE,  RC=STATUS )
-    VERIFY_(STATUS)
+    !call MAPL_GetObjectFromGC (state%fineGC, GENSTATE,  RC=STATUS )
+    !VERIFY_(STATUS)
 
     !call MAPL_TimerOn(GENSTATE,"TOTAL")
     !call MAPL_TimerOn(GENSTATE,"RUN2")
 
 
-    call MAPL_Get ( GENSTATE, INTERNAL_ESMF_STATE=INTERNAL, RC=STATUS )
-    VERIFY_(STATUS)
+    !call MAPL_Get ( GENSTATE, INTERNAL_ESMF_STATE=INTERNAL, RC=STATUS )
+    !VERIFY_(STATUS)
  
     vars  => state%vars   ! direct handle to control variables
     grid  => state%grid   ! direct handle to grid
@@ -4525,13 +4630,17 @@ end subroutine RUN
     ALLOCATE(  logpe(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
     ALLOCATE(    zle(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
 
+    if(.not.associated(dummy3d)) ALLOCATE(dummy3d(ifirstxy:ilastxy,jfirstxy:jlastxy,km),stat=status)
+    VERIFY_(STATUS)
+    if(.not.associated(dummy2d)) ALLOCATE(dummy2d(ifirstxy:ilastxy,jfirstxy:jlastxy),stat=status)
+    VERIFY_(STATUS)
 
     !call MAPL_GetPointer ( IMPORT, PHIS, 'PHIS', RC=STATUS )
     !VERIFY_(STATUS)
     if(.not.associated(phis))  &
        allocate(phis(ifirstxy:ilastxy,jfirstxy:jlastxy), stat=status)
     VERIFY_(STATUS)
-    call SSI_CopyFineToCoarse(import, phis, 'PHIS', rc=status)
+    call SSI_CopyFineToCoarse(import, phis, 'PHIS', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
 
     phisxy = real(phis,kind=r8)
@@ -4565,7 +4674,9 @@ end subroutine RUN
 ! Compute Energetics Before Diabatic Forcing
 ! ------------------------------------------
     if (associated(QOLD)) then
-       thv = vars%pt*(1.0+eps*QOLD)
+        call SSI_CopyFineToCoarse(export, dummy3d, 'Q', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+       thv = vars%pt*(1.0+eps*dummy3d)
     else
        thv = vars%pt
     endif
@@ -4602,12 +4713,12 @@ end subroutine RUN
 ! Get Cubed-Sphere Wind Exports
 ! -----------------------------
     call getAgridWinds(vars%u, vars%v, ua, va, uc, vc)
-    call FILLOUT3 (export, 'U_DGRID', vars%u  , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'V_DGRID', vars%v  , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'U_CGRID', uc      , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'V_CGRID', vc      , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'U_AGRID', ua      , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'V_AGRID', va      , rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'U_DGRID', vars%u  , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'V_DGRID', vars%v  , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'U_CGRID', uc      , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'V_CGRID', vc      , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'U_AGRID', ua      , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'V_AGRID', va      , STATE, rc=status); VERIFY_(STATUS)
  
 ! Create A-Grid Winds
 ! -------------------
@@ -4626,15 +4737,18 @@ end subroutine RUN
 
     call MAPL_GetPointer(export,temp2d,'KE',  rc=status)
     VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = kenrg
+    if(associated(temp2d)) then ! temp2d = kenrg
+        call SSI_CopyCoarseToFine(export, kenrg, 'KE', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    endif
 
     kenrg = (kenrg-kenrg0)/DT
     penrg = (penrg-penrg0)/DT
     tenrg = (tenrg-tenrg0)/DT
 
-    call FILLOUT2 (export, 'KEPHY', kenrg, rc=status); VERIFY_(STATUS)
-    call FILLOUT2 (export, 'PEPHY', penrg, rc=status); VERIFY_(STATUS)
-    call FILLOUT2 (export, 'TEPHY', tenrg, rc=status); VERIFY_(STATUS)
+    call FILLOUT2 (export, 'KEPHY', kenrg, STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT2 (export, 'PEPHY', penrg, STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT2 (export, 'TEPHY', tenrg, STATE, rc=status); VERIFY_(STATUS)
 
 ! DTHVDTPHYINT
 ! ------------
@@ -4645,7 +4759,9 @@ end subroutine RUN
           do k=1,km
           dthdtphyint2 = dthdtphyint2 + thv(:,:,k)*dp(:,:,k)
           enddo
-          temp2D       = (dthdtphyint2-dthdtphyint1) * MAPL_P00**MAPL_KAPPA / (MAPL_GRAV*DT)
+          dummy2d      = (dthdtphyint2-dthdtphyint1) * MAPL_P00**MAPL_KAPPA / (MAPL_GRAV*DT)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'DTHVDTPHYINT', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
       endif
 
     call getPK ( pke )
@@ -4656,22 +4772,26 @@ end subroutine RUN
   call Write_Profile(grid, tempxy, 'T')
 #endif
 
-    call FILLOUT3 (export, 'DELP'   , dp      , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'U'      , ua      , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'V'      , va      , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'T'      , tempxy  , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'Q'      , qv      , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'PL'     , pl      , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'PLE'    , vars%pe , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'PLK'    , vars%pkz, rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'PKE'    , pke     , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'THV'    , thv     , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'PT'     , vars%pt , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'PE'     , vars%pe , rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'DELP'   , dp      , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'U'      , ua      , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'V'      , va      , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'T'      , tempxy  , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'Q'      , qv      , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'PL'     , pl      , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'PLE'    , vars%pe , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'PLK'    , vars%pkz, STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'PKE'    , pke     , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'THV'    , thv     , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'PT'     , vars%pt , STATE, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'PE'     , vars%pe , STATE, rc=status); VERIFY_(STATUS)
 
     call MAPL_GetPointer(export,temp3d,'TH',rc=status)
     VERIFY_(STATUS)
-    if(associated(temp3d)) temp3d = (tempxy)*(p00/(0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1))))**kappa
+    if(associated(temp3d)) then
+       dummy3d = (tempxy)*(p00/(0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1))))**kappa
+       call SSI_CopyCoarseToFine(export, dummy3d, 'TH', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    endif
 
       do ntracer=1,ntracers
          write(myTracer, "('Q',i1.1)") ntracer-1
@@ -4679,10 +4799,12 @@ end subroutine RUN
          VERIFY_(STATUS)
          if((associated(temp3d)) .and. (STATE%GRID%NQ>=ntracer)) then
             if (state%vars%tracer(ntracer)%is_r4) then
-               temp3d = state%vars%tracer(ntracer)%content_r4
+               dummy3d = state%vars%tracer(ntracer)%content_r4
             else
-               temp3d = state%vars%tracer(ntracer)%content
+               dummy3d = state%vars%tracer(ntracer)%content
             endif
+            call SSI_CopyCoarseToFine(export, dummy3d, TRIM(myTracer), STATE%f2c_SSI_arr_map, rc=status)
+            VERIFY_(STATUS)
          endif
       enddo
 
@@ -4695,14 +4817,18 @@ end subroutine RUN
     enddo
        zle(:,:,:) = zle(:,:,:)/grav
 
-    call FILLOUT3 (export, 'ZLE', zle, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'ZLE', zle, STATE, rc=status); VERIFY_(STATUS)
 
 ! Compute Mid-Layer Heights
 ! -------------------------
 
     call MAPL_GetPointer(export,temp3d,'ZL',  rc=status)
     VERIFY_(STATUS)
-    if(associated(temp3d)) temp3d = 0.5*( zle(:,:,2:) + zle(:,:,:km) )
+    if(associated(temp3d)) then
+       dummy3d = 0.5*( zle(:,:,2:) + zle(:,:,:km) )
+       call SSI_CopyCoarseToFine(export, dummy3d, 'ZL', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    endif
 
     pke = log(vars%pe)
 
@@ -4712,189 +4838,243 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'U200',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ua,pke,log(20000.)  ,  status)
+       call VertInterp(dummy2d,ua,pke,log(20000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'U200', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
  
     call MAPL_GetPointer(export,temp2d,'U250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ua,pke,log(25000.)  ,  status)
+       call VertInterp(dummy2d,ua,pke,log(25000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'U250', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'U500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ua,pke,log(50000.)  ,  status)
+       call VertInterp(dummy2d,ua,pke,log(50000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'U500', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'U700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ua,pke,log(70000.)  ,  status)
+       call VertInterp(dummy2d,ua,pke,log(70000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'U700', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'U850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ua,pke,log(85000.)  ,  status)
+       call VertInterp(dummy2d,ua,pke,log(85000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'U850', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V200',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,va,pke,log(20000.)  ,  status)
+       call VertInterp(dummy2d,va,pke,log(20000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'V200', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,va,pke,log(25000.)  ,  status)
+       call VertInterp(dummy2d,va,pke,log(25000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'V250', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,va,pke,log(50000.)  ,  status)
+       call VertInterp(dummy2d,va,pke,log(50000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'V500', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,va,pke,log(70000.)  ,  status)
+       call VertInterp(dummy2d,va,pke,log(70000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'V700', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,va,pke,log(85000.)  ,  status)
+       call VertInterp(dummy2d,va,pke,log(85000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'V850', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'T250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,tempxy,pke,log(25000.)  , status)
+       call VertInterp(dummy2d,tempxy,pke,log(25000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'T250', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'T300',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,tempxy,pke,log(30000.)  , status)
+       call VertInterp(dummy2d,tempxy,pke,log(30000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'T300', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'T500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,tempxy,pke,log(50000.)  ,  status)
+       call VertInterp(dummy2d,tempxy,pke,log(50000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'T500', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'T700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,tempxy,pke,log(70000.)  ,  status)
+       call VertInterp(dummy2d,tempxy,pke,log(70000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'T700', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'T850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,tempxy,pke,log(85000.)  ,  status)
+       call VertInterp(dummy2d,tempxy,pke,log(85000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'T850', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'Q250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,qv,pke,log(25000.)  ,  status)
+       call VertInterp(dummy2d,qv,pke,log(25000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'Q250', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'Q500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,qv,pke,log(50000.)  ,  status)
+       call VertInterp(dummy2d,qv,pke,log(50000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'Q500', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'Q850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,qv,pke,log(85000.)  ,  status)
+       call VertInterp(dummy2d,qv,pke,log(85000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'Q850', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'Z700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle*grav,pke,log(70000.)  , status)
+       call VertInterp(dummy2d,zle*grav,pke,log(70000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'Z700', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'Z500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle*grav,pke,log(50000.)  , status)
+       call VertInterp(dummy2d,zle*grav,pke,log(50000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'Z500', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'Z300',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle*grav,pke,log(30000.)  , status)
+       call VertInterp(dummy2d,zle*grav,pke,log(30000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'Z300', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'H250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle,pke,log(25000.)  , status)
+       call VertInterp(dummy2d,zle,pke,log(25000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'H250', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'H300',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle,pke,log(30000.)  , status)
+       call VertInterp(dummy2d,zle,pke,log(30000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'H300', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'H500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle,pke,log(50000.)  , status)
+       call VertInterp(dummy2d,zle,pke,log(50000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'H500', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'H700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle,pke,log(70000.)  , status)
+       call VertInterp(dummy2d,zle,pke,log(70000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'H700', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'H850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle,pke,log(85000.)  , status)
+       call VertInterp(dummy2d,zle,pke,log(85000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'H850', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'H1000',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle,pke,log(100000.)  , status)
+       call VertInterp(dummy2d,zle,pke,log(100000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'H1000', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
@@ -4902,19 +5082,35 @@ end subroutine RUN
 ! ---------------------------------------
     call MAPL_GetPointer(export,temp2d,'UTOP', rc=status)
     VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = ua(:,:,1)
+    if(associated(temp2d)) then
+       dummy2d = ua(:,:,1)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'UTOP', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    endif
 
     call MAPL_GetPointer(export,temp2d,'VTOP', rc=status)
     VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = va(:,:,1)
+    if(associated(temp2d)) then
+       dummy2d = va(:,:,1)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'VTOP', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    endif
 
     call MAPL_GetPointer(export,temp2d,'TTOP', rc=status)
     VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = tempxy(:,:,1)
+    if(associated(temp2d)) then
+       dummy2d = tempxy(:,:,1)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'TTOP', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    endif
 
     call MAPL_GetPointer(export,temp2d,'DELPTOP', rc=status)
     VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = dp(:,:,1)
+    if(associated(temp2d)) then
+       dummy2d = dp(:,:,1)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'DELPTOP', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    endif
 
 ! Compute Heights Above Surface
 ! -----------------------------
@@ -4925,14 +5121,18 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'U50M',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ua,-zle,-50., status)
+       call VertInterp(dummy2d,ua,-zle,-50., status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'U50M', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V50M',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,va,-zle,-50., status)
+       call VertInterp(dummy2d,va,-zle,-50., status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'V50M', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
 
@@ -4941,28 +5141,36 @@ end subroutine RUN
 
     call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
     VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d=vars%pe(:,:,km+1)
+    if(associated(temp2d)) then
+       dummy2d = vars%pe(:,:,km+1)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'PS', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    endif
 
 ! Compute Vertically Averaged T,U
 ! -------------------------------
     call MAPL_GetPointer(export,temp2d,'TAVE',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       temp2d = 0.0
+       dummy2d = 0.0
        do k=1,km
-       temp2d = temp2d + tempxy(:,:,k)*dp(:,:,k)
+       dummy2d = dummy2d + tempxy(:,:,k)*dp(:,:,k)
        enddo
-       temp2d = temp2d / (vars%pe(:,:,km+1)-vars%pe(:,:,1))
+       dummy2d = dummy2d / (vars%pe(:,:,km+1)-vars%pe(:,:,1))
+       call SSI_CopyCoarseToFine(export, dummy2d, 'TAVE', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
     endif
 
     call MAPL_GetPointer(export,temp2d,'UAVE',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       temp2d = 0.0
+       dummy2d = 0.0
        do k=1,km
-       temp2d = temp2d + ua(:,:,k)*dp(:,:,k)
+       dummy2d = dummy2d + ua(:,:,k)*dp(:,:,k)
        enddo
-       temp2d = temp2d / (vars%pe(:,:,km+1)-vars%pe(:,:,1))
+       dummy2d = dummy2d / (vars%pe(:,:,km+1)-vars%pe(:,:,1))
+       call SSI_CopyCoarseToFine(export, dummy2d, 'UAVE', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
     endif
 
 ! Convert T to Tv
@@ -4972,7 +5180,11 @@ end subroutine RUN
 
     call MAPL_GetPointer(export,temp3d,'TV',  rc=status)
     VERIFY_(STATUS)
-    if(associated(temp3d)) temp3d=tempxy
+    if(associated(temp3d)) then
+       dummy3d = tempxy
+       call SSI_CopyCoarseToFine(export, dummy3d, 'TV', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    endif
 
 ! Compute Sea-Level Pressure
 ! --------------------------
@@ -5007,10 +5219,38 @@ end subroutine RUN
        call Write_Profile(grid, slp/100.0, 'SLP') 
 #endif                       
 
-       if(associated(temp2d)) temp2d = slp
-       if(associated(ztemp1)) where( ztemp1.eq.MAPL_UNDEF ) ztemp1 = H1000
-       if(associated(ztemp2)) where( ztemp2.eq.MAPL_UNDEF ) ztemp2 = H850
-       if(associated(ztemp3)) where( ztemp3.eq.MAPL_UNDEF ) ztemp3 = H500
+       if(associated(temp2d)) then
+          dummy2d = slp
+          call SSI_CopyCoarseToFine(export, dummy2d, 'SLP', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+       endif
+       ! first copy current ztemp1,2,3 from fine to coarse so that
+       ! the 'where' statement can be properly executed and then copy
+       ! back from corase to fine.
+       !if(associated(ztemp1)) where( ztemp1.eq.MAPL_UNDEF ) ztemp1 = H1000
+       if(associated(ztemp1)) then
+          call SSI_CopyFineToCoarse(export, dummy2d, 'H1000', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+          where( dummy2d.eq.MAPL_UNDEF ) dummy2d = H1000
+          call SSI_CopyCoarseToFine(export, dummy2d, 'H1000', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+       endif
+       !if(associated(ztemp2)) where( ztemp2.eq.MAPL_UNDEF ) ztemp2 = H850
+       if(associated(ztemp2)) then
+          call SSI_CopyFineToCoarse(export, dummy2d, 'H850', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+          where( dummy2d.eq.MAPL_UNDEF ) dummy2d = H850
+          call SSI_CopyCoarseToFine(export, dummy2d, 'H850', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+       endif
+       !if(associated(ztemp3)) where( ztemp3.eq.MAPL_UNDEF ) ztemp3 = H500
+       if(associated(ztemp3)) then
+          call SSI_CopyFineToCoarse(export, dummy2d, 'H500', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+          where( dummy2d.eq.MAPL_UNDEF ) dummy2d = H500
+          call SSI_CopyCoarseToFine(export, dummy2d, 'H500', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+       endif
        DEALLOCATE(slp,H1000,H850,H500)
     end if
 
@@ -5289,7 +5529,7 @@ end subroutine RunAddIncs
 
        if(.not.associated(tend)) allocate(tend(is:ie,js:je,km), stat=status)
        VERIFY_(STATUS)
-       call SSI_CopyFineToCoarse(import, tend, 'DUDT', rc=status)
+       call SSI_CopyFineToCoarse(import, tend, 'DUDT', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
 
        tend_ua(is:ie,js:je,1:km) = tend
@@ -5297,7 +5537,7 @@ end subroutine RunAddIncs
        !call ESMFL_StateGetPointerToData ( IMPORT,TEND,'DVDT',RC=STATUS )
        !VERIFY_(STATUS)
 
-       call SSI_CopyFineToCoarse(import, tend, 'DVDT', rc=status)
+       call SSI_CopyFineToCoarse(import, tend, 'DVDT', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
 
        tend_va(is:ie,js:je,1:km) = tend
@@ -5344,7 +5584,7 @@ end subroutine RunAddIncs
        !VERIFY_(STATUS)
 
        if(.not. associated(tend_kp1)) allocate(tend_kp1(is:ie,js:je,km+1))
-       call SSI_CopyFineToCoarse(import, tend_kp1, 'DPEDT', rc=status)
+       call SSI_CopyFineToCoarse(import, tend_kp1, 'DPEDT', STATE%f2c_SSI_arr_map, rc=status)
 
     !block
     !   type(ESMF_VM) :: vm
@@ -5354,7 +5594,7 @@ end subroutine RunAddIncs
     !   call ESMF_VMGetCurrent(vm, rc=status)
     !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
     !   if(.not. associated(tend_temp)) allocate(tend_temp(is:ie,js:je,km))
-    !   call SSI_CopyFineToCoarse(import, tend_temp, 'DPEDT', rc=status)
+    !   call SSI_CopyFineToCoarse(import, tend_temp, 'DPEDT', STATE%f2c_SSI_arr_map, rc=status)
     !   VERIFY_(STATUS)
     !   if(localPet == 0) then
     !      write(107,*) shape(tend_temp)
@@ -5392,7 +5632,7 @@ end subroutine RunAddIncs
        !call ESMFL_StateGetPointerToData ( IMPORT,TEND,'DTDT',RC=STATUS )
        !VERIFY_(STATUS)
 
-       call SSI_CopyFineToCoarse(import, tend, 'DTDT', rc=status)
+       call SSI_CopyFineToCoarse(import, tend, 'DTDT', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
 
        !if (DYN_DEBUG) then
@@ -5450,19 +5690,19 @@ end subroutine RunAddIncs
        DEALLOCATE (DPOLD)
     endif ! .not. Adiabatic
 
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%U, 'U', rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%U, 'U', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%V, 'V', rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%V, 'V', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PT, 'PT', rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%PT, 'PT', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PE, 'PE', rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%PE, 'PE', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PKZ, 'PKZ', rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%PKZ, 'PKZ', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%DZ, 'DZ', rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%DZ, 'DZ', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%W, 'W', rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%W, 'W', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
 
     if (ALLOCATED(Q  )) DEALLOCATE( Q   )
@@ -5473,11 +5713,12 @@ end subroutine RunAddIncs
  end subroutine ADD_INCS
 
 
-   subroutine FILLOUT3r8(export, name, V, RC)
+   subroutine FILLOUT3r8(export, name, V, STATE, RC)
      type (ESMF_State),  intent(inout) :: export
      character(len=*),   intent(IN   ) :: name
      real(r8),           intent(IN   ) :: V(:,:,:)
      integer, optional,  intent(  out) :: rc
+     type(DynState), pointer :: STATE
 
      real(r8), pointer          :: CPL(:,:,:)
      integer                    :: status
@@ -5485,41 +5726,64 @@ end subroutine RunAddIncs
 
      call MAPL_GetPointer(export, cpl, name, RC=STATUS)
      VERIFY_(STATUS)
-     if(associated(cpl)) cpl=v
+     if(associated(cpl)) then
+        call SSI_CopyCoarseToFine(export, v, name, STATE%f2c_SSI_arr_map, rc=status)
+        VERIFY_(STATUS)
+     endif
 
    end subroutine FILLOUT3r8
 
-   subroutine FILLOUT3(export, name, V, RC)
+   subroutine FILLOUT3(export, name, V, STATE, RC)
      type (ESMF_State),  intent(inout) :: export
      character(len=*),   intent(IN   ) :: name
      real(r8),           intent(IN   ) :: V(:,:,:)
      integer, optional,  intent(  out) :: rc
+     type(DynState), pointer :: STATE
 
      real(r4), pointer          :: CPL(:,:,:)
+     real(r4), pointer          :: dummy(:,:,:)
      integer                    :: status
      character(len=ESMF_MAXSTR) :: IAm="CoarseFillout3"
+     integer :: dimen(3)
 
      call MAPL_GetPointer(export, cpl, name, RC=STATUS)
      VERIFY_(STATUS)
-     if(associated(cpl)) cpl=v
+     if(associated(cpl)) then
+        dimen = shape(V)
+        allocate(dummy(dimen(1),dimen(2),dimen(3)), stat=status)
+        VERIFY_(STATUS)
+        dummy = V
+        call SSI_CopyCoarseToFine(export, dummy, name, STATE%f2c_SSI_arr_map, rc=status)
+        VERIFY_(STATUS)
+     endif
 
    end subroutine FILLOUT3
 
 !-----------------------------------------------------------------------
 
-   subroutine FILLOUT2(export, name, V, rc)
+   subroutine FILLOUT2(export, name, V, STATE, rc)
      type (ESMF_State),  intent(inout) :: export
      character(len=*),   intent(IN   ) :: name
      real(r8),           intent(IN   ) :: V(:,:)
      integer, optional,  intent(  out) :: rc
+     type(DynState), pointer :: STATE
 
      real(kind=4), pointer      :: CPL(:,:)
+     real(r4), pointer          :: dummy(:,:)
      integer                    :: status
      character(len=ESMF_MAXSTR) :: IAm="CoarseFillout2"
+     integer :: dimen(2)
 
      call MAPL_GetPointer(export, cpl, name, RC=STATUS)
      VERIFY_(STATUS)
-     if(associated(cpl)) cpl=v
+     if(associated(cpl)) then
+        dimen = shape(V)
+        allocate(dummy(dimen(1),dimen(2)), stat=status)
+        VERIFY_(STATUS)
+        dummy = V
+        call SSI_CopyCoarseToFine(export, dummy, name, STATE%f2c_SSI_arr_map, rc=status)
+        VERIFY_(STATUS)
+     endif
 
      return
    end subroutine FILLOUT2
@@ -5627,7 +5891,7 @@ subroutine Finalize(gc, import, export, clock, rc)
     character(len=ESMF_MAXSTR)        :: COMP_NAME
     integer                           :: status
 
-    type (MAPL_MetaComp),     pointer :: MAPL 
+    !type (MAPL_MetaComp),     pointer :: MAPL 
     type (ESMF_Config)                :: cf
 
 
@@ -5811,8 +6075,8 @@ subroutine Coldstart(gc, import, export, clock, rc)
     character(len=ESMF_MAXSTR)        :: COMP_NAME
     integer                           :: status
 
-    type (MAPL_MetaComp),     pointer :: MAPL 
-    type (ESMF_State)                 :: INTERNAL
+    !type (MAPL_MetaComp),     pointer :: MAPL 
+    !type (ESMF_State)                 :: INTERNAL
 
     real(REAL8), pointer                 :: AK(:), BK(:)
     real(REAL8), pointer                 :: U      (:,:,:)
@@ -5870,8 +6134,8 @@ subroutine Coldstart(gc, import, export, clock, rc)
 ! Retrieve the pointer to the state
 ! ---------------------------------
 
-    call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-    VERIFY_(STATUS)
+    !call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
+    !VERIFY_(STATUS)
 
     call ESMF_UserCompGetInternalState(GC, 'DYNstate', wrap, status)
     VERIFY_(STATUS)
@@ -5880,15 +6144,16 @@ subroutine Coldstart(gc, import, export, clock, rc)
 
 !BOR    
 ! !RESOURCE_ITEM: K :: Value of isothermal temperature on coldstart
-    call MAPL_GetResource ( MAPL, T0, 'T0:', default=273., RC=STATUS )
+    !call MAPL_GetResource ( MAPL, T0, 'T0:', default=273., RC=STATUS )
+    call ESMF_ConfigGetAttribute ( CF, T0, label='T0:', default=273., RC=STATUS )
     VERIFY_(STATUS)
 !EOR
-    call MAPL_Get ( MAPL,                &
-           INTERNAL_ESMF_STATE=INTERNAL, &
-           lats = LATS,                  &
-           lons = LONS,                  &
-                               RC=STATUS )
-    VERIFY_(STATUS)
+    !call MAPL_Get ( MAPL,                &
+           !INTERNAL_ESMF_STATE=INTERNAL, &
+    !       lats = LATS,                  &
+    !       lons = LONS,                  &
+    !                           RC=STATUS )
+    !VERIFY_(STATUS)
 
    if (FV_Atm(1)%flagstruct%grid_type == 4) then
     ! Doubly-Period setup based on first LAT/LON coordinate

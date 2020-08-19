@@ -1,5 +1,5 @@
 
-subroutine SUB_(state, coarse_Array, name, rc)
+subroutine SUB_(state, coarse_Array, name, f2c_SSI_arr_map, rc)
 
    use ESMF
    implicit none
@@ -7,17 +7,18 @@ subroutine SUB_(state, coarse_Array, name, rc)
    type(ESMF_State), intent(in) :: state
    real(TYPEKIND_), intent(inout) :: coarse_Array DIMENSIONS_
    character(len=*), intent(in) :: name 
+   type(SSI_Type), intent(in) :: f2c_SSI_arr_map
    integer, optional, intent(out) :: rc
     
 !local
    character(len=ESMF_MAXSTR)      :: IAm='SSI_CopyFineToCoarse'
-#include "copy_header.h"
+#include "SSI_Copy_Header.h"
 
    call ESMF_StateGet(state, trim(name), field, rc=status)
    VERIFY_(STATUS)
    
-   print *, __FILE__, __LINE__, "shape...coarse_Array ", shape(coarse_Array)
-#include "range_def.h"
+   !print *, __FILE__, __LINE__, "shape...coarse_Array ", shape(coarse_Array)
+#include "SSI_Range_Def.h"
 
     RETURN_(ESMF_SUCCESS)
 

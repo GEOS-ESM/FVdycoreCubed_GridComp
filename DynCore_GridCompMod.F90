@@ -2372,9 +2372,9 @@ contains
     call ESMF_GridCompSetServices(coarseGC, userRoutine=CoarseSetServices, &
        rc=status)
     VERIFY_(STATUS)
-    print *, __FILE__, __LINE__, "out of coarse_setvm", status
-    call ESMF_VMBarrier(vm,rc=status)
-    VERIFY_(STATUS)
+    !print *, __FILE__, __LINE__, "out of coarse_setvm", status
+    !call ESMF_VMBarrier(vm,rc=status)
+    !VERIFY_(STATUS)
     !endif
 
     call MAPL_GenericSetServices( GC, RC=STATUS )
@@ -2443,6 +2443,10 @@ contains
 
   type(ESMF_FieldBundle)             :: tradv, tradvex
   integer                            :: i,numTracers,fv3_standalone
+  type(ESMF_Grid)                    :: grid
+  type(ESMF_VM)                    :: vm
+  integer :: localPet
+  character(len=100) :: fname
 
 ! Begin
 !------
@@ -2516,51 +2520,88 @@ contains
 ! Get the private internal state
 !-------------------------------
 
-    call ESMF_UserCompGetInternalState(coarseGC, 'DYNstate', wrap, status)
-       VERIFY_(STATUS)
+    !call ESMF_UserCompGetInternalState(coarseGC, 'DYNstate', wrap, status)
+    !   VERIFY_(STATUS)
     !if(STATUS == ESMF_SUCCESS) then
-       state => wrap%dyn_state
-       !DycoreGrid  => state%grid   ! direct handle to grid
-       state%fineGC = GC
+    !state => wrap%dyn_state
+    !DycoreGrid  => state%grid   ! direct handle to grid
+    !state%fineGC = GC
 
+    call ESMF_GridCompGet( GC, grid=grid, RC=STATUS )
+    VERIFY_(STATUS)
+    call ESMF_GridCompSet( coarseGC, grid=grid, RC=STATUS )
+    VERIFY_(STATUS)
+
+    call ESMF_GridCompGet(GC, vm=vm, rc=status)
+    VERIFY_(STATUS)
+    call ESMF_VMGet(vm,localPet=localPet,rc=status)
 ! Initialize coarse decomposition GC
 ! --------------------------------------------
-       call ESMF_GridCompInitialize(coarseGC, importState=IMPORT, &
-          exportState=EXPORT, clock=clock, PHASE=1, rc=status) ! run Initialize
-       VERIFY_(STATUS)
+    call ESMF_GridCompInitialize(coarseGC, importState=INTERNAL, &
+       PHASE=1, rc=status) ! set FV ESMF internal state
+    VERIFY_(STATUS)
+
+    call ESMF_GridCompInitialize(coarseGC, importState=IMPORT, &
+       exportState=EXPORT, clock=clock, PHASE=2, rc=status) ! run Initialize
+    VERIFY_(STATUS)
     !endif
 
-    call MAPL_GetPointer(INTERNAL,UD,'U'  ,RC=STATUS)
-    VERIFY_(STATUS)
-    call MAPL_GetPointer(INTERNAL,VD,'V'  ,RC=STATUS)
-    VERIFY_(STATUS)
-    call MAPL_GetPointer(INTERNAL,PE,'PE' ,RC=STATUS)
-    VERIFY_(STATUS)
-    call MAPL_GetPointer(INTERNAL,PT,'PT' ,RC=STATUS)
-    VERIFY_(STATUS)
-    call MAPL_GetPointer(INTERNAL,PK,'PKZ',RC=STATUS)
-    VERIFY_(STATUS)
+    !call MAPL_GetPointer(INTERNAL,UD,'U'  ,RC=STATUS)
+    !VERIFY_(STATUS)
+    !print *, __FILE__, __LINE__, 'local pet', localPet
+    !call ESMF_VMBarrier(vm,rc=status)
+    !VERIFY_(STATUS)
+    !call MAPL_GetPointer(INTERNAL,VD,'V'  ,RC=STATUS)
+    !VERIFY_(STATUS)
+    !call MAPL_GetPointer(INTERNAL,PE,'PE' ,RC=STATUS)
+    !VERIFY_(STATUS)
+    !call MAPL_GetPointer(INTERNAL,PT,'PT' ,RC=STATUS)
+    !VERIFY_(STATUS)
+    !call MAPL_GetPointer(INTERNAL,PK,'PKZ',RC=STATUS)
+    !VERIFY_(STATUS)
 
-! Create A-Grid Winds
-! -------------------
-    !ifirst = state%grid%is
-    !ilast  = state%grid%ie
-    !jfirst = state%grid%js
-    !jlast  = state%grid%je
-    !km     = state%grid%npz
+! Cr!eate A-Grid Winds
+! --!-----------------
+    !!ifirst = state%grid%is
+    !!ilast  = state%grid%ie
+    !!jfirst = state%grid%js
+    !!jlast  = state%grid%je
+    !!km     = state%grid%npz
 
-    allocate( UA(size(UD,1),size(UD,2),size(UD,3)) )
-    allocate( VA(size(VD,1),size(VD,2),size(VD,3)) )
+    !allocate( UA(size(UD,1),size(UD,2),size(UD,3)) )
+    !allocate( VA(size(VD,1),size(VD,2),size(VD,3)) )
+    !if (localPet == 13) then
+    !   write(143, *) localPet, size(UD,1),size(UD,2),size(UD,3)
+    !   write(143,*) UD
+    !   write(143,*) '============='
+    !   write(143, *) localPet, size(VD,1),size(VD,2),size(VD,3)
+    !   write(143,*) VD
+    !   write(143,*) '============='
+    !   write(143, *) localPet
+    !   write(143,*) PE
+    !   write(143,*) '============='
+    !   write(143, *) localPet
+    !   write(143,*) PT
+    !   write(143,*) '============='
+    !   write(143, *) localPet
+    !   write(143,*) PK
+    !endif
 
-    call getAgridWinds( UD, VD, UA, VA, rotate=.true.)
+    !call getAgridWinds( UD, VD, UA, VA, rotate=.true.)
+    !print *, __FILE__, __LINE__, 'local pet', localPet
+    !call ESMF_VMBarrier(vm,rc=status)
+    !VERIFY_(STATUS)
 
-      U = UA
-      V = VA
-      T = PT*PK
-    PLE = PE
+    !  U = UA
+    !  V = VA
+    !  T = PT*PK
+    !PLE = PE
 
-    deallocate( UA )
-    deallocate( VA )
+    !deallocate( UA )
+    !deallocate( VA )
+    !print *, __FILE__, __LINE__, 'local pet', localPet
+    !call ESMF_VMBarrier(vm,rc=status)
+    !VERIFY_(STATUS)
 
 ! Fill Grid-Cell Area Delta-X/Y
 ! -----------------------------
@@ -2644,6 +2685,11 @@ contains
 
     call MAPL_TimerOff(MAPL,"INITIALIZE")
     call MAPL_TimerOff(MAPL,"TOTAL")
+      !write(fname, '(a,i2.2)') 'ple_dyn.',localPet
+      !open(unit=281,file=trim(fname),form='formatted', status='new')
+      !write(281,*) localPet, shape(PLE)
+      !write(281,*) PLE
+
 
     RETURN_(ESMF_SUCCESS)
   end subroutine Initialize

@@ -18,6 +18,7 @@ set (srcs
   CoarseDynCore_GridCompMod.F90
   SSI_FineToCoarseMod.F90
   SSI_CoarseToFineMod.F90
+  SSI_TypeMod.F90
   )
 
 set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared)
