@@ -175,7 +175,7 @@ contains
           ! do not maximize PEs on fewer PETs if SSI shared memory not supported
           nthreads=1
         endif
-        nthreads=1
+        nthreads=2
         call ESMF_GridCompSetVMMaxPEs(gc, maxPeCountPerPet=nthreads, rc=status)
         VERIFY_(STATUS)
       endif
@@ -385,7 +385,7 @@ contains
   integer                            :: i,numTracers,fv3_standalone
   type(ESMF_VM) :: vm
   integer :: localPet, peCount
-  integer :: omp_get_num_threads
+!$  integer :: omp_get_num_threads
 
 ! Begin
 !------

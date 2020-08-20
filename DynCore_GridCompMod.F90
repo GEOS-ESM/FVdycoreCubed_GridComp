@@ -2447,9 +2447,12 @@ contains
   type(ESMF_VM)                    :: vm
   integer :: localPet
   character(len=100) :: fname
+!$  integer :: omp_get_num_threads
 
 ! Begin
 !------
+
+!!!!$ call omp_set_num_threads(1)
 
     Iam = "Initialize"
     call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, RC=STATUS )
@@ -2474,7 +2477,9 @@ contains
     call MAPL_TimerOn(MAPL,"TOTAL")
     call MAPL_TimerOn(MAPL,"INITIALIZE")
 
-
+!$omp parallel
+!$ print *, 'DyncoreGridComp num threads ... ', omp_get_num_threads()
+!$omp end parallel
 ! Set Private Internal State from Restart File
 ! --------------------------------------------
 
@@ -2763,6 +2768,7 @@ subroutine Run(gc, import, export, clock, rc)
   logical                             :: isPresent
 
   character(len=ESMF_MAXSTR) :: IAm
+!$  integer :: omp_get_num_threads
 
   Iam = "Run"
 
@@ -2786,6 +2792,9 @@ subroutine Run(gc, import, export, clock, rc)
   VERIFY_(STATUS)
   if( associated(temp2D) ) temp2d = LATS
 
+!$omp parallel
+!$ print *, 'DyncoreGridComp Run num threads ... ', omp_get_num_threads()
+!$omp end parallel
 ! Report advected friendlies
 !---------------------------
 
