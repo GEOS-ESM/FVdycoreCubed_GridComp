@@ -257,7 +257,7 @@ cat >      input.nml << EOF
 
 &fms_nml
         print_memory_usage=.false.
-        domains_stack_size = 240000000
+        domains_stack_size = 24000000
 /
 EOF
 
