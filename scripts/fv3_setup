@@ -569,7 +569,7 @@ echo $GROUP > $HOME/.GROUProot
 if ( $LINKX == "TRUE" ) then
   if ( -e $GEOSBIN/StandAlone_FV3_Dycore.x ) ln -s $GEOSBIN/StandAlone_FV3_Dycore.x $EXPDIR
 else
-  if ( -e $GEOSBIN/StandAlone_FV3_Dycore.x ) rsync -avx $GEOSBIN/StandAlone_FV3_Dycore.x $EXPDIR
+  if ( -e $GEOSBIN/StandAlone_FV3_Dycore.x ) cp -v $GEOSBIN/StandAlone_FV3_Dycore.x $EXPDIR
 endif
 
 #######################################################################
