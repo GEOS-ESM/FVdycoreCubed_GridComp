@@ -2452,7 +2452,7 @@ contains
 ! Begin
 !------
 
-!!!!$ call omp_set_num_threads(1)
+!!$ call omp_set_num_threads(1)
 
     Iam = "Initialize"
     call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, RC=STATUS )
@@ -2477,9 +2477,9 @@ contains
     call MAPL_TimerOn(MAPL,"TOTAL")
     call MAPL_TimerOn(MAPL,"INITIALIZE")
 
-!$omp parallel
-!$ print *, 'DyncoreGridComp num threads ... ', omp_get_num_threads()
-!$omp end parallel
+!!!$omp parallel
+!!!$ print *, 'DyncoreGridComp num threads ... ', omp_get_num_threads()
+!!!$omp end parallel
 ! Set Private Internal State from Restart File
 ! --------------------------------------------
 
@@ -2549,6 +2549,7 @@ contains
     call ESMF_GridCompInitialize(coarseGC, importState=IMPORT, &
        exportState=EXPORT, clock=clock, PHASE=2, rc=status) ! run Initialize
     VERIFY_(STATUS)
+!!$ call omp_set_num_threads(1)
     !endif
 
     !call MAPL_GetPointer(INTERNAL,UD,'U'  ,RC=STATUS)
@@ -2927,6 +2928,7 @@ subroutine Run(gc, import, export, clock, rc)
   call ESMF_GridCompRun(coarseGC, importState=IMPORT, &
       exportState=EXPORT, clock=clock, PHASE=1, rc=status)
   VERIFY_(STATUS)
+!!$ call omp_set_num_threads(1)
 
   RETURN_(ESMF_SUCCESS)
 
@@ -2971,6 +2973,7 @@ end subroutine RUN
     call ESMF_GridCompRun(coarseGC, importState=IMPORT, &
         exportState=EXPORT, clock=clock, PHASE=2, rc=status)
     VERIFY_(STATUS)
+!!$ call omp_set_num_threads(1)
 
     RETURN_(ESMF_SUCCESS)
 

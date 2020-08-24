@@ -143,6 +143,7 @@ contains
       integer :: status
       character(len=ESMF_MAXSTR) :: Iam = "coarse_setvm"
       integer :: petCount, localPet
+      type(ESMF_Config)  :: cf
 
       ! Initialize return code
       rc = ESMF_SUCCESS
@@ -175,11 +176,14 @@ contains
           ! do not maximize PEs on fewer PETs if SSI shared memory not supported
           nthreads=1
         endif
-        nthreads=2
+        call ESMF_GridCompGet( GC, CONFIG=CF, rc=status)
+        VERIFY_(STATUS)
+        call ESMF_ConfigGetAttribute( CF, nthreads, label='OMP_NUM_THREADS:', default= 1, RC=STATUS )
+        VERIFY_(STATUS)
         call ESMF_GridCompSetVMMaxPEs(gc, maxPeCountPerPet=nthreads, rc=status)
         VERIFY_(STATUS)
       endif
-      !print *, __FILE__, __LINE__, "ssiSharedMemoryEnabled: ", ssiSharedMemoryEnabled, nthreads, pthreadsEnabled
+      print *, __FILE__, __LINE__, "ssiSharedMemoryEnabled: ", ssiSharedMemoryEnabled, nthreads, pthreadsEnabled
         !write(msg,*) "user2_setvm: OpenMP num thread:", nthreads
         !call ESMF_LogWrite(msg, ESMF_LOGMSG_INFO, rc=rc)
         !call ESMF_LogFlush(rc=rc)
@@ -406,6 +410,7 @@ contains
     call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
     VERIFY_(STATUS)
 !set OMP_NUM_THREADS to local PeCount
+!!$ call omp_set_dynamic(.TRUE.)
 !$ call omp_set_num_threads(peCount)
 
 !$omp parallel
@@ -721,6 +726,7 @@ contains
     !call MAPL_TimerOff(MAPL,"INITIALIZE")
     !call MAPL_TimerOff(MAPL,"TOTAL")
 
+!$ call omp_set_num_threads(1)
     RETURN_(ESMF_SUCCESS)
   end subroutine Initialize
   
@@ -1019,12 +1025,12 @@ subroutine Run(gc, import, export, clock, rc)
   call ESMF_GridValidate(ESMFGRID,RC=STATUS)
   VERIFY_(STATUS)
 
-!    call ESMF_VMGet(vm, localPet=localPet, rc=status)
-!    VERIFY_(STATUS)
-!    call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
-!    VERIFY_(STATUS)
-!!!!set OMP_NUM_THREADS to local PeCount
-!!!!$ call omp_set_num_threads(peCount)
+    call ESMF_VMGet(vm, localPet=localPet, rc=status)
+    VERIFY_(STATUS)
+    call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
+    VERIFY_(STATUS)
+!set OMP_NUM_THREADS to local PeCount
+!$ call omp_set_num_threads(peCount)
 
 !!!!$ print *, 'Run ', omp_get_num_threads()
 ! Retrieve the pointer to the generic state
@@ -3490,6 +3496,7 @@ subroutine Run(gc, import, export, clock, rc)
  !endif
   !print *, __FILE__, __LINE__, "DynRun status ", STATUS
 
+!$ call omp_set_num_threads(1)
   RETURN_(ESMF_SUCCESS)
 
 !contains
@@ -4587,12 +4594,12 @@ end subroutine RUN
     VERIFY_(STATUS)
     Iam = trim(COMP_NAME) // trim(Iam)
 
-!!!    call ESMF_VMGet(vm, localPet=localPet, rc=status)
-!!!    VERIFY_(STATUS)
-!!!    call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
-!!!    VERIFY_(STATUS)
-!!!!set OMP_NUM_THREADS to local PeCount
-!!!!$ call omp_set_num_threads(peCount)
+    call ESMF_VMGet(vm, localPet=localPet, rc=status)
+    VERIFY_(STATUS)
+    call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
+    VERIFY_(STATUS)
+!set OMP_NUM_THREADS to local PeCount
+!$ call omp_set_num_threads(peCount)
 
 !!!!$ print *, 'RunaddIncs ', omp_get_num_threads(), peCount
 ! Retrieve the pointer to the internal state
@@ -5338,6 +5345,7 @@ end subroutine RUN
     !call MAPL_TimerOff(GENSTATE,"RUN2")
     !call MAPL_TimerOff(GENSTATE,"TOTAL")
 
+!$ call omp_set_num_threads(1)
     RETURN_(ESMF_SUCCESS)
 end subroutine RunAddIncs
 
