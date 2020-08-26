@@ -338,6 +338,7 @@ contains
 
   integer :: comm
   integer :: p_split=1
+  integer :: temp_int
 
 ! BEGIN
 
@@ -617,12 +618,13 @@ contains
       f2c_SSI_arr_map%nth_y = nthreads/f2c_SSI_arr_map%nth_x
       _ASSERT(mod(nthreads,f2c_SSI_arr_map%nth_x*f2c_SSI_arr_map%nth_y) == 0, &
               'nthreads must be evenly divided by nth_x*nth_y')
-      f2c_SSI_arr_map%nnx = 2 
-      f2c_SSI_arr_map%nny = 2
+      f2c_SSI_arr_map%nnx = 6 
+      f2c_SSI_arr_map%nny = 6
       f2c_SSI_arr_map%npet_x = f2c_SSI_arr_map%nnx/f2c_SSI_arr_map%nth_x
       f2c_SSI_arr_map%npet_y = f2c_SSI_arr_map%nny/f2c_SSI_arr_map%nth_y
-      f2c_SSI_arr_map%pet_id_x = mod(localPet, f2c_SSI_arr_map%npet_x)
-      f2c_SSI_arr_map%pet_id_y = localPet/f2c_SSI_arr_map%npet_x
+      temp_int = mod(localPet, f2c_SSI_arr_map%npet_x*f2c_SSI_arr_map%npet_y)
+      f2c_SSI_arr_map%pet_id_x = mod(temp_int, f2c_SSI_arr_map%npet_x)
+      f2c_SSI_arr_map%pet_id_y = temp_int/f2c_SSI_arr_map%npet_x
       f2c_SSI_arr_map%is = fv_atm(1)%bd%isc
       f2c_SSI_arr_map%js = fv_atm(1)%bd%jsc
       STATE%f2c_SSI_arr_map => f2c_SSI_arr_map
@@ -879,37 +881,37 @@ contains
   !VERIFY_(STATUS)
   if(.not.associated(u)) allocate(u(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, u(is:ie,js:je,:), 'U', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, u, 'U', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   if(.not.associated(v)) allocate(v(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, v(is:ie,js:je,:), 'V', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, v, 'V', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   if(.not.associated(pt)) allocate(pt(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, pt(is:ie,js:je,:), 'PT', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, pt, 'PT', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   if(.not.associated(pe)) allocate(pe(is:ie,js:je,npz+1), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, pe(is:ie,js:je,:), 'PE', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, pe, 'PE', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   if(.not.associated(pkz)) allocate(pkz(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, pkz(is:ie,js:je,:), 'PKZ', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, pkz, 'PKZ', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   if(.not.associated(dz)) allocate(dz(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, dz(is:ie,js:je,:), 'DZ', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, dz, 'DZ', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   if(.not.associated(w)) allocate(w(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, w(is:ie,js:je,:), 'W', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, w, 'W', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   !print *, __FILE__, __LINE__
@@ -1045,7 +1047,7 @@ contains
 
   if(.not.associated(phis)) allocate(phis(isc:iec,jsc:jec), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(import, phis(isc:iec,jsc:jec), 'PHIS', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(import, phis, 'PHIS', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
  ! Set FV3 surface geopotential
@@ -1305,7 +1307,7 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
   ! Be sure we have the correct PHIS and number of tracers for this run
    if (fv_first_run) then
 
-     call SSI_CopyFineToCoarse(import, phis(isc:iec,jsc:jec), 'PHIS', f2c_SSI_arr_map, rc=status)
+     call SSI_CopyFineToCoarse(import, phis, 'PHIS', f2c_SSI_arr_map, rc=status)
      VERIFY_(STATUS)
     !block
     !   type(ESMF_VM) :: vm
@@ -2254,19 +2256,19 @@ subroutine State_To_FV ( STATE, internal )
 ! Update Winds
 !------------
   !U => STATE%VARS%U
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%U(isc:iec,jsc:jec,:), 'U', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%V(isc:iec,jsc:jec,:), 'V', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%PT(isc:iec,jsc:jec,:), 'PT', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%PT, 'PT', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%PE(isc:iec,jsc:jec,:), 'PE', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%PE, 'PE', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%PKZ(isc:iec,jsc:jec,:), 'PKZ', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%PKZ, 'PKZ', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%DZ(isc:iec,jsc:jec,:), 'DZ', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%DZ, 'DZ', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%W(isc:iec,jsc:jec,:), 'W', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%W, 'W', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
   !print *, __FILE__, __LINE__
   !call ESMF_VMBarrier(VM, rc=status)
@@ -2480,19 +2482,19 @@ subroutine FV_To_State ( STATE, internal )
 
     !U => STATE%VARS%U
 
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%U(isc:iec,jsc:jec,:), 'U', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
     VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%V(isc:iec,jsc:jec,:), 'V', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
     VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PT(isc:iec,jsc:jec,:), 'PT', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%PT, 'PT', f2c_SSI_arr_map, rc=status)
     VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PE(isc:iec,jsc:jec,:), 'PE', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%PE, 'PE', f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PKZ(isc:iec,jsc:jec,:), 'PKZ', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%PKZ, 'PKZ', f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%DZ(isc:iec,jsc:jec,:), 'DZ', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%DZ, 'DZ', f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%W(isc:iec,jsc:jec,:), 'W', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(internal, STATE%VARS%W, 'W', f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
     
    return
@@ -3995,38 +3997,49 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
   
   real(FVPRC) :: ut(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied, FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed)
   real(FVPRC) :: vt(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied, FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed)
-
   real(FVPRC) ::  utemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied  ,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed+1,1:FV_Atm(1)%npz)
   real(FVPRC) ::  vtemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied+1,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed  ,1:FV_Atm(1)%npz)
-  real(FVPRC) :: uatemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied  ,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed  ,1:FV_Atm(1)%npz)
   real(FVPRC) :: vatemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied  ,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed  ,1:FV_Atm(1)%npz)
   real(FVPRC) :: uctemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied+1,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed  ,1:FV_Atm(1)%npz)
   real(FVPRC) :: vctemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied  ,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed+1,1:FV_Atm(1)%npz)
+  real(FVPRC) :: uatemp_t(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied  ,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed  ,1:FV_Atm(1)%npz)
 !EOP
 !------------------------------------------------------------------------------
 !BOC
+  type(ESMF_VM) :: vm
+  integer :: localPet
+
+   call ESMF_VMGetCurrent(vm)
+   call ESMF_VMGet(vm, localPet=localPet)
+
   isc=FV_Atm(1)%bd%isc ; iec=FV_Atm(1)%bd%iec
   jsc=FV_Atm(1)%bd%jsc ; jec=FV_Atm(1)%bd%jec
   isd=FV_Atm(1)%bd%isd ; ied=FV_Atm(1)%bd%ied
   jsd=FV_Atm(1)%bd%jsd ; jed=FV_Atm(1)%bd%jed
   npz = FV_Atm(1)%npz
   
+   print *, __FILE__,__LINE__,'local pet', localPet, isc,iec,jsc,jec,isd,ied,jsd,jed,npz
+   call ESMF_VMBarrier(vm)
   utemp  = 0
   vtemp  = 0
-  uatemp = 0
   vatemp = 0
   uctemp = 0
   vctemp = 0
+  uatemp_t = 0
 
   if (FV_Atm(1)%flagstruct%grid_type>=4) then
   ! Doubly Periodic
-    uatemp(isc:iec,jsc:jec,:) = u
+    uatemp_t(isc:iec,jsc:jec,:) = u
     vatemp(isc:iec,jsc:jec,:) = v
-    call mpp_update_domains(uatemp, FV_Atm(1)%domain, &
+    call mpp_update_domains(uatemp_t, FV_Atm(1)%domain, &
                             whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.false.)
+   print *, __FILE__, __LINE__, 'local pet', localPet
+   call ESMF_VMBarrier(vm)
     call mpp_update_domains(vatemp, FV_Atm(1)%domain, &
                             whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.true.)
-    utemp(isc:iec,jsc:jec+1,:) = uatemp(isc:iec,jsc:jec+1,:)
+   print *, __FILE__, __LINE__, 'local pet', localPet
+   call ESMF_VMBarrier(vm)
+    utemp(isc:iec,jsc:jec+1,:) = uatemp_t(isc:iec,jsc:jec+1,:)
     vtemp(isc:iec+1,jsc:jec,:) = vatemp(isc:iec+1,jsc:jec,:)
   else
     utemp(isc:iec,jsc:jec,:) = u
@@ -4036,6 +4049,8 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
                           wbuffery=wbuffer, ebuffery=ebuffer, &
                           sbufferx=sbuffer, nbufferx=nbuffer, &
                           gridtype=DGRID_NE, complete=.true. )
+   print *, __FILE__, __LINE__, 'local pet', localPet
+   call ESMF_VMBarrier(vm)
     do k=1,npz
        do i=isc,iec
           utemp(i,jec+1,k) = nbuffer(i,k)
@@ -4046,27 +4061,35 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
     enddo   
   endif
 
+   print *, __FILE__, __LINE__, 'local pet', localPet
+   call ESMF_VMBarrier(vm)
   call mpp_update_domains(utemp, vtemp, FV_Atm(1)%domain, gridtype=DGRID_NE, complete=.true.)
+   print *, __FILE__, __LINE__, 'local pet', localPet
+   call ESMF_VMBarrier(vm)
   do k=1,npz
    call d2a2c_vect(utemp(:,:,k),  vtemp(:,:,k), &
-                   uatemp(:,:,k), vatemp(:,:,k), &
+                   uatemp_t(:,:,k), vatemp(:,:,k), &
                    uctemp(:,:,k), vctemp(:,:,k), ut, vt, .true., &
                    FV_Atm(1)%gridstruct,FV_Atm(1)%bd, FV_Atm(1)%flagstruct%npx, FV_Atm(1)%flagstruct%npy, &
                    FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%grid_type)
   enddo
   if (FV_Atm(1)%flagstruct%grid_type<4 .AND. present(rotate)) then 
    if (rotate) call cubed_to_latlon(utemp  , vtemp  , &
-                                    uatemp , vatemp , &
+                                    uatemp_t , vatemp , &
                                     FV_Atm(1)%gridstruct, &
                                     FV_Atm(1)%flagstruct%npx, FV_Atm(1)%flagstruct%npy, FV_Atm(1)%flagstruct%npz, -1, &
                                     FV_Atm(1)%gridstruct%grid_type, &
                                     FV_Atm(1)%domain,FV_Atm(1)%gridstruct%nested,FV_Atm(1)%flagstruct%c2l_ord,FV_Atm(1)%bd)
   endif
 
-  ua(:,:,:) = uatemp(isc:iec,jsc:jec,:)
+   print *, __FILE__, __LINE__, 'local pet', localPet
+   call ESMF_VMBarrier(vm)
+  ua(:,:,:) = uatemp_t(isc:iec,jsc:jec,:)
   va(:,:,:) = vatemp(isc:iec,jsc:jec,:)
   if (present(uc)) uc(:,:,:) = uctemp(isc:iec,jsc:jec,:)
   if (present(vc)) vc(:,:,:) = vctemp(isc:iec,jsc:jec,:)
+   print *, __FILE__, __LINE__, 'local pet', localPet
+   call ESMF_VMBarrier(vm)
 
   return
 end subroutine fv_getAgridWinds_3D

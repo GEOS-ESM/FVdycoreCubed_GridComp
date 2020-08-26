@@ -46,9 +46,11 @@
             ! first fine PET whose DE is the first in coarse will
             ! always reference first local array in localArrayList
             arr_loc = 1
+            !print '(9i3,i4)', localPet, ith, jth,pet_id_x,pet_id_y,nth_x,nth_y,nnx,nny, arr_loc
          else
             arr_loc = ith + pet_id_x*nth_x + (pet_id_y*nth_y+jth-1)*nnx
             is = ie + 1
+            !print '(9i3,i4)', localPet, ith, jth,pet_id_x,pet_id_y,nth_x,nth_y,nnx,nny, arr_loc
          end if
          call ESMF_LocalArrayGet(localArrayList(arr_Loc), farrayPtr=farrayPtr, &
             rc=status) 
@@ -61,7 +63,6 @@
          if (ndim == 3) km = arrsize(3)
          !print *, __FILE__, localPet, arr_loc, 'is ', is,ie
          !print *, __FILE__, localPet, arr_loc, 'js ', js,je
-         !print *, __FILE__, localPet, 'th ', ith, jth
          call NAME_COPY_(COPY_, rc=status)
          VERIFY_(STATUS)
          !COPY_
@@ -102,8 +103,8 @@
        !   write(116,*) '==============='
        !   write(116,*) '==============='
        !endif
-         call ESMF_VMBarrier(vm, rc=status)
-         VERIFY_(STATUS)
+         !call ESMF_VMBarrier(vm, rc=status)
+         !VERIFY_(STATUS)
          deallocate(arrsize)
       end do
    end do

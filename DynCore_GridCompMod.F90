@@ -2605,9 +2605,9 @@ contains
 
     !deallocate( UA )
     !deallocate( VA )
-    !print *, __FILE__, __LINE__, 'local pet', localPet
-    !call ESMF_VMBarrier(vm,rc=status)
-    !VERIFY_(STATUS)
+    print *, __FILE__, __LINE__, 'local pet', localPet
+    call ESMF_VMBarrier(vm,rc=status)
+    VERIFY_(STATUS)
 
 ! Fill Grid-Cell Area Delta-X/Y
 ! -----------------------------
@@ -2695,6 +2695,9 @@ contains
       !open(unit=281,file=trim(fname),form='formatted', status='new')
       !write(281,*) localPet, shape(PLE)
       !write(281,*) PLE
+    print *, __FILE__, __LINE__, 'local pet', localPet
+    call ESMF_VMBarrier(vm,rc=status)
+    VERIFY_(STATUS)
 
 
     RETURN_(ESMF_SUCCESS)

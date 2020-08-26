@@ -411,7 +411,7 @@ contains
     VERIFY_(STATUS)
 !set OMP_NUM_THREADS to local PeCount
 !!$ call omp_set_dynamic(.TRUE.)
-!$ call omp_set_num_threads(peCount)
+!!$ call omp_set_num_threads(peCount)
 
 !$omp parallel
 !$ print *, 'Initialize ', omp_get_num_threads(), peCount
@@ -475,6 +475,11 @@ contains
     call DynInit ( GC, STATE, CLOCK, INTERNAL, IMPORT, status)
     VERIFY_(STATUS)
 
+    !print *, __FILE__, __LINE__, 'local pet', localPet
+    !call ESMF_VMBarrier(vm,rc=status)
+    !VERIFY_(STATUS)
+
+
     !call MAPL_TimerOff(MAPL,"-DYN_INIT")
 
 ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
@@ -526,8 +531,10 @@ contains
 
     if(.not.associated(UD)) allocate(UD(ifirst:ilast,jfirst:jlast,1:km), stat=status)
     VERIFY_(STATUS)
+      !print *, __FILE__, __LINE__, ifirst,ilast,jfirst,jlast,km
       call SSI_CopyFineToCoarse(INTERNAL, UD, 'U', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
+      !print *, __FILE__, __LINE__, ifirst,ilast,jfirst,jlast,km
     if(.not.associated(VD)) allocate(VD(ifirst:ilast,jfirst:jlast,1:km), stat=status)
     VERIFY_(STATUS)
       call SSI_CopyFineToCoarse(INTERNAL, VD, 'V', STATE%f2c_SSI_arr_map, rc=status)
@@ -548,6 +555,10 @@ contains
 
     allocate( UA(ifirst:ilast,jfirst:jlast,km) )
     allocate( VA(ifirst:ilast,jfirst:jlast,km) )
+
+    print *, __FILE__, __LINE__, 'local pet', localPet
+    call ESMF_VMBarrier(vm,rc=status)
+    VERIFY_(STATUS)
 
     call getAgridWinds( UD, VD, UA, VA, rotate=.true.)
 
@@ -580,6 +591,10 @@ contains
     !endif
     call SSI_CopyCoarseToFine(export, temp3d, 'PLE', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
+    print *, __FILE__, __LINE__, 'local pet', localPet
+    call ESMF_VMBarrier(vm,rc=status)
+    VERIFY_(STATUS)
+
 
     !block
     !   type(ESMF_Field) :: field
@@ -702,6 +717,10 @@ contains
     temp2d = DycoreGrid%area
     call SSI_CopyCoarseToFine(export, temp2d, 'AREA', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
+    print *, __FILE__, __LINE__, 'local pet', localPet
+    call ESMF_VMBarrier(vm,rc=status)
+    VERIFY_(STATUS)
+
 
     !block
     !   character(len=128) :: fv_file
@@ -726,7 +745,7 @@ contains
     !call MAPL_TimerOff(MAPL,"INITIALIZE")
     !call MAPL_TimerOff(MAPL,"TOTAL")
 
-!$ call omp_set_num_threads(1)
+!!$ call omp_set_num_threads(1)
     RETURN_(ESMF_SUCCESS)
   end subroutine Initialize
   
@@ -1030,7 +1049,7 @@ subroutine Run(gc, import, export, clock, rc)
     call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
     VERIFY_(STATUS)
 !set OMP_NUM_THREADS to local PeCount
-!$ call omp_set_num_threads(peCount)
+!!$ call omp_set_num_threads(peCount)
 
 !!!!$ print *, 'Run ', omp_get_num_threads()
 ! Retrieve the pointer to the generic state
@@ -3496,7 +3515,7 @@ subroutine Run(gc, import, export, clock, rc)
  !endif
   !print *, __FILE__, __LINE__, "DynRun status ", STATUS
 
-!$ call omp_set_num_threads(1)
+!!$ call omp_set_num_threads(1)
   RETURN_(ESMF_SUCCESS)
 
 !contains
@@ -4599,7 +4618,7 @@ end subroutine RUN
     call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
     VERIFY_(STATUS)
 !set OMP_NUM_THREADS to local PeCount
-!$ call omp_set_num_threads(peCount)
+!!$ call omp_set_num_threads(peCount)
 
 !!!!$ print *, 'RunaddIncs ', omp_get_num_threads(), peCount
 ! Retrieve the pointer to the internal state
@@ -5345,7 +5364,7 @@ end subroutine RUN
     !call MAPL_TimerOff(GENSTATE,"RUN2")
     !call MAPL_TimerOff(GENSTATE,"TOTAL")
 
-!$ call omp_set_num_threads(1)
+!!$ call omp_set_num_threads(1)
     RETURN_(ESMF_SUCCESS)
 end subroutine RunAddIncs
 
