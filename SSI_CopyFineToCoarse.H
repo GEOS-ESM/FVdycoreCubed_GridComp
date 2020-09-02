@@ -17,7 +17,6 @@ subroutine SUB_(state, coarse_Array, name, f2c_SSI_arr_map, rc)
    call ESMF_StateGet(state, trim(name), field, rc=status)
    VERIFY_(STATUS)
    
-   !print *, __FILE__, __LINE__, "shape...coarse_Array ", shape(coarse_Array)
 #include "SSI_Range_Def.h"
 
     RETURN_(ESMF_SUCCESS)

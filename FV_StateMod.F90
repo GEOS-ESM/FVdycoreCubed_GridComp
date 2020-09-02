@@ -338,7 +338,7 @@ contains
 
   integer :: comm
   integer :: p_split=1
-  integer :: temp_int
+  integer :: temp_int, nnx, nny, nth_x, nth_y
 
 ! BEGIN
 
@@ -353,10 +353,6 @@ contains
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
-
-  !call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-  !print *, __FILE__, __LINE__, "status ", trim(IAm), status
-  !VERIFY_(STATUS)
 
     !call MAPL_TimerOn(MAPL,"--FMS_INIT")
     call ESMF_VMGet(VM,mpiCommunicator=comm,rc=status)
@@ -400,16 +396,12 @@ contains
       call ESMF_ConfigGetAttribute( CF, FV_Atm(1)%flagstruct%deglat, label='FIXED_LATS:', default=FV_Atm(1)%flagstruct%deglat, rc=status )
       VERIFY_(STATUS)
 ! MPI decomp setup
-      call ESMF_VMGet(vm, localPet=localPet, rc=status)
-      VERIFY_(STATUS)
-      call ESMF_VMGet(vm, pet=localPet, peCount=nthreads, rc=status)
-      VERIFY_(STATUS)
-
-      !print *, __FILE__, __LINE__, "nthreads: ", localPet, nthreads, FV_Atm(1)%flagstruct%grid_type
       !call MAPL_GetResource( MAPL, nx, 'NX:', default=0, RC=STATUS )
       call ESMF_ConfigGetAttribute( CF, nx, label='NX:', default=0, RC=STATUS )
       VERIFY_(STATUS)
-      FV_Atm(1)%layout(1) = nx/nthreads
+      call ESMF_ConfigGetAttribute( CF, nth_x, label='NTH_X:', default=1, RC=STATUS )
+      VERIFY_(STATUS)
+      FV_Atm(1)%layout(1) = nx/nth_x
       !call MAPL_GetResource( MAPL, ny, 'NY:', default=0, RC=STATUS )
       call ESMF_ConfigGetAttribute( CF, ny, label='NY:', default=0, RC=STATUS )
       VERIFY_(STATUS)
@@ -418,6 +410,9 @@ contains
       else
          FV_Atm(1)%layout(2) = ny / 6
       end if
+      call ESMF_ConfigGetAttribute( CF, nth_y, label='NTH_Y:', default=1, RC=STATUS )
+      VERIFY_(STATUS)
+      FV_Atm(1)%layout(2) = FV_Atm(1)%layout(2)/nth_y
 
 ! Get other scalars
 ! -----------------
@@ -611,15 +606,18 @@ contains
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
-! f2c_SSI_arr_map data hardwired for now; will come from Config
-      f2c_SSI_arr_map%nth_x = nthreads  
-      _ASSERT(mod(nthreads,f2c_SSI_arr_map%nth_x) == 0, &
-              'nthreads must be evenly divided by nth_x')
-      f2c_SSI_arr_map%nth_y = nthreads/f2c_SSI_arr_map%nth_x
-      _ASSERT(mod(nthreads,f2c_SSI_arr_map%nth_x*f2c_SSI_arr_map%nth_y) == 0, &
-              'nthreads must be evenly divided by nth_x*nth_y')
-      f2c_SSI_arr_map%nnx = 6 
-      f2c_SSI_arr_map%nny = 6
+! f2c_SSI_arr_map data
+      call ESMF_VMGet(vm, localPet=localPet, rc=status)
+      VERIFY_(STATUS)
+
+      f2c_SSI_arr_map%nth_x = nth_x  
+      f2c_SSI_arr_map%nth_y = nth_y
+      call ESMF_ConfigGetAttribute( CF, nnx, label='NNX:', default=1, RC=STATUS )
+      VERIFY_(STATUS)
+      call ESMF_ConfigGetAttribute( CF, nny, label='NNY:', default=1, RC=STATUS )
+      VERIFY_(STATUS)
+      f2c_SSI_arr_map%nnx = nnx 
+      f2c_SSI_arr_map%nny = nny
       f2c_SSI_arr_map%npet_x = f2c_SSI_arr_map%nnx/f2c_SSI_arr_map%nth_x
       f2c_SSI_arr_map%npet_y = f2c_SSI_arr_map%nny/f2c_SSI_arr_map%nth_y
       temp_int = mod(localPet, f2c_SSI_arr_map%npet_x*f2c_SSI_arr_map%npet_y)
@@ -628,27 +626,6 @@ contains
       f2c_SSI_arr_map%is = fv_atm(1)%bd%isc
       f2c_SSI_arr_map%js = fv_atm(1)%bd%jsc
       STATE%f2c_SSI_arr_map => f2c_SSI_arr_map
-      !print *, __FILE__, localPet, nthreads, fv_atm(1)%bd%is, fv_atm(1)%bd%js, fv_atm(1)%bd%ie, fv_atm(1)%bd%je
-
-    !block
-    !   character(len=128) :: fv_file
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    !   VERIFY_(STATUS)
-    !   write(fv_file,'(A,i2.2)') "fv_file_",localPet
-    !   open(unit=55,file=trim(fv_file),form='formatted',status='new')
-    !   write(55,'(A,i6)') 'fv_atm(1)%bd%is ', fv_atm(1)%bd%is
-    !   write(55,'(A,i6)') 'fv_atm(1)%bd%ie ', fv_atm(1)%bd%ie
-    !   write(55,'(A,i6)') 'fv_atm(1)%bd%js ', fv_atm(1)%bd%js
-    !   write(55,'(A,i6)') 'fv_atm(1)%bd%je ', fv_atm(1)%bd%je
-    !   write(55,'(A,i6)') 'fv_atm(1)%bd%isd ', fv_atm(1)%bd%isd
-    !   write(55,'(A,i6)') 'fv_atm(1)%bd%ied ', fv_atm(1)%bd%ied
-    !   write(55,'(A,i6)') 'fv_atm(1)%bd%jsd ', fv_atm(1)%bd%jsd
-    !   write(55,'(A,i6)') 'fv_atm(1)%bd%jed ', fv_atm(1)%bd%jed
-    !   write(55,'(A,i6)') 'fv_atm(1)%flagstruct%npx ', fv_atm(1)%flagstruct%npx
-    !   write(55,'(A,i6)') 'fv_atm(1)%flagstruct%npy ', fv_atm(1)%flagstruct%npy
-    !   write(55,'(A,i6)') 'fv_atm(1)%flagstruct%npz ', fv_atm(1)%flagstruct%npz
-    !   close(55)
-    !end block
 
 !! Setup GFDL microphysics module
     call gfdl_cloud_microphys_init()
@@ -876,9 +853,6 @@ contains
 !  VERIFY_(STATUS)
 
 ! Allocate coarse decomp internal state
-  !print *, __FILE__, __LINE__, is, ie, js, je
-  !call ESMF_VMBarrier(VM, rc=status)
-  !VERIFY_(STATUS)
   if(.not.associated(u)) allocate(u(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
   call SSI_CopyFineToCoarse(internal, u, 'U', f2c_SSI_arr_map, rc=status)
@@ -914,32 +888,12 @@ contains
   call SSI_CopyFineToCoarse(internal, w, 'W', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
-  !print *, __FILE__, __LINE__
-  !call ESMF_VMBarrier(VM, rc=status)
-  !VERIFY_(STATUS)
   call CREATE_VARS ( FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec,     &
                      1, FV_Atm(1)%flagstruct%npz, FV_Atm(1)%flagstruct%npz+1,            &
                      U, V, PT, PE, PKZ, DZ, W, &
                      STATE%VARS )
-  !print *, __FILE__, __LINE__
-  !call ESMF_VMBarrier(VM, rc=status)
-  !VERIFY_(STATUS)
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: CREATE_VARS', RC=STATUS )
   VERIFY_(STATUS)
-
-    !block
-    !   type(ESMF_VM) :: vm
-    !   integer :: localPet
-    !   integer :: rc, status
-    !   call ESMF_VMGetCurrent(vm, rc=status)
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    !   if(localPet == 0) then
-    !      write(100,*) shape(STATE%VARS%U)
-    !      write(100,*) STATE%VARS%U
-    !      write(102,*) shape(U)
-    !      write(102,*) U
-    !   endif
-    !end block
 
   GRID%IS     = FV_Atm(1)%bd%isc
   GRID%IE     = FV_Atm(1)%bd%iec
@@ -1058,9 +1012,6 @@ contains
   FV_Atm(1)%bk = bk
   FV_Atm(1)%ptop = FV_Atm(1)%ak(1)
   FV_Atm(1)%q(:,:,:,:) = 0.0 ! We Don't Have QV from the Import yet
-  !print *, __FILE__, __LINE__
-  !call ESMF_VMBarrier(VM, rc=status)
-  !VERIFY_(STATUS)
 
   if (COLDSTART) then
 
@@ -1128,9 +1079,6 @@ contains
   if ( (gid==0) .and. (FV_Atm(1)%flagstruct%grid_type == 4) ) print*, 'FV3 being run as Doubly-Periodic: test_case=', test_case
   if ( (gid==0)                              ) print*, ' '
 
-  !print *, __FILE__, __LINE__
-  !call ESMF_VMBarrier(VM, rc=status)
-  !VERIFY_(STATUS)
   if (DEBUG) call debug_fv_state('DEBUG_RESTART',STATE)
 !
 ! Write the vertical coordinate to STDOUT
@@ -1188,9 +1136,6 @@ contains
 
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV Initialize', RC=STATUS )
   VERIFY_(STATUS)
-  !print *, __FILE__, __LINE__
-  !call ESMF_VMBarrier(VM, rc=status)
-  !VERIFY_(STATUS)
 
   RETURN_(ESMF_SUCCESS)
 
@@ -2270,36 +2215,6 @@ subroutine State_To_FV ( STATE, internal )
   VERIFY_(STATUS)
   call SSI_CopyFineToCoarse(internal, STATE%VARS%W, 'W', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  !print *, __FILE__, __LINE__
-  !call ESMF_VMBarrier(VM, rc=status)
-  !VERIFY_(STATUS)
-
-  !  block
-  !     type(ESMF_VM) :: vm
-  !     integer :: localPet
-  !     integer :: rc, status
-  !     call ESMF_VMGetCurrent(vm, rc=status)
-  !     call ESMF_VMGet(vm, localPet=localPet, rc=status)
-  !     if(localPet == 0) then
-  !        write(103,*) shape(STATE%VARS%U)
-  !        write(103,*) STATE%VARS%U
-  !     endif
-  !     if(localPet == 1) then
-  !        write(104,*) shape(STATE%VARS%U)
-  !        write(104,*) STATE%VARS%U
-  !     endif
-  !     if(localPet == 2) then
-  !        write(105,*) shape(STATE%VARS%U)
-  !        write(105,*) STATE%VARS%U
-  !     endif
-  !     if(localPet == 3) then
-  !        write(106,*) shape(STATE%VARS%U)
-  !        write(106,*) STATE%VARS%U
-  !     endif
-  !  end block
-  !print *, __FILE__, __LINE__
-  !call ESMF_VMBarrier(VM, rc=status)
-  !VERIFY_(STATUS)
 
 ! D-Grid
   FV_Atm(1)%u(:,:,:) = tiny_number
@@ -2333,9 +2248,6 @@ subroutine State_To_FV ( STATE, internal )
     enddo
   endif
 
-  !print *, __FILE__, __LINE__
-  !call ESMF_VMBarrier(VM, rc=status)
-  !VERIFY_(STATUS)
    if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%w(isc:iec,jsc:jec,:) = STATE%VARS%W
  
 !------------
@@ -2379,9 +2291,6 @@ subroutine State_To_FV ( STATE, internal )
       FV_Atm(1)%ps(isc:iec,jsc:jec) = FV_Atm(1)%pe(isc:iec,km+1,jsc:jec)
 
    endif
-  !print *, __FILE__, __LINE__
-  !call ESMF_VMBarrier(VM, rc=status)
-  !VERIFY_(STATUS)
 
     FV_Atm(1)%delp(:,:,:) = tiny_number
     do k=1,km
@@ -2392,9 +2301,6 @@ subroutine State_To_FV ( STATE, internal )
       enddo
     enddo
 
-  !print *, __FILE__, __LINE__
-  !call ESMF_VMBarrier(VM, rc=status)
-  !VERIFY_(STATUS)
     if (.not. SW_DYNAMICS) then
 
 !-----------------------
@@ -2414,10 +2320,6 @@ subroutine State_To_FV ( STATE, internal )
        FV_Atm(1)%pkz(isc:iec,jsc:jec,:) = STATE%VARS%PKZ
 
     endif
-  !print *, __FILE__, __LINE__
-  !call ESMF_VMBarrier(VM, rc=status)
-  !VERIFY_(STATUS)
-
 
    return
 
@@ -4018,8 +3920,6 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
   jsd=FV_Atm(1)%bd%jsd ; jed=FV_Atm(1)%bd%jed
   npz = FV_Atm(1)%npz
   
-   print *, __FILE__,__LINE__,'local pet', localPet, isc,iec,jsc,jec,isd,ied,jsd,jed,npz
-   call ESMF_VMBarrier(vm)
   utemp  = 0
   vtemp  = 0
   vatemp = 0
@@ -4033,12 +3933,8 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
     vatemp(isc:iec,jsc:jec,:) = v
     call mpp_update_domains(uatemp_t, FV_Atm(1)%domain, &
                             whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.false.)
-   print *, __FILE__, __LINE__, 'local pet', localPet
-   call ESMF_VMBarrier(vm)
     call mpp_update_domains(vatemp, FV_Atm(1)%domain, &
                             whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.true.)
-   print *, __FILE__, __LINE__, 'local pet', localPet
-   call ESMF_VMBarrier(vm)
     utemp(isc:iec,jsc:jec+1,:) = uatemp_t(isc:iec,jsc:jec+1,:)
     vtemp(isc:iec+1,jsc:jec,:) = vatemp(isc:iec+1,jsc:jec,:)
   else
@@ -4049,8 +3945,6 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
                           wbuffery=wbuffer, ebuffery=ebuffer, &
                           sbufferx=sbuffer, nbufferx=nbuffer, &
                           gridtype=DGRID_NE, complete=.true. )
-   print *, __FILE__, __LINE__, 'local pet', localPet
-   call ESMF_VMBarrier(vm)
     do k=1,npz
        do i=isc,iec
           utemp(i,jec+1,k) = nbuffer(i,k)
@@ -4061,11 +3955,7 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
     enddo   
   endif
 
-   print *, __FILE__, __LINE__, 'local pet', localPet
-   call ESMF_VMBarrier(vm)
   call mpp_update_domains(utemp, vtemp, FV_Atm(1)%domain, gridtype=DGRID_NE, complete=.true.)
-   print *, __FILE__, __LINE__, 'local pet', localPet
-   call ESMF_VMBarrier(vm)
   do k=1,npz
    call d2a2c_vect(utemp(:,:,k),  vtemp(:,:,k), &
                    uatemp_t(:,:,k), vatemp(:,:,k), &
@@ -4082,14 +3972,10 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
                                     FV_Atm(1)%domain,FV_Atm(1)%gridstruct%nested,FV_Atm(1)%flagstruct%c2l_ord,FV_Atm(1)%bd)
   endif
 
-   print *, __FILE__, __LINE__, 'local pet', localPet
-   call ESMF_VMBarrier(vm)
   ua(:,:,:) = uatemp_t(isc:iec,jsc:jec,:)
   va(:,:,:) = vatemp(isc:iec,jsc:jec,:)
   if (present(uc)) uc(:,:,:) = uctemp(isc:iec,jsc:jec,:)
   if (present(vc)) vc(:,:,:) = vctemp(isc:iec,jsc:jec,:)
-   print *, __FILE__, __LINE__, 'local pet', localPet
-   call ESMF_VMBarrier(vm)
 
   return
 end subroutine fv_getAgridWinds_3D

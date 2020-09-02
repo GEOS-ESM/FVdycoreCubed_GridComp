@@ -2344,38 +2344,9 @@ contains
     VERIFY_(STATUS)
 
 
-    !block
-    !   type(ESMF_VM) :: vmc
-    !   integer :: localPet
-    !   character(len=100) :: file_name1
-    !   integer :: unit
-    !   call ESMF_GridCompGet(coarseGC, vm=vmc, rc=status)
-    !   VERIFY_(STATUS)
-    !   call ESMF_VMGet(vmc, localPet=localPet, rc=status)
-    !   VERIFY_(STATUS)
-    !   print *, __FILE__, __LINE__, localPet
-    !   !write(file_name1, '(A,i2.2)'), 'lons_lats', localPet
-    !   !open(newunit=unit, file=trim(file_name1), form='formatted', status='unknown')
-    !   !write(unit,*) 'LONS '
-    !   !write(unit,*) shape(lons)
-    !   !write(unit,*) lons
-    !   !write(unit,*) 
-    !   !write(unit,*) 'LATS '
-    !   !write(unit,*) shape(lats)
-    !   !write(unit,*) lats
-    !   !close(unit)
-    !end block
-
-    !call ESMF_GridCompGet(coarseGC, vm=coarseVM, rc=status)
-    !VERIFY_(STATUS)
-    !if (status == ESMF_SUCCESS) then
     call ESMF_GridCompSetServices(coarseGC, userRoutine=CoarseSetServices, &
        rc=status)
     VERIFY_(STATUS)
-    !print *, __FILE__, __LINE__, "out of coarse_setvm", status
-    !call ESMF_VMBarrier(vm,rc=status)
-    !VERIFY_(STATUS)
-    !endif
 
     call MAPL_GenericSetServices( GC, RC=STATUS )
     VERIFY_(STATUS)
@@ -2554,9 +2525,6 @@ contains
 
     !call MAPL_GetPointer(INTERNAL,UD,'U'  ,RC=STATUS)
     !VERIFY_(STATUS)
-    !print *, __FILE__, __LINE__, 'local pet', localPet
-    !call ESMF_VMBarrier(vm,rc=status)
-    !VERIFY_(STATUS)
     !call MAPL_GetPointer(INTERNAL,VD,'V'  ,RC=STATUS)
     !VERIFY_(STATUS)
     !call MAPL_GetPointer(INTERNAL,PE,'PE' ,RC=STATUS)
@@ -2576,27 +2544,8 @@ contains
 
     !allocate( UA(size(UD,1),size(UD,2),size(UD,3)) )
     !allocate( VA(size(VD,1),size(VD,2),size(VD,3)) )
-    !if (localPet == 13) then
-    !   write(143, *) localPet, size(UD,1),size(UD,2),size(UD,3)
-    !   write(143,*) UD
-    !   write(143,*) '============='
-    !   write(143, *) localPet, size(VD,1),size(VD,2),size(VD,3)
-    !   write(143,*) VD
-    !   write(143,*) '============='
-    !   write(143, *) localPet
-    !   write(143,*) PE
-    !   write(143,*) '============='
-    !   write(143, *) localPet
-    !   write(143,*) PT
-    !   write(143,*) '============='
-    !   write(143, *) localPet
-    !   write(143,*) PK
-    !endif
 
     !call getAgridWinds( UD, VD, UA, VA, rotate=.true.)
-    !print *, __FILE__, __LINE__, 'local pet', localPet
-    !call ESMF_VMBarrier(vm,rc=status)
-    !VERIFY_(STATUS)
 
     !  U = UA
     !  V = VA
@@ -2605,9 +2554,6 @@ contains
 
     !deallocate( UA )
     !deallocate( VA )
-    print *, __FILE__, __LINE__, 'local pet', localPet
-    call ESMF_VMBarrier(vm,rc=status)
-    VERIFY_(STATUS)
 
 ! Fill Grid-Cell Area Delta-X/Y
 ! -----------------------------
@@ -2691,14 +2637,6 @@ contains
 
     call MAPL_TimerOff(MAPL,"INITIALIZE")
     call MAPL_TimerOff(MAPL,"TOTAL")
-      !write(fname, '(a,i2.2)') 'ple_dyn.',localPet
-      !open(unit=281,file=trim(fname),form='formatted', status='new')
-      !write(281,*) localPet, shape(PLE)
-      !write(281,*) PLE
-    print *, __FILE__, __LINE__, 'local pet', localPet
-    call ESMF_VMBarrier(vm,rc=status)
-    VERIFY_(STATUS)
-
 
     RETURN_(ESMF_SUCCESS)
   end subroutine Initialize
@@ -2796,9 +2734,9 @@ subroutine Run(gc, import, export, clock, rc)
   VERIFY_(STATUS)
   if( associated(temp2D) ) temp2d = LATS
 
-!$omp parallel
-!$ print *, 'DyncoreGridComp Run num threads ... ', omp_get_num_threads()
-!$omp end parallel
+!!$omp parallel
+!!$ print *, 'DyncoreGridComp Run num threads ... ', omp_get_num_threads()
+!!$omp end parallel
 ! Report advected friendlies
 !---------------------------
 

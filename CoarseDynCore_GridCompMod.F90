@@ -140,6 +140,7 @@ contains
       !integer       :: ssiMaxPetCount
       character(len=160)    :: msg
       integer       :: nthreads, omp_get_num_threads
+      integer       :: nth_x, nth_y
       integer :: status
       character(len=ESMF_MAXSTR) :: Iam = "coarse_setvm"
       integer :: petCount, localPet
@@ -178,8 +179,11 @@ contains
         endif
         call ESMF_GridCompGet( GC, CONFIG=CF, rc=status)
         VERIFY_(STATUS)
-        call ESMF_ConfigGetAttribute( CF, nthreads, label='OMP_NUM_THREADS:', default= 1, RC=STATUS )
+        call ESMF_ConfigGetAttribute( CF, nth_x, label='NTH_X:', default= 1, RC=STATUS )
         VERIFY_(STATUS)
+        call ESMF_ConfigGetAttribute( CF, nth_y, label='NTH_Y:', default= 1, RC=STATUS )
+        VERIFY_(STATUS)
+        nthreads = nth_x*nth_y
         call ESMF_GridCompSetVMMaxPEs(gc, maxPeCountPerPet=nthreads, rc=status)
         VERIFY_(STATUS)
       endif
@@ -411,7 +415,7 @@ contains
     VERIFY_(STATUS)
 !set OMP_NUM_THREADS to local PeCount
 !!$ call omp_set_dynamic(.TRUE.)
-!!$ call omp_set_num_threads(peCount)
+!$ call omp_set_num_threads(peCount)
 
 !$omp parallel
 !$ print *, 'Initialize ', omp_get_num_threads(), peCount
@@ -556,9 +560,9 @@ contains
     allocate( UA(ifirst:ilast,jfirst:jlast,km) )
     allocate( VA(ifirst:ilast,jfirst:jlast,km) )
 
-    print *, __FILE__, __LINE__, 'local pet', localPet
-    call ESMF_VMBarrier(vm,rc=status)
-    VERIFY_(STATUS)
+    !print *, __FILE__, __LINE__, 'local pet', localPet
+    !call ESMF_VMBarrier(vm,rc=status)
+    !VERIFY_(STATUS)
 
     call getAgridWinds( UD, VD, UA, VA, rotate=.true.)
 
@@ -591,9 +595,9 @@ contains
     !endif
     call SSI_CopyCoarseToFine(export, temp3d, 'PLE', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    print *, __FILE__, __LINE__, 'local pet', localPet
-    call ESMF_VMBarrier(vm,rc=status)
-    VERIFY_(STATUS)
+    !print *, __FILE__, __LINE__, 'local pet', localPet
+    !call ESMF_VMBarrier(vm,rc=status)
+    !VERIFY_(STATUS)
 
 
     !block
@@ -717,8 +721,8 @@ contains
     temp2d = DycoreGrid%area
     call SSI_CopyCoarseToFine(export, temp2d, 'AREA', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    print *, __FILE__, __LINE__, 'local pet', localPet
-    call ESMF_VMBarrier(vm,rc=status)
+    !print *, __FILE__, __LINE__, 'local pet', localPet
+    !call ESMF_VMBarrier(vm,rc=status)
     VERIFY_(STATUS)
 
 
@@ -746,6 +750,7 @@ contains
     !call MAPL_TimerOff(MAPL,"TOTAL")
 
 !!$ call omp_set_num_threads(1)
+!!$ call omp_set_dynamic(.FALSE.)
     RETURN_(ESMF_SUCCESS)
   end subroutine Initialize
   
@@ -1028,6 +1033,7 @@ subroutine Run(gc, import, export, clock, rc)
     integer :: localPet, peCount
     integer :: omp_get_num_threads
     
+!!$ call omp_set_dynamic(.TRUE.)
   Iam = "CoarseRun"
 
 ! Retrieve the pointer to the internal state
@@ -3504,6 +3510,8 @@ subroutine Run(gc, import, export, clock, rc)
       if (allocated(names0)) DEALLOCATE( names0  )
       DEALLOCATE( phi00  )
 
+!!$ call omp_set_dynamic(.FALSE.)
+
       !call freeTracers(state)
 
   !call MAPL_TimerOff(MAPL,"RUN")
@@ -4608,6 +4616,7 @@ end subroutine RUN
     integer :: localPet, peCount
     integer :: omp_get_num_threads
 
+!!$ call omp_set_dynamic(.TRUE.)
     Iam = "CoarseRunAddIncs"
     call ESMF_GridCompGet( GC, name=COMP_NAME, vm=vm, RC=STATUS )
     VERIFY_(STATUS)
@@ -5365,6 +5374,7 @@ end subroutine RUN
     !call MAPL_TimerOff(GENSTATE,"TOTAL")
 
 !!$ call omp_set_num_threads(1)
+!!$ call omp_set_dynamic(.FALSE.)
     RETURN_(ESMF_SUCCESS)
 end subroutine RunAddIncs
 
