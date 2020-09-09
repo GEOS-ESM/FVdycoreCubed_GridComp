@@ -59,6 +59,7 @@
    use CoarseFVdycoreCubed_GridComp, only : coarse_setvm, &
                                             CoarseSetServices => SetServices, &
                                             DYN_wrap
+   use SSI_FineToCoarse, only: SSI_StateSync
 
 ! !PUBLIC MEMBER FUNCTIONS:
 
@@ -2262,6 +2263,25 @@ contains
          PRECISION  = ESMF_KIND_R8,                                &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+
+! Addedd LONS and LATS in order to use same copy routines as for the other
+! fields on the coarse side 
+    call MAPL_AddInternalSpec ( gc,                                &
+         SHORT_NAME = 'LATS',                                       &
+         LONG_NAME  = 'latitude',                             &
+         UNITS      = 'radians'  ,                                       &
+         DIMS       = MAPL_DimsHorzOnly,                           &
+         VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddInternalSpec ( gc,                                &
+         SHORT_NAME = 'LONS',                                       &
+         LONG_NAME  = 'longitude',                             &
+         UNITS      = 'radians'  ,                                       &
+         DIMS       = MAPL_DimsHorzOnly,                           &
+         VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
+     VERIFY_(STATUS)
+
 !EOS
 
 
@@ -2403,6 +2423,8 @@ contains
   real(r4), pointer                  ::   u(:,:,:)
   real(r4), pointer                  ::   v(:,:,:)
   real(r4), pointer                  ::   t(:,:,:)
+  real(r4), pointer                  :: LATS(:,:), LONS(:,:)
+  real(r4), pointer                  :: LATS_MAPL(:,:), LONS_MAPL(:,:)
 
   character(len=ESMF_MAXSTR)         :: ReplayMode
   real                               :: DNS_INTERVAL
@@ -2493,6 +2515,17 @@ contains
     VERIFY_(STATUS)
     call MAPL_GetPointer(EXPORT,T,  'T',  ALLOC=.true.,RC=STATUS)
 
+! Initialize LATS and LONS into INTERNAL state to be retieved on coarse side
+! needed for coldstart
+    call MAPL_Get ( MAPL, lats = LATS_MAPL, lons = LONS_MAPL, RC=STATUS )
+    VERIFY_(STATUS)
+    call MAPL_GetPointer(INTERNAL, LATS, 'LATS', RC=STATUS)
+    VERIFY_(STATUS)
+    LATS = LATS_MAPL
+    call MAPL_GetPointer(INTERNAL, LONS, 'LONS', RC=STATUS)
+    VERIFY_(STATUS)
+    LONS = LONS_MAPL
+
 ! Get the private internal state
 !-------------------------------
 
@@ -2511,15 +2544,31 @@ contains
     call ESMF_GridCompGet(GC, vm=vm, rc=status)
     VERIFY_(STATUS)
     call ESMF_VMGet(vm,localPet=localPet,rc=status)
+    VERIFY_(STATUS)
 ! Initialize coarse decomposition GC
 ! --------------------------------------------
+
+    !call SSI_StateSync(INTERNAL, rc=status)
+    !VERIFY_(STATUS)
+    !call SSI_StateSync(IMPORT, rc=status)
+    !VERIFY_(STATUS)
+    !call SSI_StateSync(EXPORT, rc=status)
+    !VERIFY_(STATUS)
+
     call ESMF_GridCompInitialize(coarseGC, importState=INTERNAL, &
        PHASE=1, rc=status) ! set FV ESMF internal state
     VERIFY_(STATUS)
-
     call ESMF_GridCompInitialize(coarseGC, importState=IMPORT, &
        exportState=EXPORT, clock=clock, PHASE=2, rc=status) ! run Initialize
     VERIFY_(STATUS)
+
+!!$ call omp_set_num_threads(1)
+    !call SSI_StateSync(INTERNAL, rc=status)
+    !VERIFY_(STATUS)
+    !call SSI_StateSync(IMPORT, rc=status)
+    !VERIFY_(STATUS)
+    !call SSI_StateSync(EXPORT, rc=status)
+    !VERIFY_(STATUS)
 !!$ call omp_set_num_threads(1)
     !endif
 
@@ -2712,6 +2761,7 @@ subroutine Run(gc, import, export, clock, rc)
   character(len=ESMF_MAXSTR) :: IAm
 !$  integer :: omp_get_num_threads
 
+!!$    call omp_set_num_threads(1)
   Iam = "Run"
 
   call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
@@ -2866,9 +2916,25 @@ subroutine Run(gc, import, export, clock, rc)
          bundleAdv = BUNDLE ! replace with TRADV
       end if ! adjustTracers
 
+  !call SSI_StateSync(INTERNAL, rc=status)
+  !VERIFY_(STATUS)
+  !call SSI_StateSync(IMPORT, rc=status)
+  !VERIFY_(STATUS)
+  !call SSI_StateSync(EXPORT, rc=status)
+  !VERIFY_(STATUS)
+
+!!$ call omp_set_num_threads(1)
   call ESMF_GridCompRun(coarseGC, importState=IMPORT, &
       exportState=EXPORT, clock=clock, PHASE=1, rc=status)
   VERIFY_(STATUS)
+!!$ call omp_set_num_threads(1)
+
+  !call SSI_StateSync(INTERNAL, rc=status)
+  !VERIFY_(STATUS)
+  !call SSI_StateSync(IMPORT, rc=status)
+  !VERIFY_(STATUS)
+  !call SSI_StateSync(EXPORT, rc=status)
+  !VERIFY_(STATUS)
 !!$ call omp_set_num_threads(1)
 
   RETURN_(ESMF_SUCCESS)
@@ -2911,9 +2977,25 @@ end subroutine RUN
 
     Iam = "RunAddIncs"
 
+    !call SSI_StateSync(INTERNAL, rc=status)
+    !VERIFY_(STATUS)
+    !call SSI_StateSync(IMPORT, rc=status)
+    !VERIFY_(STATUS)
+    !call SSI_StateSync(EXPORT, rc=status)
+    !VERIFY_(STATUS)
+
+!!$ call omp_set_num_threads(1)
     call ESMF_GridCompRun(coarseGC, importState=IMPORT, &
         exportState=EXPORT, clock=clock, PHASE=2, rc=status)
     VERIFY_(STATUS)
+!!$ call omp_set_num_threads(1)
+
+    !call SSI_StateSync(INTERNAL, rc=status)
+    !VERIFY_(STATUS)
+    !call SSI_StateSync(IMPORT, rc=status)
+    !VERIFY_(STATUS)
+    !call SSI_StateSync(EXPORT, rc=status)
+    !VERIFY_(STATUS)
 !!$ call omp_set_num_threads(1)
 
     RETURN_(ESMF_SUCCESS)

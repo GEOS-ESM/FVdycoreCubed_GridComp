@@ -241,13 +241,20 @@ contains
    type (DYN_wrap)                  :: wrap
    integer :: status
    character(len=ESMF_MAXSTR) :: Iam = "CoarseSetServices"
+   type(ESMF_VM) :: vm
+   integer :: localPet, peCount
 
 ! Register services for this component
 ! ------------------------------------
 
 ! Allocate this instance of the internal state and put it in wrapper.
 ! -------------------------------------------------------------------
-
+    call ESMF_GridCompGet(gc, vm=vm, rc=status)
+    call ESMF_VMGet(vm, localPet=localPet, rc=status)
+    VERIFY_(STATUS)
+    call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
+    VERIFY_(STATUS)
+!$ call omp_set_num_threads(peCount)
     allocate( state, stat=status )
     VERIFY_(STATUS)
     wrap%dyn_state => state
@@ -415,7 +422,7 @@ contains
     VERIFY_(STATUS)
 !set OMP_NUM_THREADS to local PeCount
 !!$ call omp_set_dynamic(.TRUE.)
-!$ call omp_set_num_threads(peCount)
+!!$ call omp_set_num_threads(peCount)
 
 !$omp parallel
 !$ print *, 'Initialize ', omp_get_num_threads(), peCount
@@ -482,7 +489,6 @@ contains
     !print *, __FILE__, __LINE__, 'local pet', localPet
     !call ESMF_VMBarrier(vm,rc=status)
     !VERIFY_(STATUS)
-
 
     !call MAPL_TimerOff(MAPL,"-DYN_INIT")
 
@@ -595,91 +601,6 @@ contains
     !endif
     call SSI_CopyCoarseToFine(export, temp3d, 'PLE', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    !print *, __FILE__, __LINE__, 'local pet', localPet
-    !call ESMF_VMBarrier(vm,rc=status)
-    !VERIFY_(STATUS)
-
-
-    !block
-    !   type(ESMF_Field) :: field
-    !   type(ESMF_Array) :: array
-    !   integer, allocatable :: arrayImg(:), localDeToDeMap(:)
-    !   integer              :: ssiLocalDeCount
-    !   type(ESMF_VM) :: vm
-    !   integer :: localPet
-    !   character(len=100) :: file_name1, file_name2
-    !   type(ESMF_LocalArray), allocatable :: localArrayList(:)
-    !   real(ESMF_KIND_R8), pointer :: farrayPtr(:,:,:)
-    !   integer :: ipet, dimCount, deCount, ide
-    !   type(ESMF_Grid) :: grid
-    !   type(ESMF_DistGrid) :: distgrid
-    !   integer, allocatable :: min_indx(:,:), max_indx(:,:)
-    !   
-    !   call ESMF_VMGetCurrent(vm, rc=status) 
-    !   VERIFY_(STATUS)
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status) 
-    !   VERIFY_(STATUS)
-    !   write(file_name1, '(A,i2.2)'), 'file1_', localPet
-    !   open(unit=74, file=trim(file_name1), form='formatted', status='new')
-    !   write(74,*) shape(UD)
-    !   write(74,*) UD
-    !   call ESMF_VMBarrier(vm, rc=status)
-    !   call ESMF_StateGet(INTERNAL, 'U', field, rc=status)
-    !   VERIFY_(STATUS)
-    !   call ESMF_FieldGet(field, grid=grid, rc=status)
-    !   VERIFY_(STATUS)
-    !   call ESMF_AttributeGet(field, name='SSI_ARRAY_SIZE', &
-    !        value=ssiLocalDeCount, rc=status)
-    !   VERIFY_(STATUS)
-    !   allocate(arrayImg(ssiLocalDeCount), stat=status)
-    !   VERIFY_(STATUS)
-    !   call ESMF_AttributeGet(field, name='SSI_ARRAY_SAVED', &
-    !        valueList=arrayImg, rc=status)
-    !   VERIFY_(STATUS)
-    !   array = transfer(arrayimg,array)
-    !   allocate(localDeToDeMap(ssiLocalDeCount), stat=status)
-    !   allocate(localArrayList(ssiLocalDeCount), stat=status)
-    !   VERIFY_(STATUS)
-    !   call ESMF_ArrayGet(array, localDeToDeMap=localDeToDeMap, &
-    !        localarrayList=localArrayList, rc=status)
-    !   VERIFY_(STATUS)
-    !   call ESMF_VMBarrier(vm, rc=status)
-    !   if (localPet == 0) then
-    !   do ipet = 0, ssiLocalDeCount-1
-    !      write(file_name2, '(A,i2.2)'), 'file2_', ipet
-    !      call ESMF_LocalArrayGet(localArrayList(ipet+1), farrayPtr=farrayPtr, &
-    !      !call ESMF_LocalArrayGet(localArrayList(localPet+1), distgrid=distgrid, &
-    !           rc=status)
-    !      !call ESMF_GridGet(grid, distgrid=distgrid, rc=status)
-    !      VERIFY_(STATUS)
-    !      !call ESMF_DistGridGet(distgrid, dimCount=dimCount, deCount=deCount,rc=status)
-    !      !VERIFY_(STATUS)
-    !      !allocate(min_indx(dimCount,deCount),max_indx(dimCount,deCount))
-    !      !call ESMF_DistGridGet(distgrid, minIndexPDe=min_indx, &
-    !      !     maxIndexPDe=max_indx, rc=status)
-    !      !VERIFY_(STATUS)
-    !      
-    !!      !print *, "localPet ........ ", __FILE__, __LINE__, localPet, ssiLocalDeCount
-    !      open(unit=75, file=trim(file_name2), form='formatted', status='new')
-    !      !do ide = 1, deCount
-    !      !write(75, '(A,3i6)') 'Dyncore is ', min_indx(1,1), dimCount, ide
-    !      !write(75, '(A,i6)') 'Dyncore ie ', max_indx(1,1)
-    !      !write(75, '(A,i6)') 'Dyncore ie ', min_indx(2,1)
-    !      !write(75, '(A,i6)') 'Dyncore ie ', max_indx(2,1)
-    !      !write(75, *)
-    !      !end do
-    !      !write(75, *) 'Dyncore start ', lbound(U)
-    !      !write(75, *) 'Dyncore start ', ubound(U)
-    !       write(75,*) shape(farrayPtr)
-    !       write(75,*) farrayPtr
-    !       close(75)
-    !    end do
-    !    end if
-    !!      !call ESMF_VMBarrier(vm, rc=status)
-    !end block
-
-    !deallocate( UA )
-    !deallocate( VA )
 
 ! Fill Grid-Cell Area Delta-X/Y
 ! -----------------------------
@@ -690,22 +611,6 @@ contains
     if(.not.associated(temp2d)) allocate(temp2d(ifirst:ilast,jfirst:jlast), stat=status)
     VERIFY_(STATUS)
 
-    !call ESMF_VMGet(VM, localPet=localPet, rc=status)
-    !VERIFY_(STATUS)
-    !if (localPet == 11) then
-    !   print *, __FILE__, __LINE__, STATE%f2c_SSI_arr_map%nth_x
-    !   print *, STATE%f2c_SSI_arr_map%nth_y
-    !   print *, STATE%f2c_SSI_arr_map%nnx
-    !   print *, STATE%f2c_SSI_arr_map%nny
-    !   print *, STATE%f2c_SSI_arr_map%npet_x
-    !   print *, STATE%f2c_SSI_arr_map%npet_y
-    !   print *, STATE%f2c_SSI_arr_map%pet_id_x
-    !   print *, STATE%f2c_SSI_arr_map%pet_id_y
-    !   print *, STATE%f2c_SSI_arr_map%is
-    !   print *, __FILE__, __LINE__, STATE%f2c_SSI_arr_map%js
-    !end if
-    !call ESMF_VMBarrier(VM, rc=status)
-    !VERIFY_(STATUS)
     temp2d = DycoreGrid%dxc
     call SSI_CopyCoarseToFine(export, temp2d, 'DXC', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
@@ -725,26 +630,6 @@ contains
     !call ESMF_VMBarrier(vm,rc=status)
     VERIFY_(STATUS)
 
-
-    !block
-    !   character(len=128) :: fv_file
-    !   integer :: unit
-    !   integer :: localPet
-    !   type(ESMF_VM) :: vm
-    !   call ESMF_VMGetCurrent(vm, rc=status)
-    !   VERIFY_(STATUS)
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    !   VERIFY_(STATUS)
-    !   write(fv_file,'(A,i2.2)') "fv_file_",localPet
-    !   open(newunit=unit,file=trim(fv_file),form='formatted',status='new')
-    !   write(unit, *) "localPet: ", localPet
-    !   write(unit, *) shape(DycoreGrid%dxc), localPet
-    !   write(unit, *) DycoreGrid%dxc
-    !   write(unit, *)
-    !   write(unit, *) shape(DycoreGrid%dyc)
-    !   write(unit, *) DycoreGrid%dyc
-    !   close(unit)
-    !end block
 
     !call MAPL_TimerOff(MAPL,"INITIALIZE")
     !call MAPL_TimerOff(MAPL,"TOTAL")
