@@ -219,7 +219,7 @@ contains
 
 ! 3D Tracers
      do ntracer=1,ntracers
-        write(myTracer, "('TEST_TRACER',i1.1)") ntracer-1
+        write(myTracer, "('TEST_TRACER',i5.5)") ntracer-1
         call MAPL_AddExportSpec ( gc,                             &
              SHORT_NAME = TRIM(myTracer),                         &
              LONG_NAME  = TRIM(myTracer),                         &
@@ -811,7 +811,7 @@ contains
                advTracers(N)%content    = TRACERS(:,:,:,N)
             end if
 ! Fill Export States
-            write(myTracer, "('TEST_TRACER',i1.1)") N-1
+            write(myTracer, "('TEST_TRACER',i5.5)") N-1
             call MAPL_GetPointer(EXPORT, temp3D, TRIM(myTracer), rc=status)
             VERIFY_(STATUS)
             if ((associated(temp3D)) .and. (N<=ntracers)) then
