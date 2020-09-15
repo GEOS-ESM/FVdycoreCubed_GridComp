@@ -1593,7 +1593,7 @@ contains
 
      do ntracer=1,ntracers
         do nlev=1,nlevs
-           write(myTracer, "('Q',i1.1,'_',i3.3)") ntracer-1, plevs(nlev)
+           write(myTracer, "('Q',i5.5,'_',i3.3)") ntracer-1, plevs(nlev)
            call MAPL_AddExportSpec ( gc,                             &     
                 SHORT_NAME = TRIM(myTracer),                              &
                 LONG_NAME  = TRIM(myTracer),                             &
@@ -1602,7 +1602,7 @@ contains
                 VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
            VERIFY_(STATUS)
         enddo
-        write(myTracer, "('Q',i1.1)") ntracer-1
+        write(myTracer, "('Q',i5.5)") ntracer-1
         call MAPL_AddExportSpec ( gc,                             &
              SHORT_NAME = TRIM(myTracer),                         &
              LONG_NAME  = TRIM(myTracer),                         &
@@ -4360,7 +4360,7 @@ subroutine Run(gc, import, export, clock, rc)
 
 
       do ntracer=1,ntracers
-         write(myTracer, "('Q',i1.1)") ntracer-1
+         write(myTracer, "('Q',i5.5)") ntracer-1
          call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
          VERIFY_(STATUS)
          if((associated(temp3d)) .and. (NQ>=ntracer)) then
@@ -6367,7 +6367,7 @@ end subroutine RUN
     if(associated(temp3d)) temp3d = (tempxy)*(p00/(0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1))))**kappa
 
       do ntracer=1,ntracers
-         write(myTracer, "('Q',i1.1)") ntracer-1
+         write(myTracer, "('Q',i5.5)") ntracer-1
          call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
          VERIFY_(STATUS)
          if((associated(temp3d)) .and. (STATE%GRID%NQ>=ntracer)) then
