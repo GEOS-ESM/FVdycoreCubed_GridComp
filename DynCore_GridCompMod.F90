@@ -59,7 +59,7 @@
    use CoarseFVdycoreCubed_GridComp, only : coarse_setvm, &
                                             CoarseSetServices => SetServices, &
                                             DYN_wrap
-   use SSI_FineToCoarse, only: SSI_StateSync
+   !use SSI_FineToCoarse, only: SSI_StateSync
 
 ! !PUBLIC MEMBER FUNCTIONS:
 
@@ -376,7 +376,6 @@ contains
 
     !call ESMF_UserCompSetInternalState ( GC,'DYNstate',wrap,status )
     !VERIFY_(STATUS)
-
 
 !BOS
 
@@ -2111,15 +2110,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'DYNTIMER',                            &
-       LONG_NAME          = 'timer_in_the_dynamics',               &
-       UNITS              = 'seconds',                             &
-       DIMS               = MAPL_DimsHorzOnly,                     &
-       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
-    VERIFY_(STATUS)
-
-    call MAPL_AddExportSpec ( gc,                                  &
-       SHORT_NAME         = 'COMMTIMER',                           &
-       LONG_NAME          = 'communication_timer_in_the_dynamics', &
+       LONG_NAME          = 'timer_for_main_dynamics_run',         &
        UNITS              = 'seconds',                             &
        DIMS               = MAPL_DimsHorzOnly,                     &
        VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
@@ -2264,26 +2255,26 @@ contains
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
 
-! Addedd LONS and LATS in order to use same copy routines as for the other
-! fields on the coarse side 
-    call MAPL_AddInternalSpec ( gc,                                &
-         SHORT_NAME = 'LATS',                                       &
-         LONG_NAME  = 'latitude',                             &
-         UNITS      = 'radians'  ,                                       &
+!AOO Add LONS and LATS to import to safe as field to be used
+!at coarse side where MAPL state is not available
+    call MAPL_AddInternalSpec( gc,                                  &
+         SHORT_NAME = 'LONS',                                      &
+         LONG_NAME  = 'Center_longitudes',                         &
+         UNITS      = 'radians',                                   &
+         !PRECISION  = ESMF_KIND_R8,                                &
          DIMS       = MAPL_DimsHorzOnly,                           &
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
      VERIFY_(STATUS)
 
-    call MAPL_AddInternalSpec ( gc,                                &
-         SHORT_NAME = 'LONS',                                       &
-         LONG_NAME  = 'longitude',                             &
-         UNITS      = 'radians'  ,                                       &
+    call MAPL_AddInternalSpec( gc,                                  &
+         SHORT_NAME = 'LATS',                                      &
+         LONG_NAME  = 'Center_latitudes',                          &
+         UNITS      = 'radians',                                   &
+         !PRECISION  = ESMF_KIND_R8,                                &
          DIMS       = MAPL_DimsHorzOnly,                           &
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
-     VERIFY_(STATUS)
-
+     VERIFY_(STATUS)      
 !EOS
-
 
 ! Set the Profiling timers
 ! ------------------------
@@ -2438,8 +2429,10 @@ contains
   integer                            :: i,numTracers,fv3_standalone
   type(ESMF_Grid)                    :: grid
   type(ESMF_VM)                    :: vm
+  type(ESMF_Field)                    :: U_field
   integer :: localPet
-  character(len=100) :: fname
+  character(len=ESMF_MAXSTR) :: fname
+  integer :: ierr, n
 !$  integer :: omp_get_num_threads
 
 ! Begin
@@ -2448,7 +2441,7 @@ contains
 !!$ call omp_set_num_threads(1)
 
     Iam = "Initialize"
-    call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, RC=STATUS )
+    call ESMF_GridCompGet( GC, name=COMP_NAME, vm=vm, CONFIG=CF, RC=STATUS )
     VERIFY_(STATUS)
     Iam = trim(COMP_NAME) // Iam
 
@@ -2469,6 +2462,34 @@ contains
 
     call MAPL_TimerOn(MAPL,"TOTAL")
     call MAPL_TimerOn(MAPL,"INITIALIZE")
+
+   ! call MAPL_Get ( MAPL, INTERNAL_ESMF_STATE=INTERNAL, RC=STATUS )
+   ! VERIFY_(STATUS)
+   !call ESMF_StateGet(EXPORT, 'U', U_field, rc=status)
+   !VERIFY_(STATUS)
+   !call ESMF_AttributeGet( U_field, count=n, rc=status)
+   !VERIFY_(STATUS)
+   !call ESMF_VMGet(vm, localPet=localPet, rc=status)
+   !VERIFY_(STATUS)
+   !if (localPet == 0) then
+   !do i = 1, n
+   !   call ESMF_AttributeGet( U_field, attributeIndex=i, name=fname, rc=status)
+   !   VERIFY_(STATUS)
+   !   print *, "Attribute ...", i, trim(fname)
+   !enddo
+   !endif
+   !call MPI_Finalize(ierr)
+   !stop
+
+
+! Check for ColdStart from the configuration 
+!--------------------------------------
+    call MAPL_GetResource ( MAPL, ColdRestart, 'COLDSTART:', default=0, rc=status )
+    VERIFY_(STATUS)
+    if (ColdRestart /=0 ) then
+      call Coldstart( gc, import, export, clock, rc=STATUS )
+      VERIFY_(STATUS)
+    endif
 
 !!!$omp parallel
 !!!$ print *, 'DyncoreGridComp num threads ... ', omp_get_num_threads()
@@ -3095,5 +3116,182 @@ subroutine Finalize(gc, import, export, clock, rc)
 
 end subroutine FINALIZE
 
+!BOP
+
+! !IROUTINE: Coldstart
+
+! !DESCRIPTION:
+!   Routine to coldstart from an isothermal state of rest.
+!   The temperature can be specified in the config, otherwise
+!   it is 300K. The surface pressure is assumed to be 1000 hPa.
+!
+! !INTERFACE:
+
+subroutine Coldstart(gc, import, export, clock, rc)
+
+! !ARGUMENTS:
+
+    type(ESMF_GridComp), intent(inout) :: gc
+    type(ESMF_State),    intent(inout) :: import
+    type(ESMF_State),    intent(inout) :: export
+    type (ESMF_Clock),   intent(inout) :: clock
+    integer, intent(out), optional     :: rc
+
+!EOP
+
+    character(len=ESMF_MAXSTR)        :: IAm="FV:Coldstart"
+    character(len=ESMF_MAXSTR)        :: COMP_NAME
+    integer                           :: status
+
+    type (MAPL_MetaComp),     pointer :: MAPL 
+    type (ESMF_State)                 :: INTERNAL
+
+    type(ESMF_Config)                 :: CF
+
+    integer                     :: case_id
+    integer                     :: case_tracers
+
+    integer :: FV3_STANDALONE
+    integer :: n
+
+! Tracer Stuff
+    type (ESMF_Grid)                 :: esmfGRID 
+    type (ESMF_FieldBundle)          :: TRADV_BUNDLE
+    character(len=ESMF_MAXSTR)       :: FIELDNAME
+
+! Begin
+
+    call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, RC=STATUS )
+    VERIFY_(STATUS)
+    Iam = trim(COMP_NAME) // trim(Iam)
+
+! Retrieve the pointer to the state
+! ---------------------------------
+
+    call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
+    VERIFY_(STATUS)
+
+
+    call MAPL_Get ( MAPL,                &
+           INTERNAL_ESMF_STATE=INTERNAL, &
+                               RC=STATUS )
+    VERIFY_(STATUS)
+
+
+! Check if running standalone model
+    call ESMF_ConfigGetAttribute ( CF, FV3_STANDALONE, Label="FV3_STANDALONE:", default=0, RC=STATUS)
+    VERIFY_(STATUS)
+
+! 3D Baroclinic Test Cases
+
+    call ESMF_ConfigGetAttribute( cf, case_id      , label='CASE_ID:'      , default=0 , rc = STATUS )
+    VERIFY_(STATUS)
+    call ESMF_ConfigGetAttribute( cf, case_tracers , label='CASE_TRACERS:' , default=1234, rc=STATUS) 
+    VERIFY_(STATUS)
+
+!--------------------
+! Parse Tracers
+!--------------------
+   if (FV3_STANDALONE /= 0) then
+      call ESMF_StateGet(IMPORT, 'TRADV' , TRADV_BUNDLE,   RC=STATUS)
+      VERIFY_(STATUS)
+
+      call ESMF_GridCompGet(gc, grid=esmfGRID, rc=STATUS)
+      VERIFY_(STATUS)
+
+      FIELDNAME = 'Q'
+      call addTracer_thin(TRADV_BUNDLE, esmfGRID, FIELDNAME)
+
+    if (case_tracers /= 1234) then
+
+      do n=1,case_tracers
+        write(FIELDNAME, "('Q',i3.3)") n
+        call addTracer_thin(TRADV_BUNDLE, esmfGRID, FIELDNAME)
+      enddo
+
+    else
+
+!-----------------------------------------------------------------------
+!     tracer q1
+!-----------------------------------------------------------------------
+      FIELDNAME = 'Q1'
+      call addTracer_thin(TRADV_BUNDLE, esmfGRID, FIELDNAME)
+
+!-----------------------------------------------------------------------
+!     tracer q2
+!-----------------------------------------------------------------------
+      FIELDNAME = 'Q2'
+      call addTracer_thin(TRADV_BUNDLE, esmfGRID, FIELDNAME)
+
+!-----------------------------------------------------------------------
+!     tracer q3
+!-----------------------------------------------------------------------
+      FIELDNAME = 'Q3'
+      call addTracer_thin(TRADV_BUNDLE, esmfGRID, FIELDNAME)
+
+!-----------------------------------------------------------------------
+!     tracer q4
+!-----------------------------------------------------------------------
+      FIELDNAME = 'Q4'
+      call addTracer_thin(TRADV_BUNDLE, esmfGRID, FIELDNAME)
+
+!-----------------------------------------------------------------------
+!     tracer q5
+!-----------------------------------------------------------------------
+      if (case_id == 3) then
+         FIELDNAME = 'Q5'
+         call addTracer_thin(TRADV_BUNDLE, esmfGRID, FIELDNAME)
+
+!-----------------------------------------------------------------------
+!     tracer q6
+!-----------------------------------------------------------------------
+         FIELDNAME = 'Q6'
+         call addTracer_thin(TRADV_BUNDLE, esmfGRID, FIELDNAME)
+      endif
+
+    endif
+    endif
+
+    RETURN_(ESMF_SUCCESS)
+  end subroutine COLDSTART
+
+subroutine addTracer_thin(bundle, grid, fieldname)
+  type (ESMF_FieldBundle)          :: BUNDLE
+  type (ESMF_Grid)                 :: GRID
+  character(len=ESMF_MAXSTR)       :: FIELDNAME
+
+  integer :: nq,rc,status
+  type(DynTracers), pointer        :: t(:)
+
+  character(len=ESMF_MAXSTR)       :: IAm='FV:addTracer_thin'
+         
+  type (ESMF_Field)                :: field
+         
+      call ESMF_FieldBundleGet(BUNDLE, fieldCount=NQ, RC=STATUS)
+      VERIFY_(STATUS)
+
+      NQ = NQ + 1 
+               
+      field = MAPL_FieldCreateEmpty(name=trim(fieldname), grid=GRID, RC=STATUS)
+      VERIFY_(STATUS)
+      call ESMF_AttributeSet(field,name='VLOCATION',value=MAPL_VLocationCenter,rc=status)
+      VERIFY_(STATUS)
+      call ESMF_AttributeSet(field,name='DIMS',value=MAPL_DimsHorzVert,rc=status)
+      VERIFY_(STATUS)
+      call ESMF_AttributeSet(field,name='PRECISION',value=ESMF_KIND_R4,rc=status)
+      VERIFY_(STATUS)
+      call ESMF_AttributeSet(field,name='HALOWIDTH',value=0,rc=status)
+      VERIFY_(STATUS)
+      call ESMF_AttributeSet(field,name='DEFAULT_PROVIDED',value=.false.,rc=status)
+      VERIFY_(STATUS)
+      call MAPL_AllocateCoupling(field, rc=STATUS)
+      VERIFY_(STATUS)
+      call MAPL_FieldBundleAdd ( bundle, field, rc=STATUS )
+      VERIFY_(STATUS)
+
+      !STATE%GRID%NQ = NQ
+
+  return
+end subroutine addTracer_thin
 
 end module FVdycoreCubed_GridComp

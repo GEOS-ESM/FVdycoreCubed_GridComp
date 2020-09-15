@@ -241,20 +241,20 @@ contains
    type (DYN_wrap)                  :: wrap
    integer :: status
    character(len=ESMF_MAXSTR) :: Iam = "CoarseSetServices"
-   type(ESMF_VM) :: vm
-   integer :: localPet, peCount
+   !type(ESMF_VM) :: vm
+   !integer :: localPet, peCount
 
 ! Register services for this component
 ! ------------------------------------
 
 ! Allocate this instance of the internal state and put it in wrapper.
 ! -------------------------------------------------------------------
-    call ESMF_GridCompGet(gc, vm=vm, rc=status)
-    call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    VERIFY_(STATUS)
-    call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
-    VERIFY_(STATUS)
-!$ call omp_set_num_threads(peCount)
+!    call ESMF_GridCompGet(gc, vm=vm, rc=status)
+!    call ESMF_VMGet(vm, localPet=localPet, rc=status)
+!    VERIFY_(STATUS)
+!    call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
+!    VERIFY_(STATUS)
+!!$ call omp_set_num_threads(peCount)
     allocate( state, stat=status )
     VERIFY_(STATUS)
     wrap%dyn_state => state
@@ -360,8 +360,8 @@ contains
   type (ESMF_Field)                  :: field
   !real, pointer                      :: pref(:), ak4(:), bk4(:)
 
-  !real(r8), pointer                  ::  ak(:)
-  !real(r8), pointer                  ::  bk(:)
+  real(r8), pointer                  ::  ak(:)
+  real(r8), pointer                  ::  bk(:)
   real(r8), pointer                  ::  ud(:,:,:)
   real(r8), pointer                  ::  vd(:,:,:)
   real(r8), pointer                  ::  pe(:,:,:)
@@ -422,7 +422,7 @@ contains
     VERIFY_(STATUS)
 !set OMP_NUM_THREADS to local PeCount
 !!$ call omp_set_dynamic(.TRUE.)
-!!$ call omp_set_num_threads(peCount)
+!$ call omp_set_num_threads(peCount)
 
 !$omp parallel
 !$ print *, 'Initialize ', omp_get_num_threads(), peCount
@@ -473,6 +473,75 @@ contains
     if (ColdRestart /=0 ) then
       call Coldstart( gc, import, export, clock, rc=STATUS )
       VERIFY_(STATUS)
+    !block
+    !   character(len=ESMF_MAXSTR) :: fname
+    !   type(ESMF_VM) :: vm
+    !   integer :: localPet
+    !   type (ESMF_FieldBundle)          :: BUNDLE
+    !   type (ESMF_Field)          :: field
+    !   real(kind=4), pointer :: TRACER(:,:,:)
+    !   real(kind=4), pointer                  :: LATS(:,:), LONS(:,:)
+    !   call ESMF_VMGetCurrent(vm, rc=status)
+    !   VERIFY_(STATUS)
+    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
+    !   VERIFY_(STATUS)
+    !   call MAPL_GetPointer(INTERNAL,UD,'U'  ,RC=STATUS)
+    !   VERIFY_(STATUS)
+    !   call MAPL_GetPointer(INTERNAL,VD,'V'  ,RC=STATUS)
+    !   VERIFY_(STATUS)
+    !   call MAPL_GetPointer(INTERNAL,PE,'PE' ,RC=STATUS)
+    !   VERIFY_(STATUS)
+    !   call MAPL_GetPointer(INTERNAL,PT,'PT' ,RC=STATUS)
+    !   VERIFY_(STATUS)
+    !   call MAPL_GetPointer(INTERNAL,PK,'PKZ',RC=STATUS)
+    !   VERIFY_(STATUS)
+    !   call MAPL_GetPointer(INTERNAL, AK, 'AK', RC=STATUS)
+    !   VERIFY_(STATUS)
+    !   call MAPL_GetPointer(INTERNAL, BK, 'BK', RC=STATUS)
+    !   VERIFY_(STATUS)
+    !   call MAPL_GetPointer(INTERNAL, LONS, 'LONS', RC=STATUS)
+    !   VERIFY_(STATUS)
+    !   call MAPL_GetPointer(INTERNAL, LATS, 'LATS', RC=STATUS)
+    !   VERIFY_(STATUS)
+    !   call ESMF_StateGet(IMPORT, 'TRADV' , BUNDLE,   RC=STATUS)
+    !   VERIFY_(STATUS)
+    !   call ESMF_FieldBundleGet(BUNDLE, fieldName='Q', field=field, RC=STATUS)
+    !  VERIFY_(STATUS)
+    !   call ESMF_FieldGet(field, farrayptr=TRACER, RC=STATUS)
+    !  VERIFY_(STATUS)
+    !   write(fname,'(a,i3.3)') 'fields-', localPet
+    !   open(220, file=trim(fname), form='formatted', status='new')
+    !   write(220,*) 'U ....', shape(UD)
+    !   !write(220,*) 'U ....', is, ie, js, je, ks, ke
+    !   write(220,*) UD
+    !   write(220,*) '====================================================='
+    !   write(220,*) 'V ....', shape(VD)
+    !   write(220,*) VD
+    !   write(220,*) '====================================================='
+    !   write(220,*) 'PE ....', shape(PE)
+    !   write(220,*) PE
+    !   write(220,*) '====================================================='
+    !   write(220,*) 'PT ....', shape(PT)
+    !   write(220,*) PT
+    !   write(220,*) '====================================================='
+    !   write(220,*) 'PK ....', shape(PK)
+    !   write(220,*) PK
+    !   write(220,*) '====================================================='
+    !   write(220,*) 'BK ....', shape(bk)
+    !   write(220,*) bk
+    !   write(220,*) '====================================================='
+    !   write(220,*) 'AK ....', shape(ak)
+    !   write(220,*) ak
+    !   write(220,*) '====================================================='
+    !   write(220,*) 'LONS ....', shape(LONS)
+    !   write(220,*) LONS
+    !   write(220,*) '====================================================='
+    !   write(220,*) 'LATS ....', shape(LATS)
+    !   write(220,*) LATS
+    !   write(220,*) '====================================================='
+    !   write(220,*) 'Q ....', shape(TRACER)
+    !   write(220,*) TRACER
+    !end block
     endif
 
 ! Set Private Internal State from Restart File
@@ -628,7 +697,7 @@ contains
     VERIFY_(STATUS)
     !print *, __FILE__, __LINE__, 'local pet', localPet
     !call ESMF_VMBarrier(vm,rc=status)
-    VERIFY_(STATUS)
+    !VERIFY_(STATUS)
 
 
     !call MAPL_TimerOff(MAPL,"INITIALIZE")
@@ -6038,8 +6107,8 @@ subroutine Coldstart(gc, import, export, clock, rc)
     real(REAL8), pointer                 :: PE     (:,:,:)
     real(REAL8), pointer                 :: PKZ    (:,:,:)
     real(kind=4), pointer             :: phis   (:,:)
-    real, pointer                     :: LONS   (:,:)
-    real, pointer                     :: LATS   (:,:)
+    real(kind=4), pointer                     :: LONS   (:,:)
+    real(kind=4), pointer                     :: LATS   (:,:)
     real                              :: T0
     integer                           :: L
     type(ESMF_Config)                 :: CF
@@ -6077,6 +6146,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
     character(len=ESMF_MAXSTR)       :: STRING
     real(REAL8), parameter    :: r0_6=0.6
     real(REAL8), parameter    :: r1_0=1.0
+    integer :: NQ
 
 ! Begin
 
@@ -6095,6 +6165,15 @@ subroutine Coldstart(gc, import, export, clock, rc)
     state => wrap%dyn_state
     grid  => state%grid   ! direct handle to grid
 
+    IS = FV_Atm(1)%bd%isc
+    IE = FV_Atm(1)%bd%iec
+    JS = FV_Atm(1)%bd%jsc
+    JE = FV_Atm(1)%bd%jec
+    KS = 1
+    KE = FV_Atm(1)%npz
+    KM = KE-KS+1
+    !print '(7i3)', is, ie, js, je, ks, ke, km
+
 !BOR    
 ! !RESOURCE_ITEM: K :: Value of isothermal temperature on coldstart
     !call MAPL_GetResource ( MAPL, T0, 'T0:', default=273., RC=STATUS )
@@ -6108,45 +6187,66 @@ subroutine Coldstart(gc, import, export, clock, rc)
     !                           RC=STATUS )
     !VERIFY_(STATUS)
 
+   allocate(LONS(is:ie,js:je), stat=status)
+   VERIFY_(STATUS)
+   call SSI_CopyFineToCoarse(INTERNAL, LONS, 'LONS', STATE%f2c_SSI_arr_map, rc=status)
+   VERIFY_(STATUS)
+   allocate(LATS(is:ie,js:je), stat=status)
+   VERIFY_(STATUS)
+   call SSI_CopyFineToCoarse(INTERNAL, LATS, 'LATS', STATE%f2c_SSI_arr_map, rc=status)
+   VERIFY_(STATUS)
+
    if (FV_Atm(1)%flagstruct%grid_type == 4) then
     ! Doubly-Period setup based on first LAT/LON coordinate
      LONS(:,:) =  0.0
      LATS(:,:) = 15.0*PI/180.0
    endif
 
-! A-Grid U Wind
-        call MAPL_GetPointer(Internal,U,'U'  ,rc=STATUS)
-        VERIFY_(STATUS)
-! A-Grid V Wind
-        call MAPL_GetPointer(Internal,V,'V'  ,rc=STATUS)
-! Surface Geopotential
-        call MAPL_GetPointer ( IMPORT, phis, 'PHIS', RC=STATUS )
-        VERIFY_(STATUS)
-! Potential-Temperature
-        call MAPL_GetPointer(Internal,PT,'PT',rc=STATUS)
-        VERIFY_(STATUS)
-! Edge Pressures
-        call MAPL_GetPointer(Internal,PE  ,'PE',rc=STATUS)
-        VERIFY_(STATUS)
-! Presssure ^ kappa at mid-layers
-        call MAPL_GetPointer(Internal,PKZ ,'PKZ',rc=STATUS)
-        VERIFY_(STATUS)
+!! A-Grid U Wind
+!        call MAPL_GetPointer(Internal,U,'U'  ,rc=STATUS)
+!        VERIFY_(STATUS)
+!! A-Grid V Wind
+!        call MAPL_GetPointer(Internal,V,'V'  ,rc=STATUS)
+!! Surface Geopotential
+!        call MAPL_GetPointer ( IMPORT, phis, 'PHIS', RC=STATUS )
+!        VERIFY_(STATUS)
+!! Potential-Temperature
+!        call MAPL_GetPointer(Internal,PT,'PT',rc=STATUS)
+!        VERIFY_(STATUS)
+!! Edge Pressures
+!        call MAPL_GetPointer(Internal,PE  ,'PE',rc=STATUS)
+!        VERIFY_(STATUS)
+!! Presssure ^ kappa at mid-layers
+!        call MAPL_GetPointer(Internal,PKZ ,'PKZ',rc=STATUS)
+!        VERIFY_(STATUS)
 ! AK and BK for vertical coordinate
         call MAPL_GetPointer(Internal,ak  ,'AK' ,rc=STATUS)
         VERIFY_(STATUS)
         call MAPL_GetPointer(Internal,bk  ,'BK' ,rc=STATUS)
         VERIFY_(STATUS)
 
+   allocate(U(is:ie,js:je,1:km), stat=status)
+   VERIFY_(STATUS)
+   allocate(V(is:ie,js:je,1:km), stat=status)
+   VERIFY_(STATUS)
+   allocate(PT(is:ie,js:je,1:km), stat=status)
+   VERIFY_(STATUS)
+   allocate(PE(is:ie,js:je,0:km), stat=status)
+   VERIFY_(STATUS)
+   allocate(PKZ(is:ie,js:je,1:km), stat=status)
+   VERIFY_(STATUS)
+   allocate(phis(is:ie,js:je), stat=status)
+   VERIFY_(STATUS)
 
     U = 0.0
 
-    IS = lbound(U,1)
-    IE = ubound(U,1)
-    JS = lbound(U,2)
-    JE = ubound(U,2)
-    KS = lbound(U,3)
-    KE = ubound(U,3)
-    KM = KE-KS+1
+    !IS = lbound(U,1)
+    !IE = ubound(U,1)
+    !JS = lbound(U,2)
+    !JE = ubound(U,2)
+    !KS = lbound(U,3)
+    !KE = ubound(U,3)
+    !KM = KE-KS+1
 
     ALLOCATE( PS(IS:IE,JS:JE) )
 
@@ -6471,14 +6571,31 @@ subroutine Coldstart(gc, import, export, clock, rc)
 !--------------------
 ! Parse Tracers
 !--------------------
+   call ESMF_StateGet(IMPORT, 'TRADV' , TRADV_BUNDLE,   RC=STATUS)
+   VERIFY_(STATUS)
+   call ESMF_FieldBundleGet(TRADV_BUNDLE, fieldCount=NQ, RC=STATUS)
+   VERIFY_(STATUS)
+
+   !block
+   !   character(len=ESMF_MAXSTR), allocatable :: fieldNameList(:)
+   !   integer :: ierr
+   !   allocate(fieldNameList(NQ))
+   !   call ESMF_FieldBundleGet(TRADV_BUNDLE, fieldNameList=fieldNameList, RC=STATUS)
+   !   VERIFY_(STATUS)
+   !   print *, __FILE__,__LINE__,NQ, (trim(fieldNameList(i)),i=1,NQ)
+   !   call MPI_Finalize(ierr)
+   !   stop
+   !end block
+
+   allocate( TRACER(IS:IE, JS:JE, 1:KM), STAT=STATUS)
+   VERIFY_(STATUS)
+   allocate( state%vars%tracer(NQ), STAT=STATUS)
+   VERIFY_(STATUS)
+
    if (FV3_STANDALONE /= 0) then
-      call ESMF_StateGet(IMPORT, 'TRADV' , TRADV_BUNDLE,   RC=STATUS)
-      VERIFY_(STATUS)
 
+          VERIFY_(STATUS)
       call ESMF_GridCompGet(gc, grid=esmfGRID, rc=STATUS)
-      VERIFY_(STATUS)
-
-      allocate( TRACER(IS:IE, JS:JE, 1:KM), STAT=STATUS)
       VERIFY_(STATUS)
 
       TRACER(:,:,:)  = 0.0
@@ -6590,6 +6707,23 @@ subroutine Coldstart(gc, import, export, clock, rc)
     DEALLOCATE( PS )
 
     DYN_COLDSTART=.true.
+
+    call SSI_CopyCoarseToFine(INTERNAL, U, 'U', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
+    call SSI_CopyCoarseToFine(INTERNAL, V, 'V', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
+    call SSI_CopyCoarseToFine(INTERNAL, PT, 'PT', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
+    call SSI_CopyCoarseToFine(INTERNAL, PE, 'PE', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
+    call SSI_CopyCoarseToFine(INTERNAL, PKZ, 'PKZ', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
+    call SSI_CopyCoarseToFine(IMPORT, phis, 'PHIS', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
+   call SSI_CopyCoarseToFine(INTERNAL, LONS, 'LONS', STATE%f2c_SSI_arr_map, rc=status)
+   VERIFY_(STATUS)
+   call SSI_CopyCoarseToFine(INTERNAL, LATS, 'LATS', STATE%f2c_SSI_arr_map, rc=status)
+   VERIFY_(STATUS)
 
     RETURN_(ESMF_SUCCESS)
   end subroutine COLDSTART
@@ -6884,53 +7018,40 @@ subroutine addTracer_r8(state, bundle, var, grid, fieldname)
   type (ESMF_FieldBundle)          :: BUNDLE
   real(r8), pointer                :: var(:,:,:)
   type (ESMF_Grid)                 :: GRID
-  type (ESMF_DistGrid)             :: DistGRID
   character(len=ESMF_MAXSTR)       :: FIELDNAME
 
   integer :: nq,rc,status
-  type(DynTracers), pointer        :: t(:)
 
   character(len=ESMF_MAXSTR)       :: IAm='CoarseFV:addTracer_r8'
 
-  type (ESMF_Field)                :: field
-  real(r8),              pointer   :: ptr(:,:,:)
+  character(len=ESMF_MAXSTR), allocatable :: fieldNames(:)
+  integer :: dimen(3)
 
-      call ESMF_GridGet (GRID,  distGrid=distgrid,       RC=STATUS)
-      VERIFY_(STATUS)
+  call ESMF_FieldBundleGet(BUNDLE, fieldCount=NQ, RC=STATUS)
+  VERIFY_(STATUS)
 
-      call ESMF_FieldBundleGet(BUNDLE, fieldCount=NQ, RC=STATUS)
-      VERIFY_(STATUS)
+  allocate(fieldNames(NQ))
+  call ESMF_FieldBundleGet(bundle, fieldNameList=fieldNames, RC=STATUS)
+  VERIFY_(STATUS)
+  call SSI_BundleCopyCoarseToFine(bundle, &
+       var, fieldname, STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  dimen = shape(var)
+  do i = 1, NQ
+     if (trim(fieldNames(i)) == trim(fieldname)) then
+        state%vars%tracer(i)%is_r4 = .false.
+        if(.not.associated(state%vars%tracer(i)%content)) then
+           allocate(state%vars%tracer(i)%content(dimen(1),dimen(2),dimen(3)), stat=status)
+           VERIFY_(status)
+        endif
+        call SSI_BundleCopyFineToCoarse(bundle, &
+             state%vars%tracer(i)%content, fieldname, STATE%f2c_SSI_arr_map, rc=status)
+        VERIFY_(STATUS)
+        exit
+    endif
+  enddo
 
-      NQ = NQ + 1
-
-      field = ESMF_FieldCreate(GRID, var, datacopyflag=ESMF_DATACOPY_VALUE, name=fieldname, RC=STATUS )
-      VERIFY_(STATUS)
-      call ESMF_AttributeSet(field,name='VLOCATION',value=MAPL_VLocationCenter,rc=status)
-      VERIFY_(STATUS)
-      call ESMF_AttributeSet(field,name='DIMS',value=MAPL_DimsHorzVert,rc=status)
-      VERIFY_(STATUS)
-      call MAPL_FieldBundleAdd ( bundle, field, rc=STATUS )
-      VERIFY_(STATUS)
-
-      if (NQ == 1) then
-         ALLOCATE(STATE%VARS%tracer(nq), STAT=STATUS)
-         VERIFY_(STATUS)
-         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, rc=status)
-         VERIFY_(STATUS)
-         state%vars%tracer(nq)%content => ptr
-         state%vars%tracer(nq  )%is_r4 = .false.
-      else
-         allocate(t(nq))
-         t(1:nq-1) = state%vars%tracer
-         deallocate(state%vars%tracer)
-         state%vars%tracer => t
-         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, rc=status)
-         VERIFY_(STATUS)
-         state%vars%tracer(nq)%content => ptr
-         state%vars%tracer(nq  )%is_r4 = .false.
-      endif
-
-      STATE%GRID%NQ = NQ
+  STATE%GRID%NQ = NQ
 
   return
 end subroutine addTracer_r8
@@ -6940,53 +7061,40 @@ subroutine addTracer_r4(state, bundle, var, grid, fieldname)
   type (ESMF_FieldBundle)          :: BUNDLE
   real(r4), pointer                :: var(:,:,:)
   type (ESMF_Grid)                 :: GRID
-  type (ESMF_DistGrid)             :: DistGRID
   character(len=ESMF_MAXSTR)       :: FIELDNAME
 
   integer :: nq,rc,status
-  type(DynTracers), pointer        :: t(:)
 
   character(len=ESMF_MAXSTR)       :: IAm='CoarseFV:addTracer_r4'
          
-  type (ESMF_Field)                :: field
-  real(r4),              pointer   :: ptr(:,:,:)
-         
-      call ESMF_GridGet (GRID,  distGrid=distgrid,       RC=STATUS)
-      VERIFY_(STATUS)
+  character(len=ESMF_MAXSTR), allocatable :: fieldNames(:)
+  integer :: dimen(3)
 
-      call ESMF_FieldBundleGet(BUNDLE, fieldCount=NQ, RC=STATUS)
-      VERIFY_(STATUS)
+  call ESMF_FieldBundleGet(BUNDLE, fieldCount=NQ, RC=STATUS)
+  VERIFY_(STATUS)
 
-      NQ = NQ + 1 
-               
-      field = ESMF_FieldCreate(GRID, var, datacopyflag=ESMF_DATACOPY_VALUE, name=fieldname, RC=STATUS ) 
-      VERIFY_(STATUS)
-      call ESMF_AttributeSet(field,name='VLOCATION',value=MAPL_VLocationCenter,rc=status)
-      VERIFY_(STATUS)
-      call ESMF_AttributeSet(field,name='DIMS',value=MAPL_DimsHorzVert,rc=status)
-      VERIFY_(STATUS)
-      call MAPL_FieldBundleAdd ( bundle, field, rc=STATUS )
-      VERIFY_(STATUS)
+  allocate(fieldNames(NQ))
+  call ESMF_FieldBundleGet(bundle, fieldNameList=fieldNames, RC=STATUS)
+  VERIFY_(STATUS)
+  call SSI_BundleCopyCoarseToFine(bundle, &
+       var, fieldname, STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  dimen = shape(var)
+  do i = 1, NQ
+     if (trim(fieldNames(i)) == trim(fieldname)) then
+        state%vars%tracer(i)%is_r4 = .true.
+        if(.not.associated(state%vars%tracer(i)%content_r4)) then
+           allocate(state%vars%tracer(i)%content_r4(dimen(1),dimen(2),dimen(3)), stat=status)
+           VERIFY_(status)
+        endif
+        call SSI_BundleCopyFineToCoarse(bundle, &
+             state%vars%tracer(i)%content_r4, fieldname, STATE%f2c_SSI_arr_map, rc=status)
+        VERIFY_(STATUS)
+        exit
+    endif
+  enddo
 
-      if (NQ == 1) then
-         ALLOCATE(STATE%VARS%tracer(nq), STAT=STATUS)
-         VERIFY_(STATUS)
-         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, rc=status)
-         VERIFY_(STATUS)
-         state%vars%tracer(nq)%content_r4 => ptr
-         state%vars%tracer(nq  )%is_r4 = .true.
-      else
-         allocate(t(nq))
-         t(1:nq-1) = state%vars%tracer
-         deallocate(state%vars%tracer)
-         state%vars%tracer => t
-         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, rc=status)
-         VERIFY_(STATUS)
-         state%vars%tracer(nq)%content_r4 => ptr
-         state%vars%tracer(nq  )%is_r4 = .true.
-      endif
-
-      STATE%GRID%NQ = NQ
+  STATE%GRID%NQ = NQ
 
   return
 end subroutine addTracer_r4

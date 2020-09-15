@@ -15,8 +15,10 @@ module SSI_CoarseToFine
    end interface
 
    interface SSI_BundleCopyCoarseToFine
-      module procedure SSI_BundleCopyCoarseToFine_R4_3 
-      module procedure SSI_BundleCopyCoarseToFine_R8_3 
+      module procedure SSI_BundleCopyCoarseToFine_Index_R4_3 
+      module procedure SSI_BundleCopyCoarseToFine_Index_R8_3 
+      module procedure SSI_BundleCopyCoarseToFine_Name_R4_3 
+      module procedure SSI_BundleCopyCoarseToFine_Name_R8_3 
    end interface
 
    interface SSI_copy_ptr_c2f
@@ -32,7 +34,8 @@ module SSI_CoarseToFine
 #define    SUB__(N,A)   SUB___(N,A)
 #define SUB___(N,A) IDENTITY(N)IDENTITY(_)IDENTITY(A)
 #define NAME_ SSI_CopyCoarseToFine
-#define NAME_BUNDLE_ SSI_BundleCopyCoarseToFine
+#define NAME_BUNDLE_INDEX_ SSI_BundleCopyCoarseToFine_Index
+#define NAME_BUNDLE_NAME_ SSI_BundleCopyCoarseToFine_Name
 #define NAME_COPY_ SSI_copy_ptr_c2f
 #define COPY____(P,C,R) IDENTITY(P),IDENTITY(C)IDENTITY(R)
 
@@ -109,13 +112,15 @@ module SSI_CoarseToFine
 #undef TKR_
 #undef DIMENSIONS_
 #undef TYPEKIND_
-#undef SUB_
+#undef SUB_INDEX_
+#undef SUB_NAME_
 #undef RANGE_
 #define TKR_ R4_3
 #define DIMENSIONS_ (:,:,:)
 #define RANGE_ (is:ie,js:je,1:km)
 #define TYPEKIND_ ESMF_KIND_R4
-#define    SUB_           SUB__(NAME_BUNDLE_,TKR_)
+#define    SUB_INDEX_           SUB__(NAME_BUNDLE_INDEX_,TKR_)
+#define    SUB_NAME_           SUB__(NAME_BUNDLE_NAME_,TKR_)
 #define COPY_ COPY____(farrayPtr,coarse_Array,RANGE_)
 #include "SSI_BundleCopyCoarseToFine.H"
 
@@ -123,13 +128,15 @@ module SSI_CoarseToFine
 #undef TKR_
 #undef DIMENSIONS_
 #undef TYPEKIND_
-#undef SUB_
+#undef SUB_INDEX_
+#undef SUB_NAME_
 #undef RANGE_
 #define TKR_ R8_3
 #define DIMENSIONS_ (:,:,:)
 #define RANGE_ (is:ie,js:je,1:km)
 #define TYPEKIND_ ESMF_KIND_R8
-#define    SUB_           SUB__(NAME_BUNDLE_,TKR_)
+#define    SUB_INDEX_           SUB__(NAME_BUNDLE_INDEX_,TKR_)
+#define    SUB_NAME_           SUB__(NAME_BUNDLE_NAME_,TKR_)
 #define COPY_ COPY____(farrayPtr,coarse_Array,RANGE_)
 #include "SSI_BundleCopyCoarseToFine.H"
 
