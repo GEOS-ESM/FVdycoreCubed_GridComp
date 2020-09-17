@@ -119,8 +119,8 @@ private
 
   type T_TRACERS
        logical                                   :: is_r4
-       real(REAL8), dimension(:,:,:  ), pointer     :: content
-       real(REAL4), dimension(:,:,:  ), pointer     :: content_r4
+       real(REAL8), dimension(:,:,:  ), pointer     :: content => NULL()
+       real(REAL4), dimension(:,:,:  ), pointer     :: content_r4 => NULL()
        character(LEN=ESMF_MAXSTR)                          :: tname
   end type T_TRACERS
 
@@ -964,8 +964,6 @@ contains
   call WRITE_PARALLEL(' ')
   call WRITE_PARALLEL(STATE%DT, &
     format='("INITIALIZED ALARM: DYN_TIME_TO_RUN EVERY ",F9.1," secs.")')
-  !print *, __FILE__, __LINE__, "state%dt ", STATE%DT
-
 !  Clear wall clock time clocks and global budgets
 
   STATE%RUN_TIMES = 0
@@ -1037,10 +1035,10 @@ contains
      ALLOCATE( VA(isc:iec  ,jsc:jec  ,1:FV_Atm(1)%npz) )
      ALLOCATE( UD(isc:iec  ,jsc:jec+1,1:FV_Atm(1)%npz) )
      ALLOCATE( VD(isc:iec+1,jsc:jec  ,1:FV_Atm(1)%npz) )
-     call SSI_CopyFineToCoarse(internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
-     VERIFY_(STATUS)
-     call SSI_CopyFineToCoarse(internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
-     VERIFY_(STATUS)
+     !call SSI_CopyFineToCoarse(internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
+     !VERIFY_(STATUS)
+     !call SSI_CopyFineToCoarse(internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
+     !VERIFY_(STATUS)
      UA(isc:iec,jsc:jec,:) = STATE%VARS%U(isc:iec,jsc:jec,:)
      VA(isc:iec,jsc:jec,:) = STATE%VARS%V(isc:iec,jsc:jec,:)
      call INTERP_AGRID_TO_DGRID( UA, VA, UD, VD )

@@ -468,6 +468,7 @@ contains
 ! Check for ColdStart from the configuration 
 !--------------------------------------
     !call MAPL_GetResource ( MAPL, ColdRestart, 'COLDSTART:', default=0, rc=status )
+
     call ESMF_ConfigGetAttribute ( CF, ColdRestart, label='COLDSTART:', default=0, rc=status )
     VERIFY_(STATUS)
     if (ColdRestart /=0 ) then
@@ -552,12 +553,10 @@ contains
 
     !call MAPL_TimerOn(MAPL,"-DYN_INIT")
     !call DynInit ( STATE, CLOCK, INTERNAL, IMPORT, state%fineGC, status)
+
     call DynInit ( GC, STATE, CLOCK, INTERNAL, IMPORT, status)
     VERIFY_(STATUS)
 
-    !print *, __FILE__, __LINE__, 'local pet', localPet
-    !call ESMF_VMBarrier(vm,rc=status)
-    !VERIFY_(STATUS)
 
     !call MAPL_TimerOff(MAPL,"-DYN_INIT")
 

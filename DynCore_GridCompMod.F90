@@ -2487,7 +2487,7 @@ contains
     call MAPL_GetResource ( MAPL, ColdRestart, 'COLDSTART:', default=0, rc=status )
     VERIFY_(STATUS)
     if (ColdRestart /=0 ) then
-      call Coldstart( gc, import, export, clock, rc=STATUS )
+      call Coldstart_Thin( gc, import, export, clock, rc=STATUS )
       VERIFY_(STATUS)
     endif
 
@@ -3118,7 +3118,7 @@ end subroutine FINALIZE
 
 !BOP
 
-! !IROUTINE: Coldstart
+! !IROUTINE: Coldstart_Thin
 
 ! !DESCRIPTION:
 !   Routine to coldstart from an isothermal state of rest.
@@ -3127,7 +3127,7 @@ end subroutine FINALIZE
 !
 ! !INTERFACE:
 
-subroutine Coldstart(gc, import, export, clock, rc)
+subroutine Coldstart_Thin(gc, import, export, clock, rc)
 
 ! !ARGUMENTS:
 
@@ -3253,7 +3253,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
     endif
 
     RETURN_(ESMF_SUCCESS)
-  end subroutine COLDSTART
+  end subroutine Coldstart_thin
 
 subroutine addTracer_thin(bundle, grid, fieldname)
   type (ESMF_FieldBundle)          :: BUNDLE
