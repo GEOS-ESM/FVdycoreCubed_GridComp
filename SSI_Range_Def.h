@@ -1,18 +1,22 @@
    call ESMF_AttributeGet(field, name='SSI_ARRAY_SIZE', &
         value=ssiLocalDeCount, rc=status)
    VERIFY_(STATUS)
-   allocate(arrayImg(ssiLocalDeCount), stat=status)
+   call ESMF_AttributeGet(field, name='SSI_ARRAY_SAVED', &
+        itemCount=itemCount, rc=status)
+   VERIFY_(STATUS)
+   allocate(arrayImg(itemCount), stat=status)
    VERIFY_(STATUS)
    call ESMF_AttributeGet(field, name='SSI_ARRAY_SAVED', &
         valueList=arrayImg, rc=status)
    VERIFY_(STATUS)
    array = transfer(arrayimg,array)
-   allocate(localDeToDeMap(ssiLocalDeCount), stat=status)
-   VERIFY_(STATUS)
+   !allocate(localDeToDeMap(ssiLocalDeCount), stat=status)
+   !VERIFY_(STATUS)
    allocate(localArrayList(ssiLocalDeCount), stat=status)
    VERIFY_(STATUS)
-   call ESMF_ArrayGet(array, localDeToDeMap=localDeToDeMap, &
-        localarrayList=localArrayList, rc=status)
+   !call ESMF_ArrayGet(array, localDeToDeMap=localDeToDeMap, &
+   !     localarrayList=localArrayList, rc=status)
+   call ESMF_ArrayGet(array, localarrayList=localArrayList, rc=status)
    VERIFY_(STATUS)
    call ESMF_VMGetCurrent(vm, rc=status)
    VERIFY_(STATUS)
@@ -30,7 +34,6 @@
    pet_id_x = f2c_SSI_arr_map%pet_id_x
    pet_id_y = f2c_SSI_arr_map%pet_id_y
    
-
    do jth = 1, nth_y
       if (jth == 1) then
          !js = f2c_SSI_arr_map%js
@@ -64,3 +67,6 @@
          deallocate(arrsize)
       end do
    end do
+
+   deallocate(arrayImg)
+   deallocate(localArrayList)

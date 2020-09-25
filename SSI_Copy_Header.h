@@ -1,6 +1,7 @@
    type(ESMF_LocalArray), allocatable :: localArrayList(:)
    integer, allocatable :: arrayImg(:), localDeToDeMap(:)
    integer              :: ssiLocalDeCount
+   integer              :: itemCount
    type(ESMF_Field) :: field
    type(ESMF_Array) :: array
    real(TYPEKIND_), pointer :: farrayPtr DIMENSIONS_

@@ -2798,6 +2798,9 @@ subroutine Run(gc, import, export, clock, rc)
   call MAPL_Get( MAPL, LONS=LONS, LATS=LATS, RC=STATUS )
   VERIFY_(STATUS)
 
+  call MAPL_TimerOn(MAPL,"TOTAL")
+  call MAPL_TimerOn(MAPL,"RUN")
+
   call MAPL_GetPointer(EXPORT, temp2d, 'LONS', RC=STATUS)
   VERIFY_(STATUS)
   if( associated(temp2D) ) temp2d = LONS
@@ -2958,6 +2961,9 @@ subroutine Run(gc, import, export, clock, rc)
   !VERIFY_(STATUS)
 !!$ call omp_set_num_threads(1)
 
+  call MAPL_TimerOff(MAPL,"RUN")
+  call MAPL_TimerOff(MAPL,"TOTAL")
+
   RETURN_(ESMF_SUCCESS)
 
 end subroutine RUN
@@ -2992,11 +2998,19 @@ end subroutine RUN
 !EOP
 
 ! !Local Variables:
+
+    type (MAPL_MetaComp), pointer :: genstate
   
     integer                                          :: status
     character(len=ESMF_MAXSTR) :: IAm
 
     Iam = "RunAddIncs"
+
+    call MAPL_GetObjectFromGC (GC, GENSTATE,  RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_TimerOn(GENSTATE,"TOTAL")
+    call MAPL_TimerOn(GENSTATE,"RUN2")
 
     !call SSI_StateSync(INTERNAL, rc=status)
     !VERIFY_(STATUS)
@@ -3018,6 +3032,9 @@ end subroutine RUN
     !call SSI_StateSync(EXPORT, rc=status)
     !VERIFY_(STATUS)
 !!$ call omp_set_num_threads(1)
+
+    call MAPL_TimerOff(GENSTATE,"RUN2")
+    call MAPL_TimerOff(GENSTATE,"TOTAL")
 
     RETURN_(ESMF_SUCCESS)
 
