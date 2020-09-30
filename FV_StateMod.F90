@@ -334,16 +334,29 @@ contains
   integer   :: ks                 !  True # press. levs
   integer   :: ndt,nx,ny
 
-  !type (MAPL_MetaComp),          pointer :: MAPL  => NULL()
+  type (MAPL_MetaComp),          pointer :: MAPL  => NULL()
 
   integer :: comm
   integer :: p_split=1
   integer :: temp_int, nnx, nny, nth_x, nth_y
+  integer, allocatable :: gcImg(:)
+  integer :: itemCount
+  type(ESMF_GridComp) :: fineGC
 
 ! BEGIN
 
     call ESMF_GridCompGet( GC, CONFIG=CF, rc=status)
     VERIFY_(STATUS)
+
+! Retrieve fine GC 
+! ---------------------------------
+    call ESMF_AttributeGet(GC, name='GC_IMAGE', itemCount=itemCount, rc=status)
+    VERIFY_(STATUS)
+    allocate(gcImg(itemCount), stat=status)
+    VERIFY_(STATUS)
+    call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
+    VERIFY_(STATUS)
+    fineGC = transfer(gcImg, fineGC)
 
     call ESMF_VMGetCurrent(VM, rc=STATUS)
     VERIFY_(STATUS)
@@ -354,17 +367,20 @@ contains
 ! Retrieve the pointer to the state
 ! ---------------------------------
 
-    !call MAPL_TimerOn(MAPL,"--FMS_INIT")
+    call MAPL_GetObjectFromGC (fineGC, MAPL,  RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_TimerOn(MAPL,"-FMS_INIT")
     call ESMF_VMGet(VM,mpiCommunicator=comm,rc=status)
     VERIFY_(STATUS)
     call fms_init(comm)
-    !call MAPL_TimerOff(MAPL,"--FMS_INIT")
+    call MAPL_TimerOff(MAPL,"-FMS_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FMS_INIT', RC=STATUS )
     VERIFY_(STATUS)
 ! Start up FV                   
-    !call MAPL_TimerOn(MAPL,"--FV_INIT")
+    call MAPL_TimerOn(MAPL,"-FV_INIT")
     call fv_init1(FV_Atm, DT, grids_on_this_pe, p_split)
-    !call MAPL_TimerOff(MAPL,"--FV_INIT")
+    call MAPL_TimerOff(MAPL,"-FV_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
@@ -600,9 +616,9 @@ contains
    endif
 
 !! Start up FV                   
-    !call MAPL_TimerOn(MAPL,"--FV_INIT")
+    call MAPL_TimerOn(MAPL,"-FV_INIT")
     call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
-    !call MAPL_TimerOff(MAPL,"--FV_INIT")
+    call MAPL_TimerOff(MAPL,"-FV_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
@@ -721,10 +737,10 @@ contains
 
   use test_cases_mod, only : test_case, init_double_periodic 
 
+  type (ESMF_GridComp)         , intent(INOUT) :: GC
   type (T_FVDYCORE_STATE),pointer              :: STATE
 
   type (ESMF_Clock), target,     intent(INOUT) :: CLOCK
-  type (ESMF_GridComp)         , intent(INOUT) :: GC
   type (ESMF_State)            , intent(INOUT) :: INTERNAL
   type (ESMF_State)            , intent(INOUT) :: IMPORT
   integer, optional            , intent(OUT  ) :: RC
@@ -855,37 +871,37 @@ contains
 ! Allocate coarse decomp internal state
   if(.not.associated(u)) allocate(u(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, u, 'U', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, u, 'U', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   if(.not.associated(v)) allocate(v(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, v, 'V', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, v, 'V', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   if(.not.associated(pt)) allocate(pt(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, pt, 'PT', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, pt, 'PT', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   if(.not.associated(pe)) allocate(pe(is:ie,js:je,npz+1), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, pe, 'PE', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, pe, 'PE', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   if(.not.associated(pkz)) allocate(pkz(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, pkz, 'PKZ', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, pkz, 'PKZ', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   if(.not.associated(dz)) allocate(dz(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, dz, 'DZ', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, dz, 'DZ', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   if(.not.associated(w)) allocate(w(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, w, 'W', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, w, 'W', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   call CREATE_VARS ( FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec,     &
@@ -999,7 +1015,7 @@ contains
 
   if(.not.associated(phis)) allocate(phis(isc:iec,jsc:jec), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(import, phis, 'PHIS', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, import, phis, 'PHIS', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
  ! Set FV3 surface geopotential
@@ -1028,25 +1044,25 @@ contains
                                  FV_Atm(1)%flagstruct%moist_phys, FV_Atm(1)%flagstruct%hydrostatic, hybrid, FV_Atm(1)%delz, FV_Atm(1)%ze0, &
                                  FV_Atm(1)%ks, FV_Atm(1)%ptop, FV_Atm(1)%domain, tile_in, FV_Atm(1)%bd)
      ! Copy FV to internal State
-       call FV_To_State ( STATE, internal )
+       call FV_To_State ( GC, STATE, internal )
        if( gid==masterproc ) write(*,*) 'Doubly Periodic IC generated LAT:', FV_Atm(1)%flagstruct%deglat
    else
      ALLOCATE( UA(isc:iec  ,jsc:jec  ,1:FV_Atm(1)%npz) )
      ALLOCATE( VA(isc:iec  ,jsc:jec  ,1:FV_Atm(1)%npz) )
      ALLOCATE( UD(isc:iec  ,jsc:jec+1,1:FV_Atm(1)%npz) )
      ALLOCATE( VD(isc:iec+1,jsc:jec  ,1:FV_Atm(1)%npz) )
-     !call SSI_CopyFineToCoarse(internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
+     !call SSI_CopyFineToCoarse(GC, internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
      !VERIFY_(STATUS)
-     !call SSI_CopyFineToCoarse(internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
+     !call SSI_CopyFineToCoarse(GC, internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
      !VERIFY_(STATUS)
      UA(isc:iec,jsc:jec,:) = STATE%VARS%U(isc:iec,jsc:jec,:)
      VA(isc:iec,jsc:jec,:) = STATE%VARS%V(isc:iec,jsc:jec,:)
      call INTERP_AGRID_TO_DGRID( UA, VA, UD, VD )
      STATE%VARS%U(isc:iec,jsc:jec,:) = UD(isc:iec,jsc:jec,:)
      STATE%VARS%V(isc:iec,jsc:jec,:) = VD(isc:iec,jsc:jec,:)
-     call SSI_CopyCoarseToFine(internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
+     call SSI_CopyCoarseToFine(GC, internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
      VERIFY_(status)
-     call SSI_CopyCoarseToFine(internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
+     call SSI_CopyCoarseToFine(GC, internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
      VERIFY_(status)
      DEALLOCATE ( UA )
      DEALLOCATE ( VA )
@@ -1059,7 +1075,7 @@ contains
         call fv_getDELZ(DZ,PT,PE)
         PT = PT/PKZ
      endif
-     call State_To_FV( STATE, internal )
+     call State_To_FV( GC, STATE, internal )
    endif ! doubly-periodic
 
   else ! COLDSTART
@@ -1071,7 +1087,7 @@ contains
     !   call fv_getDELZ(DZ,PT,PE)
     !   PT = PT/PKZ
     !endif
-     call State_To_FV( STATE, internal )
+     call State_To_FV( GC, STATE, internal )
 
   endif
 
@@ -1207,7 +1223,7 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
 
   type(domain2D) :: domain
 
-  !type (MAPL_MetaComp),          pointer :: mapl  => NULL()
+  type (MAPL_MetaComp),          pointer :: mapl  => NULL()
 
   logical :: SPHU_FILLED = .FALSE.
   logical :: QLIQ_FILLED = .FALSE.
@@ -1224,13 +1240,26 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
   logical :: CLCN_FILLED = .FALSE.
 
   logical :: NWAT_TEST
+  integer, allocatable :: gcImg(:)
+  integer :: itemCount
+  type(ESMF_GridComp) :: fineGC
 
 ! Begin
 
+! Retrieve fine GC 
+! ---------------------------------
+    call ESMF_AttributeGet(GC, name='GC_IMAGE', itemCount=itemCount, rc=status)
+    VERIFY_(STATUS)
+    allocate(gcImg(itemCount), stat=status)
+    VERIFY_(STATUS)
+    call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
+    VERIFY_(STATUS)
+    fineGC = transfer(gcImg, fineGC)
+
 ! Retrieve the pointer to the state
 ! ---------------------------------
+  call MAPL_GetObjectFromGC (fineGC, MAPL,  RC=STATUS )
 
-  !call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
   call ESMF_GridCompGet (GC, CONFIG=CF,  RC=STATUS )
   VERIFY_(STATUS)
 
@@ -1258,7 +1287,7 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
   ! Be sure we have the correct PHIS and number of tracers for this run
    if (fv_first_run) then
 
-     call SSI_CopyFineToCoarse(import, phis, 'PHIS', f2c_SSI_arr_map, rc=status)
+     call SSI_CopyFineToCoarse(GC, import, phis, 'PHIS', f2c_SSI_arr_map, rc=status)
      VERIFY_(STATUS)
     !block
     !   type(ESMF_VM) :: vm
@@ -1650,7 +1679,7 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
     if (DEBUG) call debug_fv_state('Before Dynamics Execution',STATE)
 
 ! Update FV with Internal State
-    call State_To_FV( STATE, internal )
+    call State_To_FV( GC, STATE, internal )
 
     ! Query for PSDRY from AGCM.rc and set to MAPL_PSDRY if not found
     !call MAPL_GetResource( MAPL, massD0, 'PSDRY:', default=MAPL_PSDRY, RC=STATUS )
@@ -1680,7 +1709,7 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
 
 ! Check Dry Mass (Apply fixer is option is enabled)
    if ( check_mass .OR. fix_mass ) then
-      !call MAPL_TimerOn(MAPL,"--MASS_FIX")
+      call MAPL_TimerOn(MAPL,"--MASS_FIX")
 
       if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. &
             ((.not. FV_Atm(1)%flagstruct%hydrostatic) .OR. FV_Atm(1)%flagstruct%nwat==6)  ) then
@@ -1782,14 +1811,14 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
 
       endif
 
-      !call MAPL_TimerOff(MAPL,"--MASS_FIX")
+      call MAPL_TimerOff(MAPL,"--MASS_FIX")
    endif
 
           ! if (mpp_pe()==mpp_root_pe()) then
           !    write(6,*) 'Advecting tracers: ', FV_Atm(1)%ncnst, STATE%GRID%NQ
           ! endif
 
-    !call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
+    call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
     if (.not. FV_OFF) then
     call set_domain(FV_Atm(1)%domain)  ! needed for diagnostic output done in fv_dynamics
     call fv_dynamics(FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng,   &
@@ -1824,10 +1853,10 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
     call nullify_domain()
 
     endif
-    !call MAPL_TimerOff(MAPL,"--FV_DYNAMICS")
+    call MAPL_TimerOff(MAPL,"--FV_DYNAMICS")
 
 ! Copy FV to internal State
-   call FV_To_State ( STATE, internal )
+   call FV_To_State ( GC, STATE, internal )
 
   SPHU_FILLED = .FALSE.
   QLIQ_FILLED = .FALSE.
@@ -2157,10 +2186,11 @@ end subroutine FV_Run
 
  end subroutine FV_Finalize
 
-subroutine State_To_FV ( STATE, internal )
+subroutine State_To_FV (GC, STATE, internal )
 
 ! !INPUT PARAMETERS:
 
+   type(ESMF_GridComp),         intent(inout) :: GC
    type(T_FVDYCORE_STATE),      pointer   :: STATE
    type(ESMF_State),            intent(inout) :: internal
 
@@ -2207,19 +2237,19 @@ subroutine State_To_FV ( STATE, internal )
 ! Update Winds
 !------------
   !U => STATE%VARS%U
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%PT, 'PT', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, STATE%VARS%PT, 'PT', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%PE, 'PE', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, STATE%VARS%PE, 'PE', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%PKZ, 'PKZ', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, STATE%VARS%PKZ, 'PKZ', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%DZ, 'DZ', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, STATE%VARS%DZ, 'DZ', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%W, 'W', f2c_SSI_arr_map, rc=status)
+  call SSI_CopyFineToCoarse(GC, internal, STATE%VARS%W, 'W', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
 ! D-Grid
@@ -2331,11 +2361,12 @@ subroutine State_To_FV ( STATE, internal )
 
 end subroutine State_To_FV
 
-subroutine FV_To_State ( STATE, internal )
+subroutine FV_To_State ( GC, STATE, internal )
 
 !
 ! !INPUT PARAMETERS:
 
+   type(ESMF_GridComp),         intent(inout) :: GC
    type(T_FVDYCORE_STATE),      pointer   :: STATE
    type(ESMF_State),           intent(inout) :: internal
 
@@ -2390,19 +2421,19 @@ subroutine FV_To_State ( STATE, internal )
 
     !U => STATE%VARS%U
 
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(GC, internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
     VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(GC, internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
     VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PT, 'PT', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(GC, internal, STATE%VARS%PT, 'PT', f2c_SSI_arr_map, rc=status)
     VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PE, 'PE', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(GC, internal, STATE%VARS%PE, 'PE', f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PKZ, 'PKZ', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(GC, internal, STATE%VARS%PKZ, 'PKZ', f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%DZ, 'DZ', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(GC, internal, STATE%VARS%DZ, 'DZ', f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%W, 'W', f2c_SSI_arr_map, rc=status)
+    call SSI_CopyCoarseToFine(GC, internal, STATE%VARS%W, 'W', f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
     
    return

@@ -1,9 +1,10 @@
 
-subroutine SUB_INDEX_(bundle, coarse_Array, index, f2c_SSI_arr_map, rc)
+subroutine SUB_INDEX_(GC, bundle, coarse_Array, index, f2c_SSI_arr_map, rc)
 
    use ESMF
    implicit none
 
+   type(ESMF_GridComp), intent(inout) :: GC
    type(ESMF_FieldBundle) :: bundle
    integer, intent(in) :: index 
    real(TYPEKIND_), intent(inout) :: coarse_Array DIMENSIONS_
@@ -23,11 +24,12 @@ subroutine SUB_INDEX_(bundle, coarse_Array, index, f2c_SSI_arr_map, rc)
 
 end subroutine SUB_INDEX_
 
-subroutine SUB_NAME_(bundle, coarse_Array, name, f2c_SSI_arr_map, rc)
+subroutine SUB_NAME_(GC, bundle, coarse_Array, name, f2c_SSI_arr_map, rc)
 
    use ESMF
    implicit none
 
+   type(ESMF_GridComp), intent(inout) :: GC
    type(ESMF_FieldBundle) :: bundle
    character(len=ESMF_MAXSTR), intent(in) :: name
    real(TYPEKIND_), intent(inout) :: coarse_Array DIMENSIONS_

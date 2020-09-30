@@ -348,6 +348,7 @@ contains
 
     type (MAPL_MetaComp),      pointer :: MAPL
     character (len=ESMF_MAXSTR)        :: LAYOUT_FILE
+    integer, allocatable :: gcImg(:)
 
 ! Get the configuration from the component
 !-----------------------------------------
@@ -2281,21 +2282,23 @@ contains
 
     call MAPL_TimerAdd(GC,    name="INITIALIZE"  ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="RUN"         ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="-FMS_INIT"  ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="RUN2"        ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="-FV_INIT"  ,RC=STATUS)
     VERIFY_(STATUS)
     call MAPL_TimerAdd(GC,    name="-DYN_INIT"    ,RC=STATUS)       
     VERIFY_(STATUS)          
-    call MAPL_TimerAdd(GC,    name="--FMS_INIT"  ,RC=STATUS)
-    VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="--FV_INIT"  ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="RUN"         ,RC=STATUS)
     VERIFY_(STATUS)
     call MAPL_TimerAdd(GC,    name="-DYN_CORE"   ,RC=STATUS)
     VERIFY_(STATUS)
+    call MAPL_TimerAdd(GC,    name="--MASS_FIX"  ,RC=STATUS)
+    VERIFY_(STATUS)
     call MAPL_TimerAdd(GC,    name="--FV_DYNAMICS",RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="--MASS_FIX"  ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="RUN2"        ,RC=STATUS)
+    VERIFY_(STATUS)
+    call MAPL_TimerAdd(GC,    name="DATA_COPY"        ,RC=STATUS)
     VERIFY_(STATUS)
     call MAPL_TimerAdd(GC,    name="FINALIZE"    ,RC=STATUS)
     VERIFY_(STATUS)
@@ -2348,6 +2351,9 @@ contains
         RC=STATUS)
     VERIFY_(STATUS)
 
+! add GC as attribute to coarseGC via transfer
+    gcImg = transfer(GC, gcImg)
+    call ESMF_AttributeSet(coarseGC, name='GC_IMAGE', valueList=gcImg, rc=status)
 ! Generic SetServices
 !--------------------
 
