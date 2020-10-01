@@ -1,23 +1,24 @@
+    call timing_on('DATA_COPY')
 ! Retrieve fine GC 
 ! ---------------------------------
-    call ESMF_AttributeGet(GC, name='GC_IMAGE', itemCount=itemCount, rc=status)
-    VERIFY_(STATUS)
-    allocate(gcImg(itemCount), stat=status)
-    VERIFY_(STATUS)
-    call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
-    VERIFY_(STATUS)
-    fineGC = transfer(gcImg, fineGC)
+    !call ESMF_AttributeGet(GC, name='GC_IMAGE', itemCount=itemCount, rc=status)
+    !VERIFY_(STATUS)
+    !allocate(gcImg(itemCount), stat=status)
+    !VERIFY_(STATUS)
+    !call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
+    !VERIFY_(STATUS)
+    !fineGC = transfer(gcImg, fineGC)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
 
-    call MAPL_GetObjectFromGC (fineGC, MAPL,  RC=STATUS )
-    VERIFY_(STATUS)
+    !call MAPL_GetObjectFromGC (fineGC, MAPL,  RC=STATUS )
+    !VERIFY_(STATUS)
 
 ! Start the timers
 !-----------------
     !call MAPL_TimerOn(MAPL,"TOTAL")
-    call MAPL_TimerOn(MAPL,"DATA_COPY")
+    !call MAPL_TimerOn(MAPL,"DATA_COPY")
 
 
    call ESMF_AttributeGet(field, name='SSI_ARRAY_SIZE', &
@@ -91,9 +92,10 @@
    end do
 
    deallocate(arrayImg)
-   deallocate(gcImg)
+   !deallocate(gcImg)
    deallocate(localArrayList)
 
-   call MAPL_TimerOff(MAPL,"DATA_COPY")
+   !call MAPL_TimerOff(MAPL,"DATA_COPY")
    !call MAPL_TimerOff(MAPL,"TOTAL")
+   call timing_off('DATA_COPY')
 
