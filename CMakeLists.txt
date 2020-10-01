@@ -15,7 +15,6 @@ set (srcs
   CubeToLatLon.F90 
   CubeGridPrototype.F90
   GEOS_FV3_Utilities.F90
-  CoarseDynCore_GridCompMod.F90
   SSI_FineToCoarseMod.F90
   SSI_CoarseToFineMod.F90
   SSI_TypeMod.F90
