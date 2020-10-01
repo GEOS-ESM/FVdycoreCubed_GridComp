@@ -144,10 +144,29 @@ contains
       integer :: status
       character(len=ESMF_MAXSTR) :: Iam = "coarse_setvm"
       integer :: petCount, localPet
-      type(ESMF_Config)  :: cf
+      type (MAPL_MetaComp), pointer :: MAPL  => NULL()
+      integer, allocatable :: gcImg(:)
+      integer :: itemCount
+      type(ESMF_GridComp) :: fineGC
+      !type(ESMF_Config)  :: cf
 
       ! Initialize return code
       rc = ESMF_SUCCESS
+
+! Retrieve fine GC 
+! ---------------------------------
+      call ESMF_AttributeGet(GC, name='GC_IMAGE', itemCount=itemCount, rc=status)
+      VERIFY_(STATUS)
+      allocate(gcImg(itemCount), stat=status)
+      VERIFY_(STATUS)
+      call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
+      VERIFY_(STATUS)
+      fineGC = transfer(gcImg, fineGC)
+
+! Retrieve the pointer to the state
+! ---------------------------------
+      call MAPL_GetObjectFromGC (fineGC, MAPL,  RC=STATUS )
+      VERIFY_(STATUS)
 
       !call ESMF_LogWrite("Executing 'userm2_setvm'", ESMF_LOGMSG_INFO, rc=rc)
       !if (rc/=ESMF_SUCCESS) return ! bail out
@@ -177,12 +196,13 @@ contains
           ! do not maximize PEs on fewer PETs if SSI shared memory not supported
           nthreads=1
         endif
-        call ESMF_GridCompGet( GC, CONFIG=CF, rc=status)
+! nth_x = coarsening factor in X-direction
+        call MAPL_GetResource( MAPL, nth_x, 'NTH_X:', default=1, RC=STATUS )
         VERIFY_(STATUS)
-        call ESMF_ConfigGetAttribute( CF, nth_x, label='NTH_X:', default= 1, RC=STATUS )
+! nth_y = coarsening factor in Y-direction
+        call MAPL_GetResource( MAPL, nth_y, 'NTH_Y:', default=1, RC=STATUS )
         VERIFY_(STATUS)
-        call ESMF_ConfigGetAttribute( CF, nth_y, label='NTH_Y:', default= 1, RC=STATUS )
-        VERIFY_(STATUS)
+! nthreads = num threads to use in dyncore
         nthreads = nth_x*nth_y
         call ESMF_GridCompSetVMMaxPEs(gc, maxPeCountPerPet=nthreads, rc=status)
         VERIFY_(STATUS)
@@ -241,20 +261,62 @@ contains
    type (DYN_wrap)                  :: wrap
    integer :: status
    character(len=ESMF_MAXSTR) :: Iam = "CoarseSetServices"
-   !type(ESMF_VM) :: vm
-   !integer :: localPet, peCount
+   type(ESMF_VM) :: vm
+   integer :: localPet, peCount, petCount
+   integer, allocatable :: gcImg(:)
+   integer :: itemCount
+   type(ESMF_GridComp) :: fineGC
+   type(MAPL_MetaComp), pointer :: MAPL
+   integer :: nx, ny, nnx, nny, nth_x, nth_y
 
-! Register services for this component
-! ------------------------------------
+! Retrieve fine GC 
+! ---------------------------------
+    call ESMF_AttributeGet(GC, name='GC_IMAGE', itemCount=itemCount, rc=status)
+    VERIFY_(STATUS)
+    allocate(gcImg(itemCount), stat=status)
+    VERIFY_(STATUS)
+    call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
+    VERIFY_(STATUS)
+    fineGC = transfer(gcImg, fineGC)
+
+! Retrieve the pointer to the state
+! ---------------------------------
+
+    call MAPL_GetObjectFromGC (fineGC, MAPL,  RC=STATUS )
+    VERIFY_(STATUS)
+
+! Checks aligments of number of threads, procs/node, etc.
+
+    call MAPL_GetResource( MAPL, nx, 'NX:', default=0, RC=STATUS )
+    VERIFY_(STATUS)
+    call MAPL_GetResource( MAPL, nth_x, 'NTH_X:', default=1, RC=STATUS )
+    VERIFY_(STATUS)
+    call MAPL_GetResource( MAPL, ny, 'NY:', default=0, RC=STATUS )
+    VERIFY_(STATUS)
+    call MAPL_GetResource( MAPL, nth_y, 'NTH_Y:', default=1, RC=STATUS )
+    VERIFY_(STATUS)
+    call MAPL_GetResource( MAPL, nnx, 'NNX:', default=1, RC=STATUS          )
+    VERIFY_(STATUS)
+    call MAPL_GetResource( MAPL, nny, 'NNY:', default=1, RC=STATUS )
+    VERIFY_(STATUS)
+
+    _ASSERT(mod(nx*ny, nnx*nny) == 0, 'num_procs/node must evenly divide total num_procs')
+    _ASSERT(mod(nnx, nth_x) == 0, 'coarsening factor in X-direction must evenly divide num_procs/node in X-direction')
+    _ASSERT(mod(nx, nth_x) == 0, 'coarsening factor in X-direction must evenly divide num_procs in X-direction')
+    _ASSERT(mod(nny, nth_y) == 0, 'coarsening factor in Y-direction must evenly divide num_procs/node in Y-direction')
+    _ASSERT(mod(ny/6, nth_y) == 0, 'coarsening factor in Y-direction must evenly divide num_procs in Y-direction')
+
+    !call ESMF_GridCompGet(gc, vm=vm, rc=status)
+    !VERIFY_(STATUS)
+    !call ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=status)
+    !VERIFY_(STATUS)
+    !call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
+    !VERIFY_(STATUS)
+!!$ call omp_set_num_threads(peCount)
 
 ! Allocate this instance of the internal state and put it in wrapper.
 ! -------------------------------------------------------------------
-!    call ESMF_GridCompGet(gc, vm=vm, rc=status)
-!    call ESMF_VMGet(vm, localPet=localPet, rc=status)
-!    VERIFY_(STATUS)
-!    call ESMF_VMGet(vm, pet=localPet, peCount=peCount, rc=status)
-!    VERIFY_(STATUS)
-!!$ call omp_set_num_threads(peCount)
+
     allocate( state, stat=status )
     VERIFY_(STATUS)
     wrap%dyn_state => state
@@ -262,11 +324,11 @@ contains
 ! Save pointer to the wrapped internal state in the GC
 ! ----------------------------------------------------
 
-    !call DynSetup(GC)
-
     call ESMF_UserCompSetInternalState ( GC,'DYNstate',wrap,status )
     VERIFY_(STATUS)
 
+! Register services for this component
+! ------------------------------------
     call ESMF_GridCompSetEntryPoint (gc, ESMF_METHOD_INITIALIZE, &
        userRoutine=set_esmf_internal_state, PHASE=1, rc=status)
     VERIFY_(STATUS)
@@ -472,89 +534,18 @@ contains
 
 !BOR
 ! !RESOURCE_ITEM: none :: name of layout file
-    !call MAPL_GetResource ( MAPL, layout_file, 'LAYOUT:', default='fvcore_layout.rc', rc=status )
-    call ESMF_ConfigGetAttribute ( CF, layout_file, label='LAYOUT:', default='fvcore_layout.rc', rc=status )
+    call MAPL_GetResource ( MAPL, layout_file, 'LAYOUT:', default='fvcore_layout.rc', rc=status )
 !EOR
     VERIFY_(STATUS)
 
 ! Check for ColdStart from the configuration 
 !--------------------------------------
-    !call MAPL_GetResource ( MAPL, ColdRestart, 'COLDSTART:', default=0, rc=status )
+    call MAPL_GetResource ( MAPL, ColdRestart, 'COLDSTART:', default=0, rc=status )
 
-    call ESMF_ConfigGetAttribute ( CF, ColdRestart, label='COLDSTART:', default=0, rc=status )
     VERIFY_(STATUS)
     if (ColdRestart /=0 ) then
       call Coldstart( gc, import, export, clock, rc=STATUS )
       VERIFY_(STATUS)
-    !block
-    !   character(len=ESMF_MAXSTR) :: fname
-    !   type(ESMF_VM) :: vm
-    !   integer :: localPet
-    !   type (ESMF_FieldBundle)          :: BUNDLE
-    !   type (ESMF_Field)          :: field
-    !   real(kind=4), pointer :: TRACER(:,:,:)
-    !   real(kind=4), pointer                  :: LATS(:,:), LONS(:,:)
-    !   call ESMF_VMGetCurrent(vm, rc=status)
-    !   VERIFY_(STATUS)
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL,UD,'U'  ,RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL,VD,'V'  ,RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL,PE,'PE' ,RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL,PT,'PT' ,RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL,PK,'PKZ',RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL, AK, 'AK', RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL, BK, 'BK', RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL, LONS, 'LONS', RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL, LATS, 'LATS', RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call ESMF_StateGet(IMPORT, 'TRADV' , BUNDLE,   RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call ESMF_FieldBundleGet(BUNDLE, fieldName='Q', field=field, RC=STATUS)
-    !  VERIFY_(STATUS)
-    !   call ESMF_FieldGet(field, farrayptr=TRACER, RC=STATUS)
-    !  VERIFY_(STATUS)
-    !   write(fname,'(a,i3.3)') 'fields-', localPet
-    !   open(220, file=trim(fname), form='formatted', status='new')
-    !   write(220,*) 'U ....', shape(UD)
-    !   !write(220,*) 'U ....', is, ie, js, je, ks, ke
-    !   write(220,*) UD
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'V ....', shape(VD)
-    !   write(220,*) VD
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'PE ....', shape(PE)
-    !   write(220,*) PE
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'PT ....', shape(PT)
-    !   write(220,*) PT
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'PK ....', shape(PK)
-    !   write(220,*) PK
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'BK ....', shape(bk)
-    !   write(220,*) bk
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'AK ....', shape(ak)
-    !   write(220,*) ak
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'LONS ....', shape(LONS)
-    !   write(220,*) LONS
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'LATS ....', shape(LATS)
-    !   write(220,*) LATS
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'Q ....', shape(TRACER)
-    !   write(220,*) TRACER
-    !end block
     endif
 
 ! Set Private Internal State from Restart File
@@ -1043,28 +1034,6 @@ subroutine Run(gc, import, export, clock, rc)
 !!!!$ print *, 'Run ', omp_get_num_threads()
   !call MAPL_Get( MAPL, LONS=LONS, LATS=LATS, RC=STATUS )
   !VERIFY_(STATUS)
-
-    !block
-    !   type(ESMF_VM) :: vm
-    !   integer :: localPet
-    !   character(len=100) :: file_name1
-    !   integer, save :: iter = 1
-    !   call ESMF_VMGetCurrent(vm, rc=status)
-    !   VERIFY_(STATUS)
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    !   VERIFY_(STATUS)
-    !   if(iter ==  1) then
-    !   write(file_name1, '(A,i2.2)'), 'ak_bk_', localPet
-    !   open(unit=74, file=trim(file_name1), form='formatted', status='unknown')
-    !   endif
-    !   write(74,*) shape(LONS), shape(LATS)
-    !   write(74,*) 'LONS '
-    !   write(74,*) LONS
-    !   write(74,*) 'LATS '
-    !   write(74,*) LATS
-    !   iter =  iter+1
-    !   !close(74)
-    !end block
 
   !call MAPL_GetPointer(EXPORT, temp2d, 'LONS', RC=STATUS)
   !VERIFY_(STATUS)
@@ -1749,8 +1718,7 @@ subroutine Run(gc, import, export, clock, rc)
       allocate( trsum1(nq) )
       allocate( trsum2(nq) )
 
-      !call MAPL_GetResource(MAPL, ANA_IS_WEIGHTED, Label="ANA_IS_WEIGHTED:", default='NO', RC=STATUS)
-      call ESMF_ConfigGetAttribute(CF, ANA_IS_WEIGHTED, label="ANA_IS_WEIGHTED:", default='NO', RC=STATUS)
+      call MAPL_GetResource(MAPL, ANA_IS_WEIGHTED, Label="ANA_IS_WEIGHTED:", default='NO', RC=STATUS)
       VERIFY_(STATUS)
            ANA_IS_WEIGHTED = ESMF_UtilStringUpperCase(ANA_IS_WEIGHTED)
                IS_WEIGHTED =   adjustl(ANA_IS_WEIGHTED)=="YES" .or. adjustl(ANA_IS_WEIGHTED)=="NO"
@@ -2292,11 +2260,9 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Call Wrapper (DynRun) for FVDycore
 ! ----------------------------------
-      !call MAPL_GetResource( MAPL, CONSV, 'CONSV:', default=1, RC=STATUS )
-      call ESMF_ConfigGetAttribute( CF, CONSV, label='CONSV:', default=1, RC=STATUS )
+      call MAPL_GetResource( MAPL, CONSV, 'CONSV:', default=1, RC=STATUS )
       VERIFY_(STATUS)
-      !call MAPL_GetResource( MAPL,  FILL,  'FILL:', default=0, RC=STATUS )
-      call ESMF_ConfigGetAttribute( CF,  FILL,  label='FILL:', default=0, RC=STATUS )
+      call MAPL_GetResource( MAPL,  FILL,  'FILL:', default=0, RC=STATUS )
       VERIFY_(STATUS)
 
       LCONSV = CONSV.eq.1
@@ -3340,22 +3306,6 @@ subroutine Run(gc, import, export, clock, rc)
     !VERIFY_(status)
     !call SSI_CopyCoarseToFine(GC, internal, STATE%VARS%PT, 'PT', STATE%f2c_SSI_arr_map, rc=status)
     !VERIFY_(status)
-
-    !block
-    !   type(ESMF_VM) :: vm
-    !   integer :: localPet
-    !   integer :: rc, status
-    !   real(r8), pointer :: U(:,:,:)
-    !   call ESMF_VMGetCurrent(vm, rc=status)
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    !   call MAPL_GetPointer(internal, U, 'U', rc=status)
-    !   if(localPet == 0) then
-    !      write(105,*) shape(U)
-    !      write(105,*) U
-    !      write(106,*) shape(vars%u)
-    !      write(106,*) vars%u
-    !   endif
-    !end block
 
 ! De-Allocate Arrays
 ! ------------------
@@ -5643,24 +5593,6 @@ end subroutine RunAddIncs
        if(.not. associated(tend_kp1)) allocate(tend_kp1(is:ie,js:je,km+1))
        call SSI_CopyFineToCoarse(GC, import, tend_kp1, 'DPEDT', STATE%f2c_SSI_arr_map, rc=status)
 
-    !block
-    !   type(ESMF_VM) :: vm
-    !   integer :: localPet
-    !   integer :: rc, status
-    !   real(r4), pointer :: tend_temp(:,:,:)
-    !   call ESMF_VMGetCurrent(vm, rc=status)
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    !   if(.not. associated(tend_temp)) allocate(tend_temp(is:ie,js:je,km))
-    !   call SSI_CopyFineToCoarse(GC, import, tend_temp, 'DPEDT', STATE%f2c_SSI_arr_map, rc=status)
-    !   VERIFY_(STATUS)
-    !   if(localPet == 0) then
-    !      write(107,*) shape(tend_temp)
-    !      write(107,*) tend_temp
-    !      write(108,*) shape(tend)
-    !      write(108,*) tend
-    !   endif
-    !end block
-
 
        STATE%VARS%PE = STATE%VARS%PE + DT*TEND_kp1
 
@@ -6135,7 +6067,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
     character(len=ESMF_MAXSTR)        :: COMP_NAME
     integer                           :: status
 
-    !type (MAPL_MetaComp),     pointer :: MAPL 
+    type (MAPL_MetaComp),     pointer :: MAPL 
     !type (ESMF_State)                 :: INTERNAL
 
     real(REAL8), pointer                 :: AK(:), BK(:)
@@ -6185,6 +6117,9 @@ subroutine Coldstart(gc, import, export, clock, rc)
     real(REAL8), parameter    :: r0_6=0.6
     real(REAL8), parameter    :: r1_0=1.0
     integer :: NQ
+    type (ESMF_GridComp) :: fineGC 
+    integer, allocatable :: gcImg(:)
+    integer :: itemCount
 
 ! Begin
 
@@ -6192,11 +6127,21 @@ subroutine Coldstart(gc, import, export, clock, rc)
     VERIFY_(STATUS)
     Iam = trim(COMP_NAME) // trim(Iam)
 
+! Retrieve fine GC 
+! ---------------------------------
+      call ESMF_AttributeGet(GC, name='GC_IMAGE', itemCount=itemCount, rc=status)
+      VERIFY_(STATUS)
+      allocate(gcImg(itemCount), stat=status)
+      VERIFY_(STATUS)
+      call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
+      VERIFY_(STATUS)
+      fineGC = transfer(gcImg, fineGC)
+
 ! Retrieve the pointer to the state
 ! ---------------------------------
 
-    !call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-    !VERIFY_(STATUS)
+    call MAPL_GetObjectFromGC (fineGC, MAPL,  RC=STATUS )
+    VERIFY_(STATUS)
 
     call ESMF_UserCompGetInternalState(GC, 'DYNstate', wrap, status)
     VERIFY_(STATUS)
@@ -6214,8 +6159,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
 
 !BOR    
 ! !RESOURCE_ITEM: K :: Value of isothermal temperature on coldstart
-    !call MAPL_GetResource ( MAPL, T0, 'T0:', default=273., RC=STATUS )
-    call ESMF_ConfigGetAttribute ( CF, T0, label='T0:', default=273., RC=STATUS )
+    call MAPL_GetResource ( MAPL, T0, 'T0:', default=273., RC=STATUS )
     VERIFY_(STATUS)
 !EOR
     !call MAPL_Get ( MAPL,                &
@@ -6613,17 +6557,6 @@ subroutine Coldstart(gc, import, export, clock, rc)
    VERIFY_(STATUS)
    call ESMF_FieldBundleGet(TRADV_BUNDLE, fieldCount=NQ, RC=STATUS)
    VERIFY_(STATUS)
-
-   !block
-   !   character(len=ESMF_MAXSTR), allocatable :: fieldNameList(:)
-   !   integer :: ierr
-   !   allocate(fieldNameList(NQ))
-   !   call ESMF_FieldBundleGet(TRADV_BUNDLE, fieldNameList=fieldNameList, RC=STATUS)
-   !   VERIFY_(STATUS)
-   !   print *, __FILE__,__LINE__,NQ, (trim(fieldNameList(i)),i=1,NQ)
-   !   call MPI_Finalize(ierr)
-   !   stop
-   !end block
 
    allocate( TRACER(IS:IE, JS:JE, 1:KM), STAT=STATUS)
    VERIFY_(STATUS)
