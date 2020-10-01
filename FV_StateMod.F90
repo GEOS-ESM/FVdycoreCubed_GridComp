@@ -1289,19 +1289,6 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
 
      call SSI_CopyFineToCoarse(GC, import, phis, 'PHIS', f2c_SSI_arr_map, rc=status)
      VERIFY_(STATUS)
-    !block
-    !   type(ESMF_VM) :: vm
-    !   integer :: localPet
-    !   integer :: rc, status
-    !   call ESMF_VMGetCurrent(vm, rc=status)
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    !   if(localPet == 0) then
-    !      write(105,*) shape(phis)
-    !      write(105,*) phis
-    !      !write(106,*) shape(phis_temp)
-    !      !write(106,*) phis_temp
-    !   endif
-    !end block
 
     ! Determine how many water species we have
      nwat_tracers = 0

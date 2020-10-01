@@ -486,75 +486,6 @@ contains
     if (ColdRestart /=0 ) then
       call Coldstart( gc, import, export, clock, rc=STATUS )
       VERIFY_(STATUS)
-    !block
-    !   character(len=ESMF_MAXSTR) :: fname
-    !   type(ESMF_VM) :: vm
-    !   integer :: localPet
-    !   type (ESMF_FieldBundle)          :: BUNDLE
-    !   type (ESMF_Field)          :: field
-    !   real(kind=4), pointer :: TRACER(:,:,:)
-    !   real(kind=4), pointer                  :: LATS(:,:), LONS(:,:)
-    !   call ESMF_VMGetCurrent(vm, rc=status)
-    !   VERIFY_(STATUS)
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL,UD,'U'  ,RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL,VD,'V'  ,RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL,PE,'PE' ,RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL,PT,'PT' ,RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL,PK,'PKZ',RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL, AK, 'AK', RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL, BK, 'BK', RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL, LONS, 'LONS', RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call MAPL_GetPointer(INTERNAL, LATS, 'LATS', RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call ESMF_StateGet(IMPORT, 'TRADV' , BUNDLE,   RC=STATUS)
-    !   VERIFY_(STATUS)
-    !   call ESMF_FieldBundleGet(BUNDLE, fieldName='Q', field=field, RC=STATUS)
-    !  VERIFY_(STATUS)
-    !   call ESMF_FieldGet(field, farrayptr=TRACER, RC=STATUS)
-    !  VERIFY_(STATUS)
-    !   write(fname,'(a,i3.3)') 'fields-', localPet
-    !   open(220, file=trim(fname), form='formatted', status='new')
-    !   write(220,*) 'U ....', shape(UD)
-    !   !write(220,*) 'U ....', is, ie, js, je, ks, ke
-    !   write(220,*) UD
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'V ....', shape(VD)
-    !   write(220,*) VD
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'PE ....', shape(PE)
-    !   write(220,*) PE
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'PT ....', shape(PT)
-    !   write(220,*) PT
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'PK ....', shape(PK)
-    !   write(220,*) PK
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'BK ....', shape(bk)
-    !   write(220,*) bk
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'AK ....', shape(ak)
-    !   write(220,*) ak
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'LONS ....', shape(LONS)
-    !   write(220,*) LONS
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'LATS ....', shape(LATS)
-    !   write(220,*) LATS
-    !   write(220,*) '====================================================='
-    !   write(220,*) 'Q ....', shape(TRACER)
-    !   write(220,*) TRACER
-    !end block
     endif
 
 ! Set Private Internal State from Restart File
@@ -1043,28 +974,6 @@ subroutine Run(gc, import, export, clock, rc)
 !!!!$ print *, 'Run ', omp_get_num_threads()
   !call MAPL_Get( MAPL, LONS=LONS, LATS=LATS, RC=STATUS )
   !VERIFY_(STATUS)
-
-    !block
-    !   type(ESMF_VM) :: vm
-    !   integer :: localPet
-    !   character(len=100) :: file_name1
-    !   integer, save :: iter = 1
-    !   call ESMF_VMGetCurrent(vm, rc=status)
-    !   VERIFY_(STATUS)
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    !   VERIFY_(STATUS)
-    !   if(iter ==  1) then
-    !   write(file_name1, '(A,i2.2)'), 'ak_bk_', localPet
-    !   open(unit=74, file=trim(file_name1), form='formatted', status='unknown')
-    !   endif
-    !   write(74,*) shape(LONS), shape(LATS)
-    !   write(74,*) 'LONS '
-    !   write(74,*) LONS
-    !   write(74,*) 'LATS '
-    !   write(74,*) LATS
-    !   iter =  iter+1
-    !   !close(74)
-    !end block
 
   !call MAPL_GetPointer(EXPORT, temp2d, 'LONS', RC=STATUS)
   !VERIFY_(STATUS)
@@ -3340,22 +3249,6 @@ subroutine Run(gc, import, export, clock, rc)
     !VERIFY_(status)
     !call SSI_CopyCoarseToFine(GC, internal, STATE%VARS%PT, 'PT', STATE%f2c_SSI_arr_map, rc=status)
     !VERIFY_(status)
-
-    !block
-    !   type(ESMF_VM) :: vm
-    !   integer :: localPet
-    !   integer :: rc, status
-    !   real(r8), pointer :: U(:,:,:)
-    !   call ESMF_VMGetCurrent(vm, rc=status)
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    !   call MAPL_GetPointer(internal, U, 'U', rc=status)
-    !   if(localPet == 0) then
-    !      write(105,*) shape(U)
-    !      write(105,*) U
-    !      write(106,*) shape(vars%u)
-    !      write(106,*) vars%u
-    !   endif
-    !end block
 
 ! De-Allocate Arrays
 ! ------------------
@@ -5643,25 +5536,6 @@ end subroutine RunAddIncs
        if(.not. associated(tend_kp1)) allocate(tend_kp1(is:ie,js:je,km+1))
        call SSI_CopyFineToCoarse(GC, import, tend_kp1, 'DPEDT', STATE%f2c_SSI_arr_map, rc=status)
 
-    !block
-    !   type(ESMF_VM) :: vm
-    !   integer :: localPet
-    !   integer :: rc, status
-    !   real(r4), pointer :: tend_temp(:,:,:)
-    !   call ESMF_VMGetCurrent(vm, rc=status)
-    !   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-    !   if(.not. associated(tend_temp)) allocate(tend_temp(is:ie,js:je,km))
-    !   call SSI_CopyFineToCoarse(GC, import, tend_temp, 'DPEDT', STATE%f2c_SSI_arr_map, rc=status)
-    !   VERIFY_(STATUS)
-    !   if(localPet == 0) then
-    !      write(107,*) shape(tend_temp)
-    !      write(107,*) tend_temp
-    !      write(108,*) shape(tend)
-    !      write(108,*) tend
-    !   endif
-    !end block
-
-
        STATE%VARS%PE = STATE%VARS%PE + DT*TEND_kp1
 
        ! **********************************************************************
@@ -6613,17 +6487,6 @@ subroutine Coldstart(gc, import, export, clock, rc)
    VERIFY_(STATUS)
    call ESMF_FieldBundleGet(TRADV_BUNDLE, fieldCount=NQ, RC=STATUS)
    VERIFY_(STATUS)
-
-   !block
-   !   character(len=ESMF_MAXSTR), allocatable :: fieldNameList(:)
-   !   integer :: ierr
-   !   allocate(fieldNameList(NQ))
-   !   call ESMF_FieldBundleGet(TRADV_BUNDLE, fieldNameList=fieldNameList, RC=STATUS)
-   !   VERIFY_(STATUS)
-   !   print *, __FILE__,__LINE__,NQ, (trim(fieldNameList(i)),i=1,NQ)
-   !   call MPI_Finalize(ierr)
-   !   stop
-   !end block
 
    allocate( TRACER(IS:IE, JS:JE, 1:KM), STAT=STATUS)
    VERIFY_(STATUS)
