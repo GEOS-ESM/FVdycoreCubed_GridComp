@@ -2298,8 +2298,6 @@ contains
     VERIFY_(STATUS)
     call MAPL_TimerAdd(GC,    name="RUN2"        ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="DATA_COPY"        ,RC=STATUS)
-    VERIFY_(STATUS)
     call MAPL_TimerAdd(GC,    name="FINALIZE"    ,RC=STATUS)
     VERIFY_(STATUS)
 

@@ -1,10 +1,9 @@
 
-subroutine SUB_(GC, state, coarse_Array, name, f2c_SSI_arr_map, rc)
+subroutine SUB_(state, coarse_Array, name, f2c_SSI_arr_map, rc)
 
    use ESMF
    implicit none
 
-   type(ESMF_GridComp), intent(inout) :: GC
    type(ESMF_State), intent(in) :: state
    real(TYPEKIND_), intent(inout) :: coarse_Array DIMENSIONS_
    character(len=*), intent(in) :: name 

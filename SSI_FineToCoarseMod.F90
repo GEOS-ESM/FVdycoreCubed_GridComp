@@ -6,6 +6,7 @@ module SSI_FineToCoarse
    use MAPL
 
    use SSI_TypeMod, only : SSI_Type
+   use fv_timing_mod,       only: timing_on, timing_off
 
    private 
 

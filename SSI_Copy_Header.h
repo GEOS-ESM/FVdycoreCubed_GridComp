@@ -13,5 +13,3 @@
    integer :: ndim, is, ie, js, je, km, ith, jth
    integer, allocatable :: gcImg(:)
    integer :: itemCount
-   type(ESMF_GridComp) :: fineGC
-   type (MAPL_MetaComp),      pointer :: mapl => Null()
