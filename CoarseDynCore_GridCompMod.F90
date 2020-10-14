@@ -1886,9 +1886,9 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer ( export, temp2D, 'DMDTANA', rc=status )
       VERIFY_(STATUS)
       if( associated(temp2D) ) then
-         temp2D = ( (vars%pe(:,:,km+1)-vars%pe(:,:,1)) - dmdt )/(grav*dt)
-         !call SSI_CopyCoarseToFine(export, temp2D, 'DMDTANA', STATE%f2c_SSI_arr_map, rc=status)
-         !VERIFY_(STATUS)
+         dummy2d = ( (vars%pe(:,:,km+1)-vars%pe(:,:,1)) - dmdt )/(grav*dt)
+         call SSI_CopyCoarseToFine(export, temp2D, 'DMDTANA', STATE%f2c_SSI_arr_map, rc=status)
+         VERIFY_(STATUS)
       endif
 
       call getAgridWinds(vars%u, vars%v, ua, va, rotate=.true.)
@@ -4348,12 +4348,12 @@ end subroutine RUN
        VERIFY_(STATUS)
        call ESMF_FieldGet(FIELD, Array=Array, name=fieldname, RC=STATUS)
        VERIFY_(STATUS)
-       !call ESMF_ArrayGet(array,typekind=kind,rc=status)
-       !VERIFY_(STATUS)
+       call ESMF_ArrayGet(array,typekind=kind,rc=status)
+       VERIFY_(STATUS)
 
-       !STATE%VARS%TRACER(N)%IS_R4  = (kind == ESMF_TYPEKIND_R4)   ! Is real*4?
+       STATE%VARS%TRACER(N)%IS_R4  = (kind == ESMF_TYPEKIND_R4)   ! Is real*4?
 
-       !STATE%VARS%TRACER(N)%TNAME = fieldname
+       STATE%VARS%TRACER(N)%TNAME = fieldname
 
        if ( STATE%VARS%TRACER(N)%IS_R4 ) then
           !call ESMF_ArrayGet(array, localDE=0, farrayptr=ptr_r4, rc=status)
@@ -6162,14 +6162,14 @@ subroutine Coldstart(gc, import, export, clock, rc)
     !                           RC=STATUS )
     !VERIFY_(STATUS)
 
-   allocate(LONS(is:ie,js:je), stat=status)
-   VERIFY_(STATUS)
-   call SSI_CopyFineToCoarse(INTERNAL, LONS, 'LONS', STATE%f2c_SSI_arr_map, rc=status)
-   VERIFY_(STATUS)
-   allocate(LATS(is:ie,js:je), stat=status)
-   VERIFY_(STATUS)
-   call SSI_CopyFineToCoarse(INTERNAL, LATS, 'LATS', STATE%f2c_SSI_arr_map, rc=status)
-   VERIFY_(STATUS)
+   !allocate(LONS(is:ie,js:je), stat=status)
+   !VERIFY_(STATUS)
+   !call SSI_CopyFineToCoarse(INTERNAL, LONS, 'LONS', STATE%f2c_SSI_arr_map, rc=status)
+   !VERIFY_(STATUS)
+   !allocate(LATS(is:ie,js:je), stat=status)
+   !VERIFY_(STATUS)
+   !call SSI_CopyFineToCoarse(INTERNAL, LATS, 'LATS', STATE%f2c_SSI_arr_map, rc=status)
+   !VERIFY_(STATUS)
 
    if (FV_Atm(1)%flagstruct%grid_type == 4) then
     ! Doubly-Period setup based on first LAT/LON coordinate
@@ -6684,10 +6684,10 @@ subroutine Coldstart(gc, import, export, clock, rc)
     VERIFY_(STATUS)
     call SSI_CopyCoarseToFine(IMPORT, phis, 'PHIS', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-   call SSI_CopyCoarseToFine(INTERNAL, LONS, 'LONS', STATE%f2c_SSI_arr_map, rc=status)
-   VERIFY_(STATUS)
-   call SSI_CopyCoarseToFine(INTERNAL, LATS, 'LATS', STATE%f2c_SSI_arr_map, rc=status)
-   VERIFY_(STATUS)
+   !call SSI_CopyCoarseToFine(INTERNAL, LONS, 'LONS', STATE%f2c_SSI_arr_map, rc=status)
+   !VERIFY_(STATUS)
+   !call SSI_CopyCoarseToFine(INTERNAL, LATS, 'LATS', STATE%f2c_SSI_arr_map, rc=status)
+   !VERIFY_(STATUS)
 
     RETURN_(ESMF_SUCCESS)
   end subroutine COLDSTART
