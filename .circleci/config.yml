@@ -13,6 +13,24 @@ executors:
       OMPI_MCA_btl_vader_single_copy_mechanism: none
     resource_class: xlarge
 
+workflows:
+  version: 2.1
+  build-and-test:
+    jobs:
+      - build-GEOSgcm:
+          context: 
+            - docker-hub-creds
+      - make-FV3-experiment:
+          context: 
+            - docker-hub-creds
+          requires:
+            - build-GEOSgcm
+      - run-FV3-standalone:
+          context: 
+            - docker-hub-creds
+          requires:
+            - make-FV3-experiment
+
 jobs:
   build-GEOSgcm:
     executor: gcc-build-env
@@ -130,16 +148,3 @@ jobs:
             cd ${CIRCLE_WORKING_DIRECTORY}/workspace/test-fv3-c12
 
             cat *.log
-
-workflows:
-  version: 2.1
-  build-and-test:
-    jobs:
-      - build-GEOSgcm
-      - make-FV3-experiment:
-          requires:
-            - build-GEOSgcm
-      - run-FV3-standalone:
-          requires:
-            - make-FV3-experiment
-
