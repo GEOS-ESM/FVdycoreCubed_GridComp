@@ -4,6 +4,9 @@ executors:
   gcc-build-env:
     docker:
       - image: gmao/ubuntu20-geos-env-mkl:6.0.16-openmpi_4.0.5-gcc_10.2.0
+        auth:
+          username: $DOCKERHUB_USER
+          password: $DOCKERHUB_AUTH_TOKEN
     environment:
       OMPI_ALLOW_RUN_AS_ROOT: 1
       OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
