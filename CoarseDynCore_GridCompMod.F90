@@ -207,7 +207,7 @@ contains
         call ESMF_GridCompSetVMMaxPEs(gc, maxPeCountPerPet=nthreads, rc=status)
         VERIFY_(STATUS)
       endif
-      print *, __FILE__, __LINE__, "ssiSharedMemoryEnabled: ", ssiSharedMemoryEnabled, nthreads, pthreadsEnabled
+      !print *, __FILE__, __LINE__, "ssiSharedMemoryEnabled: ", ssiSharedMemoryEnabled, nthreads, pthreadsEnabled
         !write(msg,*) "user2_setvm: OpenMP num thread:", nthreads
         !call ESMF_LogWrite(msg, ESMF_LOGMSG_INFO, rc=rc)
         !call ESMF_LogFlush(rc=rc)
@@ -511,9 +511,9 @@ contains
 !!$ call omp_set_dynamic(.TRUE.)
 !$ call omp_set_num_threads(peCount)
 
-!$omp parallel
-!$ print *, 'Initialize ', omp_get_num_threads(), peCount
-!$omp end parallel
+!!$omp parallel
+!!$ print *, 'Initialize ', omp_get_num_threads(), peCount
+!!$omp end parallel
 
 ! Get the private internal state
 !-------------------------------
@@ -697,6 +697,32 @@ contains
     !call ESMF_VMBarrier(vm,rc=status)
     !VERIFY_(STATUS)
 
+!=====Begin intemittent replay=======================
+
+! Set the intermittent replay alarm, if needed.
+! Note that it is a non-sticky alarm
+! and is set to ringing on first step. So it will
+! work whether the clock is backed-up and ticked
+! or not.
+
+    call MAPL_GetResource(MAPL, ReplayMode, 'REPLAY_MODE:', default="NoReplay", RC=STATUS )
+    VERIFY_(STATUS)
+
+    if(adjustl(ReplayMode)=="Intermittent") then
+       call MAPL_GetResource(MAPL, DNS_INTERVAL,'REPLAY_INTERVAL:', default=21600., RC=STATUS )
+       VERIFY_(STATUS)
+       call ESMF_TimeIntervalSet(Intv, S=nint(DNS_INTERVAL), RC=STATUS)
+       VERIFY_(STATUS)
+
+       ALARM = ESMF_AlarmCreate(name='INTERMITTENT', clock=CLOCK,      &
+                                ringInterval=Intv, sticky=.false.,    &
+                                                            RC=STATUS )
+       VERIFY_(STATUS)
+       call ESMF_AlarmRingerOn(ALARM, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+!========End intermittent replay========================
 
     !call MAPL_TimerOff(MAPL,"INITIALIZE")
     !call MAPL_TimerOff(MAPL,"TOTAL")
@@ -943,8 +969,8 @@ subroutine Run(gc, import, export, clock, rc)
     character(len=ESMF_MAXSTR) :: uname,vname,tname,qname,psname,dpname,o3name,rgrid,tvar
 
     type (MAPL_SunOrbit)       :: ORBIT
-    real(kind=4), pointer      :: LATS(:,:), LATS_fine(:,:)
-    real(kind=4), pointer      :: LONS(:,:), LONS_fine(:,:)
+    real(kind=4), pointer      :: LATS(:,:)
+    real(kind=4), pointer      :: LONS(:,:)
     real(kind=4), allocatable  ::  ZTH(:,:)
     real(kind=4), allocatable  ::  SLR(:,:)
 
@@ -1261,143 +1287,143 @@ subroutine Run(gc, import, export, clock, rc)
 ! If requested, do Intermittent Replay
 !-------------------------------------
 
-      !call MAPL_GetResource(MAPL, ReplayMode, 'REPLAY_MODE:', default="NoReplay", RC=STATUS )
-      !VERIFY_(STATUS)
+      call MAPL_GetResource(MAPL, ReplayMode, 'REPLAY_MODE:', default="NoReplay", RC=STATUS )
+      VERIFY_(STATUS)
 
-      !REPLAYING: if(adjustl(ReplayMode)=="Intermittent") then
+      REPLAYING: if(adjustl(ReplayMode)=="Intermittent") then
 
-! If r!eplay alarm is ringing, we need to reset state
-!-----!----------------------------------------------
+! If replay alarm is ringing, we need to reset state
+!---------------------------------------------------
 
-      !   call ESMF_ClockGetAlarm(Clock,'INTERMITTENT',Alarm,rc=Status)
-      !   VERIFY_(status) 
-      !   call ESMF_ClockGet(Clock, CurrTime=currentTIME, rc=status)
-      !   VERIFY_(status)
+         call ESMF_ClockGetAlarm(Clock,'INTERMITTENT',Alarm,rc=Status)
+         VERIFY_(status) 
+         call ESMF_ClockGet(Clock, CurrTime=currentTIME, rc=status)
+         VERIFY_(status)
 
-      !   is_ringing = ESMF_AlarmIsRinging( Alarm,rc=status )
-      !   VERIFY_(status) 
+         is_ringing = ESMF_AlarmIsRinging( Alarm,rc=status )
+         VERIFY_(status) 
 
-      !   RefTime = currentTime
+         RefTime = currentTime
 
-      !   call check_replay_time_(is_ringing)
-      !   TIME_TO_REPLAY: if(is_ringing) then
+         call check_replay_time_(is_ringing)
+         TIME_TO_REPLAY: if(is_ringing) then
 
-      !      call ESMF_AlarmRingerOff(Alarm, __RC__)
+            call ESMF_AlarmRingerOff(Alarm, __RC__)
 
-!     !      Read in file name of field to replay to and all other relavant resources
-!     !      ------------------------------------------------------------------------
-      !      call MAPL_GetResource ( MAPL,ReplayFile,'REPLAY_FILE:', RC=STATUS )
-      !      VERIFY_(status)
-      !      call MAPL_GetResource ( MAPL,ReplayType,'REPLAY_TYPE:', Default="FULL", RC=STATUS )
-      !      VERIFY_(status)
+!           Read in file name of field to replay to and all other relavant resources
+!           ------------------------------------------------------------------------
+            call MAPL_GetResource ( MAPL,ReplayFile,'REPLAY_FILE:', RC=STATUS )
+            VERIFY_(status)
+            call MAPL_GetResource ( MAPL,ReplayType,'REPLAY_TYPE:', Default="FULL", RC=STATUS )
+            VERIFY_(status)
    
-      !      call MAPL_GetResource ( MAPL, im_replay, Label="REPLAY_IM:", RC=status )
-      !      VERIFY_(STATUS)
-      !      call MAPL_GetResource ( MAPL, jm_replay, Label="REPLAY_JM:", RC=status )
-      !      VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL, im_replay, Label="REPLAY_IM:", RC=status )
+            VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL, jm_replay, Label="REPLAY_JM:", RC=status )
+            VERIFY_(STATUS)
 
-      !      call MAPL_GetResource ( MAPL, psname, Label="REPLAY_PSNAME:", Default="NULL",  RC=status )
-      !      VERIFY_(STATUS)
-      !      call MAPL_GetResource ( MAPL, dpname, Label="REPLAY_DPNAME:", Default="delp",  RC=status )
-      !      VERIFY_(STATUS)
-      !      call MAPL_GetResource ( MAPL,  uname, Label="REPLAY_UNAME:", Default="uwnd",   RC=status )
-      !      VERIFY_(STATUS)
-      !      call MAPL_GetResource ( MAPL,  vname, Label="REPLAY_VNAME:", Default="vwnd",   RC=status )
-      !      VERIFY_(STATUS)
-      !      call MAPL_GetResource ( MAPL,  tname, Label="REPLAY_TNAME:", Default="theta",  RC=status )
-      !      VERIFY_(STATUS)
-      !      call MAPL_GetResource ( MAPL,  qname, Label="REPLAY_QNAME:", Default="sphu",   RC=status )
-      !      VERIFY_(STATUS)
-      !      call MAPL_GetResource ( MAPL, o3name, Label="REPLAY_O3NAME:", Default="ozone", RC=status )
-      !      VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL, psname, Label="REPLAY_PSNAME:", Default="NULL",  RC=status )
+            VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL, dpname, Label="REPLAY_DPNAME:", Default="delp",  RC=status )
+            VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL,  uname, Label="REPLAY_UNAME:", Default="uwnd",   RC=status )
+            VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL,  vname, Label="REPLAY_VNAME:", Default="vwnd",   RC=status )
+            VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL,  tname, Label="REPLAY_TNAME:", Default="theta",  RC=status )
+            VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL,  qname, Label="REPLAY_QNAME:", Default="sphu",   RC=status )
+            VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL, o3name, Label="REPLAY_O3NAME:", Default="ozone", RC=status )
+            VERIFY_(STATUS)
 
-      !      call MAPL_GetResource ( MAPL,  rgrid, Label="REPLAY_GRID:", Default="D-GRID", RC=status )
-      !      VERIFY_(STATUS)
-      !      call MAPL_GetResource ( MAPL,   tvar, Label="REPLAY_TVAR:", Default="THETAV", RC=status )
-      !      VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL,  rgrid, Label="REPLAY_GRID:", Default="D-GRID", RC=status )
+            VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL,   tvar, Label="REPLAY_TVAR:", Default="THETAV", RC=status )
+            VERIFY_(STATUS)
 
-      !      call MAPL_GetResource ( MAPL, CREMAP, LABEL="REPLAY_REMAP:", default="no", RC=status )
-      !      VERIFY_(STATUS)
-      !      call MAPL_GetResource ( MAPL, TREMAP, LABEL="REPLAY_REMAP_ALL_TRACERS:", default="yes", RC=status )
-      !      VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL, CREMAP, LABEL="REPLAY_REMAP:", default="no", RC=status )
+            VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL, TREMAP, LABEL="REPLAY_REMAP_ALL_TRACERS:", default="yes", RC=status )
+            VERIFY_(STATUS)
 
-      !      call MAPL_GetResource ( MAPL, rc_blend,         'REPLAY_BLEND:', default=  0  , RC=STATUS )
-      !      VERIFY_(STATUS)
-      !      call MAPL_GetResource ( MAPL, rc_blend_p_above, 'REPLAY_BLEND_P_ABOVE:', default= 10.0, RC=STATUS )
-      !      VERIFY_(STATUS)
-      !      call MAPL_GetResource ( MAPL, rc_blend_p_below, 'REPLAY_BLEND_P_BELOW:', default=100.0, RC=STATUS )
-      !      VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL, rc_blend,         'REPLAY_BLEND:', default=  0  , RC=STATUS )
+            VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL, rc_blend_p_above, 'REPLAY_BLEND_P_ABOVE:', default= 10.0, RC=STATUS )
+            VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL, rc_blend_p_below, 'REPLAY_BLEND_P_BELOW:', default=100.0, RC=STATUS )
+            VERIFY_(STATUS)
 
-      !      call MAPL_GetResource ( MAPL, sclinc, label ='SCLINC:', default=1.0, RC=STATUS )
-
-
-      !     ! Read the fields to be reset into a bundle
-      !     !------------------------------------------
-
-      !      call ESMF_ConfigGetAttribute( CF, nx_ana, label ='NX:', rc = STATUS )
-      !      VERIFY_(STATUS)
-      !      call ESMF_ConfigGetAttribute( CF, ny_ana, label ='NY:', rc = STATUS )
-      !      VERIFY_(STATUS)
-
-      !      block
-      !        use MAPL_LatLonGridFactoryMod
-
-      !        ANAgrid = grid_manager%make_grid( &
-      !             & LatLonGridFactory(im_world=IM_REPLAY, jm_world=JM_REPLAY, lm=km, &
-      !             & nx=nx_ana, ny=ny_ana, rc=status))
-      !        VERIFY_(STATUS)
-      !      end block
-
-      !      ANA_Bundle = ESMF_FieldBundleCreate( RC=STATUS)
-      !      VERIFY_(STATUS)
-      !      call ESMF_FieldBundleSet(ANA_Bundle, grid=ANAGRID, RC=STATUS)
-      !      VERIFY_(STATUS)
-
-      !      call MAPL_CFIORead(ReplayFile, RefTime, ANA_Bundle, RC=STATUS)
-      !      VERIFY_(STATUS)
-
-!     !      Create transform from lat-lon to cubed
-!     !      --------------------------------------
-      !      l2c => regridder_manager%make_regridder(ANAGrid, ESMFGRID, REGRID_METHOD_BILINEAR, RC=STATUS)
-      !      VERIFY_(STATUS)
-
-!     !      Fill the state variables from the bundle only if
-!     !      the corresponding fields are there
-!     !      -------------------------------------------------
-
-! soon! dump_n_splash will go; we'll have instead:
-!    c!all get_inc_on_anagrid_ - this will convert the internal state to
-!     ! ana-grid, diff with what's in file and produce what incremental_
-!     ! normally works from - a knob will tell incremental_ where fields 
-!     ! are in memory or need reading from file.
-!    c!all incremental_
-!    c!all state_remap_
-      !      if (trim(ReplayType)=='FULL') then
-      !         call dump_n_splash_
-      !      else
-      !         call incremental_
-      !      endif
-      !      call state_remap_
-
-!     !      Done with replay; clean-up
-!     !      --------------------------
-
-      !      call ESMF_FieldBundleGet(ANA_Bundle , FieldCount=NUMVARS,      RC=STATUS)
-      !      VERIFY_(STATUS)
-
-      !      do k=1,NUMVARS
-      !         call ESMF_FieldBundleGet (ANA_Bundle, k, ANA_FIELD,    RC=STATUS)
-      !         VERIFY_(STATUS)
-      !         call MAPL_FieldDestroy   (ANA_Field,                   RC=STATUS)
-      !         VERIFY_(STATUS)
-      !      end do
-
-      !      call ESMF_FieldBundleDestroy(ANA_Bundle,                       RC=STATUS)
-      !      VERIFY_(STATUS)
+            call MAPL_GetResource ( MAPL, sclinc, label ='SCLINC:', default=1.0, RC=STATUS )
 
 
-      !      end if TIME_TO_REPLAY
-      !end if REPLAYING
+           ! Read the fields to be reset into a bundle
+           !------------------------------------------
+
+            call ESMF_ConfigGetAttribute( CF, nx_ana, label ='NX:', rc = STATUS )
+            VERIFY_(STATUS)
+            call ESMF_ConfigGetAttribute( CF, ny_ana, label ='NY:', rc = STATUS )
+            VERIFY_(STATUS)
+
+            block
+              use MAPL_LatLonGridFactoryMod
+
+              ANAgrid = grid_manager%make_grid( &
+                   & LatLonGridFactory(im_world=IM_REPLAY, jm_world=JM_REPLAY, lm=km, &
+                   & nx=nx_ana, ny=ny_ana, rc=status))
+              VERIFY_(STATUS)
+            end block
+
+            ANA_Bundle = ESMF_FieldBundleCreate( RC=STATUS)
+            VERIFY_(STATUS)
+            call ESMF_FieldBundleSet(ANA_Bundle, grid=ANAGRID, RC=STATUS)
+            VERIFY_(STATUS)
+
+            call MAPL_CFIORead(ReplayFile, RefTime, ANA_Bundle, RC=STATUS)
+            VERIFY_(STATUS)
+
+!           Create transform from lat-lon to cubed
+!           --------------------------------------
+            l2c => regridder_manager%make_regridder(ANAGrid, ESMFGRID, REGRID_METHOD_BILINEAR, RC=STATUS)
+            VERIFY_(STATUS)
+
+!           Fill the state variables from the bundle only if
+!           the corresponding fields are there
+!           -------------------------------------------------
+
+! soon dump_n_splash will go; we'll have instead:
+!    call get_inc_on_anagrid_ - this will convert the internal state to
+!      ana-grid, diff with what's in file and produce what incremental_
+!      normally works from - a knob will tell incremental_ where fields 
+!      are in memory or need reading from file.
+!    call incremental_
+!    call state_remap_
+            if (trim(ReplayType)=='FULL') then
+               call dump_n_splash_
+            else
+               call incremental_
+            endif
+            call state_remap_
+
+!           Done with replay; clean-up
+!           --------------------------
+
+            call ESMF_FieldBundleGet(ANA_Bundle , FieldCount=NUMVARS,      RC=STATUS)
+            VERIFY_(STATUS)
+
+            do k=1,NUMVARS
+               call ESMF_FieldBundleGet (ANA_Bundle, k, ANA_FIELD,    RC=STATUS)
+               VERIFY_(STATUS)
+               call MAPL_FieldDestroy   (ANA_Field,                   RC=STATUS)
+               VERIFY_(STATUS)
+            end do
+
+            call ESMF_FieldBundleDestroy(ANA_Bundle,                       RC=STATUS)
+            VERIFY_(STATUS)
+
+
+            end if TIME_TO_REPLAY
+      end if REPLAYING
 
 ! Create Local Copy of QV and OX (Contains Updates from Analysis)
 !----------------------------------------------------------------
@@ -3449,838 +3475,842 @@ subroutine Run(gc, import, export, clock, rc)
 !!$ call omp_set_num_threads(1)
   RETURN_(ESMF_SUCCESS)
 
-!contains
+contains
+
+subroutine check_replay_time_(lring)
+
+   logical :: lring
+   integer :: REPLAY_REF_DATE, REPLAY_REF_TIME, REPLAY_REF_TGAP
+   integer :: REF_TIME(6), REF_TGAP(6)
+   type (ESMF_TimeInterval)  :: RefTGap
+
+   call MAPL_GetResource(MAPL, ReplayType, 'REPLAY_TYPE:', default="FULL", rc=status )
+!  if (trim(ReplayType) == "FULL") return
+
+   CALL MAPL_GetResource( MAPL, REPLAY_REF_DATE, label = 'REPLAY_REF_DATE:', Default=-1, rc=status )
+   CALL MAPL_GetResource( MAPL, REPLAY_REF_TIME, label = 'REPLAY_REF_TIME:', Default=-1, rc=status )
+   CALL MAPL_GetResource( MAPL, REPLAY_REF_TGAP, label = 'REPLAY_REF_TGAP:', Default=-1, rc=status )
+
+   if(REPLAY_REF_DATE==-1.or.REPLAY_REF_TIME==-1) return
+
+   REF_TIME(1) =     REPLAY_REF_DATE/10000
+   REF_TIME(2) = mod(REPLAY_REF_DATE,10000)/100
+   REF_TIME(3) = mod(REPLAY_REF_DATE,100)
+   REF_TIME(4) =     REPLAY_REF_TIME/10000
+   REF_TIME(5) = mod(REPLAY_REF_TIME,10000)/100
+   REF_TIME(6) = mod(REPLAY_REF_TIME,100)
+
+! set replay time
+! ---------------
+   call ESMF_TimeSet(  RefTime, YY =  REF_TIME(1), &
+                                MM =  REF_TIME(2), &
+                                DD =  REF_TIME(3), &
+                                H  =  REF_TIME(4), &
+                                M  =  REF_TIME(5), &
+                                S  =  REF_TIME(6), rc=status ); VERIFY_(STATUS)
+  if (REPLAY_REF_TGAP>0) then
+      REF_TGAP    = 0
+      REF_TGAP(4) =     REPLAY_REF_TGAP/10000
+      REF_TGAP(5) = mod(REPLAY_REF_TGAP,10000)/100
+      REF_TGAP(6) = mod(REPLAY_REF_TGAP,100)
+      call ESMF_TimeIntervalSet(  RefTGap, YY = REF_TGAP(1), &
+                                           MM = REF_TGAP(2), &
+                                            D = REF_TGAP(3), &
+                                            H = REF_TGAP(4), &
+                                            M = REF_TGAP(5), &
+                                            S = REF_TGAP(6), &
+                                    startTime = currentTime, &
+                                                rc = STATUS  ); VERIFY_(STATUS)
+
+      RefTime = RefTime - RefTGap 
+  endif
+
+! check if it's time to replay
+! ----------------------------
+  if(RefTime==currentTime) then
+     lring=.true.
+  else
+     lring=.false.
+  endif
+
+! In this case, increment RefTime to proper time
+! ----------------------------------------------
+  if (REPLAY_REF_TGAP>0) then
+      RefTime = currentTime + RefTGap 
+  endif
+
+end subroutine check_replay_time_
+
+subroutine dump_n_splash_
+
+    real(kind=4), pointer :: XTMP2d (:,:) =>NULL()
+    real(kind=4), pointer :: XTMP3d(:,:,:)=>NULL()
+    real(kind=4), pointer :: YTMP3d(:,:,:)=>NULL()
+    real(r8), allocatable :: ana_thv (:,:,:)
+    real(r8), allocatable :: ana_phis  (:,:)
+    real(r8), allocatable :: ana_pkxy  (:,:,:)
+    real(r8), allocatable :: ana_pkz   (:,:,:)
+    real(r8), allocatable :: ana_dp    (:,:,:)
+    real(r8), allocatable :: ana_pe    (:,:,:)
+    real(r8), allocatable :: ana_qq    (:,:,:,:)
+    real(r8), allocatable :: ana_pt    (:,:,:)
+    real(r8), allocatable :: ana_u     (:,:,:)
+    real(r8), allocatable :: ana_v     (:,:,:)
+    real(r4), allocatable :: aux3d     (:,:,:)
+    real(r4), allocatable :: UAtmpR4   (:,:,:)
+    real(r4), allocatable :: VAtmpR4   (:,:,:)
 !
-!subroutine check_replay_time_(lring)
+    character(len=ESMF_MAXSTR) :: NAME
+    real(r4), pointer :: ptr3dr4   (:,:,:)
+    real(r8), pointer :: ptr3dr8   (:,:,:)
+    integer :: iwind,rank,icnt
+    integer :: iib,iie,jjb,jje,nq3d
+    integer, parameter :: iapproach=2 ! handle pressure more carefully
+    logical :: do_remap, remap_all_tracers
+
+    do_remap = (cremap=="yes" .or. cremap=="YES")
+    remap_all_tracers = (tremap=="yes" .or. tremap=="YES")
+    nq3d=2 ! this routine only updates QV and OX
+    iib = lbound(vars%pe,1)
+    iie = ubound(vars%pe,1)
+    jjb = lbound(vars%pe,2)
+    jje = ubound(vars%pe,2)
+    allocate(   ana_thv (iib:iie,jjb:jje,km  ) )
+    allocate(   ana_pkxy(iib:iie,jjb:jje,km+1) )
+    allocate(   ana_pkz (iib:iie,jjb:jje,km  ) )
+    allocate(    ana_dp (iib:iie,jjb:jje,km  ) )
+    allocate(    ana_pe (iib:iie,jjb:jje,km+1) )
+    allocate(    ana_qq (iib:iie,jjb:jje,km  ,nq3d) )
+    allocate(    ana_pt (iib:iie,jjb:jje,km  ) )
+    allocate(     ana_u (grid%is:grid%ie  ,grid%js:grid%je+1,km) )
+    allocate(     ana_v (grid%is:grid%ie+1,grid%js:grid%je  ,km) )
+! U
+    iwind=0
+    if( trim(uname).ne.'NULL' ) then
+      call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(uname),XTMP3d, RC=STATUS)
+      VERIFY_(STATUS)
+      iwind=iwind+1
+    endif
+! V
+    if( trim(vname).ne.'NULL' ) then
+       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(vname),YTMP3D, RC=STATUS)
+       VERIFY_(STATUS)
+       iwind=iwind+1
+    endif
+
+! calculate d-grid winds
+    if(iwind==0) then
+       ana_u = vars%u(grid%is:grid%ie,grid%js:grid%je,1:km)
+       ana_v = vars%v(grid%is:grid%ie,grid%js:grid%je,1:km)
+    else if(iwind==1) then
+      status=1
+      call WRITE_PARALLEL('cannot handle single wind component')
+      VERIFY_(STATUS)
+    else if (iwind==2) then
+#ifdef INC_WINDS
+       if (iapproach==1) then
+#endif /* INC_WINDS */
+          allocate(cubeTEMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
+          allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
+#ifdef SCALAR_WINDS
+          call WRITE_PARALLEL('Replaying winds as scalars')
+          call l2c%regrid(XTMP3d, cubeTEMP3D, RC=STATUS )
+          VERIFY_(STATUS)
+          call l2c%regrid(YTMP3d, cubeVTMP3D, RC=STATUS )
+          VERIFY_(STATUS)
+#else
+          call WRITE_PARALLEL('Replaying winds')
+          call l2c%regrid(XTMP3d, YTMP3d, cubeTEMP3d, cubeVTMP3d, rc=status)
+#endif /* SCALAR_WINDS */
+          allocate( UAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
+          allocate( VAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
+          UAtmp = cubetemp3d ! A-grid winds on cube
+          VAtmp = cubevtmp3d ! A-grid winds on cube
+          deallocate(cubeTEMP3D)
+          deallocate(cubeVTMP3D)
+          allocate( UDtmp(grid%is:grid%ie  ,grid%js:grid%je+1,km) )
+          allocate( VDtmp(grid%is:grid%ie+1,grid%js:grid%je  ,km) )
+          call Agrid_To_Native( UAtmp, VAtmp, UDtmp, VDtmp ) ! Calculate D-grid winds from rotated A-grid winds
+          ana_u = UDtmp(grid%is:grid%ie,grid%js:grid%je,1:km)
+          ana_v = VDtmp(grid%is:grid%ie,grid%js:grid%je,1:km)
+          deallocate(udtmp,vdtmp)
+          deallocate(uatmp,vatmp)
+#ifdef INC_WINDS
+      else ! approach 2: operate on increments
+          allocate(cubeTEMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
+          allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
+          allocate( UAtmpR4(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
+          allocate( VAtmpR4(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
+          ! get background A-grid winds 
+          call getAgridWinds (vars%u,vars%v,ana_u,ana_v,rotate=.true.)
+          ! transform background A-grid winds to lat-lon
+          call regridder_manager%make_regridder(ESMFGRID, ANAGrid, REGRID_METHOD_BILINEAR, RC=STATUS)
+          VERIFY_(STATUS)
+          cubeTEMP3d = ana_u(grid%is:grid%ie,grid%js:grid%je,1:km) ! copy to satisfy interface below
+          cubeVTMP3d = ana_v(grid%is:grid%ie,grid%js:grid%je,1:km) ! copy to satisfy interface below
+          call c2l%regrid(cubeTEMP3d, cubeVTMP3d, UAtmpR4,    VAtmpR4, RC=STATUS)
+          VERIFY_(STATUS)
+          ! calculate unrotated analysis increments of lat-lon U/V-A-grid winds
+          UAtmpR4 = XTMP3d-UAtmpR4
+          UAtmpR4 = VTMP3d-VAtmpR4
+          ! convert the lat-lon A-grid wind increment back to the cubed
+          call WRITE_PARALLEL('Replaying winds')
+          call l2c%regrid(UAtmpR4,    VAtmpR4, cubeTEMP3d, cubeVTMP3d, RC=STATUS)
+          ! convert cubed wind increment to D-grid
+          allocate( UDtmp(grid%is:grid%ie  ,grid%js:grid%je+1,km) )
+          allocate( VDtmp(grid%is:grid%ie+1,grid%js:grid%je  ,km) )
+          deallocate(ana_u,ana_v)
+          allocate( ana_u(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
+          allocate( ana_v(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
+          ana_u = cubeTEMP3d ! need this to satisfy interface below
+          ana_v = cubeVTMP3d ! need this to satisfy interface below
+          call Agrid_To_Native( ana_u, ana_v, UDtmp, VDtmp ) ! Calculate D-grid winds from rotated A-grid winds
+          ! update winds: rotate, cubed, D-grid analyzed winds
+          deallocate(ana_u,ana_v)
+          allocate( ana_u(grid%is:grid%ie  ,grid%js:grid%je+1,km) )
+          allocate( ana_v(grid%is:grid%ie+1,grid%js:grid%je  ,km) )
+          ana_u = vars%u + UDtmp
+          ana_v = vars%v + VDtmp
+          ! clean up
+          deallocate(VDtmp)
+          deallocate(UDtmp)
+          deallocate(UAtmpR4)
+          deallocate(VAtmpR4)
+          deallocate(cubeVTMP3D)
+          deallocate(cubeTEMP3D)
+      endif
+#endif /* INC_WINDS */
+    endif
+
+! PE or PS
+    if( trim(dpname).ne.'NULL' ) then
+       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(dpname),XTMP3d, RC=STATUS)
+       VERIFY_(STATUS)
+       call WRITE_PARALLEL('Replaying '//trim(dpname))
+       if ( iapproach == 1 ) then ! convert lat-lon delp to cubed and proceed
+          allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
+          call l2c%regrid(XTMP3d, cubeTEMP3D, RC=STATUS )
+          VERIFY_(STATUS)
+          ana_dp=cubeTEMP3D
+          deallocate(cubeTEMP3D)
+       else ! just because pressure is such delicate beast: convert cubed delp
+            ! to lat-lon, calculate an increment in lat-lon, convert increment
+            ! on delp to cubed, and create cubed version of analyzed delp
+            allocate(aux3d (size(XTMP3d,1),size(XTMP3d,2),km))
+            allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
+            ! delp on the cube
+            cubeTEMP3D(:,:,:) = vars%pe(:,:,2:)-vars%pe(:,:,:km)
+            ! transform cubed delp
+            c2l => regridder_manager%make_regridder(ESMFGRID, ANAGrid, REGRID_METHOD_BILINEAR, RC=STATUS )
+            VERIFY_(STATUS)
+            call c2l%regrid(cubeTEMP3D, aux3d, RC=STATUS )
+            VERIFY_(STATUS)
+            ! calculate delp increment on lat-lon and transform it to cubed
+            aux3d = XTMP3d - aux3d
+            call l2c%regrid(aux3d, cubeTEMP3D, RC=STATUS )
+            VERIFY_(STATUS)
+            ! delp analysis on the cube (careful since want to preserve
+            ! precision in delp to the best extent possible)
+            ana_dp = vars%pe(:,:,2:)-vars%pe(:,:,:km) + cubeTEMP3D
+            deallocate(aux3d)
+            deallocate(cubeTEMP3D)
+       endif
+       ana_pe(:,:,1) = grid%ak(1)
+       do k=2,km+1
+          ana_pe(:,:,k) = ana_pe(:,:,k-1) + ana_dp(:,:,k-1)
+       enddo
+       pkxy = ana_pe**kappa
+       do k=1,km
+          ana_pkz(:,:,k) = ( pkxy(:,:,k+1)-pkxy(:,:,k) ) &
+                         / ( kappa*( log(ana_pe(:,:,k+1))-log(ana_pe(:,:,k))) )
+       enddo
+    else
+       if( trim(psname).ne.'NULL' ) then
+          call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(psname),XTMP2D, RC=STATUS)
+          VERIFY_(STATUS)
+          call WRITE_PARALLEL('Replaying '//trim(psname))
+          allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
+          allocate(     aux3D(size(XTMP2d ,1),size(XTMP2d ,2),1))
+          if ( iapproach == 1 ) then ! convert lat-lon delp to cubed and proceed
+             aux3d(:,:,1)=XTMP2D ! rank-2 interface to HorzT does not work
+             call l2c%regrid(aux3d, cubeTEMP3D, RC=STATUS )
+             VERIFY_(STATUS)
+          else ! operate on increment to ps
+             ! transform cubed delp
+             cubeTEMP3D(:,:,1) = vars%pe(:,:,km+1) ! cubed ps
+             c2l => regridder_manager%make_regridder(ESMFGRID, ANAGrid, REGRID_METHOD_BILINEAR, RC=STATUS )
+             VERIFY_(STATUS)
+             call c2l%regrid(cubeTEMP3D, aux3d, RC=STATUS )
+             VERIFY_(STATUS)
+             ! increment to ps on the lat-lon
+             aux3d(:,:,1) = XTMP2D - aux3d(:,:,1)
+             ! lat-lon increment to ps converted to the cube
+             call l2c%regrid(aux3d, cubeTEMP3D, RC=STATUS )
+             ! ps update on the cube
+             cubeTEMP3d(:,:,1) = vars%pe(:,:,km+1) + cubeTEMP3D(:,:,1)
+          endif
+          do k=1,km+1
+             ana_pe(:,:,k) = grid%ak(k) + cubeTEMP3d(:,:,1)*grid%bk(k)
+          enddo
+          deallocate(aux3D)
+          deallocate(cubeTEMP3D)
+          do k=2,km+1
+             ana_dp(:,:,k-1) = ana_pe(:,:,k) - ana_pe(:,:,k-1)
+          enddo
+          pkxy = ana_pe**kappa
+          do k=1,km
+             ana_pkz(:,:,k) = ( pkxy(:,:,k+1)-pkxy(:,:,k) ) &
+                            / ( kappa*( log(ana_pe(:,:,k+1))-log(ana_pe(:,:,k))) )
+          enddo
+       else
+          ana_pe  = vars%pe
+          ana_pkz = vars%pkz
+       endif
+    endif
+
+! O3
+    if( trim(o3name).ne.'NULL' ) then
+       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(o3name),XTMP3d, RC=STATUS)
+       VERIFY_(STATUS)
+       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
+       call l2c%regrid(XTMP3d, cubeTEMP3D, RC=STATUS )
+       VERIFY_(STATUS)
+
+!      Ozone needs to be adjusted to OX
+!      --------------------------------
+       call WRITE_PARALLEL('Replaying '//trim(o3name))
+    
+       !call MAPL_Get(MAPL, LONS=LONS, LATS=LATS, ORBIT=ORBIT, RC=STATUS )
+       call MAPL_Get(MAPL, ORBIT=ORBIT, RC=STATUS )
+       VERIFY_(STATUS)
+
+       if(.not.associated(LATS)) ALLOCATE(LATS(grid%is:grid%ie, grid%js:grid%je),stat=status)
+       VERIFY_(STATUS)
+    call SSI_CopyFineToCoarse(internal, LATS, 'LATS', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
+
+       if(.not.associated(LONS)) ALLOCATE(LONS(grid%is:grid%ie, grid%js:grid%je),stat=status)
+       VERIFY_(STATUS)
+    call SSI_CopyFineToCoarse(internal, LONS, 'LONS', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
+
+       allocate( ZTH( size(LONS,1),size(LONS,2) ) )
+       allocate( SLR( size(LONS,1),size(LONS,2) ) )
+
+       call MAPL_SunGetInsolation( LONS,LATS,ORBIT,ZTH,SLR, CLOCK=CLOCK,RC=STATUS  )
+       VERIFY_(STATUS)
+
+       pl = ( vars%pe(:,:,2:) + vars%pe(:,:,:km) ) * 0.5
+
+       do L=1,km
+          if( ooo%is_r4 ) then 
+             where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
+                  ooo%content_r4(:,:,L) = max(0.,cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6)
+          else
+             where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
+                  ooo%content   (:,:,L) = max(0.,cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6)
+          endif
+       enddo
+
+       deallocate( ZTH, SLR )
+       deallocate(cubeTEMP3D)
+    endif
+    if( ooo%is_r4 ) then ! ana_qq(2) used as aux var to hold ox
+        ana_qq(:,:,:,2) = ooo%content_r4
+    else
+        ana_qq(:,:,:,2) = ooo%content
+    endif
+
+! QV
+    if( trim(qname).ne.'NULL' ) then
+       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(qname),XTMP3d, RC=STATUS)
+       VERIFY_(STATUS)
+       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
+       call l2c%regrid(XTMP3d, cubeTEMP3D, RC=STATUS )
+       VERIFY_(STATUS)
+       call WRITE_PARALLEL('Replaying '//trim(qname))
+       if( qqq%is_r4 ) then
+           qqq%content_r4 = max(0.,cubeTEMP3D)
+       else
+           qqq%content    = max(0.,cubeTEMP3D)
+       endif
+       deallocate(cubeTEMP3D)
+    endif
+    if( qqq%is_r4 ) then ! ana_qq(1) used as aux var to calculate pt/pthv
+        ana_qq(:,:,:,1) = qqq%content_r4
+    else
+        ana_qq(:,:,:,1) = qqq%content
+    endif
+
+! PT
+    if( trim(tname).ne.'NULL' ) then
+       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(tname),XTMP3d, RC=STATUS)
+       VERIFY_(STATUS)
+       allocate(cubeTEMP3D(size(ana_thv,1),size(ana_thv,2),km))
+       call l2c%regrid(XTMP3d, cubeTEMP3D, RC=STATUS )
+       VERIFY_(STATUS)
+       call WRITE_PARALLEL('Replaying '//trim(tname)// '; treated as '//trim(tvar))
+       if( trim(tvar).eq.'THETAV' ) ana_thv = cubeTEMP3D
+       if( trim(tvar).eq.'TV'     ) ana_thv = cubeTEMP3D/ana_pkz
+       if( trim(tvar).eq.'THETA' .or. &
+           trim(tvar).eq.'T'      ) then
+           if( trim(tvar).eq.'THETA' ) ana_thv = cubeTEMP3D*(1.0+eps*ana_qq(:,:,:,1))
+           if( trim(tvar).eq.'T'     ) ana_thv = cubeTEMP3D*(1.0+eps*ana_qq(:,:,:,1))/ana_pkz
+       endif
+       deallocate(cubeTEMP3D)
+       ana_pt  = ana_thv/(1.0+eps*ana_qq(:,:,:,1))
+    else
+       ana_thv = vars%pt*(1.0+eps*ana_qq(:,:,:,1))
+       ana_pt  = vars%pt
+    endif
+
+!   Refresh vars ("update" them)
+!   -------------
+    vars%u   = ana_u(grid%is:grid%ie,grid%js:grid%je,:)
+    vars%v   = ana_v(grid%is:grid%ie,grid%js:grid%je,:)
+    vars%pe  = ana_pe
+    vars%pkz = ana_pkz
+    vars%pt  = ana_pt
+
+! clean up
+    deallocate( ana_v       )
+    deallocate( ana_u       )
+    deallocate( ana_pt      )
+    deallocate( ana_qq      )
+    deallocate( ana_dp      )
+    deallocate( ana_pe      )
+    deallocate( ana_pkz     )
+    deallocate( ana_pkxy    )
+    deallocate( ana_thv     )
+
+    call WRITE_PARALLEL('Dump_n_Splash Replay Done')
+end subroutine dump_n_splash_
+
+subroutine incremental_
+    real(r8), allocatable :: dpkxy  (:,:,:)
+    real(r8), allocatable :: dpkz   (:,:,:)
+    real(r8), allocatable :: dpe    (:,:,:)
+    real(r8), allocatable :: dqqv   (:,:,:)
+    real(r8), allocatable :: dqox   (:,:,:)
+    real(r8), allocatable :: dth    (:,:,:)
+    real(r8), allocatable :: du     (:,:,:)
+    real(r8), allocatable :: dv     (:,:,:)
+    real(r4), allocatable :: aux3d  (:,:,:)
+    integer :: iib,iie,jjb,jje
+    integer :: iwind
+    logical :: allhere,iamr4
+
+    iib = lbound(vars%pe,1)
+    iie = ubound(vars%pe,1)
+    jjb = lbound(vars%pe,2)
+    jje = ubound(vars%pe,2)
+    allocate( dpkxy(iib:iie,jjb:jje,km+1) )
+    allocate( dpkz (iib:iie,jjb:jje,km  ) )
+    allocate(  dpe (iib:iie,jjb:jje,km+1) )
+    allocate( dqqv (iib:iie,jjb:jje,km  ) )
+    allocate( dqox (iib:iie,jjb:jje,km  ) )
+    allocate(  dth (iib:iie,jjb:jje,km  ) )
+    allocate(   du (grid%is:grid%ie  ,grid%js:grid%je+1,km) )
+    allocate(   dv (grid%is:grid%ie+1,grid%js:grid%je  ,km) )
+    dpkxy=0.0d0
+    dpkz =0.0d0
+    dpe  =0.0d0
+    dqqv =0.0d0
+    dqox =0.0d0
+    dth  =0.0d0
+    du   =0.0d0
+    dv   =0.0d0
+
+    allhere = trim(uname ).ne.'NULL'.and.trim(vname ).ne.'NULL'.and. &
+              trim(o3name).ne.'NULL'.and. &
+              trim(tname ).ne.'NULL'.and.trim(qname ).ne.'NULL'
+    if(.not.allhere) then
+       call WRITE_PARALLEL('Not all varibles needed for replay are available')
+       status = 999
+       VERIFY_(status)
+    endif
+    call WRITE_PARALLEL('Starting incremental replay')
+
+! U
+    iwind=0
+    if( trim(uname).ne.'NULL' ) then
+       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(uname),TEMP3D, RC=STATUS)
+       VERIFY_(STATUS)
+       iwind=iwind+1
+    endif
+! V
+    if( trim(vname).ne.'NULL' ) then
+       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(vname),VTMP3D, RC=STATUS)
+       VERIFY_(STATUS)
+       iwind=iwind+1
+    endif
+
+! calculate d-grid winds
+    if(iwind==1) then
+      status=1
+      print *, 'cannot handle single wind component'
+      VERIFY_(STATUS)
+    else if (iwind==2) then
+       allocate(cubeTEMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
+       allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
+#ifdef SCALAR_WINDS
+       call WRITE_PARALLEL('Replaying increment of winds as scalars')
+       call l2c%regrid(TEMP3D, cubeTEMP3D, RC=STATUS )
+       VERIFY_(STATUS)
+       call l2c%regrid(VTMP3D, cubeVTMP3D, RC=STATUS )
+       VERIFY_(STATUS)
+#else
+       call WRITE_PARALLEL('Replaying increment of winds')
+       call l2c%regrid(TEMP3d,     VTMP3d, cubeTEMP3d, cubeVTMP3d, RC=STATUS)
+#endif /* SCALAR_WINDS */
+       allocate( UAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
+       allocate( VAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
+       UAtmp = cubetemp3d ! A-grid winds on cube
+       VAtmp = cubevtmp3d ! A-grid winds on cube
+       call Agrid_To_Native( UAtmp, VAtmp, du, dv )       ! Calculate D-grid winds from rotated A-grid winds
+       deallocate(uatmp,vatmp)
+       deallocate(cubeTEMP3D)
+       deallocate(cubeVTMP3D)
+    endif
+
+! DELP
+    if( trim(psname)=='NULL' .and. trim(dpname).ne.'NULL' ) then
+       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(dpname),TEMP3D, RC=STATUS)
+       VERIFY_(STATUS)
+       call WRITE_PARALLEL('Replaying increment of '//trim(dpname))
+       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
+       call l2c%regrid(TEMP3D, cubeTEMP3D, RC=STATUS )
+       VERIFY_(STATUS)
+       dpe(:,:,1) = 0.0
+       do k=2,km+1
+          dpe(:,:,k) = dpe(:,:,k-1) + cubeTEMP3D(:,:,k-1)
+       enddo
+       deallocate(cubeTEMP3D)
+
+        pkxy =            (vars%pe)** kappa
+       dpkxy = kappa*(pkxy/vars%pe)*dpe
+       do k=1,km
+          dpkz(:,:,k) = (  (    dpkxy (:,:,k+1) -   dpkxy(:,:,k) )* &
+                         log((vars%pe (:,:,k+1))/(vars%pe(:,:,k) )) &
+                        -  (     pkxy (:,:,k+1) -    pkxy(:,:,k) )* &
+                           (     dpe  (:,:,k+1) * vars%pe(:,:,k) &
+                           -     dpe  (:,:,k)   * vars%pe(:,:,k+1) ) &
+                            / (vars%pe(:,:,k+1)*vars%pe(:,:,k)) &
+                         )  / (kappa*( log(vars%pe(:,:,k+1)/vars%pe(:,:,k)) )**2)
+       enddo
+    endif
+
+! PS
+    if( trim(psname)/='NULL' .and. trim(dpname)=='NULL' ) then
+       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(psname),TEMP2D, RC=STATUS)
+       VERIFY_(STATUS)
+       call WRITE_PARALLEL('Replaying increment of '//trim(psname))
+       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
+       allocate(     aux3D(size( TEMP2D,1),size( TEMP2D,2),1))
+       aux3d(:,:,1) = TEMP2D ! same trick of putting in rank-3 array for transforms
+       call l2c%regrid(aux3d, cubeTEMP3D, RC=STATUS )
+       VERIFY_(STATUS)
+       do k=2,km+1
+          dpe(:,:,k-1) =  grid%ak(k) - grid%ak(k-1) + cubeTEMP3d(:,:,1)*(grid%bk(k)-grid%bk(k-1))
+       enddo
+       deallocate(     aux3d)
+       deallocate(cubeTEMP3D)
+
+        pkxy =            (vars%pe)** kappa
+       dpkxy = kappa*(pkxy/vars%pe)*dpe
+       do k=1,km
+          dpkz(:,:,k) = (  (    dpkxy (:,:,k+1) -   dpkxy(:,:,k) )* &
+                         log((vars%pe (:,:,k+1))/(vars%pe(:,:,k) )) &
+                        -  (     pkxy (:,:,k+1) -    pkxy(:,:,k) )* &
+                           (     dpe  (:,:,k+1) * vars%pe(:,:,k) &
+                           -     dpe  (:,:,k)   * vars%pe(:,:,k+1) ) &
+                            / (vars%pe(:,:,k+1)*vars%pe(:,:,k)) &
+                         )  / (kappa*( log(vars%pe(:,:,k+1)/vars%pe(:,:,k)) )**2)
+       enddo
+    endif
+
+! O3
+    if( trim(o3name).ne.'NULL' ) then
+       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(o3name),TEMP3D, RC=STATUS)
+       VERIFY_(STATUS)
+       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
+       call l2c%regrid(TEMP3D, cubeTEMP3D, RC=STATUS )
+       VERIFY_(STATUS)
+
+!      Ozone needs to be adjusted to OX
+!      --------------------------------
+       call WRITE_PARALLEL('Replaying increment of '//trim(o3name))
+    
+       !call MAPL_Get(MAPL, LONS=LONS, LATS=LATS, ORBIT=ORBIT, RC=STATUS )
+       call MAPL_Get(MAPL, ORBIT=ORBIT, RC=STATUS )
+       VERIFY_(STATUS)
+
+       if(.not.associated(LATS)) ALLOCATE(LATS(grid%is:grid%ie, grid%js:grid%je),stat=status)
+       VERIFY_(STATUS)
+    call SSI_CopyFineToCoarse(internal, LATS, 'LATS', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
+
+       if(.not.associated(LONS)) ALLOCATE(LONS(grid%is:grid%ie, grid%js:grid%je),stat=status)
+       VERIFY_(STATUS)
+    call SSI_CopyFineToCoarse(internal, LONS, 'LONS', STATE%f2c_SSI_arr_map, rc=status)
+    VERIFY_(STATUS)
+
+       allocate( ZTH( size(LONS,1),size(LONS,2) ) )
+       allocate( SLR( size(LONS,1),size(LONS,2) ) )
+
+       call MAPL_SunGetInsolation( LONS,LATS,ORBIT,ZTH,SLR, CLOCK=CLOCK,RC=STATUS  )
+       VERIFY_(STATUS)
+
+       pl = ( vars%pe(:,:,2:) + vars%pe(:,:,:km) ) * 0.5
+
+       do L=1,km
+          where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
+                dqox(:,:,L) = cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6
+       enddo
+   
+       deallocate( ZTH, SLR )
+       deallocate(cubeTEMP3D)
+    endif
+
+! QV
+    if( trim(qname).ne.'NULL' ) then
+       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(qname),TEMP3D, RC=STATUS)
+       VERIFY_(STATUS)
+       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
+       call l2c%regrid(TEMP3D, cubeTEMP3D, RC=STATUS )
+       VERIFY_(STATUS)
+       call WRITE_PARALLEL('Replaying increment of '//trim(qname))
+       dqqv = cubeTEMP3D
+       deallocate(cubeTEMP3D)
+    endif
+
+! PT
+    if( trim(tname).ne.'NULL' ) then
+       if(trim(tvar).ne.'TV') then
+          call WRITE_PARALLEL('Error: Cannot Replay TVAR '//trim(tvar))
+          STATUS=99
+          VERIFY_(STATUS)
+       endif
+       if(trim(tname).ne.'tv') then
+          call WRITE_PARALLEL('Error: Cannot Replay TNAME '//trim(tname))
+          STATUS=99
+          VERIFY_(STATUS)
+       endif
+       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(tname),TEMP3D, RC=STATUS)
+       VERIFY_(STATUS)
+       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
+       call l2c%regrid(TEMP3D, cubeTEMP3D, RC=STATUS )
+       VERIFY_(STATUS)
+       call WRITE_PARALLEL('Replaying increment of '//trim(tname))
+       ! have an incremental change to virtual temperature; 
+       ! want an incremental change to dry potential temperature
+       ! calculate first incremental change to t-dry (save in dth for now)
+       if( qqq%is_r4 ) then
+           dth = (cubeTEMP3D - eps*vars%pt*vars%pkz*dqqv)/(1.0+eps*qqq%content_r4)
+       else
+           dth = (cubeTEMP3D - eps*vars%pt*vars%pkz*dqqv)/(1.0+eps*qqq%content   )
+       endif
+       ! finally calculate increment to dry theta
+       dth = (dth - vars%pt*dpkz)/vars%pkz
+       deallocate(cubeTEMP3D)
+    endif
+
+! Only at the end, apply incremental correction to pressure,
+! potential temperature and water vapor
+! ----------------------------------------------------------
+  vars%u   = vars%u   + sclinc * du(grid%is:grid%ie,grid%js:grid%je,1:km)
+  vars%v   = vars%v   + sclinc * dv(grid%is:grid%ie,grid%js:grid%je,1:km)
+      pkxy =     pkxy + sclinc * dpkxy
+  vars%pkz = vars%pkz + sclinc * dpkz 
+  vars%pe  = vars%pe  + sclinc * dpe
+  vars%pt  = vars%pt  + sclinc * dth
+  if( qqq%is_r4 ) then  ! protection for negative qv is slightly inconsistent w/ update of temperature
+      qqq%content_r4 = max(0.0_r4,qqq%content_r4 + sclinc*dqqv)
+  else
+      qqq%content    = max(0.0_r8,qqq%content    + sclinc*dqqv)
+  endif
+  if( ooo%is_r4 ) then  ! brute-force protection against non-zero values
+      ooo%content_r4 = max(0.0_r4,ooo%content_r4 + sclinc*dqox)
+  else
+      ooo%content    = max(0.0_r8,ooo%content    + sclinc*dqox)
+  end if
+
+! clean up
+    deallocate( du,dv   )
+    deallocate( dth     )
+    deallocate( dqox    )
+    deallocate( dqqv    )
+    deallocate( dpe     )
+    deallocate( dpkz    )
+    deallocate( dpkxy   )
+
+    call WRITE_PARALLEL('Incremental replay complete')
+end subroutine incremental_
+
+subroutine state_remap_
+
+    real(kind=4), pointer :: XTMP2d (:,:) =>NULL()
+    real(kind=4), pointer :: XTMP3d(:,:,:)=>NULL()
+    real(kind=4), pointer :: YTMP3d(:,:,:)=>NULL()
+    real(r8), allocatable :: ana_thv (:,:,:)
+    real(r8), allocatable :: ana_phis  (:,:)
+    real(r8), allocatable :: ana_qq    (:,:,:,:)
+    real(r8), allocatable :: ana_u     (:,:,:)
+    real(r8), allocatable :: ana_v     (:,:,:)
+    real(r4), allocatable :: aux3d     (:,:,:)
 !
-!   logical :: lring
-!   integer :: REPLAY_REF_DATE, REPLAY_REF_TIME, REPLAY_REF_TGAP
-!   integer :: REF_TIME(6), REF_TGAP(6)
-!   type (ESMF_TimeInterval)  :: RefTGap
+    character(len=ESMF_MAXSTR) :: NAME
+    real(r4), pointer :: ptr3dr4   (:,:,:)
+    real(r8), pointer :: ptr3dr8   (:,:,:)
+    integer :: iwind,icnt,nq3d,rank
+    integer :: iib,iie,jjb,jje
+    logical :: do_remap,remap_all_tracers
+
+    do_remap = (cremap=="yes" .or. cremap=="YES")
+    if (.not. do_remap) return
+
+    remap_all_tracers = (tremap=="yes" .or. tremap=="YES")
+    nq3d=2 ! at a minimum it will remap QV and OX
+    if(do_remap.and.remap_all_tracers) then
+       nq3d=0
+       do N=1,NQ
+          call ESMF_FieldBundleGet(BUNDLE, N, Field, RC=STATUS )
+          call ESMF_FieldGet(Field, dimCount = rank, RC=STATUS )
+          if (rank==2) cycle
+          if (rank==3) nq3d=nq3d+1
+       enddo
+       write(STRING,'(A,I5,A)') "Found  ", nq3d, " 3d-tracers to remap"
+       call WRITE_PARALLEL( trim(STRING)   )
+    endif
+    if (nq3d<2) then
+       call WRITE_PARALLEL('state_remap: invalid number of tracers')
+       status=999
+       VERIFY_(STATUS)
+    endif
+
+    iib = lbound(vars%pe,1)
+    iie = ubound(vars%pe,1)
+    jjb = lbound(vars%pe,2)
+    jje = ubound(vars%pe,2)
+
+    allocate( ana_thv(iib:iie,jjb:jje,km  ) )
+    allocate( ana_qq (iib:iie,jjb:jje,km  ,nq3d) )
+    allocate(ana_phis(size(vars%pe,1),size(vars%pe,2)))
+
+    if( qqq%is_r4 ) then
+        ana_thv = vars%pt*(1.0+eps*qqq%content_r4(:,:,:))
+    else
+        ana_thv = vars%pt*(1.0+eps*qqq%content   (:,:,:))
+    endif
+
+    call WRITE_PARALLEL('Replay start remapping')
 !
-!   call MAPL_GetResource(MAPL, ReplayType, 'REPLAY_TYPE:', default="FULL", rc=status )
-!!  if (trim(ReplayType) == "FULL") return
+    call ESMFL_BundleGetPointertoData(ANA_Bundle,'phis',XTMP2D, RC=STATUS)
+    VERIFY_(STATUS)
+    allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
+    allocate(     aux3D(size(XTMP2D ,1),size(XTMP2D ,2),1))
+    aux3d(:,:,1)=XTMP2D ! this is a trick since the 2d interface to the transform has not worked for me (RT)
+    call l2c%regrid(aux3D, cubeTEMP3D, RC=STATUS )
+    VERIFY_(STATUS)
+    ana_phis=cubeTEMP3D(:,:,1)
+    deallocate(     aux3D)
+    deallocate(cubeTEMP3D)
 !
-!   CALL MAPL_GetResource( MAPL, REPLAY_REF_DATE, label = 'REPLAY_REF_DATE:', Default=-1, rc=status )
-!   CALL MAPL_GetResource( MAPL, REPLAY_REF_TIME, label = 'REPLAY_REF_TIME:', Default=-1, rc=status )
-!   CALL MAPL_GetResource( MAPL, REPLAY_REF_TGAP, label = 'REPLAY_REF_TGAP:', Default=-1, rc=status )
-!
-!   if(REPLAY_REF_DATE==-1.or.REPLAY_REF_TIME==-1) return
-!
-!   REF_TIME(1) =     REPLAY_REF_DATE/10000
-!   REF_TIME(2) = mod(REPLAY_REF_DATE,10000)/100
-!   REF_TIME(3) = mod(REPLAY_REF_DATE,100)
-!   REF_TIME(4) =     REPLAY_REF_TIME/10000
-!   REF_TIME(5) = mod(REPLAY_REF_TIME,10000)/100
-!   REF_TIME(6) = mod(REPLAY_REF_TIME,100)
-!
-!! set replay time
-!! ---------------
-!   call ESMF_TimeSet(  RefTime, YY =  REF_TIME(1), &
-!                                MM =  REF_TIME(2), &
-!                                DD =  REF_TIME(3), &
-!                                H  =  REF_TIME(4), &
-!                                M  =  REF_TIME(5), &
-!                                S  =  REF_TIME(6), rc=status ); VERIFY_(STATUS)
-!  if (REPLAY_REF_TGAP>0) then
-!      REF_TGAP    = 0
-!      REF_TGAP(4) =     REPLAY_REF_TGAP/10000
-!      REF_TGAP(5) = mod(REPLAY_REF_TGAP,10000)/100
-!      REF_TGAP(6) = mod(REPLAY_REF_TGAP,100)
-!      call ESMF_TimeIntervalSet(  RefTGap, YY = REF_TGAP(1), &
-!                                           MM = REF_TGAP(2), &
-!                                            D = REF_TGAP(3), &
-!                                            H = REF_TGAP(4), &
-!                                            M = REF_TGAP(5), &
-!                                            S = REF_TGAP(6), &
-!                                    startTime = currentTime, &
-!                                                rc = STATUS  ); VERIFY_(STATUS)
-!
-!      RefTime = RefTime - RefTGap 
-!  endif
-!
-!! check if it's time to replay
-!! ----------------------------
-!  if(RefTime==currentTime) then
-!     lring=.true.
-!  else
-!     lring=.false.
-!  endif
-!
-!! In this case, increment RefTime to proper time
-!! ----------------------------------------------
-!  if (REPLAY_REF_TGAP>0) then
-!      RefTime = currentTime + RefTGap 
-!  endif
-!
-!end subroutine check_replay_time_
-!
-!subroutine dump_n_splash_
-!
-!    real(kind=4), pointer :: XTMP2d (:,:) =>NULL()
-!    real(kind=4), pointer :: XTMP3d(:,:,:)=>NULL()
-!    real(kind=4), pointer :: YTMP3d(:,:,:)=>NULL()
-!    real(r8), allocatable :: ana_thv (:,:,:)
-!    real(r8), allocatable :: ana_phis  (:,:)
-!    real(r8), allocatable :: ana_pkxy  (:,:,:)
-!    real(r8), allocatable :: ana_pkz   (:,:,:)
-!    real(r8), allocatable :: ana_dp    (:,:,:)
-!    real(r8), allocatable :: ana_pe    (:,:,:)
-!    real(r8), allocatable :: ana_qq    (:,:,:,:)
-!    real(r8), allocatable :: ana_pt    (:,:,:)
-!    real(r8), allocatable :: ana_u     (:,:,:)
-!    real(r8), allocatable :: ana_v     (:,:,:)
-!    real(r4), allocatable :: aux3d     (:,:,:)
-!    real(r4), allocatable :: UAtmpR4   (:,:,:)
-!    real(r4), allocatable :: VAtmpR4   (:,:,:)
-!!
-!    character(len=ESMF_MAXSTR) :: NAME
-!    real(r4), pointer :: ptr3dr4   (:,:,:)
-!    real(r8), pointer :: ptr3dr8   (:,:,:)
-!    integer :: iwind,rank,icnt
-!    integer :: iib,iie,jjb,jje,nq3d
-!    integer, parameter :: iapproach=2 ! handle pressure more carefully
-!    logical :: do_remap, remap_all_tracers
-!
-!    do_remap = (cremap=="yes" .or. cremap=="YES")
-!    remap_all_tracers = (tremap=="yes" .or. tremap=="YES")
-!    nq3d=2 ! this routine only updates QV and OX
-!    iib = lbound(vars%pe,1)
-!    iie = ubound(vars%pe,1)
-!    jjb = lbound(vars%pe,2)
-!    jje = ubound(vars%pe,2)
-!    allocate(   ana_thv (iib:iie,jjb:jje,km  ) )
-!    allocate(   ana_pkxy(iib:iie,jjb:jje,km+1) )
-!    allocate(   ana_pkz (iib:iie,jjb:jje,km  ) )
-!    allocate(    ana_dp (iib:iie,jjb:jje,km  ) )
-!    allocate(    ana_pe (iib:iie,jjb:jje,km+1) )
-!    allocate(    ana_qq (iib:iie,jjb:jje,km  ,nq3d) )
-!    allocate(    ana_pt (iib:iie,jjb:jje,km  ) )
-!    allocate(     ana_u (grid%is:grid%ie  ,grid%js:grid%je+1,km) )
-!    allocate(     ana_v (grid%is:grid%ie+1,grid%js:grid%je  ,km) )
-!! U
-!    iwind=0
-!    if( trim(uname).ne.'NULL' ) then
-!      call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(uname),XTMP3d, RC=STATUS)
-!      VERIFY_(STATUS)
-!      iwind=iwind+1
-!    endif
-!! V
-!    if( trim(vname).ne.'NULL' ) then
-!       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(vname),YTMP3D, RC=STATUS)
-!       VERIFY_(STATUS)
-!       iwind=iwind+1
-!    endif
-!
-!! calculate d-grid winds
-!    if(iwind==0) then
-!       ana_u = vars%u(grid%is:grid%ie,grid%js:grid%je,1:km)
-!       ana_v = vars%v(grid%is:grid%ie,grid%js:grid%je,1:km)
-!    else if(iwind==1) then
-!      status=1
-!      call WRITE_PARALLEL('cannot handle single wind component')
-!      VERIFY_(STATUS)
-!    else if (iwind==2) then
-!#ifdef INC_WINDS
-!       if (iapproach==1) then
-!#endif /* INC_WINDS */
-!          allocate(cubeTEMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
-!          allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
-!#ifdef SCALAR_WINDS
-!          call WRITE_PARALLEL('Replaying winds as scalars')
-!          call l2c%regrid(XTMP3d, cubeTEMP3D, RC=STATUS )
-!          VERIFY_(STATUS)
-!          call l2c%regrid(YTMP3d, cubeVTMP3D, RC=STATUS )
-!          VERIFY_(STATUS)
-!#else
-!          call WRITE_PARALLEL('Replaying winds')
-!          call l2c%regrid(XTMP3d, YTMP3d, cubeTEMP3d, cubeVTMP3d, rc=status)
-!#endif /* SCALAR_WINDS */
-!          allocate( UAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-!          allocate( VAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-!          UAtmp = cubetemp3d ! A-grid winds on cube
-!          VAtmp = cubevtmp3d ! A-grid winds on cube
-!          deallocate(cubeTEMP3D)
-!          deallocate(cubeVTMP3D)
-!          allocate( UDtmp(grid%is:grid%ie  ,grid%js:grid%je+1,km) )
-!          allocate( VDtmp(grid%is:grid%ie+1,grid%js:grid%je  ,km) )
-!          call Agrid_To_Native( UAtmp, VAtmp, UDtmp, VDtmp ) ! Calculate D-grid winds from rotated A-grid winds
-!          ana_u = UDtmp(grid%is:grid%ie,grid%js:grid%je,1:km)
-!          ana_v = VDtmp(grid%is:grid%ie,grid%js:grid%je,1:km)
-!          deallocate(udtmp,vdtmp)
-!          deallocate(uatmp,vatmp)
-!#ifdef INC_WINDS
-!      else ! approach 2: operate on increments
-!          allocate(cubeTEMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
-!          allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
-!          allocate( UAtmpR4(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-!          allocate( VAtmpR4(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-!          ! get background A-grid winds 
-!          call getAgridWinds (vars%u,vars%v,ana_u,ana_v,rotate=.true.)
-!          ! transform background A-grid winds to lat-lon
-!          call regridder_manager%make_regridder(ESMFGRID, ANAGrid, REGRID_METHOD_BILINEAR, RC=STATUS)
-!          VERIFY_(STATUS)
-!          cubeTEMP3d = ana_u(grid%is:grid%ie,grid%js:grid%je,1:km) ! copy to satisfy interface below
-!          cubeVTMP3d = ana_v(grid%is:grid%ie,grid%js:grid%je,1:km) ! copy to satisfy interface below
-!          call c2l%regrid(cubeTEMP3d, cubeVTMP3d, UAtmpR4,    VAtmpR4, RC=STATUS)
-!          VERIFY_(STATUS)
-!          ! calculate unrotated analysis increments of lat-lon U/V-A-grid winds
-!          UAtmpR4 = XTMP3d-UAtmpR4
-!          UAtmpR4 = VTMP3d-VAtmpR4
-!          ! convert the lat-lon A-grid wind increment back to the cubed
-!          call WRITE_PARALLEL('Replaying winds')
-!          call l2c%regrid(UAtmpR4,    VAtmpR4, cubeTEMP3d, cubeVTMP3d, RC=STATUS)
-!          ! convert cubed wind increment to D-grid
-!          allocate( UDtmp(grid%is:grid%ie  ,grid%js:grid%je+1,km) )
-!          allocate( VDtmp(grid%is:grid%ie+1,grid%js:grid%je  ,km) )
-!          deallocate(ana_u,ana_v)
-!          allocate( ana_u(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-!          allocate( ana_v(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-!          ana_u = cubeTEMP3d ! need this to satisfy interface below
-!          ana_v = cubeVTMP3d ! need this to satisfy interface below
-!          call Agrid_To_Native( ana_u, ana_v, UDtmp, VDtmp ) ! Calculate D-grid winds from rotated A-grid winds
-!          ! update winds: rotate, cubed, D-grid analyzed winds
-!          deallocate(ana_u,ana_v)
-!          allocate( ana_u(grid%is:grid%ie  ,grid%js:grid%je+1,km) )
-!          allocate( ana_v(grid%is:grid%ie+1,grid%js:grid%je  ,km) )
-!          ana_u = vars%u + UDtmp
-!          ana_v = vars%v + VDtmp
-!          ! clean up
-!          deallocate(VDtmp)
-!          deallocate(UDtmp)
-!          deallocate(UAtmpR4)
-!          deallocate(VAtmpR4)
-!          deallocate(cubeVTMP3D)
-!          deallocate(cubeTEMP3D)
-!      endif
-!#endif /* INC_WINDS */
-!    endif
-!
-!! PE or PS
-!    if( trim(dpname).ne.'NULL' ) then
-!       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(dpname),XTMP3d, RC=STATUS)
-!       VERIFY_(STATUS)
-!       call WRITE_PARALLEL('Replaying '//trim(dpname))
-!       if ( iapproach == 1 ) then ! convert lat-lon delp to cubed and proceed
-!          allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-!          call l2c%regrid(XTMP3d, cubeTEMP3D, RC=STATUS )
-!          VERIFY_(STATUS)
-!          ana_dp=cubeTEMP3D
-!          deallocate(cubeTEMP3D)
-!       else ! just because pressure is such delicate beast: convert cubed delp
-!            ! to lat-lon, calculate an increment in lat-lon, convert increment
-!            ! on delp to cubed, and create cubed version of analyzed delp
-!            allocate(aux3d (size(XTMP3d,1),size(XTMP3d,2),km))
-!            allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-!            ! delp on the cube
-!            cubeTEMP3D(:,:,:) = vars%pe(:,:,2:)-vars%pe(:,:,:km)
-!            ! transform cubed delp
-!            c2l => regridder_manager%make_regridder(ESMFGRID, ANAGrid, REGRID_METHOD_BILINEAR, RC=STATUS )
-!            VERIFY_(STATUS)
-!            call c2l%regrid(cubeTEMP3D, aux3d, RC=STATUS )
-!            VERIFY_(STATUS)
-!            ! calculate delp increment on lat-lon and transform it to cubed
-!            aux3d = XTMP3d - aux3d
-!            call l2c%regrid(aux3d, cubeTEMP3D, RC=STATUS )
-!            VERIFY_(STATUS)
-!            ! delp analysis on the cube (careful since want to preserve
-!            ! precision in delp to the best extent possible)
-!            ana_dp = vars%pe(:,:,2:)-vars%pe(:,:,:km) + cubeTEMP3D
-!            deallocate(aux3d)
-!            deallocate(cubeTEMP3D)
-!       endif
-!       ana_pe(:,:,1) = grid%ak(1)
-!       do k=2,km+1
-!          ana_pe(:,:,k) = ana_pe(:,:,k-1) + ana_dp(:,:,k-1)
-!       enddo
-!       pkxy = ana_pe**kappa
-!       do k=1,km
-!          ana_pkz(:,:,k) = ( pkxy(:,:,k+1)-pkxy(:,:,k) ) &
-!                         / ( kappa*( log(ana_pe(:,:,k+1))-log(ana_pe(:,:,k))) )
-!       enddo
-!    else
-!       if( trim(psname).ne.'NULL' ) then
-!          call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(psname),XTMP2D, RC=STATUS)
-!          VERIFY_(STATUS)
-!          call WRITE_PARALLEL('Replaying '//trim(psname))
-!          allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
-!          allocate(     aux3D(size(XTMP2d ,1),size(XTMP2d ,2),1))
-!          if ( iapproach == 1 ) then ! convert lat-lon delp to cubed and proceed
-!             aux3d(:,:,1)=XTMP2D ! rank-2 interface to HorzT does not work
-!             call l2c%regrid(aux3d, cubeTEMP3D, RC=STATUS )
-!             VERIFY_(STATUS)
-!          else ! operate on increment to ps
-!             ! transform cubed delp
-!             cubeTEMP3D(:,:,1) = vars%pe(:,:,km+1) ! cubed ps
-!             c2l => regridder_manager%make_regridder(ESMFGRID, ANAGrid, REGRID_METHOD_BILINEAR, RC=STATUS )
-!             VERIFY_(STATUS)
-!             call c2l%regrid(cubeTEMP3D, aux3d, RC=STATUS )
-!             VERIFY_(STATUS)
-!             ! increment to ps on the lat-lon
-!             aux3d(:,:,1) = XTMP2D - aux3d(:,:,1)
-!             ! lat-lon increment to ps converted to the cube
-!             call l2c%regrid(aux3d, cubeTEMP3D, RC=STATUS )
-!             ! ps update on the cube
-!             cubeTEMP3d(:,:,1) = vars%pe(:,:,km+1) + cubeTEMP3D(:,:,1)
-!          endif
-!          do k=1,km+1
-!             ana_pe(:,:,k) = grid%ak(k) + cubeTEMP3d(:,:,1)*grid%bk(k)
-!          enddo
-!          deallocate(aux3D)
-!          deallocate(cubeTEMP3D)
-!          do k=2,km+1
-!             ana_dp(:,:,k-1) = ana_pe(:,:,k) - ana_pe(:,:,k-1)
-!          enddo
-!          pkxy = ana_pe**kappa
-!          do k=1,km
-!             ana_pkz(:,:,k) = ( pkxy(:,:,k+1)-pkxy(:,:,k) ) &
-!                            / ( kappa*( log(ana_pe(:,:,k+1))-log(ana_pe(:,:,k))) )
-!          enddo
-!       else
-!          ana_pe  = vars%pe
-!          ana_pkz = vars%pkz
-!       endif
-!    endif
-!
-!! O3
-!    if( trim(o3name).ne.'NULL' ) then
-!       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(o3name),XTMP3d, RC=STATUS)
-!       VERIFY_(STATUS)
-!       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-!       call l2c%regrid(XTMP3d, cubeTEMP3D, RC=STATUS )
-!       VERIFY_(STATUS)
-!
-!!      Ozone needs to be adjusted to OX
-!!      --------------------------------
-!       call WRITE_PARALLEL('Replaying '//trim(o3name))
-!    
-!       call MAPL_Get(MAPL, LONS=LONS_fine, LATS=LATS_fine, ORBIT=ORBIT, RC=STATUS )
-!       VERIFY_(STATUS)
-!       if(.not. associated(LONS)) allocate(LONS(grid%is:grid%ie,grid%js:grid%je), stat=status)
-!       VERIFY_(STATUS)
-!       if(.not. associated(LATS)) allocate(LATS(grid%is:grid%ie,grid%js:grid%je), stat=status)
-!       VERIFY_(STATUS)
-!       LONS = LONS_fine
-!       LATS = LATS_fine
-!       !call MAPL_CopyFineToCoarse(MAPL, LONS, 'LONS', rc=status)
-!       !VERIFY_(STATUS)
-!       !call MAPL_CopyFineToCoarse(MAPL, LATS, 'LATS', rc=status)
-!       !VERIFY_(STATUS)
-!       !call MAPL_Get(MAPL, ORBIT=ORBIT, RC=STATUS )
-!       !VERIFY_(STATUS)
-!
-!       allocate( ZTH( size(LONS,1),size(LONS,2) ) )
-!       allocate( SLR( size(LONS,1),size(LONS,2) ) )
-!
-!       call MAPL_SunGetInsolation( LONS,LATS,ORBIT,ZTH,SLR, CLOCK=CLOCK,RC=STATUS  )
-!       VERIFY_(STATUS)
-!
-!       pl = ( vars%pe(:,:,2:) + vars%pe(:,:,:km) ) * 0.5
-!
-!       do L=1,km
-!          if( ooo%is_r4 ) then 
-!             where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
-!                  ooo%content_r4(:,:,L) = max(0.,cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6)
-!          else
-!             where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
-!                  ooo%content   (:,:,L) = max(0.,cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6)
-!          endif
-!       enddo
-!
-!       deallocate( ZTH, SLR )
-!       deallocate(cubeTEMP3D)
-!    endif
-!    if( ooo%is_r4 ) then ! ana_qq(2) used as aux var to hold ox
-!        ana_qq(:,:,:,2) = ooo%content_r4
-!    else
-!        ana_qq(:,:,:,2) = ooo%content
-!    endif
-!
-!! QV
-!    if( trim(qname).ne.'NULL' ) then
-!       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(qname),XTMP3d, RC=STATUS)
-!       VERIFY_(STATUS)
-!       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-!       call l2c%regrid(XTMP3d, cubeTEMP3D, RC=STATUS )
-!       VERIFY_(STATUS)
-!       call WRITE_PARALLEL('Replaying '//trim(qname))
-!       if( qqq%is_r4 ) then
-!           qqq%content_r4 = max(0.,cubeTEMP3D)
-!       else
-!           qqq%content    = max(0.,cubeTEMP3D)
-!       endif
-!       deallocate(cubeTEMP3D)
-!    endif
-!    if( qqq%is_r4 ) then ! ana_qq(1) used as aux var to calculate pt/pthv
-!        ana_qq(:,:,:,1) = qqq%content_r4
-!    else
-!        ana_qq(:,:,:,1) = qqq%content
-!    endif
-!
-!! PT
-!    if( trim(tname).ne.'NULL' ) then
-!       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(tname),XTMP3d, RC=STATUS)
-!       VERIFY_(STATUS)
-!       allocate(cubeTEMP3D(size(ana_thv,1),size(ana_thv,2),km))
-!       call l2c%regrid(XTMP3d, cubeTEMP3D, RC=STATUS )
-!       VERIFY_(STATUS)
-!       call WRITE_PARALLEL('Replaying '//trim(tname)// '; treated as '//trim(tvar))
-!       if( trim(tvar).eq.'THETAV' ) ana_thv = cubeTEMP3D
-!       if( trim(tvar).eq.'TV'     ) ana_thv = cubeTEMP3D/ana_pkz
-!       if( trim(tvar).eq.'THETA' .or. &
-!           trim(tvar).eq.'T'      ) then
-!           if( trim(tvar).eq.'THETA' ) ana_thv = cubeTEMP3D*(1.0+eps*ana_qq(:,:,:,1))
-!           if( trim(tvar).eq.'T'     ) ana_thv = cubeTEMP3D*(1.0+eps*ana_qq(:,:,:,1))/ana_pkz
-!       endif
-!       deallocate(cubeTEMP3D)
-!       ana_pt  = ana_thv/(1.0+eps*ana_qq(:,:,:,1))
-!    else
-!       ana_thv = vars%pt*(1.0+eps*ana_qq(:,:,:,1))
-!       ana_pt  = vars%pt
-!    endif
-!
-!!   Refresh vars ("update" them)
-!!   -------------
-!    vars%u   = ana_u(grid%is:grid%ie,grid%js:grid%je,:)
-!    vars%v   = ana_v(grid%is:grid%ie,grid%js:grid%je,:)
-!    vars%pe  = ana_pe
-!    vars%pkz = ana_pkz
-!    vars%pt  = ana_pt
-!
-!! clean up
-!    deallocate( ana_v       )
-!    deallocate( ana_u       )
-!    deallocate( ana_pt      )
-!    deallocate( ana_qq      )
-!    deallocate( ana_dp      )
-!    deallocate( ana_pe      )
-!    deallocate( ana_pkz     )
-!    deallocate( ana_pkxy    )
-!    deallocate( ana_thv     )
-!
-!    call WRITE_PARALLEL('Dump_n_Splash Replay Done')
-!end subroutine dump_n_splash_
-!
-!subroutine incremental_
-!    real(r8), allocatable :: dpkxy  (:,:,:)
-!    real(r8), allocatable :: dpkz   (:,:,:)
-!    real(r8), allocatable :: dpe    (:,:,:)
-!    real(r8), allocatable :: dqqv   (:,:,:)
-!    real(r8), allocatable :: dqox   (:,:,:)
-!    real(r8), allocatable :: dth    (:,:,:)
-!    real(r8), allocatable :: du     (:,:,:)
-!    real(r8), allocatable :: dv     (:,:,:)
-!    real(r4), allocatable :: aux3d  (:,:,:)
-!    integer :: iib,iie,jjb,jje
-!    integer :: iwind
-!    logical :: allhere,iamr4
-!
-!    iib = lbound(vars%pe,1)
-!    iie = ubound(vars%pe,1)
-!    jjb = lbound(vars%pe,2)
-!    jje = ubound(vars%pe,2)
-!    allocate( dpkxy(iib:iie,jjb:jje,km+1) )
-!    allocate( dpkz (iib:iie,jjb:jje,km  ) )
-!    allocate(  dpe (iib:iie,jjb:jje,km+1) )
-!    allocate( dqqv (iib:iie,jjb:jje,km  ) )
-!    allocate( dqox (iib:iie,jjb:jje,km  ) )
-!    allocate(  dth (iib:iie,jjb:jje,km  ) )
-!    allocate(   du (grid%is:grid%ie  ,grid%js:grid%je+1,km) )
-!    allocate(   dv (grid%is:grid%ie+1,grid%js:grid%je  ,km) )
-!    dpkxy=0.0d0
-!    dpkz =0.0d0
-!    dpe  =0.0d0
-!    dqqv =0.0d0
-!    dqox =0.0d0
-!    dth  =0.0d0
-!    du   =0.0d0
-!    dv   =0.0d0
-!
-!    allhere = trim(uname ).ne.'NULL'.and.trim(vname ).ne.'NULL'.and. &
-!              trim(o3name).ne.'NULL'.and. &
-!              trim(tname ).ne.'NULL'.and.trim(qname ).ne.'NULL'
-!    if(.not.allhere) then
-!       call WRITE_PARALLEL('Not all varibles needed for replay are available')
-!       status = 999
-!       VERIFY_(status)
-!    endif
-!    call WRITE_PARALLEL('Starting incremental replay')
-!
-!! U
-!    iwind=0
-!    if( trim(uname).ne.'NULL' ) then
-!       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(uname),TEMP3D, RC=STATUS)
-!       VERIFY_(STATUS)
-!       iwind=iwind+1
-!    endif
-!! V
-!    if( trim(vname).ne.'NULL' ) then
-!       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(vname),VTMP3D, RC=STATUS)
-!       VERIFY_(STATUS)
-!       iwind=iwind+1
-!    endif
-!
-!! calculate d-grid winds
-!    if(iwind==1) then
-!      status=1
-!      print *, 'cannot handle single wind component'
-!      VERIFY_(STATUS)
-!    else if (iwind==2) then
-!       allocate(cubeTEMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
-!       allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
-!#ifdef SCALAR_WINDS
-!       call WRITE_PARALLEL('Replaying increment of winds as scalars')
-!       call l2c%regrid(TEMP3D, cubeTEMP3D, RC=STATUS )
-!       VERIFY_(STATUS)
-!       call l2c%regrid(VTMP3D, cubeVTMP3D, RC=STATUS )
-!       VERIFY_(STATUS)
-!#else
-!       call WRITE_PARALLEL('Replaying increment of winds')
-!       call l2c%regrid(TEMP3d,     VTMP3d, cubeTEMP3d, cubeVTMP3d, RC=STATUS)
-!#endif /* SCALAR_WINDS */
-!       allocate( UAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-!       allocate( VAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-!       UAtmp = cubetemp3d ! A-grid winds on cube
-!       VAtmp = cubevtmp3d ! A-grid winds on cube
-!       call Agrid_To_Native( UAtmp, VAtmp, du, dv )       ! Calculate D-grid winds from rotated A-grid winds
-!       deallocate(uatmp,vatmp)
-!       deallocate(cubeTEMP3D)
-!       deallocate(cubeVTMP3D)
-!    endif
-!
-!! DELP
-!    if( trim(psname)=='NULL' .and. trim(dpname).ne.'NULL' ) then
-!       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(dpname),TEMP3D, RC=STATUS)
-!       VERIFY_(STATUS)
-!       call WRITE_PARALLEL('Replaying increment of '//trim(dpname))
-!       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-!       call l2c%regrid(TEMP3D, cubeTEMP3D, RC=STATUS )
-!       VERIFY_(STATUS)
-!       dpe(:,:,1) = 0.0
-!       do k=2,km+1
-!          dpe(:,:,k) = dpe(:,:,k-1) + cubeTEMP3D(:,:,k-1)
-!       enddo
-!       deallocate(cubeTEMP3D)
-!
-!        pkxy =            (vars%pe)** kappa
-!       dpkxy = kappa*(pkxy/vars%pe)*dpe
-!       do k=1,km
-!          dpkz(:,:,k) = (  (    dpkxy (:,:,k+1) -   dpkxy(:,:,k) )* &
-!                         log((vars%pe (:,:,k+1))/(vars%pe(:,:,k) )) &
-!                        -  (     pkxy (:,:,k+1) -    pkxy(:,:,k) )* &
-!                           (     dpe  (:,:,k+1) * vars%pe(:,:,k) &
-!                           -     dpe  (:,:,k)   * vars%pe(:,:,k+1) ) &
-!                            / (vars%pe(:,:,k+1)*vars%pe(:,:,k)) &
-!                         )  / (kappa*( log(vars%pe(:,:,k+1)/vars%pe(:,:,k)) )**2)
-!       enddo
-!    endif
-!
-!! PS
-!    if( trim(psname)/='NULL' .and. trim(dpname)=='NULL' ) then
-!       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(psname),TEMP2D, RC=STATUS)
-!       VERIFY_(STATUS)
-!       call WRITE_PARALLEL('Replaying increment of '//trim(psname))
-!       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
-!       allocate(     aux3D(size( TEMP2D,1),size( TEMP2D,2),1))
-!       aux3d(:,:,1) = TEMP2D ! same trick of putting in rank-3 array for transforms
-!       call l2c%regrid(aux3d, cubeTEMP3D, RC=STATUS )
-!       VERIFY_(STATUS)
-!       do k=2,km+1
-!          dpe(:,:,k-1) =  grid%ak(k) - grid%ak(k-1) + cubeTEMP3d(:,:,1)*(grid%bk(k)-grid%bk(k-1))
-!       enddo
-!       deallocate(     aux3d)
-!       deallocate(cubeTEMP3D)
-!
-!        pkxy =            (vars%pe)** kappa
-!       dpkxy = kappa*(pkxy/vars%pe)*dpe
-!       do k=1,km
-!          dpkz(:,:,k) = (  (    dpkxy (:,:,k+1) -   dpkxy(:,:,k) )* &
-!                         log((vars%pe (:,:,k+1))/(vars%pe(:,:,k) )) &
-!                        -  (     pkxy (:,:,k+1) -    pkxy(:,:,k) )* &
-!                           (     dpe  (:,:,k+1) * vars%pe(:,:,k) &
-!                           -     dpe  (:,:,k)   * vars%pe(:,:,k+1) ) &
-!                            / (vars%pe(:,:,k+1)*vars%pe(:,:,k)) &
-!                         )  / (kappa*( log(vars%pe(:,:,k+1)/vars%pe(:,:,k)) )**2)
-!       enddo
-!    endif
-!
-!! O3
-!    if( trim(o3name).ne.'NULL' ) then
-!       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(o3name),TEMP3D, RC=STATUS)
-!       VERIFY_(STATUS)
-!       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-!       call l2c%regrid(TEMP3D, cubeTEMP3D, RC=STATUS )
-!       VERIFY_(STATUS)
-!
-!!      Ozone needs to be adjusted to OX
-!!      --------------------------------
-!       call WRITE_PARALLEL('Replaying increment of '//trim(o3name))
-!    
-!       call MAPL_Get(MAPL, LONS=LONS_fine, LATS=LATS_fine, ORBIT=ORBIT, RC=STATUS )
-!       VERIFY_(STATUS)
-!       if(.not. associated(LONS)) allocate(LONS(grid%is:grid%ie,grid%js:grid%je), stat=status)
-!       VERIFY_(STATUS)
-!       if(.not. associated(LATS)) allocate(LATS(grid%is:grid%ie,grid%js:grid%je), stat=status)
-!       VERIFY_(STATUS)
-!       LONS = LONS_fine
-!       LATS = LATS_fine
-!
-!       allocate( ZTH( size(LONS,1),size(LONS,2) ) )
-!       allocate( SLR( size(LONS,1),size(LONS,2) ) )
-!
-!       call MAPL_SunGetInsolation( LONS,LATS,ORBIT,ZTH,SLR, CLOCK=CLOCK,RC=STATUS  )
-!       VERIFY_(STATUS)
-!
-!       pl = ( vars%pe(:,:,2:) + vars%pe(:,:,:km) ) * 0.5
-!
-!       do L=1,km
-!          where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
-!                dqox(:,:,L) = cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6
-!       enddo
-!   
-!       deallocate( ZTH, SLR )
-!       deallocate(cubeTEMP3D)
-!    endif
-!
-!! QV
-!    if( trim(qname).ne.'NULL' ) then
-!       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(qname),TEMP3D, RC=STATUS)
-!       VERIFY_(STATUS)
-!       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-!       call l2c%regrid(TEMP3D, cubeTEMP3D, RC=STATUS )
-!       VERIFY_(STATUS)
-!       call WRITE_PARALLEL('Replaying increment of '//trim(qname))
-!       dqqv = cubeTEMP3D
-!       deallocate(cubeTEMP3D)
-!    endif
-!
-!! PT
-!    if( trim(tname).ne.'NULL' ) then
-!       if(trim(tvar).ne.'TV') then
-!          call WRITE_PARALLEL('Error: Cannot Replay TVAR '//trim(tvar))
-!          STATUS=99
-!          VERIFY_(STATUS)
-!       endif
-!       if(trim(tname).ne.'tv') then
-!          call WRITE_PARALLEL('Error: Cannot Replay TNAME '//trim(tname))
-!          STATUS=99
-!          VERIFY_(STATUS)
-!       endif
-!       call ESMFL_BundleGetPointertoData(ANA_Bundle,trim(tname),TEMP3D, RC=STATUS)
-!       VERIFY_(STATUS)
-!       allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-!       call l2c%regrid(TEMP3D, cubeTEMP3D, RC=STATUS )
-!       VERIFY_(STATUS)
-!       call WRITE_PARALLEL('Replaying increment of '//trim(tname))
-!       ! have an incremental change to virtual temperature; 
-!       ! want an incremental change to dry potential temperature
-!       ! calculate first incremental change to t-dry (save in dth for now)
-!       if( qqq%is_r4 ) then
-!           dth = (cubeTEMP3D - eps*vars%pt*vars%pkz*dqqv)/(1.0+eps*qqq%content_r4)
-!       else
-!           dth = (cubeTEMP3D - eps*vars%pt*vars%pkz*dqqv)/(1.0+eps*qqq%content   )
-!       endif
-!       ! finally calculate increment to dry theta
-!       dth = (dth - vars%pt*dpkz)/vars%pkz
-!       deallocate(cubeTEMP3D)
-!    endif
-!
-!! Only at the end, apply incremental correction to pressure,
-!! potential temperature and water vapor
-!! ----------------------------------------------------------
-!  vars%u   = vars%u   + sclinc * du(grid%is:grid%ie,grid%js:grid%je,1:km)
-!  vars%v   = vars%v   + sclinc * dv(grid%is:grid%ie,grid%js:grid%je,1:km)
-!      pkxy =     pkxy + sclinc * dpkxy
-!  vars%pkz = vars%pkz + sclinc * dpkz 
-!  vars%pe  = vars%pe  + sclinc * dpe
-!  vars%pt  = vars%pt  + sclinc * dth
-!  if( qqq%is_r4 ) then  ! protection for negative qv is slightly inconsistent w/ update of temperature
-!      qqq%content_r4 = max(0.0_r4,qqq%content_r4 + sclinc*dqqv)
-!  else
-!      qqq%content    = max(0.0_r8,qqq%content    + sclinc*dqqv)
-!  endif
-!  if( ooo%is_r4 ) then  ! brute-force protection against non-zero values
-!      ooo%content_r4 = max(0.0_r4,ooo%content_r4 + sclinc*dqox)
-!  else
-!      ooo%content    = max(0.0_r8,ooo%content    + sclinc*dqox)
-!  end if
-!
-!! clean up
-!    deallocate( du,dv   )
-!    deallocate( dth     )
-!    deallocate( dqox    )
-!    deallocate( dqqv    )
-!    deallocate( dpe     )
-!    deallocate( dpkz    )
-!    deallocate( dpkxy   )
-!
-!    call WRITE_PARALLEL('Incremental replay complete')
-!end subroutine incremental_
-!
-!subroutine state_remap_
-!
-!    real(kind=4), pointer :: XTMP2d (:,:) =>NULL()
-!    real(kind=4), pointer :: XTMP3d(:,:,:)=>NULL()
-!    real(kind=4), pointer :: YTMP3d(:,:,:)=>NULL()
-!    real(r8), allocatable :: ana_thv (:,:,:)
-!    real(r8), allocatable :: ana_phis  (:,:)
-!    real(r8), allocatable :: ana_qq    (:,:,:,:)
-!    real(r8), allocatable :: ana_u     (:,:,:)
-!    real(r8), allocatable :: ana_v     (:,:,:)
-!    real(r4), allocatable :: aux3d     (:,:,:)
-!!
-!    character(len=ESMF_MAXSTR) :: NAME
-!    real(r4), pointer :: ptr3dr4   (:,:,:)
-!    real(r8), pointer :: ptr3dr8   (:,:,:)
-!    integer :: iwind,icnt,nq3d,rank
-!    integer :: iib,iie,jjb,jje
-!    logical :: do_remap,remap_all_tracers
-!
-!    do_remap = (cremap=="yes" .or. cremap=="YES")
-!    if (.not. do_remap) return
-!
-!    remap_all_tracers = (tremap=="yes" .or. tremap=="YES")
-!    nq3d=2 ! at a minimum it will remap QV and OX
-!    if(do_remap.and.remap_all_tracers) then
-!       nq3d=0
-!       do N=1,NQ
-!          call ESMF_FieldBundleGet(BUNDLE, N, Field, RC=STATUS )
-!          call ESMF_FieldGet(Field, dimCount = rank, RC=STATUS )
-!          if (rank==2) cycle
-!          if (rank==3) nq3d=nq3d+1
-!       enddo
-!       write(STRING,'(A,I5,A)') "Found  ", nq3d, " 3d-tracers to remap"
-!       call WRITE_PARALLEL( trim(STRING)   )
-!    endif
-!    if (nq3d<2) then
-!       call WRITE_PARALLEL('state_remap: invalid number of tracers')
-!       status=999
-!       VERIFY_(STATUS)
-!    endif
-!
-!    iib = lbound(vars%pe,1)
-!    iie = ubound(vars%pe,1)
-!    jjb = lbound(vars%pe,2)
-!    jje = ubound(vars%pe,2)
-!
-!    allocate( ana_thv(iib:iie,jjb:jje,km  ) )
-!    allocate( ana_qq (iib:iie,jjb:jje,km  ,nq3d) )
-!    allocate(ana_phis(size(vars%pe,1),size(vars%pe,2)))
-!
-!    if( qqq%is_r4 ) then
-!        ana_thv = vars%pt*(1.0+eps*qqq%content_r4(:,:,:))
-!    else
-!        ana_thv = vars%pt*(1.0+eps*qqq%content   (:,:,:))
-!    endif
-!
-!    call WRITE_PARALLEL('Replay start remapping')
-!!
-!    call ESMFL_BundleGetPointertoData(ANA_Bundle,'phis',XTMP2D, RC=STATUS)
-!    VERIFY_(STATUS)
-!    allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
-!    allocate(     aux3D(size(XTMP2D ,1),size(XTMP2D ,2),1))
-!    aux3d(:,:,1)=XTMP2D ! this is a trick since the 2d interface to the transform has not worked for me (RT)
-!    call l2c%regrid(aux3D, cubeTEMP3D, RC=STATUS )
-!    VERIFY_(STATUS)
-!    ana_phis=cubeTEMP3D(:,:,1)
-!    deallocate(     aux3D)
-!    deallocate(cubeTEMP3D)
-!!
-!    if (remap_all_tracers) then
-!       icnt=0
-!       do N=1,NQ
-!          call ESMF_FieldBundleGet(BUNDLE, N, Field, RC=STATUS )
-!          call ESMF_FieldGet(Field, NAME=NAME, dimCount=rank, RC=STATUS )
-!          if (rank==2) cycle
-!          if (rank==3) then
-!             icnt=icnt+1
-!             if (icnt>nq3d) then
-!                 call WRITE_PARALLEL('state_remap: number of tracers exceeds known value')
-!                 status=999
-!                 VERIFY_(STATUS)
-!             endif
-!             call ESMFL_BundleGetPointerToData(BUNDLE, NAME, ptr3dr4, RC=STATUS )
-!             ana_qq(:,:,:,icnt) = ptr3dr4
-!          endif
-!       enddo
-!       if (icnt/=nq3d) then
-!          call WRITE_PARALLEL('state_remap: inconsitent number of tracers')
-!          status=999
-!          VERIFY_(STATUS)
-!       endif
-!    else
-!       if( qqq%is_r4 ) then
-!           ana_qq(:,:,:,1) = qqq%content_r4(:,:,:)
-!       else
-!           ana_qq(:,:,:,1) = qqq%content   (:,:,:)
-!       endif
-!       if( ooo%is_r4 ) then
-!           ana_qq(:,:,:,2) = ooo%content_r4(:,:,:)
-!       else
-!           ana_qq(:,:,:,2) = ooo%content   (:,:,:)
-!       endif
-!    endif ! remap_all_tracers
-!
-!    call dyn_topo_remap ( vars%pe, vars%u, vars%v, ana_thv, ana_qq, ana_phis, phisxy, &
-!                          grid%ak, grid%bk, size(ana_thv,1), size(ana_thv,2), km, nq3d )
-!
-!    if (remap_all_tracers) then
-!       icnt=0
-!       do N=1,NQ
-!          call ESMF_FieldBundleGet(BUNDLE, N, Field, RC=STATUS )
-!          call ESMF_FieldGet(Field, NAME=NAME, dimCount=rank, RC=STATUS )
-!          if (rank==2) cycle
-!          if (rank==3) then
-!             icnt=icnt+1
-!             call ESMFL_BundleGetPointerToData(BUNDLE, NAME, ptr3dr4, RC=STATUS )
-!             ptr3dr4 = ana_qq(:,:,:,icnt)
-!             if(trim(NAME)=="Q") then
-!                if( qqq%is_r4 ) then
-!                   qqq%content_r4(:,:,:) = ana_qq(:,:,:,icnt)
-!                else
-!                   qqq%content   (:,:,:) = ana_qq(:,:,:,icnt)
-!                endif
-!             endif
-!             if(trim(NAME)=="OX") then
-!                if( ooo%is_r4 ) then
-!                   ooo%content_r4(:,:,:) = ana_qq(:,:,:,icnt)
-!                else
-!                   ooo%content   (:,:,:) = ana_qq(:,:,:,icnt)
-!                endif
-!             endif
-!          endif
-!       enddo
-!    else
-!       if( qqq%is_r4 ) then
-!           qqq%content_r4(:,:,:) = ana_qq(:,:,:,1)
-!       else
-!           qqq%content   (:,:,:) = ana_qq(:,:,:,1)
-!       endif
-!       if( ooo%is_r4 ) then
-!           ooo%content_r4(:,:,:) = ana_qq(:,:,:,2)
-!       else
-!           ooo%content   (:,:,:) = ana_qq(:,:,:,2)
-!       endif
-!    endif ! remap_all_tracers
-!
-!    if( qqq%is_r4 ) then
-!       vars%pt=ana_thv(:,:,:)/(1.0+eps*qqq%content_r4(:,:,:))
-!    else
-!       vars%pt=ana_thv(:,:,:)/(1.0+eps*qqq%content   (:,:,:))
-!    endif
-!
-!    pkxy = vars%pe**kappa
-!    do k=1,km
-!       vars%pkz(:,:,k) = ( pkxy(:,:,k+1)-pkxy(:,:,k) ) &
-!                       / ( kappa*( log(vars%pe(:,:,k+1))-log(vars%pe(:,:,k)) ) )
-!    enddo
-!
-!    call WRITE_PARALLEL('Replay done remapping')
-!
-!    deallocate(ana_qq)
-!    deallocate(ana_thv)
-!    deallocate(ana_phis)
-!end subroutine state_remap_
+    if (remap_all_tracers) then
+       icnt=0
+       do N=1,NQ
+          call ESMF_FieldBundleGet(BUNDLE, N, Field, RC=STATUS )
+          call ESMF_FieldGet(Field, NAME=NAME, dimCount=rank, RC=STATUS )
+          if (rank==2) cycle
+          if (rank==3) then
+             icnt=icnt+1
+             if (icnt>nq3d) then
+                 call WRITE_PARALLEL('state_remap: number of tracers exceeds known value')
+                 status=999
+                 VERIFY_(STATUS)
+             endif
+             call ESMFL_BundleGetPointerToData(BUNDLE, NAME, ptr3dr4, RC=STATUS )
+             ana_qq(:,:,:,icnt) = ptr3dr4
+          endif
+       enddo
+       if (icnt/=nq3d) then
+          call WRITE_PARALLEL('state_remap: inconsitent number of tracers')
+          status=999
+          VERIFY_(STATUS)
+       endif
+    else
+       if( qqq%is_r4 ) then
+           ana_qq(:,:,:,1) = qqq%content_r4(:,:,:)
+       else
+           ana_qq(:,:,:,1) = qqq%content   (:,:,:)
+       endif
+       if( ooo%is_r4 ) then
+           ana_qq(:,:,:,2) = ooo%content_r4(:,:,:)
+       else
+           ana_qq(:,:,:,2) = ooo%content   (:,:,:)
+       endif
+    endif ! remap_all_tracers
+
+    call dyn_topo_remap ( vars%pe, vars%u, vars%v, ana_thv, ana_qq, ana_phis, phisxy, &
+                          grid%ak, grid%bk, size(ana_thv,1), size(ana_thv,2), km, nq3d )
+
+    if (remap_all_tracers) then
+       icnt=0
+       do N=1,NQ
+          call ESMF_FieldBundleGet(BUNDLE, N, Field, RC=STATUS )
+          call ESMF_FieldGet(Field, NAME=NAME, dimCount=rank, RC=STATUS )
+          if (rank==2) cycle
+          if (rank==3) then
+             icnt=icnt+1
+             call ESMFL_BundleGetPointerToData(BUNDLE, NAME, ptr3dr4, RC=STATUS )
+             ptr3dr4 = ana_qq(:,:,:,icnt)
+             if(trim(NAME)=="Q") then
+                if( qqq%is_r4 ) then
+                   qqq%content_r4(:,:,:) = ana_qq(:,:,:,icnt)
+                else
+                   qqq%content   (:,:,:) = ana_qq(:,:,:,icnt)
+                endif
+             endif
+             if(trim(NAME)=="OX") then
+                if( ooo%is_r4 ) then
+                   ooo%content_r4(:,:,:) = ana_qq(:,:,:,icnt)
+                else
+                   ooo%content   (:,:,:) = ana_qq(:,:,:,icnt)
+                endif
+             endif
+          endif
+       enddo
+    else
+       if( qqq%is_r4 ) then
+           qqq%content_r4(:,:,:) = ana_qq(:,:,:,1)
+       else
+           qqq%content   (:,:,:) = ana_qq(:,:,:,1)
+       endif
+       if( ooo%is_r4 ) then
+           ooo%content_r4(:,:,:) = ana_qq(:,:,:,2)
+       else
+           ooo%content   (:,:,:) = ana_qq(:,:,:,2)
+       endif
+    endif ! remap_all_tracers
+
+    if( qqq%is_r4 ) then
+       vars%pt=ana_thv(:,:,:)/(1.0+eps*qqq%content_r4(:,:,:))
+    else
+       vars%pt=ana_thv(:,:,:)/(1.0+eps*qqq%content   (:,:,:))
+    endif
+
+    pkxy = vars%pe**kappa
+    do k=1,km
+       vars%pkz(:,:,k) = ( pkxy(:,:,k+1)-pkxy(:,:,k) ) &
+                       / ( kappa*( log(vars%pe(:,:,k+1))-log(vars%pe(:,:,k)) ) )
+    enddo
+
+    call WRITE_PARALLEL('Replay done remapping')
+
+    deallocate(ana_qq)
+    deallocate(ana_thv)
+    deallocate(ana_phis)
+end subroutine state_remap_
 
 end subroutine RUN
 
@@ -6162,14 +6192,14 @@ subroutine Coldstart(gc, import, export, clock, rc)
     !                           RC=STATUS )
     !VERIFY_(STATUS)
 
-   !allocate(LONS(is:ie,js:je), stat=status)
-   !VERIFY_(STATUS)
-   !call SSI_CopyFineToCoarse(INTERNAL, LONS, 'LONS', STATE%f2c_SSI_arr_map, rc=status)
-   !VERIFY_(STATUS)
-   !allocate(LATS(is:ie,js:je), stat=status)
-   !VERIFY_(STATUS)
-   !call SSI_CopyFineToCoarse(INTERNAL, LATS, 'LATS', STATE%f2c_SSI_arr_map, rc=status)
-   !VERIFY_(STATUS)
+   allocate(LONS(is:ie,js:je), stat=status)
+   VERIFY_(STATUS)
+   call SSI_CopyFineToCoarse(INTERNAL, LONS, 'LONS', STATE%f2c_SSI_arr_map, rc=status)
+   VERIFY_(STATUS)
+   allocate(LATS(is:ie,js:je), stat=status)
+   VERIFY_(STATUS)
+   call SSI_CopyFineToCoarse(INTERNAL, LATS, 'LATS', STATE%f2c_SSI_arr_map, rc=status)
+   VERIFY_(STATUS)
 
    if (FV_Atm(1)%flagstruct%grid_type == 4) then
     ! Doubly-Period setup based on first LAT/LON coordinate
@@ -6684,10 +6714,10 @@ subroutine Coldstart(gc, import, export, clock, rc)
     VERIFY_(STATUS)
     call SSI_CopyCoarseToFine(IMPORT, phis, 'PHIS', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-   !call SSI_CopyCoarseToFine(INTERNAL, LONS, 'LONS', STATE%f2c_SSI_arr_map, rc=status)
-   !VERIFY_(STATUS)
-   !call SSI_CopyCoarseToFine(INTERNAL, LATS, 'LATS', STATE%f2c_SSI_arr_map, rc=status)
-   !VERIFY_(STATUS)
+   call SSI_CopyCoarseToFine(INTERNAL, LONS, 'LONS', STATE%f2c_SSI_arr_map, rc=status)
+   VERIFY_(STATUS)
+   call SSI_CopyCoarseToFine(INTERNAL, LATS, 'LATS', STATE%f2c_SSI_arr_map, rc=status)
+   VERIFY_(STATUS)
 
     RETURN_(ESMF_SUCCESS)
   end subroutine COLDSTART
