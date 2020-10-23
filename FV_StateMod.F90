@@ -583,7 +583,7 @@ contains
          FV_Atm(1)%flagstruct%vtdm4 = 0.02
        endif
       else
-       FV_Atm(1)%flagstruct%fv_sg_adj = DT
+       FV_Atm(1)%flagstruct%fv_sg_adj = DT*4.0
      ! Monotonic Hydrostatic defaults
        FV_Atm(1)%flagstruct%hydrostatic = .false.
        FV_Atm(1)%flagstruct%make_nh = .false.
@@ -596,8 +596,8 @@ contains
        FV_Atm(1)%flagstruct%hord_dp =  10
       ! This is the best/fastest option for tracers
        FV_Atm(1)%flagstruct%hord_tr =  8
-     ! NonMonotonic defaults for c360 (~25km) and finer
-       if (FV_Atm(1)%flagstruct%npx >= 360) then
+     ! NonMonotonic defaults for c360 (~50km) and finer
+       if (FV_Atm(1)%flagstruct%npx >= 180) then
          FV_Atm(1)%flagstruct%hord_mt =  6
          FV_Atm(1)%flagstruct%hord_vt =  6
          FV_Atm(1)%flagstruct%hord_tm =  6
@@ -605,10 +605,16 @@ contains
        ! Must now include explicit vorticity damping
          FV_Atm(1)%flagstruct%d_con = 1.
          FV_Atm(1)%flagstruct%do_vort_damp = .true.
-         FV_Atm(1)%flagstruct%vtdm4 = 0.02
+         FV_Atm(1)%flagstruct%vtdm4 = 0.01
        endif
      ! continue to adjust vorticity damping with
      ! increasing resolution
+       if (FV_Atm(1)%flagstruct%npx >= 360) then
+         FV_Atm(1)%flagstruct%vtdm4 = 0.02
+       endif
+       if (FV_Atm(1)%flagstruct%npx >= 720) then
+         FV_Atm(1)%flagstruct%vtdm4 = 0.03
+       endif
        if (FV_Atm(1)%flagstruct%npx >= 1440) then
          FV_Atm(1)%flagstruct%vtdm4 = 0.04
        endif
