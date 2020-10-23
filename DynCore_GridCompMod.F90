@@ -1599,7 +1599,7 @@ contains
 
      do ntracer=1,ntracers
         do nlev=1,nlevs
-           write(myTracer, "('Q',i5.5,'_',i3.3)") ntracer-1, plevs(nlev)
+           write(myTracer, "('Q',i1.1,'_',i3.3)") ntracer-1, plevs(nlev)
            call MAPL_AddExportSpec ( gc,                             &     
                 SHORT_NAME = TRIM(myTracer),                              &
                 LONG_NAME  = TRIM(myTracer),                             &
@@ -1608,7 +1608,7 @@ contains
                 VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
            VERIFY_(STATUS)
         enddo
-        write(myTracer, "('Q',i5.5)") ntracer-1
+        write(myTracer, "('Q',i1.1)") ntracer-1
         call MAPL_AddExportSpec ( gc,                             &
              SHORT_NAME = TRIM(myTracer),                         &
              LONG_NAME  = TRIM(myTracer),                         &
