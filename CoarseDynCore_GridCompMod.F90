@@ -207,7 +207,7 @@ contains
         call ESMF_GridCompSetVMMaxPEs(gc, maxPeCountPerPet=nthreads, rc=status)
         VERIFY_(STATUS)
       endif
-      print *, __FILE__, __LINE__, "ssiSharedMemoryEnabled: ", ssiSharedMemoryEnabled, nthreads, pthreadsEnabled
+      !print *, __FILE__, __LINE__, "ssiSharedMemoryEnabled: ", ssiSharedMemoryEnabled, nthreads, pthreadsEnabled
         !write(msg,*) "user2_setvm: OpenMP num thread:", nthreads
         !call ESMF_LogWrite(msg, ESMF_LOGMSG_INFO, rc=rc)
         !call ESMF_LogFlush(rc=rc)
@@ -511,9 +511,9 @@ contains
 !!$ call omp_set_dynamic(.TRUE.)
 !$ call omp_set_num_threads(peCount)
 
-!$omp parallel
-!$ print *, 'Initialize ', omp_get_num_threads(), peCount
-!$omp end parallel
+!!$omp parallel
+!!$ print *, 'Initialize ', omp_get_num_threads(), peCount
+!!$omp end parallel
 
 ! Get the private internal state
 !-------------------------------
