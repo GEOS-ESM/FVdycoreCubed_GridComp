@@ -2258,23 +2258,23 @@ contains
 
 !AOO Add LONS and LATS to import to safe as field to be used
 !at coarse side where MAPL state is not available
-!    call MAPL_AddInternalSpec( gc,                                  &
-!         SHORT_NAME = 'LONS',                                      &
-!         LONG_NAME  = 'Center_longitudes',                         &
-!         UNITS      = 'radians',                                   &
-!         !PRECISION  = ESMF_KIND_R8,                                &
-!         DIMS       = MAPL_DimsHorzOnly,                           &
-!         VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
-!     VERIFY_(STATUS)
-!
-!    call MAPL_AddInternalSpec( gc,                                  &
-!         SHORT_NAME = 'LATS',                                      &
-!         LONG_NAME  = 'Center_latitudes',                          &
-!         UNITS      = 'radians',                                   &
-!         !PRECISION  = ESMF_KIND_R8,                                &
-!         DIMS       = MAPL_DimsHorzOnly,                           &
-!         VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
-!     VERIFY_(STATUS)      
+    call MAPL_AddInternalSpec( gc,                                 &
+         SHORT_NAME = 'LONS',                                      &
+         LONG_NAME  = 'Center_longitudes',                         &
+         UNITS      = 'radians',                                   &
+         DIMS       = MAPL_DimsHorzOnly,                           &
+         RESTART    = MAPL_RestartSkip,                            &
+         VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddInternalSpec( gc,                                 &
+         SHORT_NAME = 'LATS',                                      &
+         LONG_NAME  = 'Center_latitudes',                          &
+         UNITS      = 'radians',                                   &
+         DIMS       = MAPL_DimsHorzOnly,                           &
+         RESTART    = MAPL_RestartSkip,                            &
+         VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
+     VERIFY_(STATUS)      
 !EOS
 
 ! Set the Profiling timers
@@ -2544,12 +2544,12 @@ contains
 ! needed for coldstart
     call MAPL_Get ( MAPL, lats = LATS_MAPL, lons = LONS_MAPL, RC=STATUS )
     VERIFY_(STATUS)
-    !call MAPL_GetPointer(INTERNAL, LATS, 'LATS', RC=STATUS)
-    !VERIFY_(STATUS)
-    !LATS = LATS_MAPL
-    !call MAPL_GetPointer(INTERNAL, LONS, 'LONS', RC=STATUS)
-    !VERIFY_(STATUS)
-    !LONS = LONS_MAPL
+    call MAPL_GetPointer(INTERNAL, LATS, 'LATS', RC=STATUS)
+    VERIFY_(STATUS)
+    LATS = LATS_MAPL
+    call MAPL_GetPointer(INTERNAL, LONS, 'LONS', RC=STATUS)
+    VERIFY_(STATUS)
+    LONS = LONS_MAPL
 
 ! Get the private internal state
 !-------------------------------
