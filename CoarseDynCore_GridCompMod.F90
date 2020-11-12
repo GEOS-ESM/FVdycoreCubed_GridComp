@@ -267,7 +267,7 @@ contains
    integer :: itemCount
    type(ESMF_GridComp) :: fineGC
    type(MAPL_MetaComp), pointer :: MAPL
-   integer :: nx, ny, nnx, nny, nth_x, nth_y
+   integer :: nx, ny, nnx, nny, nth_x, nth_y, agcm_im
 
 ! Retrieve fine GC 
 ! ---------------------------------
@@ -299,12 +299,15 @@ contains
     VERIFY_(STATUS)
     call MAPL_GetResource( MAPL, nny, 'NNY:', default=1, RC=STATUS )
     VERIFY_(STATUS)
+    call MAPL_GetResource( MAPL, agcm_im, 'AGCM_IM:', RC=STATUS )
+    VERIFY_(STATUS)
 
     _ASSERT(mod(nx*ny, nnx*nny) == 0, 'num_procs/node must evenly divide total num_procs')
     _ASSERT(mod(nnx, nth_x) == 0, 'coarsening factor in X-direction must evenly divide num_procs/node in X-direction')
     _ASSERT(mod(nx, nth_x) == 0, 'coarsening factor in X-direction must evenly divide num_procs in X-direction')
     _ASSERT(mod(nny, nth_y) == 0, 'coarsening factor in Y-direction must evenly divide num_procs/node in Y-direction')
     _ASSERT(mod(ny/6, nth_y) == 0, 'coarsening factor in Y-direction must evenly divide num_procs in Y-direction')
+    _ASSERT(mod(agcm_im, nx) == 0, 'subdomain size in X-direction must be equal')
 
     !call ESMF_GridCompGet(gc, vm=vm, rc=status)
     !VERIFY_(STATUS)
