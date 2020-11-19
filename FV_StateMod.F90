@@ -46,7 +46,8 @@ private
 #include "mpif.h"
 
   real(REAL8), save :: elapsed_time = 0
-  real(REAL8), save :: massD0
+  real(REAL8), save :: massD0 = -999.0
+  real(REAL8), allocatable, save :: massT0(:), massTADDED(:)
   real(REAL8), save :: massADDED = 0.0
 
   real(FVPRC), parameter :: tiny_number=1.e-15
@@ -62,6 +63,8 @@ private
   integer :: INT_ADIABATIC = 0
   logical :: ADIABATIC = .false.
   logical :: FV_HYDROSTATIC = .true.
+  integer :: INT_check_tracer_mass = 0
+  logical :: check_tracer_mass = .false.
   integer :: INT_check_mass = 0
   logical :: check_mass = .false.
   integer :: INT_fix_mass = 1
@@ -437,6 +440,8 @@ contains
   call MAPL_GetResource( MAPL, INT_ADIABATIC,   label='ADIABATIC:'   , default=INT_adiabatic, rc=status )
   call MAPL_GetResource( MAPL, INT_FV_OFF,      label='FV_OFF:'      , default=INT_FV_OFF, rc=status )
 
+  call MAPL_GetResource( MAPL, INT_check_tracer_mass,  label='check_tracer_mass:'  , default=INT_check_tracer_mass, rc=status )
+
   ! MAT The Fortran Standard, and thus gfortran, *does not allow* the use
   !     of if (integer). So, we must convert integer resources to logicals
 
@@ -462,6 +467,12 @@ contains
      FV_OFF = .FALSE.
   else
      FV_OFF = .TRUE.
+  end if
+
+  if (INT_check_tracer_mass == 0) then
+     check_tracer_mass = .FALSE.
+  else
+     check_tracer_mass = .TRUE.
   end if
 
 ! Constants
@@ -550,13 +561,13 @@ contains
      ! Cubed-sphere grid resolution and DT dependence 
      !              based on ideal remapping DT
       if (FV_Atm(1)%flagstruct%npx >= 48) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 90) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 180) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 450.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 360) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
@@ -602,7 +613,7 @@ contains
          FV_Atm(1)%flagstruct%vtdm4 = 0.02
        endif
       else
-       FV_Atm(1)%flagstruct%fv_sg_adj = DT
+       FV_Atm(1)%flagstruct%fv_sg_adj = DT*4.0
      ! Monotonic Hydrostatic defaults
        FV_Atm(1)%flagstruct%hydrostatic = .false.
        FV_Atm(1)%flagstruct%make_nh = .false.
@@ -615,8 +626,8 @@ contains
        FV_Atm(1)%flagstruct%hord_dp =  10
       ! This is the best/fastest option for tracers
        FV_Atm(1)%flagstruct%hord_tr =  8
-     ! NonMonotonic defaults for c360 (~25km) and finer
-       if (FV_Atm(1)%flagstruct%npx >= 360) then
+     ! NonMonotonic defaults for c360 (~50km) and finer
+       if (FV_Atm(1)%flagstruct%npx >= 180) then
          FV_Atm(1)%flagstruct%hord_mt =  6
          FV_Atm(1)%flagstruct%hord_vt =  6
          FV_Atm(1)%flagstruct%hord_tm =  6
@@ -624,10 +635,16 @@ contains
        ! Must now include explicit vorticity damping
          FV_Atm(1)%flagstruct%d_con = 1.
          FV_Atm(1)%flagstruct%do_vort_damp = .true.
-         FV_Atm(1)%flagstruct%vtdm4 = 0.02
+         FV_Atm(1)%flagstruct%vtdm4 = 0.01
        endif
      ! continue to adjust vorticity damping with
      ! increasing resolution
+       if (FV_Atm(1)%flagstruct%npx >= 360) then
+         FV_Atm(1)%flagstruct%vtdm4 = 0.02
+       endif
+       if (FV_Atm(1)%flagstruct%npx >= 720) then
+         FV_Atm(1)%flagstruct%vtdm4 = 0.03
+       endif
        if (FV_Atm(1)%flagstruct%npx >= 1440) then
          FV_Atm(1)%flagstruct%vtdm4 = 0.04
        endif
@@ -1137,6 +1154,8 @@ contains
   if ( (gid==0) .and. (FV_HYDROSTATIC)       ) print*, 'FV3 being run Hydrostatic'
   if ( (gid==0) .and. (SW_DYNAMICS)          ) print*, 'FV3 being run as Shallow-Water Model: test_case=', test_case
   if ( (gid==0) .and. (FV_Atm(1)%flagstruct%grid_type == 4) ) print*, 'FV3 being run as Doubly-Periodic: test_case=', test_case
+  STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
+  if ( (gid==0)                              ) print*, 'FV3 water species nwat=', FV_Atm(1)%flagstruct%nwat
   if ( (gid==0)                              ) print*, ' '
 
   if (DEBUG) call debug_fv_state('DEBUG_RESTART',STATE)
@@ -1218,7 +1237,7 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
   type (ESMF_Time) :: fv_time
   !type (ESMF_Config) :: CF
   integer  :: days, seconds
-  real(FVPRC) :: time_total, massD
+  real(FVPRC) :: time_total, massD, massT
 
   integer :: i,j,k,n,nn
   integer :: isc,iec,jsc,jec,ng
@@ -1352,8 +1371,9 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
          if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 1 ! Tell FV3 about QV only
          if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
            if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3 ! Tell FV3 about QV, QLIQ, QICE
-           if (nwat_tracers == 10) FV_Atm(1)%flagstruct%nwat = 6 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL plus QCLD
          endif
+         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL plus QCLD
+         if (FV_Atm(1)%flagstruct%nwat == 6) FV_Atm(1)%flagstruct%do_sat_adj = .TRUE.
        endif
        if (FV_Atm(1)%flagstruct%do_sat_adj) then
           _ASSERT(FV_Atm(1)%flagstruct%nwat == 6, 'when using fv saturation adjustment NWAT must equal 6')
@@ -1550,7 +1570,7 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
          endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'CLCN') then
-         if (FV_Atm(1)%flagstruct%nwat > 0) then ! QCLD
+         if (qcld > 0) then ! QCLD
            QCLD_FILLED = .TRUE.
            nn = nn+1
            if (state%vars%tracer(n)%is_r4) then
@@ -1568,7 +1588,7 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
          endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'CLLS') then
-         if (FV_Atm(1)%flagstruct%nwat > 0) then ! QCLD
+         if (qcld > 0) then ! QCLD
            QCLD_FILLED = .TRUE.
           ! nn increment already handled in CLCN
            if (state%vars%tracer(n)%is_r4) then
@@ -1590,36 +1610,36 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
    ! Verify
     select case (FV_Atm(1)%flagstruct%nwat)
     case (6)
-      _ASSERT(nn == 13, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
-      _ASSERT(SPHU_FILLED, 'needs informative message')
-      _ASSERT(QLIQ_FILLED, 'needs informative message')
-      _ASSERT(QICE_FILLED, 'needs informative message')
-      _ASSERT(RAIN_FILLED, 'needs informative message')
-      _ASSERT(SNOW_FILLED, 'needs informative message')
-      _ASSERT(GRPL_FILLED, 'needs informative message')
-      _ASSERT(QCLD_FILLED, 'needs informative message')
-      _ASSERT(QLCN_FILLED, 'needs informative message')
-      _ASSERT(QLLS_FILLED, 'needs informative message')
-      _ASSERT(QICN_FILLED, 'needs informative message')
-      _ASSERT(QILS_FILLED, 'needs informative message')
-      _ASSERT(CLCN_FILLED, 'needs informative message')
-      _ASSERT(CLLS_FILLED, 'needs informative message')
+      _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
+      _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled')
+      _ASSERT(QICE_FILLED, 'QICE Not Filled')
+      _ASSERT(RAIN_FILLED, 'RAIN Not Filled')
+      _ASSERT(SNOW_FILLED, 'SNOW Not Filled')
+      _ASSERT(GRPL_FILLED, 'GRPL Not Filled')
+      _ASSERT(QCLD_FILLED, 'QCLD Not Filled')
+      _ASSERT(QLCN_FILLED, 'QLCN Not Filled')
+      _ASSERT(QLLS_FILLED, 'QLLS Not Filled')
+      _ASSERT(QICN_FILLED, 'QICN Not Filled')
+      _ASSERT(QILS_FILLED, 'QILS Not Filled')
+      _ASSERT(CLCN_FILLED, 'CLCN Not Filled')
+      _ASSERT(CLLS_FILLED, 'CLLS Not Filled')
+      _ASSERT(nn == 13, 'Expecting 13 water species') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
     case (3)
-      _ASSERT(nn == 7, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
-      _ASSERT(SPHU_FILLED, 'needs informative message')
-      _ASSERT(QLIQ_FILLED, 'needs informative message')
-      _ASSERT(QICE_FILLED, 'needs informative message')
-      _ASSERT(QLCN_FILLED, 'needs informative message')
-      _ASSERT(QLLS_FILLED, 'needs informative message')
-      _ASSERT(QICN_FILLED, 'needs informative message')
-      _ASSERT(QILS_FILLED, 'needs informative message')
+      _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
+      _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled')
+      _ASSERT(QICE_FILLED, 'QICE Not Filled')
+      _ASSERT(QLCN_FILLED, 'QLCN Not Filled')
+      _ASSERT(QLLS_FILLED, 'QLLS Not Filled')
+      _ASSERT(QICN_FILLED, 'QICN Not Filled')
+      _ASSERT(QILS_FILLED, 'QILS Not Filled') 
+      _ASSERT(nn == 7, 'Expecting 7 water species') ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
     case (1)
-      _ASSERT(nn == 5, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS
-      _ASSERT(SPHU_FILLED, 'needs informative message')
-      _ASSERT(QLCN_FILLED, 'needs informative message')
-      _ASSERT(QLLS_FILLED, 'needs informative message')
-      _ASSERT(QICN_FILLED, 'needs informative message')
-      _ASSERT(QILS_FILLED, 'needs informative message')
+      _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
+      _ASSERT(QLCN_FILLED, 'QLCN Not Filled')
+      _ASSERT(QLLS_FILLED, 'QLLS Not Filled')
+      _ASSERT(QICN_FILLED, 'QICN Not Filled')
+      _ASSERT(QILS_FILLED, 'QILS Not Filled')
+      _ASSERT(nn == 5, 'Expecting 5 water species') ! Q, QLCN, QLLS, QICN, QILS
     end select
     endif !nwat > 0
       select case (FV_Atm(1)%flagstruct%nwat)
@@ -1729,7 +1749,43 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
       endif
      ! Mark FV setup complete
       fv_first_run = .false.
+      allocate(massT0(FV_Atm(1)%ncnst))
+      allocate(massTADDED(FV_Atm(1)%ncnst))
+      massT0 = -999.0
+      massTADDED = 0.0
     endif
+
+! Check Tracer Mass (Apply fixer is option is enabled)
+   if(check_tracer_mass) then
+      allocate ( mass(isc:iec,jsc:jec))
+      allocate (tqtot(isc:iec,jsc:jec))
+      do j=jsc,jec
+         do i=isc,iec
+            mass(i,j) = FV_Atm(1)%pe(i,npz+1,j)
+         enddo
+      enddo
+      do n=1,FV_Atm(1)%ncnst
+         tqtot = 0.0
+         do k=1,npz
+            tqtot(:,:) = tqtot(:,:) + FV_Atm(1)%q(isc:iec,jsc:jec,k,n)*FV_Atm(1)%delp(isc:iec,jsc:jec,k)
+         enddo
+         tqtot = tqtot/mass
+         massT = g_sum(FV_Atm(1)%domain, tqtot, isc, iec, jsc, jec, state%grid%ng, fv_atm(1)%gridstruct%area_64, 1, reproduce = .true.)
+         if (massT0(n) < 0.0d0) then
+           massT0(n) = massT
+         end if
+         if ((massT > 0) .AND. (massT0(n) > 0)) then
+          !FV_Atm(1)%q(:,:,:,n) = FV_Atm(1)%q(:,:,:,n)*massT0(n)/massT
+          !massTADDED(n) = massTADDED(n) + (massT-massT0(n))/massT0(n)
+           if (mpp_pe()==mpp_root_pe()) then
+               write(6,140) n, massT0(n), massT, massT0(n)/massT, (massT-massT0(n))/massT0(n), massTADDED(n)
+               140    format('Tracer Mass Fixer'2x,i2,g21.14,2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
+           endif
+         endif
+      enddo
+      deallocate (mass)
+      deallocate (tqtot)
+   endif
 
 ! Check Dry Mass (Apply fixer is option is enabled)
    if ( check_mass .OR. fix_mass ) then
@@ -1906,19 +1962,19 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
          do j=jsc,jec
             do i=isc,iec
               ! LIQUID
-               FQC = 0.0
-               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qlcn)) / MAX(FV_Atm(1)%q(i,j,k,qlcn)+FV_Atm(1)%q(i,j,k,qlls),1.e-5))
+           !   FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qlcn) / MAX(FV_Atm(1)%q(i,j,k,qlcn)+FV_Atm(1)%q(i,j,k,qlls),1.e-8)) )
+               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qlcn) / MAX(FV_Atm(1)%q(i,j,k,qliq),1.e-8)) )
                FV_Atm(1)%q(i,j,k,qlcn) = FV_Atm(1)%q(i,j,k,qliq)*(    FQC)
                FV_Atm(1)%q(i,j,k,qlls) = FV_Atm(1)%q(i,j,k,qliq)*(1.0-FQC)
               ! ICE
-               FQC = 0.0
-               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qicn)) / MAX(FV_Atm(1)%q(i,j,k,qicn)+FV_Atm(1)%q(i,j,k,qils),1.e-8))
+           !   FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qicn) / MAX(FV_Atm(1)%q(i,j,k,qicn)+FV_Atm(1)%q(i,j,k,qils),1.e-8)) )
+               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qicn) / MAX(FV_Atm(1)%q(i,j,k,qice),1.e-8)) )
                FV_Atm(1)%q(i,j,k,qicn) = FV_Atm(1)%q(i,j,k,qice)*(    FQC)
                FV_Atm(1)%q(i,j,k,qils) = FV_Atm(1)%q(i,j,k,qice)*(1.0-FQC)
               ! CLOUD
-               if (FV_Atm(1)%flagstruct%nwat == 6) then
-                  FQC = 0.0
-                  FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,clcn)) / MAX(FV_Atm(1)%q(i,j,k,clcn)+FV_Atm(1)%q(i,j,k,clls),1.e-8))
+               if (qcld > 0) then
+           !      FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,clcn) / MAX(FV_Atm(1)%q(i,j,k,clcn)+FV_Atm(1)%q(i,j,k,clls),1.e-5)) )
+                  FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,clcn) / MAX(FV_Atm(1)%q(i,j,k,qcld),1.e-5)) )
                   FV_Atm(1)%q(i,j,k,clcn) = FV_Atm(1)%q(i,j,k,qcld)*(    FQC)
                   FV_Atm(1)%q(i,j,k,clls) = FV_Atm(1)%q(i,j,k,qcld)*(1.0-FQC)
                endif
@@ -2040,36 +2096,36 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
    ! Verify
     select case (FV_Atm(1)%flagstruct%nwat)
     case (6)
-      _ASSERT(nn == 13, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
-      _ASSERT(SPHU_FILLED, 'needs informative message')
-      _ASSERT(QLIQ_FILLED, 'needs informative message')
-      _ASSERT(QICE_FILLED, 'needs informative message')
-      _ASSERT(RAIN_FILLED, 'needs informative message')
-      _ASSERT(SNOW_FILLED, 'needs informative message')
-      _ASSERT(GRPL_FILLED, 'needs informative message')
-      _ASSERT(QCLD_FILLED, 'needs informative message')
-      _ASSERT(QLCN_FILLED, 'needs informative message')
-      _ASSERT(QLLS_FILLED, 'needs informative message')
-      _ASSERT(QICN_FILLED, 'needs informative message')
-      _ASSERT(QILS_FILLED, 'needs informative message')
-      _ASSERT(CLCN_FILLED, 'needs informative message')
-      _ASSERT(CLLS_FILLED, 'needs informative message')
+      _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
+      _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled Out')
+      _ASSERT(QICE_FILLED, 'QICE Not Filled Out')
+      _ASSERT(RAIN_FILLED, 'RAIN Not Filled Out')
+      _ASSERT(SNOW_FILLED, 'SNOW Not Filled Out')
+      _ASSERT(GRPL_FILLED, 'GRPL Not Filled Out')
+      _ASSERT(QCLD_FILLED, 'QCLD Not Filled Out')
+      _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
+      _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
+      _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
+      _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
+      _ASSERT(CLCN_FILLED, 'CLCN Not Filled Out')
+      _ASSERT(CLLS_FILLED, 'CLLS Not Filled Out')
+      _ASSERT(nn == 13, 'Expecting 13 water species Out') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
     case (3)
-      _ASSERT(nn == 7, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
-      _ASSERT(SPHU_FILLED, 'needs informative message')
-      _ASSERT(QLIQ_FILLED, 'needs informative message')
-      _ASSERT(QICE_FILLED, 'needs informative message')
-      _ASSERT(QLCN_FILLED, 'needs informative message')
-      _ASSERT(QLLS_FILLED, 'needs informative message')
-      _ASSERT(QICN_FILLED, 'needs informative message')
-      _ASSERT(QILS_FILLED, 'needs informative message')
+      _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
+      _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled Out')
+      _ASSERT(QICE_FILLED, 'QICE Not Filled Out')
+      _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
+      _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
+      _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
+      _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
+      _ASSERT(nn == 7, 'Expecting 7 water species Out') ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
     case (1)
-      _ASSERT(nn == 5, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS
-      _ASSERT(SPHU_FILLED, 'needs informative message')
-      _ASSERT(QLCN_FILLED, 'needs informative message')
-      _ASSERT(QLLS_FILLED, 'needs informative message')
-      _ASSERT(QICN_FILLED, 'needs informative message')
-      _ASSERT(QILS_FILLED, 'needs informative message')
+      _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
+      _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
+      _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
+      _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
+      _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
+      _ASSERT(nn == 5, 'Expecting 5 water species Out') ! Q, QLCN, QLLS, QICN, QILS
     end select
 
       select case(FV_Atm(1)%flagstruct%nwat)
@@ -3776,10 +3832,14 @@ end subroutine fv_getDivergence
 subroutine fv_getUpdraftHelicity(uh25)
    use constants_mod, only: fms_grav=>grav
    use fv_diagnostics_mod, only: get_vorticity, updraft_helicity
+! made this REAL4
    real(REAL4), intent(OUT) :: uh25(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+
+! made an intermediate output of FVPRC
    real(FVPRC) :: uh25_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
    integer :: sphum=1
    real(FVPRC) :: vort(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,FV_Atm(1)%npz)
+   ! introduced these two variables for the literals
    real(FVPRC) :: z_bot, z_top
 
    z_bot = 2.e3
@@ -4465,6 +4525,7 @@ subroutine echo_fv3_setup()
 !   logical :: dwind_2d = .false.
 !   logical :: breed_vortex_inline = .false.
 !   logical :: range_warn = .false.
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%external_eta ,format='("FV3 external_eta: ",(A))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%fill ,format='("FV3 fill: ",(A))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%fill_dp ,format='("FV3 fill_dp: ",(A))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%fill_wz ,format='("FV3 fill_wz: ",(A))' )
