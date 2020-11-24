@@ -3,12 +3,33 @@ version: 2.1
 executors:
   gcc-build-env:
     docker:
-      - image: gmao/ubuntu20-geos-env-mkl:6.0.16-openmpi_4.0.5-gcc_10.2.0
+      - image: gmao/ubuntu20-geos-env-mkl:v6.0.22-openmpi_4.0.5-gcc_10.2.0
+        auth:
+          username: $DOCKERHUB_USER
+          password: $DOCKERHUB_AUTH_TOKEN
     environment:
       OMPI_ALLOW_RUN_AS_ROOT: 1
       OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
       OMPI_MCA_btl_vader_single_copy_mechanism: none
     resource_class: xlarge
+
+workflows:
+  version: 2.1
+  build-and-test:
+    jobs:
+      - build-GEOSgcm:
+          context: 
+            - docker-hub-creds
+      - make-FV3-experiment:
+          context: 
+            - docker-hub-creds
+          requires:
+            - build-GEOSgcm
+      - run-FV3-standalone:
+          context: 
+            - docker-hub-creds
+          requires:
+            - make-FV3-experiment
 
 jobs:
   build-GEOSgcm:
@@ -127,16 +148,3 @@ jobs:
             cd ${CIRCLE_WORKING_DIRECTORY}/workspace/test-fv3-c12
 
             cat *.log
-
-workflows:
-  version: 2.1
-  build-and-test:
-    jobs:
-      - build-GEOSgcm
-      - make-FV3-experiment:
-          requires:
-            - build-GEOSgcm
-      - run-FV3-standalone:
-          requires:
-            - make-FV3-experiment
-
