@@ -74,6 +74,7 @@ private
   public FV_HYDROSTATIC, ADIABATIC, DEBUG, COLDSTART, CASE_ID, SW_DYNAMICS, AdvCore_Advection
   public FV_RESET_CONSTANTS
   public FV_To_State, State_To_FV
+  public INTERNAL_CoarseToFine, INTERNAL_FineToCoarse
   public T_TRACERS, T_FVDYCORE_VARS, T_FVDYCORE_GRID, T_FVDYCORE_STATE
   public fv_fillMassFluxes
   public fv_computeMassFluxes
@@ -909,43 +910,27 @@ contains
 ! Allocate coarse decomp internal state
   if(.not.associated(u)) allocate(u(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, u, 'U', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
-
   if(.not.associated(v)) allocate(v(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, v, 'V', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
-
   if(.not.associated(pt)) allocate(pt(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, pt, 'PT', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
-
   if(.not.associated(pe)) allocate(pe(is:ie,js:je,npz+1), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, pe, 'PE', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
-
   if(.not.associated(pkz)) allocate(pkz(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, pkz, 'PKZ', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
-
   if(.not.associated(dz)) allocate(dz(is:ie,js:je,npz), stat=status)
   VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, dz, 'DZ', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
-
   if(.not.associated(w)) allocate(w(is:ie,js:je,npz), stat=status)
-  VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, w, 'W', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
   call CREATE_VARS ( FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec,     &
                      1, FV_Atm(1)%flagstruct%npz, FV_Atm(1)%flagstruct%npz+1,            &
                      U, V, PT, PE, PKZ, DZ, W, &
                      STATE%VARS )
+
+  call INTERNAL_FineToCoarse(STATE, internal, rc=status)
+  VERIFY_(status)
+
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: CREATE_VARS', RC=STATUS )
   VERIFY_(STATUS)
 
@@ -2250,24 +2235,10 @@ subroutine State_To_FV ( STATE, internal )
     akap  = kappa
     if (SW_DYNAMICS) akap  = 1.
 
+  call INTERNAL_FineToCoarse(STATE, internal, rc=status)
 !------------
 ! Update Winds
 !------------
-  !U => STATE%VARS%U
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%PT, 'PT', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%PE, 'PE', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%PKZ, 'PKZ', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%DZ, 'DZ', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
-  call SSI_CopyFineToCoarse(internal, STATE%VARS%W, 'W', f2c_SSI_arr_map, rc=status)
-  VERIFY_(STATUS)
 
 ! D-Grid
   FV_Atm(1)%u(:,:,:) = tiny_number
@@ -2435,21 +2406,7 @@ subroutine FV_To_State ( STATE, internal )
        STATE%VARS%PT  = STATE%VARS%PT/STATE%VARS%PKZ
     endif
 
-    !U => STATE%VARS%U
-
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%U, 'U', f2c_SSI_arr_map, rc=status)
-    VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%V, 'V', f2c_SSI_arr_map, rc=status)
-    VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PT, 'PT', f2c_SSI_arr_map, rc=status)
-    VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PE, 'PE', f2c_SSI_arr_map, rc=status)
-    VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PKZ, 'PKZ', f2c_SSI_arr_map, rc=status)
-    VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%DZ, 'DZ', f2c_SSI_arr_map, rc=status)
-    VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%W, 'W', f2c_SSI_arr_map, rc=status)
+    call INTERNAL_CoarseToFine(STATE, internal, rc=status)
     VERIFY_(STATUS)
     
    return
@@ -4520,6 +4477,60 @@ subroutine WRITE_PARALLEL_L ( field, format )
    call WRITE_PARALLEL ( 'F' ,format=format )
   endif
 end subroutine WRITE_PARALLEL_L
+
+subroutine INTERNAL_FineToCoarse(STATE, INTERNAL, rc)
+  Type(T_FVDYCORE_STATE), pointer :: STATE
+  Type(ESMF_State), intent(inout) :: INTERNAL
+  integer, optional :: rc
+
+!local
+  integer :: status
+  character(len=ESMF_MAXSTR) :: IAm='FV:INTERNAL_FineToCoarse'
+
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%U, 'U', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%V, 'V', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%PT, 'PT', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%PE, 'PE', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%PKZ, 'PKZ', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%DZ, 'DZ', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyFineToCoarse(internal, STATE%VARS%W, 'W', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+   
+  RETURN_(ESMF_SUCCESS)
+end subroutine INTERNAL_FineToCoarse
+
+subroutine INTERNAL_CoarseToFine(STATE, INTERNAL, rc)
+  Type(T_FVDYCORE_STATE), pointer :: STATE
+  Type(ESMF_State), intent(inout) :: INTERNAL
+  integer, optional :: rc
+
+!local
+  integer :: status
+  character(len=ESMF_MAXSTR) :: IAm='FV:INTERNAL_CoarseToFine'
+
+  call SSI_CopyCoarseToFine(internal, STATE%VARS%U, 'U', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyCoarseToFine(internal, STATE%VARS%V, 'V', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyCoarseToFine(internal, STATE%VARS%PT, 'PT', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyCoarseToFine(internal, STATE%VARS%PE, 'PE', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyCoarseToFine(internal, STATE%VARS%PKZ, 'PKZ', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyCoarseToFine(internal, STATE%VARS%DZ, 'DZ', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+  call SSI_CopyCoarseToFine(internal, STATE%VARS%W, 'W', STATE%f2c_SSI_arr_map, rc=status)
+  VERIFY_(STATUS)
+   
+  RETURN_(ESMF_SUCCESS)
+end subroutine INTERNAL_CoarseToFine
 
 end module FV_StateMod
 
