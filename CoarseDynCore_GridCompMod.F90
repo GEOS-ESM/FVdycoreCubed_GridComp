@@ -610,36 +610,8 @@ contains
     jlast  = DycoreGrid%je
     km     = DycoreGrid%npz
 
-    !if(.not.associated(UD)) allocate(UD(ifirst:ilast,jfirst:jlast,1:km), stat=status)
-    !VERIFY_(STATUS)
-    !  !print *, __FILE__, __LINE__, ifirst,ilast,jfirst,jlast,km
-    !  call SSI_CopyFineToCoarse(INTERNAL, UD, 'U', STATE%f2c_SSI_arr_map, rc=status)
-    !  VERIFY_(STATUS)
-    !  !print *, __FILE__, __LINE__, ifirst,ilast,jfirst,jlast,km
-    !if(.not.associated(VD)) allocate(VD(ifirst:ilast,jfirst:jlast,1:km), stat=status)
-    !VERIFY_(STATUS)
-    !  call SSI_CopyFineToCoarse(INTERNAL, VD, 'V', STATE%f2c_SSI_arr_map, rc=status)
-    !  VERIFY_(STATUS)
-    !if(.not.associated(PE)) allocate(PE(ifirst:ilast,jfirst:jlast,1:km+1), stat=status)
-    !VERIFY_(STATUS)
-    !  call SSI_CopyFineToCoarse(INTERNAL, PE, 'PE', STATE%f2c_SSI_arr_map, rc=status)
-    !  VERIFY_(STATUS)
-    !if(.not.associated(PT)) allocate(PT(ifirst:ilast,jfirst:jlast,1:km), stat=status)
-    !VERIFY_(STATUS)
-    !  call SSI_CopyFineToCoarse(INTERNAL, PT, 'PT', STATE%f2c_SSI_arr_map, rc=status)
-    !  VERIFY_(STATUS)
-    !if(.not.associated(PK)) allocate(PK(ifirst:ilast,jfirst:jlast,1:km), stat=status)
-    !VERIFY_(STATUS)
-    !  call SSI_CopyFineToCoarse(INTERNAL, PK, 'PKZ', STATE%f2c_SSI_arr_map, rc=status)
-    !  VERIFY_(STATUS)
-
-
     allocate( UA(ifirst:ilast,jfirst:jlast,km) )
     allocate( VA(ifirst:ilast,jfirst:jlast,km) )
-
-    !print *, __FILE__, __LINE__, 'local pet', localPet
-    !call ESMF_VMBarrier(vm,rc=status)
-    !VERIFY_(STATUS)
 
     !call getAgridWinds( UD, VD, UA, VA, rotate=.true.)
     call getAgridWinds( state%vars%u, state%vars%v, UA, VA, rotate=.true.)
@@ -698,9 +670,6 @@ contains
     temp2d = DycoreGrid%area
     call SSI_CopyCoarseToFine(export, temp2d, 'AREA', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    !print *, __FILE__, __LINE__, 'local pet', localPet
-    !call ESMF_VMBarrier(vm,rc=status)
-    !VERIFY_(STATUS)
 
 !=====Begin intemittent replay=======================
 
