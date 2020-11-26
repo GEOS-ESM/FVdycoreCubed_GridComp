@@ -33,35 +33,36 @@ Module CoarseFVdycoreCubed_GridComp
    use fv_arrays_mod,  only: REAL4, REAL8, FVPRC
 !   use fv_control_mod, only: comm_timer, dyn_timer
    !use fv_grid_tools_mod, only: grid_type
-   use FV_StateMod, only : FV_Atm,                                   &
-                           FV_To_State, State_To_FV, DEBUG_FV_STATE, &
-                           DynTracers      => T_TRACERS,             &
-                           DynVars         => T_FVDYCORE_VARS,       &
-                           DynGrid         => T_FVDYCORE_GRID,       &
-                           DynState        => T_FVDYCORE_STATE,      &
-                           DynSetup        => FV_Setup,              &
-                           DynInit         => FV_InitState,          &
-                           DynRun          => FV_Run,                &
-                           DynFinalize     => FV_Finalize,           &
-                           getAgridWinds   => INTERP_DGRID_TO_AGRID, &
-                           fillMassFluxes  => fv_fillMassFluxes,     &
-                           computeMassFluxes => fv_computeMassFluxes,&
+   use FV_StateMod, only : FV_Atm,                                       &
+                           FV_To_State, State_To_FV, DEBUG_FV_STATE,     &
+                           DynTracers      => T_TRACERS,                 &
+                           DynVars         => T_FVDYCORE_VARS,           &
+                           DynGrid         => T_FVDYCORE_GRID,           &
+                           DynState        => T_FVDYCORE_STATE,          &
+                           DynSetup        => FV_Setup,                  &
+                           DynInit         => FV_InitState,              &
+                           DynRun          => FV_Run,                    &
+                           DynFinalize     => FV_Finalize,               &
+                           getAgridWinds   => INTERP_DGRID_TO_AGRID,     &
+                           fillMassFluxes  => fv_fillMassFluxes,         &
+                           computeMassFluxes => fv_computeMassFluxes,    &
                            getVerticalMassFlux => fv_getVerticalMassFlux,&
-                           getOmega        => fv_getOmega,           &
-                           getPK           => fv_getPK,              &
-                           getVorticity    => fv_getVorticity,       &
-                           getDivergence   => fv_getdivergence,      &
-                           getEPV          => fv_getEPV,             &
-                           getPKZ          => fv_getPKZ,             &
-                           getDELZ         => fv_getDELZ,            &
-                           getQ            => fv_getQ,               &
-                           Agrid_To_Native => INTERP_AGRID_TO_DGRID, &
-                           DYN_COLDSTART   => COLDSTART,             &
-                           DYN_CASE        => CASE_ID,               &
-                           DYN_DEBUG       => DEBUG,                 &
-                           HYDROSTATIC     => FV_HYDROSTATIC,        &
-                           fv_getUpdraftHelicity,                    &
-                           ADIABATIC, SW_DYNAMICS, AdvCore_Advection
+                           getOmega        => fv_getOmega,               &
+                           getPK           => fv_getPK,                  &
+                           getVorticity    => fv_getVorticity,           &
+                           getDivergence   => fv_getdivergence,          &
+                           getEPV          => fv_getEPV,                 &
+                           getPKZ          => fv_getPKZ,                 &
+                           getDELZ         => fv_getDELZ,                &
+                           getQ            => fv_getQ,                   &
+                           Agrid_To_Native => INTERP_AGRID_TO_DGRID,     &
+                           DYN_COLDSTART   => COLDSTART,                 &
+                           DYN_CASE        => CASE_ID,                   &
+                           DYN_DEBUG       => DEBUG,                     &
+                           HYDROSTATIC     => FV_HYDROSTATIC,            &
+                           fv_getUpdraftHelicity,                        &
+                           ADIABATIC, SW_DYNAMICS, AdvCore_Advection,    &
+                           INTERNAL_FineToCoarse, INTERNAL_CoarseToFine
    use m_topo_remap, only: dyn_topo_remap
    use CubeGridPrototype, only: register_grid_and_regridders
 
@@ -609,38 +610,11 @@ contains
     jlast  = DycoreGrid%je
     km     = DycoreGrid%npz
 
-    if(.not.associated(UD)) allocate(UD(ifirst:ilast,jfirst:jlast,1:km), stat=status)
-    VERIFY_(STATUS)
-      !print *, __FILE__, __LINE__, ifirst,ilast,jfirst,jlast,km
-      call SSI_CopyFineToCoarse(INTERNAL, UD, 'U', STATE%f2c_SSI_arr_map, rc=status)
-      VERIFY_(STATUS)
-      !print *, __FILE__, __LINE__, ifirst,ilast,jfirst,jlast,km
-    if(.not.associated(VD)) allocate(VD(ifirst:ilast,jfirst:jlast,1:km), stat=status)
-    VERIFY_(STATUS)
-      call SSI_CopyFineToCoarse(INTERNAL, VD, 'V', STATE%f2c_SSI_arr_map, rc=status)
-      VERIFY_(STATUS)
-    if(.not.associated(PE)) allocate(PE(ifirst:ilast,jfirst:jlast,1:km+1), stat=status)
-    VERIFY_(STATUS)
-      call SSI_CopyFineToCoarse(INTERNAL, PE, 'PE', STATE%f2c_SSI_arr_map, rc=status)
-      VERIFY_(STATUS)
-    if(.not.associated(PT)) allocate(PT(ifirst:ilast,jfirst:jlast,1:km), stat=status)
-    VERIFY_(STATUS)
-      call SSI_CopyFineToCoarse(INTERNAL, PT, 'PT', STATE%f2c_SSI_arr_map, rc=status)
-      VERIFY_(STATUS)
-    if(.not.associated(PK)) allocate(PK(ifirst:ilast,jfirst:jlast,1:km), stat=status)
-    VERIFY_(STATUS)
-      call SSI_CopyFineToCoarse(INTERNAL, PK, 'PKZ', STATE%f2c_SSI_arr_map, rc=status)
-      VERIFY_(STATUS)
-
-
     allocate( UA(ifirst:ilast,jfirst:jlast,km) )
     allocate( VA(ifirst:ilast,jfirst:jlast,km) )
 
-    !print *, __FILE__, __LINE__, 'local pet', localPet
-    !call ESMF_VMBarrier(vm,rc=status)
-    !VERIFY_(STATUS)
-
-    call getAgridWinds( UD, VD, UA, VA, rotate=.true.)
+    !call getAgridWinds( UD, VD, UA, VA, rotate=.true.)
+    call getAgridWinds( state%vars%u, state%vars%v, UA, VA, rotate=.true.)
 
     !U = UA
     if(.not.associated(temp3d)) allocate(temp3d(ifirst:ilast,jfirst:jlast,1:km), stat=status)
@@ -653,7 +627,7 @@ contains
     call SSI_CopyCoarseToFine(export, temp3d, 'V', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
     !T = PT*PK
-    temp3d = PT*PK
+    temp3d = state%vars%pt * state%vars%pkz
     call SSI_CopyCoarseToFine(export, temp3d, 'T', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
     !PLE = PE
@@ -663,7 +637,7 @@ contains
     endif
     if(.not.associated(temp3d)) allocate(temp3d(ifirst:ilast,jfirst:jlast,1:km+1), stat=status)
     VERIFY_(STATUS)
-    temp3d = PE
+    temp3d = state%vars%pe
     !call ESMF_VMGet(VM, localPet=localPet, rc=status)
     !VERIFY_(STATUS)
     !if (localPet == 0) then
@@ -696,9 +670,6 @@ contains
     temp2d = DycoreGrid%area
     call SSI_CopyCoarseToFine(export, temp2d, 'AREA', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    !print *, __FILE__, __LINE__, 'local pet', localPet
-    !call ESMF_VMBarrier(vm,rc=status)
-    !VERIFY_(STATUS)
 
 !=====Begin intemittent replay=======================
 
@@ -1052,6 +1023,9 @@ subroutine Run(gc, import, export, clock, rc)
 
   call ESMF_GridValidate(ESMFGRID,RC=STATUS)
   VERIFY_(STATUS)
+
+  call INTERNAL_FineToCoarse(STATE, internal, rc=status)
+  VERIFY_(status)
 
     !call ESMF_VMGet(vm, localPet=localPet, rc=status)
     !VERIFY_(STATUS)
@@ -1787,7 +1761,7 @@ subroutine Run(gc, import, export, clock, rc)
          elsewhere
                 qsum2 = MAPL_UNDEF
          end where
-         call MAPL_AreaMean( TRSUM1(n), qsum2, area, esmfgrid, rc=STATUS )
+         call MAPL_AreaMean( TRSUM1(n), qsum2, real(grid%area), esmfgrid, rc=STATUS )
          VERIFY_(STATUS)
       enddo
       endif
@@ -1838,7 +1812,7 @@ subroutine Run(gc, import, export, clock, rc)
          elsewhere
                 qsum2 = MAPL_UNDEF
          end where
-         call MAPL_AreaMean( TRSUM2(n), qsum2, area, esmfgrid, rc=STATUS )
+         call MAPL_AreaMean( TRSUM2(n), qsum2, real(grid%area), esmfgrid, rc=STATUS )
          VERIFY_(STATUS)
       enddo
       endif
@@ -3328,13 +3302,6 @@ subroutine Run(gc, import, export, clock, rc)
       
     call PUSH_Q(STATE, import, rc=status)
     VERIFY_(STATUS)
-  
-    !call SSI_CopyCoarseToFine(internal, STATE%VARS%U, 'U', STATE%f2c_SSI_arr_map, rc=status)
-    !VERIFY_(status)
-    !call SSI_CopyCoarseToFine(internal, STATE%VARS%V, 'V', STATE%f2c_SSI_arr_map, rc=status)
-    !VERIFY_(status)
-    !call SSI_CopyCoarseToFine(internal, STATE%VARS%PT, 'PT', STATE%f2c_SSI_arr_map, rc=status)
-    !VERIFY_(status)
 
 ! De-Allocate Arrays
 ! ------------------
@@ -5708,19 +5675,7 @@ end subroutine RunAddIncs
        DEALLOCATE (DPOLD)
     endif ! .not. Adiabatic
 
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%U, 'U', STATE%f2c_SSI_arr_map, rc=status)
-    VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%V, 'V', STATE%f2c_SSI_arr_map, rc=status)
-    VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PT, 'PT', STATE%f2c_SSI_arr_map, rc=status)
-    VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PE, 'PE', STATE%f2c_SSI_arr_map, rc=status)
-    VERIFY_(status)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%PKZ, 'PKZ', STATE%f2c_SSI_arr_map, rc=status)
-    VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%DZ, 'DZ', STATE%f2c_SSI_arr_map, rc=status)
-    VERIFY_(STATUS)
-    call SSI_CopyCoarseToFine(internal, STATE%VARS%W, 'W', STATE%f2c_SSI_arr_map, rc=status)
+    call INTERNAL_CoarseToFine(STATE, internal, rc=status)
     VERIFY_(STATUS)
 
     if (ALLOCATED(Q  )) DEALLOCATE( Q   )
