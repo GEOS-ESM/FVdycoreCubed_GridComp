@@ -11,6 +11,7 @@ executors:
       OMPI_ALLOW_RUN_AS_ROOT: 1
       OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
       OMPI_MCA_btl_vader_single_copy_mechanism: none
+    #XLARGE# resource_class: xlarge
     resource_class: xlarge
 
 workflows:
@@ -66,7 +67,8 @@ jobs:
           name: "Build and install"
           command: |
             cd ${CIRCLE_WORKING_DIRECTORY}/GEOSgcm/build
-            make -j"$(nproc)" install
+            #XLARGE# make -j"$(nproc)" install
+            make -j4 install
 
       # We need to persist the install for the next step
       - persist_to_workspace:
