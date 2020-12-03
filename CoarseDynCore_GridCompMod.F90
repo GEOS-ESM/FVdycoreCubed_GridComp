@@ -163,6 +163,8 @@ contains
       call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
       VERIFY_(STATUS)
       fineGC = transfer(gcImg, fineGC)
+      deallocate(gcImg, stat=status)
+      VERIFY_(STATUS)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
@@ -279,6 +281,8 @@ contains
     call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
     VERIFY_(STATUS)
     fineGC = transfer(gcImg, fineGC)
+    deallocate(gcImg, stat=status)
+    VERIFY_(STATUS)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
@@ -494,6 +498,8 @@ contains
     call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
     VERIFY_(STATUS)
     fineGC = transfer(gcImg, fineGC)
+    deallocate(gcImg, stat=status)
+    VERIFY_(STATUS)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
@@ -1012,6 +1018,8 @@ subroutine Run(gc, import, export, clock, rc)
   call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
   VERIFY_(STATUS)
   fineGC = transfer(gcImg, fineGC)
+  deallocate(gcImg, stat=status)
+  VERIFY_(STATUS)
 
 ! Retrieve the pointer to the generic state
 ! -----------------------------------------
@@ -4680,6 +4688,8 @@ end subroutine RUN
     !call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
     !VERIFY_(STATUS)
     !fineGC = transfer(gcImg, fineGC)
+    !deallocate(gcImg, stat=status)
+    !VERIFY_(STATUS)
 
 ! Retrieve the pointer to the generic state
 ! -----------------------------------------
@@ -5851,6 +5861,8 @@ end subroutine RunAddIncs
         dummy = V
         call SSI_CopyCoarseToFine(export, dummy, name, STATE%f2c_SSI_arr_map, rc=status)
         VERIFY_(STATUS)
+        deallocate(dummy, stat=status)
+        VERIFY_(STATUS)
      endif
 
    end subroutine FILLOUT3
@@ -5878,6 +5890,8 @@ end subroutine RunAddIncs
         VERIFY_(STATUS)
         dummy = V
         call SSI_CopyCoarseToFine(export, dummy, name, STATE%f2c_SSI_arr_map, rc=status)
+        VERIFY_(STATUS)
+        deallocate(dummy, stat=status)
         VERIFY_(STATUS)
      endif
 
@@ -6240,6 +6254,8 @@ subroutine Coldstart(gc, import, export, clock, rc)
       call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
       VERIFY_(STATUS)
       fineGC = transfer(gcImg, fineGC)
+      deallocate(gcImg, stat=status)
+      VERIFY_(STATUS)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
