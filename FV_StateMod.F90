@@ -357,6 +357,8 @@ contains
     call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
     VERIFY_(STATUS)
     fineGC = transfer(gcImg, fineGC)
+    deallocate(gcImg,stat=status)
+    VERIFY_(STATUS)
 
     call ESMF_VMGetCurrent(VM, rc=STATUS)
     VERIFY_(STATUS)
@@ -852,6 +854,8 @@ contains
     call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
     VERIFY_(STATUS)
     fineGC = transfer(gcImg, fineGC)
+    deallocate(gcImg,stat=status)
+    VERIFY_(STATUS)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
@@ -1297,6 +1301,8 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
     call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
     VERIFY_(STATUS)
     fineGC = transfer(gcImg, fineGC)
+    deallocate(gcImg,stat=status)
+    VERIFY_(STATUS)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------

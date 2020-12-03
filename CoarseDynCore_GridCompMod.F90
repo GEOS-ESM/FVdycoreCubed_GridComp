@@ -71,7 +71,7 @@ Module CoarseFVdycoreCubed_GridComp
   implicit none
   private
 
-  !type(ESMF_FieldBundle), save :: bundleAdv
+  type(ESMF_FieldBundle), save :: bundleAdv
   integer :: NXQ = 0
   logical :: overwrite_Q = .true.
 
@@ -163,6 +163,8 @@ contains
       call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
       VERIFY_(STATUS)
       fineGC = transfer(gcImg, fineGC)
+      deallocate(gcImg, stat=status)
+      VERIFY_(STATUS)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
@@ -279,6 +281,8 @@ contains
     call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
     VERIFY_(STATUS)
     fineGC = transfer(gcImg, fineGC)
+    deallocate(gcImg, stat=status)
+    VERIFY_(STATUS)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
@@ -494,6 +498,8 @@ contains
     call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
     VERIFY_(STATUS)
     fineGC = transfer(gcImg, fineGC)
+    deallocate(gcImg, stat=status)
+    VERIFY_(STATUS)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
@@ -963,6 +969,7 @@ subroutine Run(gc, import, export, clock, rc)
     integer nx_ana, ny_ana
 
     logical, save                       :: firstime=.true.
+    logical, save                       :: firstime_tracer_alloc=.true.
     integer, save                       :: nq_saved = 0
     logical                             :: adjustTracers
     type(ESMF_Alarm)                    :: predictorAlarm
@@ -1011,6 +1018,8 @@ subroutine Run(gc, import, export, clock, rc)
   call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
   VERIFY_(STATUS)
   fineGC = transfer(gcImg, fineGC)
+  deallocate(gcImg, stat=status)
+  VERIFY_(STATUS)
 
 ! Retrieve the pointer to the generic state
 ! -----------------------------------------
@@ -1193,15 +1202,141 @@ subroutine Run(gc, import, export, clock, rc)
       ALLOCATE( mfyxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE( mfzxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
 
+! Report advected friendlies
+!---------------------------
+
       call ESMF_StateGet ( IMPORT, 'TRADV' , BUNDLE,   RC=STATUS )
       VERIFY_(STATUS)
-      !bundleAdv = BUNDLE
+
+      !-------------------------------------------------------------------
+      ! ALT: this section attempts to limit the amount of advected tracers
+      !-------------------------------------------------------------------
+      adjustTracers = .false.
+      call MAPL_GetResource ( MAPL, adjustTracerMode, &
+           'EXCLUDE_ADVECTION_TRACERS:', &
+           default='ALWAYS', rc=status )
+      VERIFY_(STATUS)
+      if (adjustTracerMode == 'ALWAYS') then
+         adjustTracers = .true.
+      else if (adjustTracerMode == 'PREDICTOR') then
+         !get PredictorAlarm from clock
+         call ESMF_ClockGetAlarm(clock, alarmName='PredictorAlarm', &
+              alarm=PredictorAlarm, rc=status)
+         if (status == ESMF_SUCCESS) then
+            !check if ringing
+            if (ESMF_AlarmIsRinging(predictorAlarm)) then
+               adjustTracers = .true.
+            end if
+         end if
+      else
+         call WRITE_PARALLEL('Invalid option, ignored')
+         adjustTracers = .false.
+      end if
+      if (adjustTracers) then
+         if (firstime) then
+            firstime=.false.
+            ! get the list of excluded tracers from resource
+            n = 0
+            call ESMF_ConfigFindLabel ( CF,'EXCLUDE_ADVECTION_TRACERS_LIST:',isPresent=isPresent,rc=STATUS )
+            VERIFY_(STATUS)
+            if(isPresent) then
+
+               tend  = .false.
+               allocate(xlist(XLIST_MAX), stat=status)
+               VERIFY_(STATUS)
+               do while (.not.tend)
+                  call ESMF_ConfigGetAttribute (CF,value=tmpstring,default='',rc=STATUS) !ALT: we don't check return status!!!
+                  if (tmpstring /= '')  then
+                     n = n + 1
+                     if (n > size(xlist)) then
+                        allocate( biggerlist(2*n), stat=status )
+                        VERIFY_(STATUS)
+                        biggerlist(1:n-1)=xlist
+                        call move_alloc(from=biggerlist, to=xlist)
+                     end if
+                     xlist(n) = tmpstring
+                  end if
+                  call ESMF_ConfigNextLine(CF,tableEnd=tend,rc=STATUS )
+                  VERIFY_(STATUS)
+               enddo
+            end if
+
+            ! Count the number of tracers
+            !---------------------
+            call ESMF_FieldBundleGet(BUNDLE, grid=bgrid,fieldCount=nqt,  RC=STATUS)
+            VERIFY_(STATUS)
+            BundleAdv = ESMF_FieldBundleCreate ( name='xTRADV', rc=STATUS )
+            VERIFY_(STATUS)
+            call ESMF_FieldBundleSet ( BundleAdv, grid=bgrid, rc=STATUS )
+            VERIFY_(STATUS)
+            !loop over NQ in TRADV
+            do i = 1, nqt
+               !get field from TRADV and its name
+               call ESMF_FieldBundleGet(bundle, fieldIndex=i, field=field, rc=status)
+               VERIFY_(STATUS)
+               call ESMF_FieldGet(FIELD, name=fieldname, RC=STATUS)
+               VERIFY_(STATUS)
+               !exclude everything that is not cloud/water species
+               if ( (AdvCore_Advection >= 1    ) .and. &
+                 (TRIM(fieldname) /= 'Q'       ) .and. &
+                 (TRIM(fieldname) /= 'QLCN'    ) .and. &
+                 (TRIM(fieldname) /= 'QLLS'    ) .and. &
+                 (TRIM(fieldname) /= 'QICN'    ) .and. &
+                 (TRIM(fieldname) /= 'QILS'    ) .and. &
+                 (TRIM(fieldname) /= 'CLCN'    ) .and. &
+                 (TRIM(fieldname) /= 'CLLS'    ) .and. &
+                 (TRIM(fieldname) /= 'NCPL'    ) .and. &
+                 (TRIM(fieldname) /= 'NCPI'    ) .and. &
+                 (TRIM(fieldname) /= 'QRAIN'   ) .and. &
+                 (TRIM(fieldname) /= 'QSNOW'   ) .and. &
+                 (TRIM(fieldname) /= 'QGRAUPEL') ) then
+                    write(STRING,'(A,A)') "FV3+ADV is excluding ", TRIM(fieldname)
+                    call WRITE_PARALLEL( trim(STRING)   )
+                     n = n + 1
+                     if (n > size(xlist)) then
+                        allocate( biggerlist(2*n), stat=status )
+                        VERIFY_(STATUS)
+                        biggerlist(1:n-1)=xlist
+                        call move_alloc(from=biggerlist, to=xlist)
+                     end if
+                     xlist(n) = TRIM(fieldname)
+               end if
+               !loop over exclude_list
+               exclude = .false.
+               do j = 1, n
+                  if (fieldname == xlist(j)) then
+                     exclude = .true.
+                     exit
+                  end if
+               end do
+               if (.not. exclude) then
+                  call MAPL_FieldBundleAdd(BundleAdv, FIELD, RC=STATUS)
+                  VERIFY_(STATUS)
+               end if
+            end do
+
+            if (allocated(xlist)) then
+           !   ! Just in case xlist was allocated, but nothing was in it, could have garbage
+           !   if (n > 0) then
+           !      call ESMF_FieldBundleRemove(BUNDLE, fieldNameList=xlist, &
+           !         relaxedFlag=.true., rc=status)
+           !      VERIFY_(STATUS)
+           !   end if
+               deallocate(xlist)
+            end if
+
+         end if ! firstime
+         BUNDLE = bundleAdv ! replace TRADV
+      else
+         bundleAdv = BUNDLE ! replace with TRADV
+      end if ! adjustTracers
+
       call ESMF_FieldBundleGet ( BUNDLE, fieldCount=NQ, RC=STATUS )
       VERIFY_(STATUS)
 
 !AOO move tracer allocation to here
-      if (firstime) then
-         firstime = .false.
+      if (firstime_tracer_alloc) then
+         firstime_tracer_alloc = .false.
          call allocateTracers(state, import, rc=status)
          VERIFY_(STATUS)
       endif
@@ -4319,10 +4454,7 @@ end subroutine RUN
     jm = state%grid%npy
     km = state%grid%npz
 
-    call ESMF_StateGet ( IMPORT, 'TRADV' , BUNDLE,   RC=STATUS )
-    VERIFY_(STATUS)
-
-    !BUNDLE = bundleAdv
+    BUNDLE = bundleAdv
 
 ! Count the friendlies
 !---------------------
@@ -4406,8 +4538,7 @@ end subroutine RUN
     type (ESMF_Field)                :: field
     integer                          :: N,NQ
 
-    call ESMF_StateGet ( IMPORT, 'TRADV' , BUNDLE,   RC=STATUS )
-    VERIFY_(STATUS)
+    BUNDLE = bundleAdv
 
 
 ! Count the friendlies
@@ -4557,6 +4688,8 @@ end subroutine RUN
     !call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
     !VERIFY_(STATUS)
     !fineGC = transfer(gcImg, fineGC)
+    !deallocate(gcImg, stat=status)
+    !VERIFY_(STATUS)
 
 ! Retrieve the pointer to the generic state
 ! -----------------------------------------
@@ -5728,6 +5861,8 @@ end subroutine RunAddIncs
         dummy = V
         call SSI_CopyCoarseToFine(export, dummy, name, STATE%f2c_SSI_arr_map, rc=status)
         VERIFY_(STATUS)
+        deallocate(dummy, stat=status)
+        VERIFY_(STATUS)
      endif
 
    end subroutine FILLOUT3
@@ -5755,6 +5890,8 @@ end subroutine RunAddIncs
         VERIFY_(STATUS)
         dummy = V
         call SSI_CopyCoarseToFine(export, dummy, name, STATE%f2c_SSI_arr_map, rc=status)
+        VERIFY_(STATUS)
+        deallocate(dummy, stat=status)
         VERIFY_(STATUS)
      endif
 
@@ -6117,6 +6254,8 @@ subroutine Coldstart(gc, import, export, clock, rc)
       call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
       VERIFY_(STATUS)
       fineGC = transfer(gcImg, fineGC)
+      deallocate(gcImg, stat=status)
+      VERIFY_(STATUS)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
@@ -7084,8 +7223,7 @@ subroutine allocateTracers(state, import, rc)
   jn = state%grid%je
   km = state%grid%npz
 
-  call ESMF_StateGet ( IMPORT, 'TRADV' , BUNDLE,   RC=STATUS )
-  VERIFY_(STATUS)
+  BUNDLE = bundleAdv
 
   call ESMF_FieldBundleGet ( BUNDLE, fieldCount=NQ, RC=STATUS )
   VERIFY_(STATUS)
