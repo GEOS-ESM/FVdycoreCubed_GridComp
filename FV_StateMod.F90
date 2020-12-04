@@ -221,8 +221,7 @@ private
     real(REAL8)                             :: hlv      ! latent heat of evaporation
     real(FVPRC)                             :: zvir     ! RWV/RAIR-1
 
-  real(kind=4), pointer             :: phis(:,:)
-  real(kind=4), pointer             :: phis_temp(:,:)
+  real(kind=4), pointer             :: phis(:,:) => Null()
 
   logical :: fv_first_run = .true.
 
@@ -912,20 +911,34 @@ contains
 !  VERIFY_(STATUS)
 
 ! Allocate coarse decomp internal state
-  if(.not.associated(u)) allocate(u(is:ie,js:je,npz), stat=status)
-  VERIFY_(STATUS)
-  if(.not.associated(v)) allocate(v(is:ie,js:je,npz), stat=status)
-  VERIFY_(STATUS)
-  if(.not.associated(pt)) allocate(pt(is:ie,js:je,npz), stat=status)
-  VERIFY_(STATUS)
-  if(.not.associated(pe)) allocate(pe(is:ie,js:je,npz+1), stat=status)
-  VERIFY_(STATUS)
-  if(.not.associated(pkz)) allocate(pkz(is:ie,js:je,npz), stat=status)
-  VERIFY_(STATUS)
-  if(.not.associated(dz)) allocate(dz(is:ie,js:je,npz), stat=status)
-  VERIFY_(STATUS)
-  if(.not.associated(w)) allocate(w(is:ie,js:je,npz), stat=status)
-  VERIFY_(STATUS)
+  if(.not.associated(u)) then
+     allocate(u(is:ie,js:je,npz), stat=status)
+     VERIFY_(STATUS)
+  endif
+  if(.not.associated(v)) then
+     allocate(v(is:ie,js:je,npz), stat=status)
+     VERIFY_(STATUS)
+  endif
+  if(.not.associated(pt)) then
+     allocate(pt(is:ie,js:je,npz), stat=status)
+     VERIFY_(STATUS)
+  endif
+  if(.not.associated(pe)) then
+     allocate(pe(is:ie,js:je,npz+1), stat=status)
+     VERIFY_(STATUS)
+  endif
+  if(.not.associated(pkz)) then
+     allocate(pkz(is:ie,js:je,npz), stat=status)
+     VERIFY_(STATUS)
+  endif
+  if(.not.associated(dz)) then
+     allocate(dz(is:ie,js:je,npz), stat=status)
+     VERIFY_(STATUS)
+  endif
+  if(.not.associated(w)) then
+     allocate(w(is:ie,js:je,npz), stat=status)
+     VERIFY_(STATUS)
+  endif
 
   call CREATE_VARS ( FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec,     &
                      1, FV_Atm(1)%flagstruct%npz, FV_Atm(1)%flagstruct%npz+1,            &
@@ -1040,8 +1053,10 @@ contains
   !call MAPL_GetPointer ( import, phis, 'PHIS', RC=STATUS )
   !VERIFY_(STATUS)
 
-  if(.not.associated(phis)) allocate(phis(isc:iec,jsc:jec), stat=status)
-  VERIFY_(STATUS)
+  if(.not.associated(phis)) then
+     allocate(phis(isc:iec,jsc:jec), stat=status)
+     VERIFY_(STATUS)
+  endif
   call SSI_CopyFineToCoarse(import, phis, 'PHIS', f2c_SSI_arr_map, rc=status)
   VERIFY_(STATUS)
 
