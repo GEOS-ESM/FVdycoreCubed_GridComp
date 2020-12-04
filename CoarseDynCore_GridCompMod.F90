@@ -458,8 +458,8 @@ contains
 
   !type (ESMF_State)                  :: INTERNAL
   type (DynGrid),  pointer           :: DycoreGrid
-  real, pointer                      :: temp2d(:,:)
-  real, pointer                      :: temp3d(:,:,:)
+  real, pointer                      :: temp2d(:,:) => Null()
+  real, pointer                      :: temp3d(:,:,:) => Null()
   
   integer                            :: ifirst
   integer                            :: ilast
@@ -623,8 +623,10 @@ contains
     call getAgridWinds( state%vars%u, state%vars%v, UA, VA, rotate=.true.)
 
     !U = UA
-    if(.not.associated(temp3d)) allocate(temp3d(ifirst:ilast,jfirst:jlast,1:km), stat=status)
-    VERIFY_(STATUS)
+    if(.not.associated(temp3d)) then
+       allocate(temp3d(ifirst:ilast,jfirst:jlast,1:km), stat=status)
+       VERIFY_(STATUS)
+    endif
     temp3d = UA
     call SSI_CopyCoarseToFine(export, temp3d, 'U', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
@@ -641,8 +643,10 @@ contains
     if (associated(temp3d)) then
        deallocate(temp3d)
     endif
-    if(.not.associated(temp3d)) allocate(temp3d(ifirst:ilast,jfirst:jlast,1:km+1), stat=status)
-    VERIFY_(STATUS)
+    if(.not.associated(temp3d)) then
+       allocate(temp3d(ifirst:ilast,jfirst:jlast,1:km+1), stat=status)
+       VERIFY_(STATUS)
+    endif
     temp3d = state%vars%pe
     !call ESMF_VMGet(VM, localPet=localPet, rc=status)
     !VERIFY_(STATUS)
@@ -652,14 +656,19 @@ contains
     call SSI_CopyCoarseToFine(export, temp3d, 'PLE', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
 
+    deallocate( UA )
+    deallocate( VA )
+
 ! Fill Grid-Cell Area Delta-X/Y
 ! -----------------------------
 
 
     !call MAPL_GetPointer(export, temp2d, 'DXC', rc=status)
     !VERIFY_(STATUS)
-    if(.not.associated(temp2d)) allocate(temp2d(ifirst:ilast,jfirst:jlast), stat=status)
-    VERIFY_(STATUS)
+    if(.not.associated(temp2d)) then
+       allocate(temp2d(ifirst:ilast,jfirst:jlast), stat=status)
+       VERIFY_(STATUS)
+    endif
 
     temp2d = DycoreGrid%dxc
     call SSI_CopyCoarseToFine(export, temp2d, 'DXC', STATE%f2c_SSI_arr_map, rc=status)
@@ -783,7 +792,7 @@ subroutine Run(gc, import, export, clock, rc)
     logical  :: is_ringing
 
     real(r8),     pointer :: phisxy(:,:)
-    real(kind=4), pointer ::   phis(:,:)
+    real(kind=4), pointer ::   phis(:,:) => Null()
 
     real(r8), allocatable ::   pkxy(:,:,:) ! pe**kappa
     real(r8), allocatable ::    pe0(:,:,:) ! edge-level pressure before dynamics
@@ -913,20 +922,20 @@ subroutine Run(gc, import, export, clock, rc)
     real(kind=4), allocatable ::       dqldt (:,:,:)
     real(kind=4), allocatable ::       dqidt (:,:,:)
     real(kind=4), allocatable ::       doxdt (:,:,:)
-    real(kind=4), pointer ::      dqvana (:,:,:)
-    real(kind=4), pointer ::      dqlana (:,:,:)
-    real(kind=4), pointer ::      dqiana (:,:,:)
-    real(kind=4), pointer ::      dqrana (:,:,:)
-    real(kind=4), pointer ::      dqsana (:,:,:)
-    real(kind=4), pointer ::      dqgana (:,:,:)
-    real(kind=4), pointer ::      doxana (:,:,:)
+    real(kind=4), pointer ::      dqvana (:,:,:) => Null()
+    real(kind=4), pointer ::      dqlana (:,:,:) => Null()
+    real(kind=4), pointer ::      dqiana (:,:,:) => Null()
+    real(kind=4), pointer ::      dqrana (:,:,:) => Null()
+    real(kind=4), pointer ::      dqsana (:,:,:) => Null()
+    real(kind=4), pointer ::      dqgana (:,:,:) => Null()
+    real(kind=4), pointer ::      doxana (:,:,:) => Null()
     real(kind=4), pointer ::       temp3d(:,:,:)
     real(kind=4), pointer ::       vtmp3d(:,:,:)
     real(kind=4), pointer ::         area(:,:)
     real(kind=4), pointer ::       temp2d(:,:)
-    real(kind=4), pointer ::       dummy2d(:,:)
-    real(kind=4), pointer ::       dummy3d(:,:,:)
-    real(kind=4), pointer ::       dummy3d_kmplus1(:,:,:)
+    real(kind=4), pointer ::       dummy2d(:,:) => Null()
+    real(kind=4), pointer ::       dummy3d(:,:,:) => Null()
+    real(kind=4), pointer ::       dummy3d_kmplus1(:,:,:) => Null()
     real(kind=4), pointer ::       tempu (:,:)
     real(kind=4), pointer ::       tempv (:,:)
     real(kind=4), allocatable ::   cubetemp3d(:,:,:)
@@ -1358,9 +1367,10 @@ subroutine Run(gc, import, export, clock, rc)
 
       !call MAPL_GetPointer ( IMPORT, PHIS, 'PHIS', RC=STATUS )
       !VERIFY_(STATUS)
-      if(.not.associated(phis))  &
+      if(.not.associated(phis))  then
          allocate(phis(ifirstxy:ilastxy,jfirstxy:jlastxy), stat=status)
-      VERIFY_(STATUS)
+         VERIFY_(STATUS)
+      endif
       call SSI_CopyFineToCoarse(import, phis, 'PHIS', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
@@ -1596,45 +1606,52 @@ subroutine Run(gc, import, export, clock, rc)
       !call MAPL_GetPointer ( IMPORT, doxana, 'DOXANA', RC=STATUS )   ! Get OX Increment from Analysis
       !VERIFY_(STATUS)
 
-      if(.not.associated(dqvana))  &
+      if(.not.associated(dqvana))  then
          allocate(dqvana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
-      VERIFY_(STATUS)
+         VERIFY_(STATUS)
+      endif
       call SSI_CopyFineToCoarse(import, dqvana, 'DQVANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
-      if(.not.associated(dqlana))  &
+      if(.not.associated(dqlana))  then
          allocate(dqlana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
-      VERIFY_(STATUS)
+         VERIFY_(STATUS)
+      endif
       call SSI_CopyFineToCoarse(import, dqlana, 'DQLANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
-      if(.not.associated(dqiana))  &
+      if(.not.associated(dqiana))  then
          allocate(dqiana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
-      VERIFY_(STATUS)
+         VERIFY_(STATUS)
+      endif
       call SSI_CopyFineToCoarse(import, dqiana, 'DQIANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
-      if(.not.associated(dqrana))  &
+      if(.not.associated(dqrana))  then
          allocate(dqrana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
-      VERIFY_(STATUS)
+         VERIFY_(STATUS)
+      endif
       call SSI_CopyFineToCoarse(import, dqrana, 'DQRANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
-      if(.not.associated(dqsana))  &
+      if(.not.associated(dqsana))  then
          allocate(dqsana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
-      VERIFY_(STATUS)
+         VERIFY_(STATUS)
+      endif
       call SSI_CopyFineToCoarse(import, dqsana, 'DQSANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
-      if(.not.associated(dqgana))  &
+      if(.not.associated(dqgana))  then
          allocate(dqgana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
-      VERIFY_(STATUS)
+         VERIFY_(STATUS)
+      endif
       call SSI_CopyFineToCoarse(import, dqgana, 'DQGANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
-      if(.not.associated(doxana))  &
+      if(.not.associated(doxana))  then
          allocate(doxana(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
-      VERIFY_(STATUS)
+         VERIFY_(STATUS)
+      endif
       call SSI_CopyFineToCoarse(import, doxana, 'DOXANA', STATE%f2c_SSI_arr_map, rc=status)
       VERIFY_(STATUS)
 
@@ -4621,7 +4638,7 @@ end subroutine RUN
     real(r8), allocatable :: tenrg0(:,:)   ! PHIS*(Psurf-Ptop)
 
     real(r8),     pointer :: phisxy(:,:)
-    real(r4),     pointer ::   phis(:,:)
+    real(r4),     pointer ::   phis(:,:) => Null()
     real(r8), allocatable ::    slp(:,:)
     real(r8), allocatable ::  H1000(:,:)
     real(r8), allocatable ::  H850 (:,:)
@@ -4649,9 +4666,9 @@ end subroutine RUN
 
     real(r4), pointer     :: QOLD(:,:,:)
     real(r4), pointer     :: temp3d(:,:,:)
-    real(r4), pointer     :: dummy3d(:,:,:)
+    real(r4), pointer     :: dummy3d(:,:,:) => Null()
     real(r4), pointer     :: temp2d(:,:  )
-    real(r4), pointer     :: dummy2d(:,:  )
+    real(r4), pointer     :: dummy2d(:,:  ) => Null()
 
     integer ifirstxy, ilastxy
     integer jfirstxy, jlastxy
@@ -4765,16 +4782,21 @@ end subroutine RUN
     ALLOCATE(  logpe(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
     ALLOCATE(    zle(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
 
-    if(.not.associated(dummy3d)) ALLOCATE(dummy3d(ifirstxy:ilastxy,jfirstxy:jlastxy,km),stat=status)
-    VERIFY_(STATUS)
-    if(.not.associated(dummy2d)) ALLOCATE(dummy2d(ifirstxy:ilastxy,jfirstxy:jlastxy),stat=status)
-    VERIFY_(STATUS)
+    if(.not.associated(dummy3d)) then
+       ALLOCATE(dummy3d(ifirstxy:ilastxy,jfirstxy:jlastxy,km),stat=status)
+       VERIFY_(STATUS)
+    endif
+    if(.not.associated(dummy2d)) then
+       ALLOCATE(dummy2d(ifirstxy:ilastxy,jfirstxy:jlastxy),stat=status)
+       VERIFY_(STATUS)
+    endif
 
     !call MAPL_GetPointer ( IMPORT, PHIS, 'PHIS', RC=STATUS )
     !VERIFY_(STATUS)
-    if(.not.associated(phis))  &
+    if(.not.associated(phis))  then
        allocate(phis(ifirstxy:ilastxy,jfirstxy:jlastxy), stat=status)
-    VERIFY_(STATUS)
+       VERIFY_(STATUS)
+    endif
     call SSI_CopyFineToCoarse(import, phis, 'PHIS', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
 
@@ -5484,8 +5506,8 @@ end subroutine RunAddIncs
 
     real(FVPRC), allocatable :: u_dt(:,:,:), v_dt(:,:,:), t_dt(:,:,:)
 
-    real(kind=4), pointer :: tend(:,:,:)
-    real(kind=4), pointer :: tend_kp1(:,:,:)
+    real(kind=4), pointer :: tend(:,:,:) => Null()
+    real(kind=4), pointer :: tend_kp1(:,:,:) => Null()
 
     type(DynTracers)      :: qqq       ! Specific Humidity
     real(FVPRC), allocatable :: Q(:,:,:,:), CVM(:,:,:)
@@ -5664,8 +5686,10 @@ end subroutine RunAddIncs
        !call ESMFL_StateGetPointerToData ( IMPORT,TEND,'DUDT',RC=STATUS )
        !VERIFY_(STATUS)
 
-       if(.not.associated(tend)) allocate(tend(is:ie,js:je,km), stat=status)
-       VERIFY_(STATUS)
+       if(.not.associated(tend)) then
+          allocate(tend(is:ie,js:je,km), stat=status)
+          VERIFY_(STATUS)
+       endif
        call SSI_CopyFineToCoarse(import, tend, 'DUDT', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
 
@@ -5720,7 +5744,10 @@ end subroutine RunAddIncs
        !call ESMFL_StateGetPointerToData ( IMPORT,TEND,'DPEDT',RC=STATUS )
        !VERIFY_(STATUS)
 
-       if(.not. associated(tend_kp1)) allocate(tend_kp1(is:ie,js:je,km+1))
+       if(.not.associated(tend_kp1)) then 
+          allocate(tend_kp1(is:ie,js:je,km+1), stat=status)
+          VERIFY_(STATUS)
+       endif
        call SSI_CopyFineToCoarse(import, tend_kp1, 'DPEDT', STATE%f2c_SSI_arr_map, rc=status)
 
        STATE%VARS%PE = STATE%VARS%PE + DT*TEND_kp1
