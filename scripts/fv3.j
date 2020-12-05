@@ -24,7 +24,7 @@ set FV_NX = @FV_NX
 set FV_NY = @FV_NY
 set NX = $FV_NX
 set NY = $FV_NY
-@  NPES = $NX * $NY
+@  MODEL_NPES = $NX * $NY
 
 set RUN_DT = @DT
 
@@ -55,6 +55,69 @@ set JOB_SGMT = '00000001 000000'
 set USE_SHMEM    = @USE_SHMEM
 set USE_IOSERVER = @USE_IOSERVER
 
+if ($USE_IOSERVER == 0) then
+   set IOS_NODES = 0
+else
+   set IOS_NODES = @IOS_NDS
+endif
+
+# Check for Over-Specification of CPU Resources
+# ---------------------------------------------
+if ($?SLURM_NTASKS) then
+   set  NCPUS = $SLURM_NTASKS
+else if ($?PBS_NODEFILE) then
+   set  NCPUS = `cat $PBS_NODEFILE | wc -l`
+else
+   set  NCPUS = NULL
+endif
+
+if ( $NCPUS != NULL ) then
+
+   if ( $USE_IOSERVER == 1 ) then
+
+      set NCPUS_PER_NODE = @NCPUS_PER_NODE
+
+      @ NODES  = `echo "( ($MODEL_NPES + $NCPUS_PER_NODE) + ($IOS_NODES * $NCPUS_PER_NODE) - 1)/$NCPUS_PER_NODE" | bc`
+      @ NPES   = $NODES * $NCPUS_PER_NODE
+
+      if( $NPES > $NCPUS ) then
+         echo "CPU Resources are Over-Specified"
+         echo "--------------------------------"
+         echo "Allotted  NCPUs: $NCPUS"
+         echo "Requested NCPUs: $NPES"
+         echo ""
+         echo "Specified NX: $NX"
+         echo "Specified NY: $NY"
+         echo ""
+         echo "Specified IOSERVER_NODES: $IOS_NODES"
+         echo "Specified cores per node: $NCPUS_PER_NODE"
+         exit
+      endif
+
+   else
+
+      @ NPES = $MODEL_NPES
+
+      if( $NPES > $NCPUS ) then
+         echo "CPU Resources are Over-Specified"
+         echo "--------------------------------"
+         echo "Allotted  NCPUs: $NCPUS"
+         echo "Requested NCPUs: $NPES"
+         echo ""
+         echo "Specified NX: $NX"
+         echo "Specified NY: $NY"
+         exit
+      endif
+
+   endif
+
+else
+   # This is for the desktop path
+
+   @ NPES = $MODEL_NPES
+
+endif
+
 #######################################################################
 #             Experiment Specific Environment Variables
 #######################################################################
@@ -83,7 +146,7 @@ module list
          setenv EXPDIR  @EXPDIR
          setenv SCRDIR  $EXPDIR/scratch_${EXPID}_${EXETAG}-${FV3EXE}
 if ($NH) setenv SCRDIR  ${SCRDIR}_NH.$$
-         setenv EXE     $GEOSBIN/StandAlone_FV3_Dycore.x
+         setenv EXE     $EXPDIR/StandAlone_FV3_Dycore.x
 
 #######################################################################
 #                 Create Experiment Scratch-Directory
@@ -122,7 +185,6 @@ JOB_SGMT:     ${JOB_SGMT}
 NUM_SGMT:     1
 HEARTBEAT_DT: ${RUN_DT}
 USE_SHMEM: ${USE_SHMEM}
-USE_IOSERVER: ${USE_IOSERVER}
 MAPL_ENABLE_TIMERS: YES
 MAPL_ENABLE_MEMUTILS: NO
 PRINTSPEC: 0  # (0: OFF, 1: IMPORT & EXPORT, 2: IMPORT, 3: EXPORT)
@@ -140,6 +202,7 @@ cat >      AGCM.rc << EOF
        AGCM_IM: ${AGCM_IM}
        AGCM_JM: ${AGCM_JM}
        AGCM_LM: ${AGCM_LM}
+IOSERVER_NODES: @IOS_NDS
       GRIDNAME: PE${AGCM_IM}x${AGCM_JM}-CF
  DYN.GRID_TYPE: Cubed-Sphere
   DYN.GRIDNAME: PE${AGCM_IM}x${AGCM_JM}-CF
@@ -163,8 +226,6 @@ NUM_READERS: @NUM_READERS
 NUM_WRITERS: @NUM_WRITERS
 # AGCM Model Restart Files
 # ------------------------
-#DYN_INTERNAL_RESTART_FILE:    fvcore_internal_rst
-#DYN_INTERNAL_RESTART_TYPE:    pbinary
 DYN_INTERNAL_CHECKPOINT_FILE: fvcore_internal_checkpoint
 DYN_INTERNAL_CHECKPOINT_TYPE: pnc4
 DYN_INTERNAL_HEADER:          1
@@ -252,14 +313,14 @@ cat >      input.nml << EOF
 
 &test_case_nml
        test_case = 5
- /
+/
 
 &fms_io_nml
 /
 
 &fms_nml
         print_memory_usage=.false.
-        domains_stack_size = 240000000
+        domains_stack_size = 24000000
 /
 EOF
 
@@ -278,9 +339,18 @@ endif
 echo "  "
 #pwd
 echo "***** USING **** $EXE *********************"
-if( $USE_SHMEM == 0 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
-mpirun -np $NPES ./StandAlone_FV3_Dycore.x |& tee ${SCRDIR}.log
-if( $USE_SHMEM == 0 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
+
+if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
+
+if( $USE_IOSERVER == 1) then
+   set IOSERVER_OPTIONS = "--npes_model $MODEL_NPES --nodes_output_server $IOS_NODES"
+else
+   set IOSERVER_OPTIONS = ""
+endif
+
+$RUN_CMD $NPES ./StandAlone_FV3_Dycore.x $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
+
+if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 
 set rc =  $status
 echo       Status = $rc

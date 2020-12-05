@@ -15,6 +15,10 @@ set (srcs
   CubeToLatLon.F90 
   CubeGridPrototype.F90
   GEOS_FV3_Utilities.F90
+  CoarseDynCore_GridCompMod.F90
+  SSI_FineToCoarseMod.F90
+  SSI_CoarseToFineMod.F90
+  SSI_TypeMod.F90
   )
 
 set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared)
@@ -46,7 +50,8 @@ elseif (FV_PRECISION MATCHES R4R8) # FV is R4 but FMS is R8
 endif ()
 
 
-set (CMAKE_Fortran_FLAGS_RELEASE "${GEOS_Fortran_FLAGS_VECT} ${OpenMP_Fortran_FLAGS}")
+set (CMAKE_Fortran_FLAGS_RELEASE "${GEOS_Fortran_FLAGS_VECT} ${OpenMP_Fortran_FLAGS} -O2")
+set (CMAKE_Fortran_FLAGS_DEBUG "${GEOS_Fortran_FLAGS_DEBUG} ${OpenMP_Fortran_FLAGS}")
 
 if (CRAY_POINTER)
   set_target_properties (${this} PROPERTIES COMPILE_FLAGS ${CRAY_POINTER})
