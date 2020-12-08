@@ -71,6 +71,9 @@ Module CoarseFVdycoreCubed_GridComp
   implicit none
   private
 
+  ! Include the MPI library definitons:
+  include 'mpif.h'
+
   type(ESMF_FieldBundle), save :: bundleAdv
   integer :: NXQ = 0
   logical :: overwrite_Q = .true.
@@ -126,6 +129,9 @@ Module CoarseFVdycoreCubed_GridComp
      module procedure Write_Profile_2d_R4
      module procedure Write_Profile_2d_R8
   end interface
+
+  real(kind=8) :: t1, t2
+  real(kind=8) :: dyn_run_timer
 
   type(ESMF_State) :: internal
 
@@ -968,6 +974,8 @@ subroutine Run(gc, import, export, clock, rc)
     real                  :: sclinc
     integer               :: rc_blend
 
+    real                  :: HGT_SURFACE
+
     character(len=ESMF_MAXSTR) :: ANA_IS_WEIGHTED
     logical                    ::     IS_WEIGHTED
 
@@ -1575,12 +1583,12 @@ subroutine Run(gc, import, export, clock, rc)
              if ( (qqq%is_r4) .and. associated(qqq%content_r4) ) then
                 if (size(qv)==size(qqq%content_r4)) then
                    qv = qqq%content_r4
-                   _ASSERT(all(qv >= 0.0),'needs informative message')
+                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              elseif (associated(qqq%content)) then
                 if (size(qv)==size(qqq%content)) then
                    qv = qqq%content
-                   _ASSERT(all(qv >= 0.0),'needs informative message')
+                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              endif
          endif
@@ -2431,9 +2439,29 @@ subroutine Run(gc, import, export, clock, rc)
 !-------------------------------------------------------
 
       call MAPL_TimerOn(MAPL,"-DYN_CORE")
+      t1 = MPI_Wtime(status)
       call DynRun (GC, STATE, CLOCK, internal, import, RC=STATUS)
       VERIFY_(STATUS)
+      t2 = MPI_Wtime(status)
+      dyn_run_timer = t2-t1
       call MAPL_TimerOff(MAPL,"-DYN_CORE")
+
+! Computational diagnostics
+! --------------------------
+    call MAPL_GetPointer(export,temp2d,'DYNTIMER',rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       dummy2d = dyn_run_timer
+       call SSI_CopyCoarseToFine(export, dummy2d, 'DYNTIMER', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    endif
+    call MAPL_GetPointer(export,temp2d,'PID',rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       dummy2d = 0 !WMP need to get from MAPL gid
+       call SSI_CopyCoarseToFine(export, dummy2d, 'PID', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    endif
 
 !#define DEBUG_WINDS
 #if defined(DEBUG_WINDS)         
@@ -2676,7 +2704,7 @@ subroutine Run(gc, import, export, clock, rc)
 
 
       do ntracer=1,ntracers
-         write(myTracer, "('Q',i1.1)") ntracer-1
+         write(myTracer, "('Q',i5.5)") ntracer-1
          call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
          VERIFY_(STATUS)
          if((associated(temp3d)) .and. (NQ>=ntracer)) then
@@ -2893,57 +2921,6 @@ subroutine Run(gc, import, export, clock, rc)
           enddo
           dummy2d = dummy2d * (MAPL_O3MW/MAPL_AIRMW) / (MAPL_GRAV*DT)
           call SSI_CopyCoarseToFine(export, dummy2d, 'DOXDTDYNINT', STATE%f2c_SSI_arr_map, rc=status)
-          VERIFY_(STATUS)
-      endif
-
-! Fill Surface and Near-Surface Variables
-! ---------------------------------------
-
-      call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) then
-          dummy2d =  vars%pe(:,:,km+1)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'PS', STATE%f2c_SSI_arr_map, rc=status)
-          VERIFY_(STATUS)
-      endif
-
-      call MAPL_GetPointer(export,temp2d,'US',  rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) then
-          dummy2d =       ua(:,:,km)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'US', STATE%f2c_SSI_arr_map, rc=status)
-          VERIFY_(STATUS)
-      endif
-
-      call MAPL_GetPointer(export,temp2d,'VS'   ,rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) then
-          dummy2d =       va(:,:,km)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'VS', STATE%f2c_SSI_arr_map, rc=status)
-          VERIFY_(STATUS)
-      endif
-
-      call MAPL_GetPointer(export,temp2d,'TA'   ,rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) then
-          dummy2d =   tempxy(:,:,km)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'TA', STATE%f2c_SSI_arr_map, rc=status)
-          VERIFY_(STATUS)
-      endif
-
-      call MAPL_GetPointer(export,temp2d,'QA'   ,rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) then
-          dummy2d =       qv(:,:,km)
-          call SSI_CopyCoarseToFine(export, dummy2d, 'QA', STATE%f2c_SSI_arr_map, rc=status)
-          VERIFY_(STATUS)
-      endif
-
-      call MAPL_GetPointer(export,temp2d,'SPEED',rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) then
-          dummy2d = sqrt( ua(:,:,km)**2 + va(:,:,km)**2 )
-          call SSI_CopyCoarseToFine(export, dummy2d, 'SPEED', STATE%f2c_SSI_arr_map, rc=status)
           VERIFY_(STATUS)
       endif
 
@@ -3199,14 +3176,6 @@ subroutine Run(gc, import, export, clock, rc)
          VERIFY_(STATUS)
       end if
 
-      call MAPL_GetPointer(export,temp2d,'DZ', rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) then
-         dummy2d = 0.5*( zle(:,:,km)-zle(:,:,km+1) )
-         call SSI_CopyCoarseToFine(export, dummy2d, 'DZ', STATE%f2c_SSI_arr_map, rc=status)
-         VERIFY_(STATUS)
-      end if
-
       call MAPL_GetPointer(export,temp3d,'ZL' ,rc=status)
       VERIFY_(STATUS)
       if(associated(temp3d)) then
@@ -3218,7 +3187,8 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp3d,'S'  ,rc=status)
       VERIFY_(STATUS)
       if(associated(temp3d)) then
-         dummy3d = temp3d + grav*(0.5*( zle(:,:,:km)+zle(:,:,2:) ))
+         call SSI_CopyFineToCoarse(export, dummy3d, 'S', STATE%f2c_SSI_arr_map, rc=status)
+         dummy3d = dummy3d + grav*(0.5*( zle(:,:,:km)+zle(:,:,2:) ))
          call SSI_CopyCoarseToFine(export, dummy3d, 'S', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
       end if
@@ -3250,7 +3220,140 @@ subroutine Run(gc, import, export, clock, rc)
          VERIFY_(STATUS)
       end if
 
-      zle = log(vars%pe)
+      call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT= 50.0, RC=STATUS)
+      VERIFY_(STATUS)
+
+! Fill Surface and Near-Surface Variables
+! ---------------------------------------
+   if ( (KM .ne. 72) .and. (HGT_SURFACE .gt. 0.0) ) then
+     ! Near surface height for surface
+     ! -------------------------------
+      call MAPL_GetPointer(export,temp2d,'DZ', rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         dummy2d = HGT_SURFACE
+         call SSI_CopyCoarseToFine(export, dummy2d, 'DZ', STATE%f2c_SSI_arr_map, rc=status)
+         VERIFY_(STATUS)
+      endif
+
+    ! Get the height above the surface
+      do k=1,km+1
+         zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
+      enddo
+
+      call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         dummy2d =  vars%pe(:,:,km+1)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'PS', STATE%f2c_SSI_arr_map, rc=status)
+         VERIFY_(STATUS)
+      endif
+
+      call MAPL_GetPointer(export,temp2d,'US',  rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         call VertInterp(dummy2d,ua,-zle,-HGT_SURFACE, status)
+         VERIFY_(STATUS)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'US', STATE%f2c_SSI_arr_map, rc=status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'VS'   ,rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         call VertInterp(dummy2d,va,-zle,-HGT_SURFACE, status)
+         VERIFY_(STATUS)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'VS', STATE%f2c_SSI_arr_map, rc=status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'TA'   ,rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         tempxy  = vars%pt * vars%pkz
+         call VertInterp(dummy2d,tempxy,-zle,-HGT_SURFACE, status)
+         VERIFY_(STATUS)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'TA', STATE%f2c_SSI_arr_map, rc=status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'QA'   ,rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         call VertInterp(dummy2d,qv,-zle,-HGT_SURFACE, status)
+         VERIFY_(STATUS)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'QA', STATE%f2c_SSI_arr_map, rc=status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'SPEED',rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         call VertInterp(dummy2d,sqrt(ua**2 + va**2),-zle,-HGT_SURFACE, status)
+         VERIFY_(STATUS)
+         call SSI_CopyCoarseToFine(export, dummy2d, 'SPEED', STATE%f2c_SSI_arr_map, rc=status)
+         VERIFY_(STATUS)
+      end if
+   else
+! Fill Surface with Lowest Model Level Variables
+! ----------------------------------------------
+      call MAPL_GetPointer(export,temp2d,'DZ', rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         dummy2d = 0.5*( zle(:,:,km)-zle(:,:,km+1) )
+         call SSI_CopyCoarseToFine(export, dummy2d, 'DZ', STATE%f2c_SSI_arr_map, rc=status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+          dummy2d =  vars%pe(:,:,km+1)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'PS', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+      endif
+
+      call MAPL_GetPointer(export,temp2d,'US',  rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+          dummy2d =       ua(:,:,km)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'US', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+      endif
+
+      call MAPL_GetPointer(export,temp2d,'VS'   ,rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+          dummy2d =       va(:,:,km)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'VS', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+      endif
+
+      call MAPL_GetPointer(export,temp2d,'TA'   ,rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+          tempxy  = vars%pt * vars%pkz
+          dummy2d =   tempxy(:,:,km)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'TA', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+      endif
+
+      call MAPL_GetPointer(export,temp2d,'QA'   ,rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+          dummy2d =       qv(:,:,km)
+          call SSI_CopyCoarseToFine(export, dummy2d, 'QA', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+      endif
+
+      call MAPL_GetPointer(export,temp2d,'SPEED',rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+          dummy2d = sqrt( ua(:,:,km)**2 + va(:,:,km)**2 )
+          call SSI_CopyCoarseToFine(export, dummy2d, 'SPEED', STATE%f2c_SSI_arr_map, rc=status)
+          VERIFY_(STATUS)
+      endif
+   endif
 
 ! Updraft Helicty Export
 
@@ -3263,6 +3366,8 @@ subroutine Run(gc, import, export, clock, rc)
       endif
 
 ! Divergence Exports
+
+      zle = log(vars%pe)
 
       call getDivergence(uc, vc, tmp3d)
 
@@ -4951,7 +5056,7 @@ end subroutine RUN
     endif
 
       do ntracer=1,ntracers
-         write(myTracer, "('Q',i1.1)") ntracer-1
+         write(myTracer, "('Q',i5.5)") ntracer-1
          call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
          VERIFY_(STATUS)
          if((associated(temp3d)) .and. (STATE%GRID%NQ>=ntracer)) then
@@ -5411,20 +5516,6 @@ end subroutine RUN
        DEALLOCATE(slp,H1000,H850,H500)
     end if
 
-! Computational diagnostics
-! --------------------------
-!    call MAPL_GetPointer(export,temp2d,'DYNTIMER',rc=status)
-!    VERIFY_(STATUS)
-!    if(associated(temp2d)) temp2d = dyn_timer
-!
-!    call MAPL_GetPointer(export,temp2d,'COMMTIMER',rc=status)
-!    VERIFY_(STATUS)
-!    if(associated(temp2d)) temp2d = comm_timer
-!
-!    call MAPL_GetPointer(export,temp2d,'PID',rc=status)
-!    VERIFY_(STATUS)
-!    if(associated(temp2d)) temp2d = 0 !WMP need to get from MAPL gid
-
 ! Deallocate Memory
 ! -----------------
 
@@ -5555,7 +5646,7 @@ end subroutine RunAddIncs
          if (TRIM(state%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
        enddo
       ! We must have these first 5 at a minimum
-       _ASSERT(nwat_tracers == 5, 'needs informative message')
+       _ASSERT(nwat_tracers == 5, 'expecting 5 water species: Q QLCN QLLS QICN QILS')
       ! Check for QRAIN, QSNOW, QGRAUPEL
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'QRAIN'   ) nwat_tracers = nwat_tracers + 1
@@ -5567,6 +5658,9 @@ end subroutine RunAddIncs
           if (nwat_tracers >= 5) nwat = 3 ! STATE has QV, QLIQ, QICE
           if (nwat_tracers == 8) nwat = 6 ! STATE has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
        endif
+    endif
+    if (.not. ADIABATIC) then
+       _ASSERT(nwat >= 1, 'expecting water species (nwat) to match')
     endif
     if (nwat >= 1) then
     ALLOCATE(   Q(is:ie,js:je,1:km,nwat) )
