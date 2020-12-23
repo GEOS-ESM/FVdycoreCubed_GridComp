@@ -153,7 +153,7 @@ contains
       integer :: petCount, localPet
       type (MAPL_MetaComp), pointer :: MAPL  => NULL()
       integer, allocatable :: gcImg(:)
-      integer :: itemCount
+      integer :: itemCount, esmf_stacksize
       type(ESMF_GridComp) :: fineGC
       !type(ESMF_Config)  :: cf
 
@@ -177,13 +177,6 @@ contains
       call MAPL_GetObjectFromGC (fineGC, MAPL,  RC=STATUS )
       VERIFY_(STATUS)
 
-      !call ESMF_LogWrite("Executing 'userm2_setvm'", ESMF_LOGMSG_INFO, rc=rc)
-      !if (rc/=ESMF_SUCCESS) return ! bail out
-      nthreads = 1
-!!!$omp parallel
-!!!$      nthreads = omp_get_num_threads()
-!!!$omp end parallel
-
       ! The following call will give each PET as many PEs as nthreads.
       ! This will reduce the number of PETs that are
       ! executing the component, but each PET will have multipe PEs available,
@@ -195,32 +188,24 @@ contains
       call ESMF_VMGet(vm, petCount=petCount, localPet=localPet, pthreadsEnabledFlag=pthreadsEnabled, &
         ssiSharedMemoryEnabledFlag=ssiSharedMemoryEnabled, rc=status)
       VERIFY_(STATUS)
-      !print *, __FILE__, __LINE__, "ssiSharedMemoryEnabled: ", petCount, localPet, ssiSharedMemoryEnabled, pthreadsEnabled
-      !call ESMF_VMBarrier(vm, rc=status)
-      !VERIFY_(STATUS)
-      if (pthreadsEnabled) then
-        !call ESMF_VMGet(vm, ssiMaxPetCount=ssiMaxPetCount, rc=rc)
-        !if (rc/=ESMF_SUCCESS) return ! bail out
-        if (.not.ssiSharedMemoryEnabled) then
-          ! do not maximize PEs on fewer PETs if SSI shared memory not supported
-          nthreads=1
-        endif
+      _ASSERT(ssiSharedMemoryEnabled, 'ESMF built with Shared Memory Required')
+      _ASSERT(pthreadsEnabled, 'ESMF built with Pthreads Enabled Required')
 ! nth_x = coarsening factor in X-direction
         call MAPL_GetResource( MAPL, nth_x, 'NTH_X:', default=1, RC=STATUS )
         VERIFY_(STATUS)
 ! nth_y = coarsening factor in Y-direction
         call MAPL_GetResource( MAPL, nth_y, 'NTH_Y:', default=1, RC=STATUS )
         VERIFY_(STATUS)
+! esmf_stacksize for the main Pthread
+        call MAPL_GetResource( MAPL, esmf_stacksize, 'ESMF_STACKSIZE:', &
+                 default=20971520, RC=STATUS )
+        VERIFY_(STATUS)
 ! nthreads = num threads to use in dyncore
         nthreads = nth_x*nth_y
-        call ESMF_GridCompSetVMMaxPEs(gc, maxPeCountPerPet=nthreads, rc=status)
+        call ESMF_GridCompSetVMMaxPEs(gc, maxPeCountPerPet=nthreads, &
+                 minStackSize=esmf_stacksize, rc=status)
         VERIFY_(STATUS)
-      endif
-      !print *, __FILE__, __LINE__, "ssiSharedMemoryEnabled: ", ssiSharedMemoryEnabled, nthreads, pthreadsEnabled
-        !write(msg,*) "user2_setvm: OpenMP num thread:", nthreads
-        !call ESMF_LogWrite(msg, ESMF_LOGMSG_INFO, rc=rc)
-        !call ESMF_LogFlush(rc=rc)
-        !print *, __FILE__, __LINE__, "coarse_setvm ..... ", nthreads
+
       RETURN_(ESMF_SUCCESS)
 
    end subroutine
