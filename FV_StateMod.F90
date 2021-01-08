@@ -669,6 +669,11 @@ contains
       f2c_SSI_arr_map%is = fv_atm(1)%bd%isc
       f2c_SSI_arr_map%js = fv_atm(1)%bd%jsc
       STATE%f2c_SSI_arr_map => f2c_SSI_arr_map
+ 
+      ! CK: Adding npx and nx to f2c_SSI_arr_map
+      f2c_SSI_arr_map%npx = FV_Atm(1)%npx !FV_Atm(1)%flagstruct%npx
+      f2c_SSI_arr_map%nx  = nx
+
 
 !! Setup GFDL microphysics module
     call gfdl_cloud_microphys_init()

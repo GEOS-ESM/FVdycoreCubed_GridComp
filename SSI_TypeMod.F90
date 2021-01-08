@@ -16,6 +16,9 @@ type SSI_Type
    integer :: npet_y  ! node-local num pets in y-direction
    integer :: is  
    integer :: js 
+
+   integer :: nx    ! CK: Value used for is and ie computation for DATA_COPY
+   integer :: npx   ! CK: Value used for is and ie computation for DATA_COPY
 end type SSI_Type
 
 public SSI_Type
