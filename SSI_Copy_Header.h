@@ -13,3 +13,5 @@
    integer :: ndim, is, ie, js, je, km, ith, jth
    integer, allocatable :: gcImg(:)
    integer :: itemCount
+
+   integer :: nx, npx
