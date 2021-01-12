@@ -1675,6 +1675,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
       tqtot = 0.0
       if ( (.not. ADIABATIC) .AND. (FV_Atm(1)%flagstruct%nwat /= 0) ) then
        if (FV_Atm(1)%flagstruct%nwat == 6) then
+         do k=1,npz
             tqtot(:,:) = tqtot(:,:) + ( &
             FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
             FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
@@ -1682,6 +1683,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
             FV_Atm(1)%q(isc:iec,jsc:jec,k,rain) + & 
             FV_Atm(1)%q(isc:iec,jsc:jec,k,snow) + & 
             FV_Atm(1)%q(isc:iec,jsc:jec,k,grpl) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
+         enddo
        else
          do k=1,npz
             tqtot(:,:) = tqtot(:,:) + ( &
