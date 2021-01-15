@@ -2292,6 +2292,8 @@ contains
     VERIFY_(STATUS)
     call MAPL_TimerAdd(GC,    name="-DYN_CORE"   ,RC=STATUS)
     VERIFY_(STATUS)
+    call MAPL_TimerAdd(GC,    name="--ADD_INCS"   ,RC=STATUS)
+    VERIFY_(STATUS)
     call MAPL_TimerAdd(GC,    name="--MASS_FIX"  ,RC=STATUS)
     VERIFY_(STATUS)
     call MAPL_TimerAdd(GC,    name="--FV_DYNAMICS",RC=STATUS)

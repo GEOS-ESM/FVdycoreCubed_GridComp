@@ -1877,7 +1877,9 @@ subroutine Run(gc, import, export, clock, rc)
       ! -----------------------
       delpold = delp                            ! Old Pressure Thickness
 
+      call MAPL_TimerOn(MAPL,"--ADD_INCS")
       call ADD_INCS ( STATE,IMPORT,internal,DT,IS_WEIGHTED=IS_WEIGHTED )
+      call MAPL_TimerOff(MAPL,"--ADD_INCS")
 
       if (DYN_DEBUG) call DEBUG_FV_STATE('ANA ADD_INCS',STATE)
 
@@ -4788,21 +4790,21 @@ end subroutine RUN
 
 ! Retrieve fine GC 
 ! ---------------------------------
-    !call ESMF_AttributeGet(GC, name='GC_IMAGE', itemCount=itemCount, rc=status)
-    !VERIFY_(STATUS)
-    !allocate(gcImg(itemCount), stat=status)
-    !VERIFY_(STATUS)
-    !call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
-    !VERIFY_(STATUS)
-    !fineGC = transfer(gcImg, fineGC)
-    !deallocate(gcImg, stat=status)
-    !VERIFY_(STATUS)
+    call ESMF_AttributeGet(GC, name='GC_IMAGE', itemCount=itemCount, rc=status)
+    VERIFY_(STATUS)
+    allocate(gcImg(itemCount), stat=status)
+    VERIFY_(STATUS)
+    call ESMF_AttributeGet(GC, name='GC_IMAGE', valueList=gcImg, rc=status)
+    VERIFY_(STATUS)
+    fineGC = transfer(gcImg, fineGC)
+    deallocate(gcImg, stat=status)
+    VERIFY_(STATUS)
 
 ! Retrieve the pointer to the generic state
 ! -----------------------------------------
 
-    !call MAPL_GetObjectFromGC (fineGC, GENSTATE,  RC=STATUS )
-    !VERIFY_(STATUS)
+    call MAPL_GetObjectFromGC (fineGC, GENSTATE,  RC=STATUS )
+    VERIFY_(STATUS)
 
     !call MAPL_TimerOn(GENSTATE,"TOTAL")
     !call MAPL_TimerOn(GENSTATE,"RUN2")
@@ -4943,7 +4945,9 @@ end subroutine RUN
 
 ! Add Diabatic Forcing to State Variables
 ! ---------------------------------------
+    call MAPL_TimerOn(GENSTATE,"--ADD_INCS")
     call ADD_INCS ( STATE,IMPORT,internal,DT )
+    call MAPL_TimerOff(GENSTATE,"--ADD_INCS")
 
     if (DYN_DEBUG) call DEBUG_FV_STATE('PHYSICS ADD_INCS',STATE)
 

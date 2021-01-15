@@ -17,8 +17,8 @@ type SSI_Type
    integer :: is  
    integer :: js 
 
-   integer :: nx    ! CK: Value used for is and ie computation for DATA_COPY
-   integer :: npx   ! CK: Value used for is and ie computation for DATA_COPY
+   integer :: nx    ! CK: Value used for is and ie computation for DATA_COPY; x-xomponent of process grid topology
+   integer :: npx   ! CK: Value used for is and ie computation for DATA_COPY; same as AGCM_IM
 end type SSI_Type
 
 public SSI_Type

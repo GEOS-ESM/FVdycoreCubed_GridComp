@@ -1447,16 +1447,24 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
        _ASSERT(FV_Atm(1)%ncnst >= 13, 'needs informative message')
        _ASSERT(FV_Atm(1)%ncnst == STATE%GRID%NQ + 3, 'needs informative message')
     end select
+
+!!$omp parallel workshare
     FV_Atm(1)%q(:,:,:,:) = 0.0
+!!$omp end parallel workshare
+
     if (FV_Atm(1)%flagstruct%nwat > 0) then
     do n=1,STATE%GRID%NQ
        if (TRIM(state%vars%tracer(n)%tname) == 'Q') then
           SPHU_FILLED = .TRUE.
           nn = nn+1
           if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
           else
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
           endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QLCN') then
@@ -1464,17 +1472,25 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
            QLIQ_FILLED = .TRUE.
            nn = nn+1
            if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
            else
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
            endif
          endif
          QLCN_FILLED = .TRUE.
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
          endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QLLS') then
@@ -1482,17 +1498,25 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
            QLIQ_FILLED = .TRUE.
           ! nn increment already handled in QLCN
            if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
            else
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
            endif
          endif
          QLLS_FILLED = .TRUE.
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
          endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QICN') then
@@ -1500,17 +1524,25 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
            QICE_FILLED = .TRUE.
            nn = nn+1
            if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
            else
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
            endif
          endif
          QICN_FILLED = .TRUE.
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
          endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QILS') then
@@ -1518,17 +1550,25 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
            QICE_FILLED = .TRUE.
           ! nn increment already handled in QICN
            if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
            else
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
            endif
          endif
          QILS_FILLED = .TRUE.
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
          endif
        endif
      ! Extra species for 6-phase microphysics
@@ -1537,27 +1577,39 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
          RAIN_FILLED = .TRUE.
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
          endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QSNOW') then
          SNOW_FILLED = .TRUE.
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
          endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL') then
          GRPL_FILLED = .TRUE.
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
          endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'CLCN') then
@@ -1565,17 +1617,25 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
            QCLD_FILLED = .TRUE.
            nn = nn+1
            if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
            else
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
            endif
          endif
          CLCN_FILLED = .TRUE.
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
          endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'CLLS') then
@@ -1583,17 +1643,25 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
            QCLD_FILLED = .TRUE.
           ! nn increment already handled in CLCN
            if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
            else
+!!$omp parallel workshare
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
            endif
          endif
          CLLS_FILLED = .TRUE.
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
          endif
        endif
        endif !nwat==6
@@ -1638,9 +1706,13 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
        do n=1,STATE%GRID%NQ
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
          endif
        enddo
       case (1)
@@ -1652,9 +1724,13 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
               (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
            nn=nn+1
            if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
            else
+!!$omp parallel workshare
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
            endif
          endif
        enddo
@@ -1667,9 +1743,13 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
               (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
            nn=nn+1
            if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
            else
+!!$omp parallel workshare
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
            endif
          endif
        enddo
@@ -1687,9 +1767,13 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
               (TRIM(state%vars%tracer(n)%tname) /= 'QGRAUPEL') ) then
            nn=nn+1
            if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
            else
+!!$omp parallel workshare
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
            endif
          endif
        enddo
@@ -1700,9 +1784,13 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
       do n=1,STATE%GRID%NQ
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
+!!$omp end parallel workshare
          endif
       enddo
       _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
@@ -1769,6 +1857,8 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
       tqtot = 0.0
       if ( (.not. ADIABATIC) .AND. (FV_Atm(1)%flagstruct%nwat /= 0) ) then
        if (FV_Atm(1)%flagstruct%nwat == 6) then
+!!$omp parallel do reduction(+:tqtot)
+         do k=1,npz
             tqtot(:,:) = tqtot(:,:) + ( &
             FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
             FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
@@ -1776,7 +1866,10 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
             FV_Atm(1)%q(isc:iec,jsc:jec,k,rain) + & 
             FV_Atm(1)%q(isc:iec,jsc:jec,k,snow) + & 
             FV_Atm(1)%q(isc:iec,jsc:jec,k,grpl) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
+         enddo
+!!$omp end parallel do
        else
+!!$omp parallel do reduction(+:tqtot)
          do k=1,npz
             tqtot(:,:) = tqtot(:,:) + ( &
             FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
@@ -1785,6 +1878,7 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
             FV_Atm(1)%q(isc:iec,jsc:jec,k,qicn) + &
             FV_Atm(1)%q(isc:iec,jsc:jec,k,qils) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
          enddo
+!!$omp end parallel do
        endif
       endif
 
@@ -1913,6 +2007,7 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
 
      ! Redistribute CN/LS liq, ice and cld condensate based on advected CN/LS species
      if (FV_Atm(1)%flagstruct%nwat >= 3) then
+!!$omp parallel do private(FQC)
       do k=1,npz
          do j=jsc,jec
             do i=isc,iec
@@ -1936,6 +2031,7 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
             enddo
          enddo
       enddo
+!!$omp end parallel do
       if (FV_Atm(1)%flagstruct%nwat == 3) then
         nn = nn+2
         QLIQ_FILLED = .TRUE.
@@ -1956,45 +2052,65 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
           SPHU_FILLED = .TRUE.
           nn = nn+1
           if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
+!!$omp end parallel workshare
           else
+!!$omp parallel workshare
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
+!!$omp end parallel workshare
           endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QLCN') then
           QLCN_FILLED = .TRUE.
           nn = nn+1
           if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
+!!$omp end parallel workshare
           else
+!!$omp parallel workshare
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
+!!$omp end parallel workshare
           endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QLLS') then
           QLLS_FILLED = .TRUE.
           nn = nn+1
           if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
+!!$omp end parallel workshare
           else
+!!$omp parallel workshare
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
+!!$omp end parallel workshare
           endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QICN') then
           QICN_FILLED = .TRUE.
           nn = nn+1
           if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
+!!$omp end parallel workshare
           else
+!!$omp parallel workshare
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
+!!$omp end parallel workshare
           endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QILS') then
           QILS_FILLED = .TRUE.
           nn = nn+1
           if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
+!!$omp end parallel workshare
           else
+!!$omp parallel workshare
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
+!!$omp end parallel workshare
           endif
        endif
        endif ! nwat >= 1
@@ -2004,45 +2120,65 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
           RAIN_FILLED = .TRUE.
           nn = nn+1
           if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain)
+!!$omp end parallel workshare
           else
+!!$omp parallel workshare
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain)
+!!$omp end parallel workshare
           endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QSNOW') then
           SNOW_FILLED = .TRUE.
           nn = nn+1
           if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow)
+!!$omp end parallel workshare
           else
+!!$omp parallel workshare
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow)
+!!$omp end parallel workshare
           endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL') then
           GRPL_FILLED = .TRUE.
           nn = nn+1
           if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl)
+!!$omp end parallel workshare
           else
+!!$omp parallel workshare
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl)
+!!$omp end parallel workshare
           endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'CLCN') then
           CLCN_FILLED = .TRUE.
           nn = nn+1
           if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
+!!$omp end parallel workshare
           else
+!!$omp parallel workshare
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
+!!$omp end parallel workshare
           endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'CLLS') then
           CLLS_FILLED = .TRUE.
           nn = nn+1
           if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
              state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
+!!$omp end parallel workshare
           else
+!!$omp parallel workshare
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
+!!$omp end parallel workshare
           endif
        endif
        endif ! nwat == 6
@@ -2088,9 +2224,13 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
        do n=1,STATE%GRID%NQ
          nn=nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+!!$omp end parallel workshare
          endif
        enddo
       case (1)
@@ -2102,9 +2242,13 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
             (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
          nn=nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+!!$omp end parallel workshare
          endif
         endif
        enddo
@@ -2117,9 +2261,13 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
             (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
          nn=nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+!!$omp end parallel workshare
          endif
         endif
        enddo
@@ -2137,9 +2285,13 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
             (TRIM(state%vars%tracer(n)%tname) /= 'QGRAUPEL') ) then
          nn=nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+!!$omp end parallel workshare
          endif
         endif
        enddo
@@ -2149,9 +2301,13 @@ subroutine FV_Run (GC, STATE, CLOCK, internal, import, RC)
       do n=1,STATE%GRID%NQ
          nn=nn+1
          if (state%vars%tracer(n)%is_r4) then
+!!$omp parallel workshare
             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+!!$omp end parallel workshare
          else
+!!$omp parallel workshare
             state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+!!$omp end parallel workshare
          endif
       enddo
       _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
@@ -2267,45 +2423,64 @@ subroutine State_To_FV ( STATE, internal )
 !------------
 
 ! D-Grid
+!$omp parallel workshare
   FV_Atm(1)%u(:,:,:) = tiny_number
   FV_Atm(1)%v(:,:,:) = tiny_number
+!$omp end parallel workshare
   if (FV_Atm(1)%flagstruct%grid_type>=4) then
   ! Doubly Periodic
+!$omp parallel workshare
     uatemp(isc:iec,jsc:jec,:) = STATE%VARS%U
     vatemp(isc:iec,jsc:jec,:) = STATE%VARS%V
+!$omp end parallel workshare
     call mpp_update_domains(uatemp, FV_Atm(1)%domain, &
                             whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.false.)
     call mpp_update_domains(vatemp, FV_Atm(1)%domain, &
                             whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.true.)
+!$omp parallel workshare
     FV_Atm(1)%u(isc:iec,jsc:jec+1,:) = uatemp(isc:iec,jsc:jec+1,:)
     FV_Atm(1)%v(isc:iec+1,jsc:jec,:) = vatemp(isc:iec+1,jsc:jec,:)
+!$omp end parallel workshare
   else
+!$omp parallel workshare
     FV_Atm(1)%u(isc:iec,jsc:jec,:) = STATE%VARS%U
     FV_Atm(1)%v(isc:iec,jsc:jec,:) = STATE%VARS%V
+!$omp end parallel workshare
     call mpp_get_boundary(FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%domain, &
                           wbuffery=wbuffer, ebuffery=ebuffer, &
                           sbufferx=sbuffer, nbufferx=nbuffer, &
                           gridtype=DGRID_NE, complete=.true. )
+!$omp parallel
+!$omp do
     do k=1,km
        do i=isc,iec
           FV_Atm(1)%u(i,jec+1,k) = nbuffer(i,k)
        enddo
     enddo
+!$omp do
     do k=1,km
        do j=jsc,jec
           FV_Atm(1)%v(iec+1,j,k) = ebuffer(j,k)
        enddo
     enddo
+!$omp end parallel
   endif
 
-   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%w(isc:iec,jsc:jec,:) = STATE%VARS%W
+   if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
+!$omp parallel workshare
+      FV_Atm(1)%w(isc:iec,jsc:jec,:) = STATE%VARS%W
+!$omp end parallel workshare
+   endif
  
 !------------
 ! Update Pressures
 !------------
 
+!$omp parallel workshare
    FV_Atm(1)%pe(:,:,:) = tiny_number
+!$omp end parallel workshare
    if (SW_DYNAMICS) then
+!$omp parallel do
       do k=1,km+1
         do j=jsc,jec
           do i=isc,iec
@@ -2313,7 +2488,10 @@ subroutine State_To_FV ( STATE, internal )
           enddo
         enddo
       enddo
+!$omp end parallel do
    else
+!$omp parallel
+!$omp do
       do k=1,km+1
         do j=jsc,jec
           do i=isc,iec
@@ -2322,6 +2500,7 @@ subroutine State_To_FV ( STATE, internal )
         enddo
       enddo
 
+!$omp do
       do k=1,km+1
         do j=jsc,jec
           do i=isc,iec
@@ -2330,6 +2509,7 @@ subroutine State_To_FV ( STATE, internal )
         enddo
       enddo
 
+!$omp do
       do k=1,km+1
         do j=jsc,jec
           do i=isc,iec
@@ -2337,12 +2517,18 @@ subroutine State_To_FV ( STATE, internal )
           enddo
         enddo
       enddo
+!$omp end parallel
 
+!$omp parallel workshare
       FV_Atm(1)%ps(isc:iec,jsc:jec) = FV_Atm(1)%pe(isc:iec,km+1,jsc:jec)
+!$omp end parallel workshare
 
    endif
 
+!$omp parallel workshare
     FV_Atm(1)%delp(:,:,:) = tiny_number
+!$omp end parallel workshare
+!$omp parallel do
     do k=1,km
       do j=jsc,jec
         do i=isc,iec
@@ -2350,24 +2536,35 @@ subroutine State_To_FV ( STATE, internal )
         enddo
       enddo
     enddo
+!$omp end parallel do
 
     if (.not. SW_DYNAMICS) then
 
 !-----------------------
 ! Copy PT and make Dry T 
 !-----------------------
+!$omp parallel workshare
        FV_Atm(1)%pt(:,:,:) = tiny_number
+!$omp end parallel workshare
+!$omp parallel workshare
        FV_Atm(1)%pt(isc:iec,jsc:jec,:) = STATE%VARS%PT*STATE%VARS%PKZ
+!$omp end parallel workshare
 
 !------------
 ! Get delz
 !------------
-       if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%delz(isc:iec,jsc:jec,:) = STATE%VARS%DZ
+       if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
+!$omp parallel workshare
+          FV_Atm(1)%delz(isc:iec,jsc:jec,:) = STATE%VARS%DZ
+!$omp end parallel workshare
+       endif
 
 !------------------------------------------------------------------------------
 ! Get pkz
 !------------------------------------------------------------------------------
+!$omp parallel workshare
        FV_Atm(1)%pkz(isc:iec,jsc:jec,:) = STATE%VARS%PKZ
+!$omp end parallel workshare
 
     endif
 
@@ -2397,39 +2594,59 @@ subroutine FV_To_State ( STATE, internal )
     KM  = state%grid%npz
 
 ! Copy updated FV data to internal state
+!$omp parallel workshare
     STATE%VARS%U(:,:,:) = FV_Atm(1)%u(isc:iec,jsc:jec,:)
     STATE%VARS%V(:,:,:) = FV_Atm(1)%v(isc:iec,jsc:jec,:)
-    if (.not. FV_Atm(1)%flagstruct%hydrostatic) STATE%VARS%W = FV_Atm(1)%w(isc:iec,jsc:jec,:)
+!$omp end parallel workshare
+    if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
+!$omp parallel workshare
+      STATE%VARS%W = FV_Atm(1)%w(isc:iec,jsc:jec,:)
+!$omp end parallel workshare
+    endif
 
     if (SW_DYNAMICS) then
+!$omp parallel workshare
        STATE%VARS%PE(:,:,1) = FV_Atm(1)%phis(isc:iec,jsc:jec)
        STATE%VARS%PE(:,:,2) = FV_Atm(1)%phis(isc:iec,jsc:jec) + FV_Atm(1)%delp(isc:iec,jsc:jec,1)
+!$omp end parallel workshare
     else
+!$omp parallel do
        do j=jsc,jec
           do i=isc,iec
              STATE%VARS%PE(i,j,:) = FV_Atm(1)%pe(i,:,j)
           enddo
        enddo
+!$omp end parallel do
 
 !-----------------------------------
 ! Fill Dry Temperature to PT
 !-----------------------------------
+!$omp parallel workshare
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
+!$omp end parallel workshare
 
 !------------------------------
 ! Get delz from FV3
 !------------------------------
-       if (.not. FV_Atm(1)%flagstruct%hydrostatic) STATE%VARS%DZ = FV_Atm(1)%delz(isc:iec,jsc:jec,:)
+       if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
+!$omp parallel workshare
+          STATE%VARS%DZ = FV_Atm(1)%delz(isc:iec,jsc:jec,:)
+!$omp end parallel workshare
+       endif
        
 !--------------------------------
 ! Get pkz from FV3
 !--------------------------------
+!$omp parallel workshare
        STATE%VARS%PKZ = FV_Atm(1)%pkz(isc:iec,jsc:jec,:)
+!$omp end parallel workshare
 
 !---------------------------------------------------------------------
 ! Convert to Dry Temperature to PT with hydrostatic pkz
 !---------------------------------------------------------------------
+!$omp parallel workshare
        STATE%VARS%PT  = STATE%VARS%PT/STATE%VARS%PKZ
+!$omp end parallel workshare
     endif
 
     call INTERNAL_CoarseToFine(STATE, internal, rc=status)
@@ -2559,16 +2776,19 @@ subroutine a2d3d(ua, va, ud, vd)
       im2 = (npx-1)/2
       jm2 = (npy-1)/2
 
+!$omp parallel workshare
     uatemp(:,:,:) = 0.0
     vatemp(:,:,:) = 0.0
 
     uatemp(is:ie,js:je,:) = ua
     vatemp(is:ie,js:je,:) = va
+!$omp end parallel workshare
 
     if (FV_Atm(1)%flagstruct%grid_type<4) then
    ! Cubed-Sphere
     call mpp_update_domains(uatemp, FV_Atm(1)%domain, complete=.false.)
     call mpp_update_domains(vatemp, FV_Atm(1)%domain, complete=.true.)
+!$omp parallel do private(i,j,v3,ue,ve,vt1,vt2,vt3,ut1,ut2,ut3)
     do k=1, npz
 ! Compute 3D wind tendency on A grid
        do j=js-1,je+1
@@ -2693,10 +2913,12 @@ subroutine a2d3d(ua, va, ud, vd)
        enddo
 
     enddo         ! k-loop
+!$omp end parallel do
    else
    ! Cartesian
     call mpp_update_domains(uatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.false.)
     call mpp_update_domains(vatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.true.)
+!$omp parallel do
     do k=1,npz
        do j=js,je+1
           do i=is,ie
@@ -2709,6 +2931,7 @@ subroutine a2d3d(ua, va, ud, vd)
           enddo
        enddo
     enddo         ! k-loop
+!$omp end parallel do
    endif
 
 end subroutine a2d3d
@@ -3956,31 +4179,40 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
   jsd=FV_Atm(1)%bd%jsd ; jed=FV_Atm(1)%bd%jed
   npz = FV_Atm(1)%npz
   
+!$omp parallel workshare
   utemp  = 0
   vtemp  = 0
   uatemp = 0
   vatemp = 0
   uctemp = 0
   vctemp = 0
+!$omp end parallel workshare
 
   if (FV_Atm(1)%flagstruct%grid_type>=4) then
   ! Doubly Periodic
+!$omp parallel workshare
     uatemp(isc:iec,jsc:jec,:) = u
     vatemp(isc:iec,jsc:jec,:) = v
+!$omp end parallel workshare
     call mpp_update_domains(uatemp, FV_Atm(1)%domain, &
                             whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.false.)
     call mpp_update_domains(vatemp, FV_Atm(1)%domain, &
                             whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.true.)
+!$omp parallel workshare
     utemp(isc:iec,jsc:jec+1,:) = uatemp(isc:iec,jsc:jec+1,:)
     vtemp(isc:iec+1,jsc:jec,:) = vatemp(isc:iec+1,jsc:jec,:)
+!$omp end parallel workshare
   else
+!$omp parallel workshare
     utemp(isc:iec,jsc:jec,:) = u
     vtemp(isc:iec,jsc:jec,:) = v
+!$omp end parallel workshare
   ! update shared edges
     call mpp_get_boundary(utemp, vtemp, FV_Atm(1)%domain, &
                           wbuffery=wbuffer, ebuffery=ebuffer, &
                           sbufferx=sbuffer, nbufferx=nbuffer, &
                           gridtype=DGRID_NE, complete=.true. )
+!$omp parallel do
     do k=1,npz
        do i=isc,iec
           utemp(i,jec+1,k) = nbuffer(i,k)
@@ -3989,9 +4221,11 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
           vtemp(iec+1,j,k) = ebuffer(j,k)
        enddo  
     enddo   
+!$omp end parallel do
   endif
 
   call mpp_update_domains(utemp, vtemp, FV_Atm(1)%domain, gridtype=DGRID_NE, complete=.true.)
+!$omp parallel do
   do k=1,npz
    call d2a2c_vect(utemp(:,:,k),  vtemp(:,:,k), &
                    uatemp(:,:,k), vatemp(:,:,k), &
@@ -3999,6 +4233,7 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
                    FV_Atm(1)%gridstruct,FV_Atm(1)%bd, FV_Atm(1)%flagstruct%npx, FV_Atm(1)%flagstruct%npy, &
                    FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%grid_type)
   enddo
+!$omp end parallel do
   if (FV_Atm(1)%flagstruct%grid_type<4 .AND. present(rotate)) then 
    if (rotate) call cubed_to_latlon(utemp  , vtemp  , &
                                     uatemp , vatemp , &
@@ -4008,10 +4243,20 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
                                     FV_Atm(1)%domain,FV_Atm(1)%gridstruct%nested,FV_Atm(1)%flagstruct%c2l_ord,FV_Atm(1)%bd)
   endif
 
+!$omp parallel workshare
   ua(:,:,:) = uatemp(isc:iec,jsc:jec,:)
   va(:,:,:) = vatemp(isc:iec,jsc:jec,:)
-  if (present(uc)) uc(:,:,:) = uctemp(isc:iec,jsc:jec,:)
-  if (present(vc)) vc(:,:,:) = vctemp(isc:iec,jsc:jec,:)
+!$omp end parallel workshare
+  if (present(uc)) then
+!$omp parallel workshare
+     uc(:,:,:) = uctemp(isc:iec,jsc:jec,:)
+!$omp end parallel workshare
+  endif
+  if (present(vc)) then
+!$omp parallel workshare
+     vc(:,:,:) = vctemp(isc:iec,jsc:jec,:)
+!$omp end parallel workshare
+  endif
 
   return
 end subroutine fv_getAgridWinds_3D
