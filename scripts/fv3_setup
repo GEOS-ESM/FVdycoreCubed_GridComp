@@ -422,7 +422,7 @@ endif
 setenv     RUN_N  $EXPID # RUN Job Name
 
 if( $SITE == 'NAS' ) then
-              setenv     RUN_N  `echo $EXPID | cut -b1-11`_RUN                         # RUN      Job Name
+              setenv     RUN_N  `echo $EXPID | cut -b1-200`_RUN                         # RUN      Job Name
               setenv BATCH_CMD "qsub"                 # PBS Batch command
               setenv BATCH_GROUP "PBS -W group_list=" # PBS Syntax for GROUP
               setenv BATCH_TIME "PBS -l walltime="    # PBS Syntax for walltime
