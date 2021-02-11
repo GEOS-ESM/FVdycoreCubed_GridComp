@@ -17,7 +17,7 @@ set (srcs
   GEOS_FV3_Utilities.F90
   )
 
-set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared)
+set(dependencies MAPL GFTL_SHARED::gftl-shared GMAO_hermes GEOS_Shared)
 
 esma_add_library (${this}
   SRCS ${srcs}
