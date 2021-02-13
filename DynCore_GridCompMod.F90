@@ -6822,9 +6822,9 @@ end subroutine RunAddIncs
 ! **********************************************************************
 
    ! Determine how many water species we have
-    nwat = 0
+    nwat = state%vars%nwat
     nwat_tracers = 0
-    if (.not. ADIABATIC) then
+    if ((nwat==0) .AND. (.not. ADIABATIC)) then
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'Q'       ) nwat_tracers = nwat_tracers + 1
          if (TRIM(state%vars%tracer(n)%tname) == 'QLCN'    ) nwat_tracers = nwat_tracers + 1
@@ -6845,6 +6845,9 @@ end subroutine RunAddIncs
           if (nwat_tracers >= 5) nwat = 3 ! STATE has QV, QLIQ, QICE
           if (nwat_tracers == 8) nwat = 6 ! STATE has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
        endif
+    endif
+    if (.not. ADIABATIC) then
+       _ASSERT(nwat >= 1, 'expecting water species (nwat) to match')
     endif
     if (nwat >= 1) then
     ALLOCATE(   Q(is:ie,js:je,1:km,nwat) )

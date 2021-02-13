@@ -52,6 +52,9 @@ if (CRAY_POINTER)
   set_target_properties (${this} PROPERTIES COMPILE_FLAGS ${CRAY_POINTER})
 endif()
 
+# Enable OpenMP
+target_link_libraries(${this} PRIVATE OpenMP::OpenMP_Fortran)
+
 add_definitions (-DSPMD -DMAPL_MODE)
 
 foreach(flag ${tmp})
