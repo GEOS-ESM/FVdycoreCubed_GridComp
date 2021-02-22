@@ -1591,6 +1591,7 @@ contains
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
      VERIFY_(STATUS)
 
+#ifdef SKIP_TRACERS
      do ntracer=1,ntracers
         do nlev=1,nlevs
            write(myTracer, "('Q',i1.1,'_',i3.3)") ntracer-1, plevs(nlev)
@@ -1611,6 +1612,7 @@ contains
              VLOCATION  = MAPL_VLocationCenter,               RC=STATUS  )
         VERIFY_(STATUS)
      enddo         
+#endif
 
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'UH25',                                      &
@@ -4359,6 +4361,7 @@ subroutine Run(gc, import, export, clock, rc)
       call FILLOUT3 (export, 'PE'     , vars%pe , rc=status); VERIFY_(STATUS)
 
 
+#ifdef SKIP_TRACERS
       do ntracer=1,ntracers
          write(myTracer, "('Q',i1.1)") ntracer-1
          call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
@@ -4371,6 +4374,7 @@ subroutine Run(gc, import, export, clock, rc)
             endif
          endif
       enddo
+#endif
 
       call MAPL_GetPointer(export, temp3D, 'PV', rc=status)
       VERIFY_(STATUS)
@@ -6366,6 +6370,7 @@ end subroutine RUN
     VERIFY_(STATUS)
     if(associated(temp3d)) temp3d = (tempxy)*(p00/(0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1))))**kappa
 
+#ifdef SKIP_TRACERS
       do ntracer=1,ntracers
          write(myTracer, "('Q',i1.1)") ntracer-1
          call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
@@ -6378,6 +6383,7 @@ end subroutine RUN
             endif
          endif
       enddo
+#endif
 
 ! Compute Edge Heights
 ! --------------------
