@@ -568,7 +568,7 @@ contains
       ! This is the best/fastest option for tracers
        FV_Atm(1)%flagstruct%hord_tr =  8
      ! NonMonotonic defaults for c360 (~50km) and finer
-       if (FV_Atm(1)%flagstruct%npx >= 180) then
+       if (FV_Atm(1)%flagstruct%npx >= 360) then
          FV_Atm(1)%flagstruct%hord_mt =  6
          FV_Atm(1)%flagstruct%hord_vt =  6
          FV_Atm(1)%flagstruct%hord_tm =  6
