@@ -843,7 +843,7 @@ program interp_restarts
                if (edge_size==0) then
                   call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev'/),(/imc,jmc,npz/),rc=status)
                else
-                  call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev','edge'/),(/imc,jmc,npz,npz+1/),rc=status)
+                  call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon ','lat ','lev ','edge'/),(/imc,jmc,npz,npz+1/),rc=status)
                end if
                call OutFmt%create_par(fname1,comm=arrdes%writers_comm,info=info,rc=status)
                call OutFmt%write(OutCfg(1),rc=status)
