@@ -198,8 +198,13 @@ endif
 
 ASKIOS:
 
-set DEFAULT_DO_IOS = FALSE
-echo "Do you wish to ${C1}IOSERVER${CN}? (Default: ${C2}NO${CN} or ${C2}FALSE${CN})"
+if ( $AGCM_IM < 180 ) then
+   set DEFAULT_DO_IOS = FALSE
+   echo "Do you wish to ${C1}IOSERVER${CN}? (Default: ${C2}NO${CN} or ${C2}FALSE${CN})"
+else
+   set DEFAULT_DO_IOS = TRUE
+   echo "Do you wish to ${C1}IOSERVER${CN}? (Default: ${C2}YES${CN} or ${C2}TRUE${CN})"
+endif
 
 set   DO_IOS  = $<
 if( .$DO_IOS == . ) then
@@ -569,7 +574,7 @@ echo $GROUP > $HOME/.GROUProot
 if ( $LINKX == "TRUE" ) then
   if ( -e $GEOSBIN/StandAlone_FV3_Dycore.x ) ln -s $GEOSBIN/StandAlone_FV3_Dycore.x $EXPDIR
 else
-  if ( -e $GEOSBIN/StandAlone_FV3_Dycore.x ) rsync -avx $GEOSBIN/StandAlone_FV3_Dycore.x $EXPDIR
+  if ( -e $GEOSBIN/StandAlone_FV3_Dycore.x ) cp -v $GEOSBIN/StandAlone_FV3_Dycore.x $EXPDIR
 endif
 
 #######################################################################
