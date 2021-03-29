@@ -157,13 +157,8 @@ endif
 
 ASKHYDRO:
 
-if ( $AGCM_IM <= 90 ) then
-   set DEFAULT_NON_HYDROSTATIC = FALSE
-   echo "Do you wish to ${C1}NON-HYDROSTATIC${CN} dynamics? (Default: ${C2}NO${CN} or ${C2}FALSE${CN})"
-else
-   set DEFAULT_NON_HYDROSTATIC = TRUE
-   echo "Do you wish to ${C1}NON-HYDROSTATIC${CN} dynamics? (Default: ${C2}YES${CN} or ${C2}TRUE${CN})"
-endif
+DEFAULT_NON_HYDROSTATIC = @CFG_NONHYDROSTATIC@
+echo "Do you wish to ${C1}NON-HYDROSTATIC${CN} dynamics? (Default: ${C2}${DEFAULT_NON_HYDROSTATIC}${CN})"
 
 set   DO_NONHYDRO  = $<
 if( .$DO_NONHYDRO == . ) then
