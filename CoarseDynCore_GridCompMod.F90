@@ -630,7 +630,6 @@ contains
     call SSI_CopyCoarseToFine(export, temp3d, 'T', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
     !PLE = PE
-    !print *, __FILE__, __LINE__, shape(PE)
     if (associated(temp3d)) then
        deallocate(temp3d)
     endif
@@ -2459,7 +2458,6 @@ subroutine Run(gc, import, export, clock, rc)
 
 !----------------------------------------------------------------------------
 
-    !print *, __FILE__, __LINE__, "DynRun status ", STATUS
     if (SW_DYNAMICS) then
 
       call MAPL_GetPointer(export,temp2d,'PHIS', rc=status)
@@ -3542,7 +3540,6 @@ subroutine Run(gc, import, export, clock, rc)
       endif
 
      end if   ! SW_DYNAMICS
-    !print *, __FILE__, __LINE__, "DynRun status ", STATUS
       
     call PUSH_Q(STATE, import, rc=status)
     VERIFY_(STATUS)
@@ -3684,7 +3681,6 @@ subroutine Run(gc, import, export, clock, rc)
  !  ! Fill Exports
  !   call RunAddIncs(gc, import, export, clock, rc)
  !endif
-  !print *, __FILE__, __LINE__, "DynRun status ", STATUS
 
 !!$ call omp_set_num_threads(1)
   RETURN_(ESMF_SUCCESS)

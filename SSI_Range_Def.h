@@ -1,32 +1,14 @@
     call timing_on('DATA_COPY')
 
-   call ESMF_AttributeGet(field, name='SSI_ARRAY_SIZE', &
-        value=ssiLocalDeCount, rc=status)
+   call ESMF_FieldGet(field, ssiLocalDeCount=ssiLocalDeCount, rc=status)
    VERIFY_(STATUS)
-   call ESMF_AttributeGet(field, name='SSI_ARRAY_SAVED', &
-        itemCount=itemCount, rc=status)
-   VERIFY_(STATUS)
-   allocate(arrayImg(itemCount), stat=status)
-   VERIFY_(STATUS)
-   call ESMF_AttributeGet(field, name='SSI_ARRAY_SAVED', &
-        valueList=arrayImg, rc=status)
-   VERIFY_(STATUS)
-   array = transfer(arrayimg,array)
-   !allocate(localDeToDeMap(ssiLocalDeCount), stat=status)
-   !VERIFY_(STATUS)
    allocate(localArrayList(ssiLocalDeCount), stat=status)
    VERIFY_(STATUS)
-   !call ESMF_ArrayGet(array, localDeToDeMap=localDeToDeMap, &
-   !     localarrayList=localArrayList, rc=status)
-   call ESMF_ArrayGet(array, localarrayList=localArrayList, rc=status)
-   VERIFY_(STATUS)
-   call ESMF_VMGetCurrent(vm, rc=status)
-   VERIFY_(STATUS)
-   call ESMF_VMGet(vm, localPet=localPet, rc=status)
-   VERIFY_(STATUS)
-   call ESMF_VMGet(vm, pet=localPet, peCount=nthreads, rc=status)
+   call ESMF_FieldGet(field, localarrayList=localArrayList, rc=status)
    VERIFY_(STATUS)
 
+   call ESMF_FieldGet(field,name=local_name, rc=status)
+   VERIFY_(STATUS)
    nth_x = f2c_SSI_arr_map%nth_x
    nth_y = f2c_SSI_arr_map%nth_y
    nnx = f2c_SSI_arr_map%nnx
@@ -77,7 +59,6 @@
 !$omp end parallel do
    end do
 
-   deallocate(arrayImg)
    deallocate(localArrayList)
 
    call timing_off('DATA_COPY')
