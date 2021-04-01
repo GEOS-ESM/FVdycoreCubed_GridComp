@@ -554,7 +554,7 @@ contains
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  14.0625)
       endif
-       FV_Atm(1)%flagstruct%fv_sg_adj = DT*4.0
+       FV_Atm(1)%flagstruct%fv_sg_adj = MIN(DT,MAX(900.0,DT*4.0))
      ! Monotonic Hydrostatic defaults
        FV_Atm(1)%flagstruct%hydrostatic = .false.
        FV_Atm(1)%flagstruct%make_nh = .false.
