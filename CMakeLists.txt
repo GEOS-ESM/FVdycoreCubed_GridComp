@@ -17,7 +17,11 @@ set (srcs
   GEOS_FV3_Utilities.F90
   )
 
-set(dependencies MAPL GFTL_SHARED::gftl-shared GMAO_hermes GEOS_Shared)
+if (ESMA_USE_GFE_NAMESPACE)
+  set(dependencies MAPL GFTL_SHARED::gftl-shared GMAO_hermes GEOS_Shared)
+else ()
+  set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared)
+endif ()
 
 esma_add_library (${this}
   SRCS ${srcs}
