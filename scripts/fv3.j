@@ -9,6 +9,7 @@
 #@RUN_P
 #@RUN_Q
 #@BATCH_GROUP
+#@BATCH_JOINOUTERR
 
 umask 022
 
