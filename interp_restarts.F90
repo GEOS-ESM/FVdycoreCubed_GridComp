@@ -69,7 +69,7 @@ program interp_restarts
    integer :: ftype
    type(Netcdf4_Fileformatter) :: InFmt,OutFmt
    type(FileMetadata), allocatable :: InCfg(:),OutCfg(:)
-   integer :: nVars,imc,jmc,lonid,latid,levid,edgeid
+   integer :: nVars,imc,jmc,lonid,latid,levid,edgeid,edge_size
    character(62) :: vname
    type(StringVector) :: moist_variables,all_moist_vars
    type(StringVectorIterator) :: siter
@@ -567,7 +567,6 @@ program interp_restarts
             VERIFY_(status)
          end if
       else 
-         write(*,*)'bma writing ak'
          if (AmWriter) call MAPL_VarWrite(OutFmt,"AK",r8_akbk)
       end if
       r8_akbk = FV_Atm(1)%bk
@@ -579,7 +578,6 @@ program interp_restarts
             VERIFY_(status)
          end if
       else  
-         write(*,*)'bma writing bk'
          if (AmWriter) call MAPL_VarWrite(OutFmt,"BK",r8_akbk)
       end if
       deallocate ( r8_akbk )
@@ -598,7 +596,6 @@ program interp_restarts
             VERIFY_(status)
          end if
       else
-         write(*,*)'bma writing u'
          call MAPL_VarWrite(OutFmt,"U",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
          VERIFY_(status)
       end if   
@@ -842,7 +839,12 @@ program interp_restarts
                call InFmt%open(trim(rst_files(ifile)%file_name),pFIO_READ,rc=status)
                allocate(InCfg(1),OutCfg(1))
                InCfg(1)=InFmt%read(rc=status)
-               call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev'/),(/imc,jmc,npz/),rc=status)
+               edge_size=inCfg(1)%get_dimension("edge")
+               if (edge_size==0) then
+                  call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev'/),(/imc,jmc,npz/),rc=status)
+               else
+                  call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon ','lat ','lev ','edge'/),(/imc,jmc,npz,npz+1/),rc=status)
+               end if
                call OutFmt%create_par(fname1,comm=arrdes%writers_comm,info=info,rc=status)
                call OutFmt%write(OutCfg(1),rc=status)
                deallocate(InCfg,OutCfg)
