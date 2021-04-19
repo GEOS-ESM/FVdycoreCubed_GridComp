@@ -1591,6 +1591,7 @@ contains
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
      VERIFY_(STATUS)
 
+#ifdef SKIP_TRACERS
      do ntracer=1,ntracers
         do nlev=1,nlevs
            write(myTracer, "('Q',i5.5,'_',i3.3)") ntracer-1, plevs(nlev)
@@ -1611,6 +1612,7 @@ contains
              VLOCATION  = MAPL_VLocationCenter,               RC=STATUS  )
         VERIFY_(STATUS)
      enddo         
+#endif
 
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'UH25',                                      &
@@ -4359,6 +4361,7 @@ subroutine Run(gc, import, export, clock, rc)
       call FILLOUT3 (export, 'PE'     , vars%pe , rc=status); VERIFY_(STATUS)
 
 
+#ifdef SKIP_TRACERS
       do ntracer=1,ntracers
          write(myTracer, "('Q',i5.5)") ntracer-1
          call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
@@ -4371,6 +4374,7 @@ subroutine Run(gc, import, export, clock, rc)
             endif
          endif
       enddo
+#endif
 
       call MAPL_GetPointer(export, temp3D, 'PV', rc=status)
       VERIFY_(STATUS)
@@ -6366,6 +6370,7 @@ end subroutine RUN
     VERIFY_(STATUS)
     if(associated(temp3d)) temp3d = (tempxy)*(p00/(0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1))))**kappa
 
+#ifdef SKIP_TRACERS
       do ntracer=1,ntracers
          write(myTracer, "('Q',i5.5)") ntracer-1
          call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
@@ -6378,6 +6383,7 @@ end subroutine RUN
             endif
          endif
       enddo
+#endif
 
 ! Compute Edge Heights
 ! --------------------
@@ -6822,9 +6828,9 @@ end subroutine RunAddIncs
 ! **********************************************************************
 
    ! Determine how many water species we have
-    nwat = 0
+    nwat = state%vars%nwat
     nwat_tracers = 0
-    if (.not. ADIABATIC) then
+    if ((nwat==0) .AND. (.not. ADIABATIC)) then
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'Q'       ) nwat_tracers = nwat_tracers + 1
          if (TRIM(state%vars%tracer(n)%tname) == 'QLCN'    ) nwat_tracers = nwat_tracers + 1
@@ -6845,6 +6851,9 @@ end subroutine RunAddIncs
           if (nwat_tracers >= 5) nwat = 3 ! STATE has QV, QLIQ, QICE
           if (nwat_tracers == 8) nwat = 6 ! STATE has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
        endif
+    endif
+    if (.not. ADIABATIC) then
+       _ASSERT(nwat >= 1, 'expecting water species (nwat) to match')
     endif
     if (nwat >= 1) then
     ALLOCATE(   Q(is:ie,js:je,1:km,nwat) )
