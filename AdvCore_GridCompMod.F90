@@ -810,12 +810,17 @@ contains
             else
                advTracers(N)%content    = TRACERS(:,:,:,N)
             end if
-! Fill Export States
-            write(myTracer, "('TEST_TRACER',i5.5)") N-1
-            call MAPL_GetPointer(EXPORT, temp3D, TRIM(myTracer), rc=status)
-            VERIFY_(STATUS)
-            if ((associated(temp3D)) .and. (N<=ntracers)) then
-               temp3D = TRACERS(:,:,:,N)
+
+            !-----------------------------------------------
+            !--> Fill Export States
+            !--> This section is used for diagnostics only.
+            !--> It has no effect on CTM experiments.
+            !-----------------------------------------------
+            if (N<=ntracers) then
+               write(myTracer, "('TEST_TRACER',i5.5)") N-1
+               call MAPL_GetPointer(EXPORT, temp3D, TRIM(myTracer), rc=status)
+               VERIFY_(STATUS)
+               if (associated(temp3D)) temp3D = TRACERS(:,:,:,N)
             endif
          enddo
 
