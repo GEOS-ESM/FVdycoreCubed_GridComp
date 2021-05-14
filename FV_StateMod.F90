@@ -531,29 +531,31 @@ contains
      ! Cubed-sphere grid resolution and DT dependence 
      !              based on ideal remapping DT
       if (FV_Atm(1)%flagstruct%npx >= 48) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 90) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 450.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 180) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 450.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 360) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 112.5   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 720) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  56.25  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 112.5   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1440) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  56.25  )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 2880) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  14.0625)
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125 )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.03125)
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  14.0625)
       endif
+      FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,2)
+
        FV_Atm(1)%flagstruct%fv_sg_adj = MAX(DT,MIN(450.0,DT*2.0))
      ! Monotonic Hydrostatic defaults
        FV_Atm(1)%flagstruct%hydrostatic = .false.
@@ -576,13 +578,10 @@ contains
        ! Must now include explicit vorticity damping
          FV_Atm(1)%flagstruct%d_con = 1.
          FV_Atm(1)%flagstruct%do_vort_damp = .true.
-         FV_Atm(1)%flagstruct%vtdm4 = 0.01
+         FV_Atm(1)%flagstruct%vtdm4 = 0.015
        endif
      ! continue to adjust vorticity damping with
      ! increasing resolution
-       if (FV_Atm(1)%flagstruct%npx >= 360) then
-         FV_Atm(1)%flagstruct%vtdm4 = 0.02
-       endif
        if (FV_Atm(1)%flagstruct%npx >= 720) then
          FV_Atm(1)%flagstruct%vtdm4 = 0.03
        endif
