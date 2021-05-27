@@ -2795,7 +2795,6 @@ subroutine Run(gc, import, export, clock, rc)
     real(kind=4), allocatable :: tropt (:,:)   ! Tropopause Temperature
     real(kind=4), allocatable :: tropq (:,:)   ! Tropopause Specific Humidity
 
-    real(r8), allocatable :: pelnxz(:,:,:) ! log pressure (pe) at layer edges
     real(r8), allocatable :: omaxyz(:,:,:) ! vertical pressure velocity (pa/sec)
     real(r8), allocatable :: cptxyz(:,:,:) ! Cp*Tv
     real(r8), allocatable :: thvxyz(:,:,:) ! Thetav
@@ -3042,8 +3041,6 @@ subroutine Run(gc, import, export, clock, rc)
       ALLOCATE( dthdtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
       ALLOCATE( dthdtremap  (ifirstxy:ilastxy,jfirstxy:jlastxy) )
       ALLOCATE( dthdtconsv  (ifirstxy:ilastxy,jfirstxy:jlastxy) )
-
-      ALLOCATE( pelnxz   (ifirstxy:ilastxy,km+1,jfirstxy:jlastxy) )
 
       ALLOCATE(  tmp2d   (ifirstxy:ilastxy,jfirstxy:jlastxy     ) )
       ALLOCATE( phisxy   (ifirstxy:ilastxy,jfirstxy:jlastxy     ) )
@@ -4161,7 +4158,8 @@ subroutine Run(gc, import, export, clock, rc)
   call Write_Profile(grid, vars%u, 'U-after-DynRun')
   call Write_Profile(grid, vars%v, 'V-after-DynRun')
 #endif
-      call getPK ( pkxy )
+    ! call getPK ( pkxy )
+      pkxy = exp( kappa * log( vars%pe ) )
 
 !----------------------------------------------------------------------------
 
@@ -5091,7 +5089,6 @@ subroutine Run(gc, import, export, clock, rc)
       DEALLOCATE( PKXY   )
       DEALLOCATE( tmp3d  )
       DEALLOCATE( tmp2d  )
-      DEALLOCATE( pelnxz )
       DEALLOCATE( omaxyz )
       DEALLOCATE( cptxyz )
       DEALLOCATE( thvxyz )
