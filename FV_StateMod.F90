@@ -1019,6 +1019,8 @@ contains
   if ( (gid==0) .and. (FV_HYDROSTATIC)       ) print*, 'FV3 being run Hydrostatic'
   if ( (gid==0) .and. (SW_DYNAMICS)          ) print*, 'FV3 being run as Shallow-Water Model: test_case=', test_case
   if ( (gid==0) .and. (FV_Atm(1)%flagstruct%grid_type == 4) ) print*, 'FV3 being run as Doubly-Periodic: test_case=', test_case
+  STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
+  if ( (gid==0)                              ) print*, 'FV3 water species nwat=', FV_Atm(1)%flagstruct%nwat
   if ( (gid==0)                              ) print*, ' '
 
   if (DEBUG) call debug_fv_state('DEBUG_RESTART',STATE)
@@ -1213,8 +1215,9 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 1 ! Tell FV3 about QV only
          if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
            if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3 ! Tell FV3 about QV, QLIQ, QICE
-           if (nwat_tracers == 10) FV_Atm(1)%flagstruct%nwat = 6 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL plus QCLD
          endif
+         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL plus QCLD
+         if (FV_Atm(1)%flagstruct%nwat == 6) FV_Atm(1)%flagstruct%do_sat_adj = .TRUE.
        endif
        if (FV_Atm(1)%flagstruct%do_sat_adj) then
           _ASSERT(FV_Atm(1)%flagstruct%nwat == 6, 'when using fv saturation adjustment NWAT must equal 6')
@@ -1411,7 +1414,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'CLCN') then
-         if (FV_Atm(1)%flagstruct%nwat > 0) then ! QCLD
+         if (qcld > 0) then ! QCLD
            QCLD_FILLED = .TRUE.
            nn = nn+1
            if (state%vars%tracer(n)%is_r4) then
@@ -1429,7 +1432,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'CLLS') then
-         if (FV_Atm(1)%flagstruct%nwat > 0) then ! QCLD
+         if (qcld > 0) then ! QCLD
            QCLD_FILLED = .TRUE.
           ! nn increment already handled in CLCN
            if (state%vars%tracer(n)%is_r4) then
@@ -1451,36 +1454,36 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
    ! Verify
     select case (FV_Atm(1)%flagstruct%nwat)
     case (6)
-      _ASSERT(nn == 13, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
-      _ASSERT(SPHU_FILLED, 'needs informative message')
-      _ASSERT(QLIQ_FILLED, 'needs informative message')
-      _ASSERT(QICE_FILLED, 'needs informative message')
-      _ASSERT(RAIN_FILLED, 'needs informative message')
-      _ASSERT(SNOW_FILLED, 'needs informative message')
-      _ASSERT(GRPL_FILLED, 'needs informative message')
-      _ASSERT(QCLD_FILLED, 'needs informative message')
-      _ASSERT(QLCN_FILLED, 'needs informative message')
-      _ASSERT(QLLS_FILLED, 'needs informative message')
-      _ASSERT(QICN_FILLED, 'needs informative message')
-      _ASSERT(QILS_FILLED, 'needs informative message')
-      _ASSERT(CLCN_FILLED, 'needs informative message')
-      _ASSERT(CLLS_FILLED, 'needs informative message')
+      _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
+      _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled')
+      _ASSERT(QICE_FILLED, 'QICE Not Filled')
+      _ASSERT(RAIN_FILLED, 'RAIN Not Filled')
+      _ASSERT(SNOW_FILLED, 'SNOW Not Filled')
+      _ASSERT(GRPL_FILLED, 'GRPL Not Filled')
+      _ASSERT(QCLD_FILLED, 'QCLD Not Filled')
+      _ASSERT(QLCN_FILLED, 'QLCN Not Filled')
+      _ASSERT(QLLS_FILLED, 'QLLS Not Filled')
+      _ASSERT(QICN_FILLED, 'QICN Not Filled')
+      _ASSERT(QILS_FILLED, 'QILS Not Filled')
+      _ASSERT(CLCN_FILLED, 'CLCN Not Filled')
+      _ASSERT(CLLS_FILLED, 'CLLS Not Filled')
+      _ASSERT(nn == 13, 'Expecting 13 water species') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
     case (3)
-      _ASSERT(nn == 7, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
-      _ASSERT(SPHU_FILLED, 'needs informative message')
-      _ASSERT(QLIQ_FILLED, 'needs informative message')
-      _ASSERT(QICE_FILLED, 'needs informative message')
-      _ASSERT(QLCN_FILLED, 'needs informative message')
-      _ASSERT(QLLS_FILLED, 'needs informative message')
-      _ASSERT(QICN_FILLED, 'needs informative message')
-      _ASSERT(QILS_FILLED, 'needs informative message')
+      _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
+      _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled')
+      _ASSERT(QICE_FILLED, 'QICE Not Filled')
+      _ASSERT(QLCN_FILLED, 'QLCN Not Filled')
+      _ASSERT(QLLS_FILLED, 'QLLS Not Filled')
+      _ASSERT(QICN_FILLED, 'QICN Not Filled')
+      _ASSERT(QILS_FILLED, 'QILS Not Filled') 
+      _ASSERT(nn == 7, 'Expecting 7 water species') ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
     case (1)
-      _ASSERT(nn == 5, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS
-      _ASSERT(SPHU_FILLED, 'needs informative message')
-      _ASSERT(QLCN_FILLED, 'needs informative message')
-      _ASSERT(QLLS_FILLED, 'needs informative message')
-      _ASSERT(QICN_FILLED, 'needs informative message')
-      _ASSERT(QILS_FILLED, 'needs informative message')
+      _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
+      _ASSERT(QLCN_FILLED, 'QLCN Not Filled')
+      _ASSERT(QLLS_FILLED, 'QLLS Not Filled')
+      _ASSERT(QICN_FILLED, 'QICN Not Filled')
+      _ASSERT(QILS_FILLED, 'QILS Not Filled')
+      _ASSERT(nn == 5, 'Expecting 5 water species') ! Q, QLCN, QLLS, QICN, QILS
     end select
     endif !nwat > 0
       select case (FV_Atm(1)%flagstruct%nwat)
@@ -1903,36 +1906,36 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
    ! Verify
     select case (FV_Atm(1)%flagstruct%nwat)
     case (6)
-      _ASSERT(nn == 13, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
-      _ASSERT(SPHU_FILLED, 'needs informative message')
-      _ASSERT(QLIQ_FILLED, 'needs informative message')
-      _ASSERT(QICE_FILLED, 'needs informative message')
-      _ASSERT(RAIN_FILLED, 'needs informative message')
-      _ASSERT(SNOW_FILLED, 'needs informative message')
-      _ASSERT(GRPL_FILLED, 'needs informative message')
-      _ASSERT(QCLD_FILLED, 'needs informative message')
-      _ASSERT(QLCN_FILLED, 'needs informative message')
-      _ASSERT(QLLS_FILLED, 'needs informative message')
-      _ASSERT(QICN_FILLED, 'needs informative message')
-      _ASSERT(QILS_FILLED, 'needs informative message')
-      _ASSERT(CLCN_FILLED, 'needs informative message')
-      _ASSERT(CLLS_FILLED, 'needs informative message')
+      _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
+      _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled Out')
+      _ASSERT(QICE_FILLED, 'QICE Not Filled Out')
+      _ASSERT(RAIN_FILLED, 'RAIN Not Filled Out')
+      _ASSERT(SNOW_FILLED, 'SNOW Not Filled Out')
+      _ASSERT(GRPL_FILLED, 'GRPL Not Filled Out')
+      _ASSERT(QCLD_FILLED, 'QCLD Not Filled Out')
+      _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
+      _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
+      _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
+      _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
+      _ASSERT(CLCN_FILLED, 'CLCN Not Filled Out')
+      _ASSERT(CLLS_FILLED, 'CLLS Not Filled Out')
+      _ASSERT(nn == 13, 'Expecting 13 water species Out') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
     case (3)
-      _ASSERT(nn == 7, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
-      _ASSERT(SPHU_FILLED, 'needs informative message')
-      _ASSERT(QLIQ_FILLED, 'needs informative message')
-      _ASSERT(QICE_FILLED, 'needs informative message')
-      _ASSERT(QLCN_FILLED, 'needs informative message')
-      _ASSERT(QLLS_FILLED, 'needs informative message')
-      _ASSERT(QICN_FILLED, 'needs informative message')
-      _ASSERT(QILS_FILLED, 'needs informative message')
+      _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
+      _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled Out')
+      _ASSERT(QICE_FILLED, 'QICE Not Filled Out')
+      _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
+      _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
+      _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
+      _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
+      _ASSERT(nn == 7, 'Expecting 7 water species Out') ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
     case (1)
-      _ASSERT(nn == 5, 'needs informative message') ! Q, QLCN, QLLS, QICN, QILS
-      _ASSERT(SPHU_FILLED, 'needs informative message')
-      _ASSERT(QLCN_FILLED, 'needs informative message')
-      _ASSERT(QLLS_FILLED, 'needs informative message')
-      _ASSERT(QICN_FILLED, 'needs informative message')
-      _ASSERT(QILS_FILLED, 'needs informative message')
+      _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
+      _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
+      _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
+      _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
+      _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
+      _ASSERT(nn == 5, 'Expecting 5 water species Out') ! Q, QLCN, QLLS, QICN, QILS
     end select
 
       select case(FV_Atm(1)%flagstruct%nwat)
