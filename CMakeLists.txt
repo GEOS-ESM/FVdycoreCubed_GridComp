@@ -18,9 +18,9 @@ set (srcs
   )
 
 if (ESMA_USE_GFE_NAMESPACE)
-  set(dependencies MAPL GFTL_SHARED::gftl-shared GMAO_hermes GEOS_Shared)
+  set(dependencies MAPL GFTL_SHARED::gftl-shared GMAO_hermes GEOS_Shared GEOSmoist_GridComp)
 else ()
-  set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared)
+  set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared GEOSmoist_GridComp)
 endif ()
 
 esma_add_library (${this}
