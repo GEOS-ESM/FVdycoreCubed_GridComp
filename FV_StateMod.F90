@@ -571,14 +571,17 @@ contains
        FV_Atm(1)%flagstruct%hord_tr =  8
      ! NonMonotonic defaults for c360 (~50km) and finer
        if (FV_Atm(1)%flagstruct%npx >= 360) then
-         FV_Atm(1)%flagstruct%hord_mt =  6
+       ! This combination of horizontal advection schemes is critical 
+       ! for anomaly correlation NWP skill. 
+       ! Using all = 5 (like GFS) produces a substantial degredation in skill
+         FV_Atm(1)%flagstruct%hord_mt =  5
          FV_Atm(1)%flagstruct%hord_vt =  6
          FV_Atm(1)%flagstruct%hord_tm =  6
          FV_Atm(1)%flagstruct%hord_dp = -6
        ! Must now include explicit vorticity damping
          FV_Atm(1)%flagstruct%d_con = 1.
          FV_Atm(1)%flagstruct%do_vort_damp = .true.
-         FV_Atm(1)%flagstruct%vtdm4 = 0.015
+         FV_Atm(1)%flagstruct%vtdm4 = 0.02
        endif
      ! continue to adjust vorticity damping with
      ! increasing resolution
