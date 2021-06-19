@@ -571,10 +571,7 @@ contains
        FV_Atm(1)%flagstruct%hord_tr =  8
      ! NonMonotonic defaults for c360 (~50km) and finer
        if (FV_Atm(1)%flagstruct%npx >= 360) then
-       ! This combination of horizontal advection schemes is critical 
-       ! for anomaly correlation NWP skill. 
-       ! Using all = 5 (like GFS) produces a substantial degredation in skill
-         FV_Atm(1)%flagstruct%hord_mt =  5
+         FV_Atm(1)%flagstruct%hord_mt =  6
          FV_Atm(1)%flagstruct%hord_vt =  6
          FV_Atm(1)%flagstruct%hord_tm =  6
          FV_Atm(1)%flagstruct%hord_dp = -6
