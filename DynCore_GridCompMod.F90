@@ -68,6 +68,9 @@
   integer :: NXQ = 0
   logical :: overwrite_Q = .true.
 
+  ! Save omega from Run1, to compute W in Run2:
+  real(kind=8), allocatable :: save_omega(:,:,:)
+
   public  SetServices      ! Register component methods
 
 ! !DESCRIPTION: This module implements the Dynamical Core as
@@ -2610,6 +2613,8 @@ contains
 
 !========End intermittent replay========================
 
+    ALLOCATE(  save_omega( DycoreGrid%is:DycoreGrid%ie, DycoreGrid%js:DycoreGrid%je, DycoreGrid%npz) )
+
     call MAPL_TimerOff(MAPL,"INITIALIZE")
     call MAPL_TimerOff(MAPL,"TOTAL")
 
@@ -4600,6 +4605,8 @@ subroutine Run(gc, import, export, clock, rc)
       zle = zle/grav
       call getOmega ( omaxyz )
 
+      save_omega = omaxyz
+
 ! Fluxes: UKE & VKE
 ! -----------------
       call MAPL_GetPointer(export,tempu,'UKE',rc=status); VERIFY_(STATUS)
@@ -6390,6 +6397,43 @@ end subroutine RUN
 
     call FILLOUT3 (export, 'ZLE', zle, rc=status); VERIFY_(STATUS)
 
+! Compute W
+! ---------
+
+    if (HYDROSTATIC) then
+      call MAPL_GetPointer(export,temp3d,'W', rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp3d)) temp3d = -1.0 * save_omega * (zle(:,:,1:km)-zle(:,:,2:km+1)) / dp
+
+      call MAPL_GetPointer(export,temp2d,'W850', rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         call VertInterp(temp2d, -1.0 * save_omega * (zle(:,:,1:km)-zle(:,:,2:km+1)) / dp, log(vars%pe), log(85000.)  , status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'W500', rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         call VertInterp(temp2d, -1.0 * save_omega * (zle(:,:,1:km)-zle(:,:,2:km+1)) / dp, log(vars%pe), log(50000.)  , status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'W200', rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         call VertInterp(temp2d, -1.0 * save_omega * (zle(:,:,1:km)-zle(:,:,2:km+1)) / dp, log(vars%pe), log(20000.)  , status)
+         VERIFY_(STATUS)
+      end if
+
+      call MAPL_GetPointer(export,temp2d,'W10', rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) then
+         call VertInterp(temp2d, -1.0 * save_omega * (zle(:,:,1:km)-zle(:,:,2:km+1)) / dp, log(vars%pe), log(1000.)  , status)
+         VERIFY_(STATUS)
+      end if
+    end if
+
 ! Compute Mid-Layer Heights
 ! -------------------------
 
@@ -7291,6 +7335,8 @@ subroutine Finalize(gc, import, export, clock, rc)
     state => wrap%dyn_state
  
     call DynFinalize( STATE )
+
+    DEALLOCATE(  save_omega )
  
 ! Call Generic Finalize
 !----------------------
