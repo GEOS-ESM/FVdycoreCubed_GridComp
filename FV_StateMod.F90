@@ -535,15 +535,17 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 112.5   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1440) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  56.25  )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 2880) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125 )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  14.0625)
       endif
-       FV_Atm(1)%flagstruct%fv_sg_adj = DT
+      FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,2)
+
+       FV_Atm(1)%flagstruct%fv_sg_adj = MAX(DT,MIN(450.0,DT*2.0))
      ! Monotonic Hydrostatic defaults
        FV_Atm(1)%flagstruct%hydrostatic = .true.
        FV_Atm(1)%flagstruct%make_nh = .false.
@@ -1748,21 +1750,15 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          do j=jsc,jec
             do i=isc,iec
               ! LIQUID
-               FQC = 0.0
-               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qlcn)) / MAX(FV_Atm(1)%q(i,j,k,qlcn)+FV_Atm(1)%q(i,j,k,qlls),1.e-5))
-               FV_Atm(1)%q(i,j,k,qlcn) = FV_Atm(1)%q(i,j,k,qliq)*(    FQC)
-               FV_Atm(1)%q(i,j,k,qlls) = FV_Atm(1)%q(i,j,k,qliq)*(1.0-FQC)
+               FV_Atm(1)%q(i,j,k,qlcn) = MIN(FV_Atm(1)%q(i,j,k,qliq),FV_Atm(1)%q(i,j,k,qlcn))
+               FV_Atm(1)%q(i,j,k,qlls) = FV_Atm(1)%q(i,j,k,qliq)-FV_Atm(1)%q(i,j,k,qlcn)
               ! ICE
-               FQC = 0.0
-               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qicn)) / MAX(FV_Atm(1)%q(i,j,k,qicn)+FV_Atm(1)%q(i,j,k,qils),1.e-8))
-               FV_Atm(1)%q(i,j,k,qicn) = FV_Atm(1)%q(i,j,k,qice)*(    FQC)
-               FV_Atm(1)%q(i,j,k,qils) = FV_Atm(1)%q(i,j,k,qice)*(1.0-FQC)
+               FV_Atm(1)%q(i,j,k,qicn) = MIN(FV_Atm(1)%q(i,j,k,qice),FV_Atm(1)%q(i,j,k,qicn))
+               FV_Atm(1)%q(i,j,k,qils) = FV_Atm(1)%q(i,j,k,qice)-FV_Atm(1)%q(i,j,k,qicn)
               ! CLOUD
-               if (FV_Atm(1)%flagstruct%nwat == 6) then
-                  FQC = 0.0
-                  FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,clcn)) / MAX(FV_Atm(1)%q(i,j,k,clcn)+FV_Atm(1)%q(i,j,k,clls),1.e-8))
-                  FV_Atm(1)%q(i,j,k,clcn) = FV_Atm(1)%q(i,j,k,qcld)*(    FQC)
-                  FV_Atm(1)%q(i,j,k,clls) = FV_Atm(1)%q(i,j,k,qcld)*(1.0-FQC)
+               if (qcld > 0) then
+                  FV_Atm(1)%q(i,j,k,clcn) = MIN(FV_Atm(1)%q(i,j,k,qcld),FV_Atm(1)%q(i,j,k,clcn))
+                  FV_Atm(1)%q(i,j,k,clls) = FV_Atm(1)%q(i,j,k,qcld)-FV_Atm(1)%q(i,j,k,clcn)
                endif
             enddo
          enddo
