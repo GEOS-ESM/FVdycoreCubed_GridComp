@@ -604,12 +604,10 @@ EOF
 else if( $MPI == mvapich2 ) then
 
 cat > $EXPDIR/SETENV.commands << EOF
-   #setenv MV2_ON_DEMAND_THRESHOLD 8192
-   #setenv MV2_USE_SHMEM_ALLREDUCE 0
-   #setenv MV2_USE_SHMEM_COLL      0
-   #setenv MV2_USE_UD_HYBRID       0
    setenv MV2_ENABLE_AFFINITY     0
    setenv SLURM_DISTRIBUTION block
+   setenv MV2_MPIRUN_TIMEOUT 100
+   setenv MV2_GATHERV_SSEND_THRESHOLD 256
 EOF
 
 else if( $MPI == mpt ) then
