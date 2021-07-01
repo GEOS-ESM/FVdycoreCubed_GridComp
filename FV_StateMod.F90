@@ -1750,15 +1750,21 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          do j=jsc,jec
             do i=isc,iec
               ! LIQUID
-               FV_Atm(1)%q(i,j,k,qlcn) = MIN(FV_Atm(1)%q(i,j,k,qliq),FV_Atm(1)%q(i,j,k,qlcn))
-               FV_Atm(1)%q(i,j,k,qlls) = FV_Atm(1)%q(i,j,k,qliq)-FV_Atm(1)%q(i,j,k,qlcn)
+               FQC = 0.0
+               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qlcn)) / MAX(FV_Atm(1)%q(i,j,k,qlcn)+FV_Atm(1)%q(i,j,k,qlls),1.e-5))
+               FV_Atm(1)%q(i,j,k,qlcn) = FV_Atm(1)%q(i,j,k,qliq)*(    FQC)
+               FV_Atm(1)%q(i,j,k,qlls) = FV_Atm(1)%q(i,j,k,qliq)*(1.0-FQC)
               ! ICE
-               FV_Atm(1)%q(i,j,k,qicn) = MIN(FV_Atm(1)%q(i,j,k,qice),FV_Atm(1)%q(i,j,k,qicn))
-               FV_Atm(1)%q(i,j,k,qils) = FV_Atm(1)%q(i,j,k,qice)-FV_Atm(1)%q(i,j,k,qicn)
+               FQC = 0.0
+               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qicn)) / MAX(FV_Atm(1)%q(i,j,k,qicn)+FV_Atm(1)%q(i,j,k,qils),1.e-8))
+               FV_Atm(1)%q(i,j,k,qicn) = FV_Atm(1)%q(i,j,k,qice)*(    FQC)
+               FV_Atm(1)%q(i,j,k,qils) = FV_Atm(1)%q(i,j,k,qice)*(1.0-FQC)
               ! CLOUD
-               if (qcld > 0) then
-                  FV_Atm(1)%q(i,j,k,clcn) = MIN(FV_Atm(1)%q(i,j,k,qcld),FV_Atm(1)%q(i,j,k,clcn))
-                  FV_Atm(1)%q(i,j,k,clls) = FV_Atm(1)%q(i,j,k,qcld)-FV_Atm(1)%q(i,j,k,clcn)
+               if (FV_Atm(1)%flagstruct%nwat == 6) then
+                  FQC = 0.0
+                  FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,clcn)) / MAX(FV_Atm(1)%q(i,j,k,clcn)+FV_Atm(1)%q(i,j,k,clls),1.e-8))
+                  FV_Atm(1)%q(i,j,k,clcn) = FV_Atm(1)%q(i,j,k,qcld)*(    FQC)
+                  FV_Atm(1)%q(i,j,k,clls) = FV_Atm(1)%q(i,j,k,qcld)*(1.0-FQC)
                endif
             enddo
          enddo
