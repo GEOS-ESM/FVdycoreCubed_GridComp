@@ -6342,7 +6342,7 @@ end subroutine RUN
           temp2D       = (dthdtphyint2-dthdtphyint1) * MAPL_P00**MAPL_KAPPA / (MAPL_GRAV*DT)
       endif
 
-    call getPK ( pke )
+    pke = exp( kappa * log( vars%pe ) )
 
     tempxy = vars%pt * vars%pkz   ! Dry Temperature
 

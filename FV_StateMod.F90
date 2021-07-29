@@ -484,8 +484,7 @@ contains
      FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
-   FV_Atm(1)%flagstruct%tau = 0.
-   FV_Atm(1)%flagstruct%rf_cutoff = 7.5e2
+   FV_Atm(1)%flagstruct%n_sponge = 0
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
    FV_Atm(1)%flagstruct%remap_option = 0
@@ -502,6 +501,10 @@ contains
    FV_Atm(1)%flagstruct%dwind_2d = .false.
    FV_Atm(1)%flagstruct%delt_max = 0.002
    FV_Atm(1)%flagstruct%ke_bg = 0.0
+  ! Rayleigh Damping
+   FV_Atm(1)%flagstruct%RF_fast = .true.
+   FV_Atm(1)%flagstruct%tau = 5
+   FV_Atm(1)%flagstruct%rf_cutoff = 7.5e2
   ! Some default damping options
    FV_Atm(1)%flagstruct%nord = 2
    FV_Atm(1)%flagstruct%dddmp = 0.2
@@ -1723,9 +1726,6 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     endif
     call MAPL_TimerOff(MAPL,"--FV_DYNAMICS")
 
-! Copy FV to internal State
-   call FV_To_State ( STATE )
-
   SPHU_FILLED = .FALSE.
   QLIQ_FILLED = .FALSE.
   QICE_FILLED = .FALSE.
@@ -1750,21 +1750,18 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          do j=jsc,jec
             do i=isc,iec
               ! LIQUID
-               FQC = 0.0
                FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qlcn)) / MAX(FV_Atm(1)%q(i,j,k,qlcn)+FV_Atm(1)%q(i,j,k,qlls),1.e-5))
-               FV_Atm(1)%q(i,j,k,qlcn) = FV_Atm(1)%q(i,j,k,qliq)*(    FQC)
-               FV_Atm(1)%q(i,j,k,qlls) = FV_Atm(1)%q(i,j,k,qliq)*(1.0-FQC)
+               FV_Atm(1)%q(i,j,k,qlcn) = MAX(0.0,FV_Atm(1)%q(i,j,k,qliq)*(    FQC))
+               FV_Atm(1)%q(i,j,k,qlls) = MAX(0.0,FV_Atm(1)%q(i,j,k,qliq)*(1.0-FQC))
               ! ICE
-               FQC = 0.0
                FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qicn)) / MAX(FV_Atm(1)%q(i,j,k,qicn)+FV_Atm(1)%q(i,j,k,qils),1.e-8))
-               FV_Atm(1)%q(i,j,k,qicn) = FV_Atm(1)%q(i,j,k,qice)*(    FQC)
-               FV_Atm(1)%q(i,j,k,qils) = FV_Atm(1)%q(i,j,k,qice)*(1.0-FQC)
+               FV_Atm(1)%q(i,j,k,qicn) = MAX(0.0,FV_Atm(1)%q(i,j,k,qice)*(    FQC))
+               FV_Atm(1)%q(i,j,k,qils) = MAX(0.0,FV_Atm(1)%q(i,j,k,qice)*(1.0-FQC))
               ! CLOUD
-               if (FV_Atm(1)%flagstruct%nwat == 6) then
-                  FQC = 0.0
+               if (qcld > 0) then
                   FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,clcn)) / MAX(FV_Atm(1)%q(i,j,k,clcn)+FV_Atm(1)%q(i,j,k,clls),1.e-8))
-                  FV_Atm(1)%q(i,j,k,clcn) = FV_Atm(1)%q(i,j,k,qcld)*(    FQC)
-                  FV_Atm(1)%q(i,j,k,clls) = FV_Atm(1)%q(i,j,k,qcld)*(1.0-FQC)
+                  FV_Atm(1)%q(i,j,k,clcn) = MIN(1.0,MAX(0.0,FV_Atm(1)%q(i,j,k,qcld)*(    FQC)))
+                  FV_Atm(1)%q(i,j,k,clls) = MIN(1.0,MAX(0.0,FV_Atm(1)%q(i,j,k,qcld)*(1.0-FQC)))
                endif
             enddo
          enddo
@@ -1990,6 +1987,9 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
       _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
   endif
 
+! Copy FV to internal State
+   call FV_To_State ( STATE )
+
     if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
 
     RETURN_(ESMF_SUCCESS)
@@ -2069,6 +2069,9 @@ subroutine State_To_FV ( STATE )
     real(FVPRC) :: sbuffer(state%grid%is:state%grid%ie,state%grid%npz)
     real(FVPRC) :: ebuffer(state%grid%js:state%grid%je,state%grid%npz)
     real(FVPRC) :: nbuffer(state%grid%is:state%grid%ie,state%grid%npz)
+
+    integer :: rc
+    character(len=ESMF_MAXSTR)          :: ERRSTR
 
     ISC = state%grid%is
     IEC = state%grid%ie
@@ -2181,6 +2184,17 @@ subroutine State_To_FV ( STATE )
        FV_Atm(1)%pt(:,:,:) = tiny_number
        FV_Atm(1)%pt(isc:iec,jsc:jec,:) = STATE%VARS%PT*STATE%VARS%PKZ
 
+        do K=1,km
+          do J=jsc,jec
+            do I=isc,iec
+               write(ERRSTR,'(A,I3)') "TEMP too cold in State_To_FV at level: ", k
+               _ASSERT(FV_Atm(1)%pt(I,J,K) >= 150.0, ERRSTR)
+               write(ERRSTR,'(A,I3)') "TEMP too warm in State_To_FV at level: ", k
+               _ASSERT(FV_Atm(1)%pt(I,J,K) <= 335.0, ERRSTR)
+            end do
+          end do
+        end do
+
 !------------
 ! Get delz
 !------------
@@ -2206,7 +2220,9 @@ subroutine FV_To_State ( STATE )
    type(T_FVDYCORE_STATE),      pointer   :: STATE
 
     integer               :: ISC,IEC, JSC,JEC, KM
-    integer               :: I,J
+    integer               :: I,J,K
+    character(len=ESMF_MAXSTR)          :: ERRSTR
+    integer :: rc
 
     ISC = state%grid%is
     IEC = state%grid%ie
@@ -2229,6 +2245,17 @@ subroutine FV_To_State ( STATE )
           enddo
        enddo
 
+        do K=1,km
+          do J=jsc,jec
+            do I=isc,iec
+               write(ERRSTR,'(A,I3)') "TEMP too cold in FV_To_State at level: ", k
+               _ASSERT(FV_Atm(1)%pt(I,J,K) >= 150.0, ERRSTR)
+               write(ERRSTR,'(A,I3)') "TEMP too warm in FV_To_State at level: ", k
+               _ASSERT(FV_Atm(1)%pt(I,J,K) <= 335.0, ERRSTR)
+            end do
+          end do
+        end do
+
 !-----------------------------------
 ! Fill Dry Temperature to PT
 !-----------------------------------
@@ -2242,10 +2269,14 @@ subroutine FV_To_State ( STATE )
 !--------------------------------
 ! Get pkz from FV3
 !--------------------------------
-       STATE%VARS%PKZ = FV_Atm(1)%pkz(isc:iec,jsc:jec,:)
-
+       if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
+         ! compute a hydrostatic PKZ for DynGridComp and Physics
+         STATE%VARS%PKZ = exp( MAPL_KAPPA * log( 0.5*(STATE%VARS%PE(:,:,1:KM)+STATE%VARS%PE(:,:,2:KM+1)) ) )
+       else
+         STATE%VARS%PKZ = FV_Atm(1)%pkz(isc:iec,jsc:jec,:)
+       endif
 !---------------------------------------------------------------------
-! Convert to Dry Temperature to PT with hydrostatic pkz
+! Convert Dry Temperature to PT with hydrostatic pkz
 !---------------------------------------------------------------------
        STATE%VARS%PT  = STATE%VARS%PT/STATE%VARS%PKZ
     endif
@@ -4255,6 +4286,8 @@ subroutine echo_fv3_setup()
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%consv_te ,format='("FV3 consv_te: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%delt_max ,format='("FV3 delt_max: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%ke_bg ,format='("FV3 ke_bg: ",(F7.5))' )
+   call WRITE_PARALLEL ( 'FV3 Rayleigh Damping Options:' )
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%RF_fast ,format='("FV3 RF_fast: ",(A))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%tau ,format='("FV3 tau: ",(F7.4))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%rf_cutoff ,format='("FV3 rf_cutoff: ",(F7.1))' )
    call WRITE_PARALLEL ( 'FV3 Logical options:' )
