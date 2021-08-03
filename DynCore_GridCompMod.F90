@@ -7084,10 +7084,11 @@ end subroutine RunAddIncs
           STATE%VARS%PT = (STATE%VARS%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW 
        endif
 
-       ! Update PKZ from hydrostatic pressures
-       !  This isn't entirely necessary, FV3 overwrites this in fv_dynamics
-       !  but we have to get back to PT here
-       call getPKZ(STATE%VARS%PKZ,STATE%VARS%PT,Q,STATE%VARS%PE,STATE%VARS%DZ,HYDROSTATIC)
+     ! ! Update PKZ from hydrostatic pressures
+     ! !  This isn't entirely necessary, FV3 overwrites this in fv_dynamics
+     ! !  but we have to get back to PT here
+     ! call getPKZ(STATE%VARS%PKZ,STATE%VARS%PT,Q,STATE%VARS%PE,STATE%VARS%DZ,HYDROSTATIC)
+       STATE%VARS%PKZ = exp( MAPL_KAPPA * log( 0.5*(STATE%VARS%PE(:,:,1:KM)+STATE%VARS%PE(:,:,2:KM+1)) ) )
 
        ! Make T back into PT
        STATE%VARS%PT = STATE%VARS%PT/STATE%VARS%PKZ
