@@ -484,7 +484,6 @@ contains
      FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
-   FV_Atm(1)%flagstruct%n_sponge = 0
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
    FV_Atm(1)%flagstruct%remap_option = 0
@@ -2269,12 +2268,12 @@ subroutine FV_To_State ( STATE )
 !--------------------------------
 ! Get pkz from FV3
 !--------------------------------
-       if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
+     ! if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
          ! compute a hydrostatic PKZ for DynGridComp and Physics
          STATE%VARS%PKZ = exp( MAPL_KAPPA * log( 0.5*(STATE%VARS%PE(:,:,1:KM)+STATE%VARS%PE(:,:,2:KM+1)) ) )
-       else
-         STATE%VARS%PKZ = FV_Atm(1)%pkz(isc:iec,jsc:jec,:)
-       endif
+     ! else
+     !   STATE%VARS%PKZ = FV_Atm(1)%pkz(isc:iec,jsc:jec,:)
+     ! endif
 !---------------------------------------------------------------------
 ! Convert Dry Temperature to PT with hydrostatic pkz
 !---------------------------------------------------------------------
