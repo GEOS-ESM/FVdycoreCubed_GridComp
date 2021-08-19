@@ -39,7 +39,6 @@
                            computeMassFluxes => fv_computeMassFluxes,&
                            getVerticalMassFlux => fv_getVerticalMassFlux,&
                            getOmega        => fv_getOmega,           &
-                           getPK           => fv_getPK,              &
                            getVorticity    => fv_getVorticity,       &
                            getDivergence   => fv_getdivergence,      &
                            getEPV          => fv_getEPV,             &
@@ -2691,6 +2690,7 @@ subroutine Run(gc, import, export, clock, rc)
     real(r8),     pointer :: phisxy(:,:)
     real(kind=4), pointer ::   phis(:,:)
 
+    real(r8), allocatable ::    plk(:,:,:) ! pl**kappa
     real(r8), allocatable ::   pkxy(:,:,:) ! pe**kappa
     real(r8), allocatable ::    pe0(:,:,:) ! edge-level pressure before dynamics
     real(r8), allocatable ::    pe1(:,:,:) ! edge-level pressure after dynamics
@@ -3044,6 +3044,7 @@ subroutine Run(gc, import, export, clock, rc)
 
       ALLOCATE(  tmp2d   (ifirstxy:ilastxy,jfirstxy:jlastxy     ) )
       ALLOCATE( phisxy   (ifirstxy:ilastxy,jfirstxy:jlastxy     ) )
+      ALLOCATE(    plk   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE(   pkxy   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
       ALLOCATE(     zl   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE(    zle   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
@@ -4158,7 +4159,7 @@ subroutine Run(gc, import, export, clock, rc)
   call Write_Profile(grid, vars%u, 'U-after-DynRun')
   call Write_Profile(grid, vars%v, 'V-after-DynRun')
 #endif
-    ! call getPK ( pkxy )
+      plk  = exp( kappa * log( 0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1)) ) )
       pkxy = exp( kappa * log( vars%pe ) )
 
 !----------------------------------------------------------------------------
@@ -4353,7 +4354,7 @@ subroutine Run(gc, import, export, clock, rc)
       call FILLOUT3 (export, 'Q'      , qv      , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PL'     , pl      , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PLE'    , vars%pe , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'PLK'    , vars%pkz, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'PLK'    , plk     , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PKE'    , pkxy    , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PT'     , vars%pt , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PE'     , vars%pe , rc=status); VERIFY_(STATUS)
@@ -5084,9 +5085,10 @@ subroutine Run(gc, import, export, clock, rc)
       DEALLOCATE( qsum1 )
       DEALLOCATE( qsum2 )
 
-      DEALLOCATE( ZL     )
-      DEALLOCATE( ZLE    )
-      DEALLOCATE( PKXY   )
+      DEALLOCATE( zl     )
+      DEALLOCATE( zle    )
+      DEALLOCATE( plk    )
+      DEALLOCATE( pkxy   )
       DEALLOCATE( tmp3d  )
       DEALLOCATE( tmp2d  )
       DEALLOCATE( omaxyz )
@@ -6120,8 +6122,8 @@ end subroutine RUN
     real(r8), allocatable ::  H500 (:,:)
     real(r8), allocatable ::  tmp2d(:,:)
     real(r8), allocatable ::  tmp3d(:,:,:)
+    real(r8), allocatable ::    plk(:,:,:)
     real(r8), allocatable ::    pke(:,:,:)
-    real(r8), allocatable ::   pkxy(:,:,:) ! pe**kappa
     real(r8), allocatable ::     pl(:,:,:)
     real(r8), allocatable ::     ua(:,:,:)
     real(r8), allocatable ::     va(:,:,:)
@@ -6220,6 +6222,7 @@ end subroutine RUN
     ALLOCATE(    thv(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
     ALLOCATE( tempxy(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
 
+    ALLOCATE(    plk(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
     ALLOCATE(    pke(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
     ALLOCATE(  logpe(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
     ALLOCATE(    zle(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
@@ -6342,6 +6345,7 @@ end subroutine RUN
           temp2D       = (dthdtphyint2-dthdtphyint1) * MAPL_P00**MAPL_KAPPA / (MAPL_GRAV*DT)
       endif
 
+    plk = exp( kappa * log( 0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1)) ) )
     pke = exp( kappa * log( vars%pe ) )
 
     tempxy = vars%pt * vars%pkz   ! Dry Temperature
@@ -6357,7 +6361,7 @@ end subroutine RUN
     call FILLOUT3 (export, 'Q'      , qv      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'PL'     , pl      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'PLE'    , vars%pe , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'PLK'    , vars%pkz, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'PLK'    , plk     , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'PKE'    , pke     , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'THV'    , thv     , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'PT'     , vars%pt , rc=status); VERIFY_(STATUS)
@@ -6734,6 +6738,7 @@ end subroutine RUN
     DEALLOCATE( tempxy )
 
     DEALLOCATE(    thv )
+    DEALLOCATE(    plk )
     DEALLOCATE(    pke )
     DEALLOCATE(  logpl )
     DEALLOCATE(  logpe )
@@ -7087,7 +7092,8 @@ end subroutine RunAddIncs
        ! Update PKZ from hydrostatic pressures
        !  This isn't entirely necessary, FV3 overwrites this in fv_dynamics
        !  but we have to get back to PT here
-       call getPKZ(STATE%VARS%PKZ,STATE%VARS%PT,Q,STATE%VARS%PE,STATE%VARS%DZ,HYDROSTATIC)
+  !!   call getPKZ(STATE%VARS%PKZ,STATE%VARS%PT,Q,STATE%VARS%PE,STATE%VARS%DZ,HYDROSTATIC)
+       call getPKZ(STATE%VARS%PKZ,STATE%VARS%PE)
 
        ! Make T back into PT
        STATE%VARS%PT = STATE%VARS%PT/STATE%VARS%PKZ

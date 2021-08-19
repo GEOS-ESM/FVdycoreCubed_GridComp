@@ -33,7 +33,7 @@ module FV_StateMod
    use fv_sg_mod, only: fv_subgrid_z
    use gfdl_cloud_microphys_mod, only: gfdl_cloud_microphys_init
 
-   use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
+   use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check
 
 implicit none
 private
@@ -484,7 +484,6 @@ contains
      FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
-   FV_Atm(1)%flagstruct%n_sponge = 0
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
    FV_Atm(1)%flagstruct%remap_option = 0
@@ -2070,6 +2069,8 @@ subroutine State_To_FV ( STATE )
     real(FVPRC) :: ebuffer(state%grid%js:state%grid%je,state%grid%npz)
     real(FVPRC) :: nbuffer(state%grid%is:state%grid%ie,state%grid%npz)
 
+    logical :: bad_data=.false.
+
     integer :: rc
     character(len=ESMF_MAXSTR)          :: ERRSTR
 
@@ -2184,16 +2185,10 @@ subroutine State_To_FV ( STATE )
        FV_Atm(1)%pt(:,:,:) = tiny_number
        FV_Atm(1)%pt(isc:iec,jsc:jec,:) = STATE%VARS%PT*STATE%VARS%PKZ
 
-        do K=1,km
-          do J=jsc,jec
-            do I=isc,iec
-               write(ERRSTR,'(A,I3)') "TEMP too cold in State_To_FV at level: ", k
-               _ASSERT(FV_Atm(1)%pt(I,J,K) >= 150.0, ERRSTR)
-               write(ERRSTR,'(A,I3)') "TEMP too warm in State_To_FV at level: ", k
-               _ASSERT(FV_Atm(1)%pt(I,J,K) <= 335.0, ERRSTR)
-            end do
-          end do
-        end do
+       if ( FV_Atm(1)%flagstruct%range_warn ) then
+          call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                            150., 335., bad_data)
+       endif
 
 !------------
 ! Get delz
@@ -2219,7 +2214,8 @@ subroutine FV_To_State ( STATE )
 
    type(T_FVDYCORE_STATE),      pointer   :: STATE
 
-    integer               :: ISC,IEC, JSC,JEC, KM
+    logical :: bad_data = .false.
+    integer               :: ISC,IEC, JSC,JEC, KM, NG
     integer               :: I,J,K
     character(len=ESMF_MAXSTR)          :: ERRSTR
     integer :: rc
@@ -2229,6 +2225,7 @@ subroutine FV_To_State ( STATE )
     JSC = state%grid%js
     JEC = state%grid%je
     KM  = state%grid%npz
+    NG  = state%grid%ng
 
 ! Copy updated FV data to internal state
     STATE%VARS%U(:,:,:) = FV_Atm(1)%u(isc:iec,jsc:jec,:)
@@ -2245,20 +2242,13 @@ subroutine FV_To_State ( STATE )
           enddo
        enddo
 
-        do K=1,km
-          do J=jsc,jec
-            do I=isc,iec
-               write(ERRSTR,'(A,I3)') "TEMP too cold in FV_To_State at level: ", k
-               _ASSERT(FV_Atm(1)%pt(I,J,K) >= 150.0, ERRSTR)
-               write(ERRSTR,'(A,I3)') "TEMP too warm in FV_To_State at level: ", k
-               _ASSERT(FV_Atm(1)%pt(I,J,K) <= 335.0, ERRSTR)
-            end do
-          end do
-        end do
-
 !-----------------------------------
 ! Fill Dry Temperature to PT
 !-----------------------------------
+       if ( FV_Atm(1)%flagstruct%range_warn ) then
+          call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                            150., 335., bad_data)
+       endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 
 !------------------------------
@@ -2269,15 +2259,12 @@ subroutine FV_To_State ( STATE )
 !--------------------------------
 ! Get pkz from FV3
 !--------------------------------
-       if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
-         ! compute a hydrostatic PKZ for DynGridComp and Physics
-         STATE%VARS%PKZ = exp( MAPL_KAPPA * log( 0.5*(STATE%VARS%PE(:,:,1:KM)+STATE%VARS%PE(:,:,2:KM+1)) ) )
-       else
-         STATE%VARS%PKZ = FV_Atm(1)%pkz(isc:iec,jsc:jec,:)
-       endif
-!---------------------------------------------------------------------
-! Convert Dry Temperature to PT with hydrostatic pkz
-!---------------------------------------------------------------------
+!!!!   STATE%VARS%PKZ = FV_Atm(1)%pkz(isc:iec,jsc:jec,:)
+       call fv_getPKZ(STATE%VARS%PKZ,STATE%VARS%PE)
+
+!--------------------------------
+! Convert Dry Temperature to PT
+!--------------------------------
        STATE%VARS%PT  = STATE%VARS%PT/STATE%VARS%PKZ
     endif
 
@@ -2315,13 +2302,12 @@ subroutine fv_getQ(Q, qNAME)
 return
 end subroutine fv_getQ
 
-subroutine fv_getPKZ(pkz,temp,qv,pe,delz,HYDROSTATIC)
+subroutine fv_getPKZ_NH(pkz,temp,qv,pe,delz)
   real(REAL8), intent(OUT) ::  pkz(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
   real(REAL8), intent( IN) :: temp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
   real(FVPRC), intent( IN) ::   qv(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
   real(REAL8), intent( IN) ::   pe(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz+1)
   real(REAL8), intent( IN) :: delz(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
-  logical    , intent( IN) :: HYDROSTATIC
 ! Local
   real(REAL8) ::   pk(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz+1)
   real(REAL8) :: peln(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz+1)
@@ -2343,7 +2329,6 @@ subroutine fv_getPKZ(pkz,temp,qv,pe,delz,HYDROSTATIC)
 !-------------------------------------------------------------------------
 ! Re-compute the full (nonhydrostatic) pressure due to temperature changes
 !-------------------------------------------------------------------------
-    if ( .not.hydrostatic ) then
 !$omp parallel do default(shared)
       do k=1,npz
          do j=jsc,jec
@@ -2355,7 +2340,29 @@ subroutine fv_getPKZ(pkz,temp,qv,pe,delz,HYDROSTATIC)
             enddo
          enddo
       enddo
-    else
+
+return
+end subroutine fv_getPKZ_NH
+
+subroutine fv_getPKZ(pkz,pe)
+  real(REAL8), intent(OUT) ::  pkz(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
+  real(REAL8), intent( IN) ::   pe(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz+1)
+! Local
+  real(REAL8) ::   pk(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz+1)
+  real(REAL8) :: peln(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz+1)
+  real(REAL8) :: rdg
+  integer :: i,j,k, isc,iec, jsc,jec, npz
+
+  isc = FV_Atm(1)%bd%isc
+  iec = FV_Atm(1)%bd%iec
+  jsc = FV_Atm(1)%bd%jsc
+  jec = FV_Atm(1)%bd%jec
+  npz = FV_Atm(1)%npz
+
+  rdg  = -rgas / grav
+  peln = log(pe)
+  pk   = exp( kappa*peln )
+
 !$omp parallel do default(shared)
       do k=1,npz
          do j=jsc,jec
@@ -2365,11 +2372,9 @@ subroutine fv_getPKZ(pkz,temp,qv,pe,delz,HYDROSTATIC)
             enddo
          enddo
       enddo
-    endif
 
 return
 end subroutine fv_getPKZ
-
 
 subroutine a2d3d(ua, va, ud, vd)
 
