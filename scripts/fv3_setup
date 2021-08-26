@@ -678,7 +678,7 @@ EOF
 # specific compared to the above adjustments
 if ( $SITE == 'NCCS' ) then
 
-cat >> $HOMDIR/SETENV.commands << EOF
+cat >> $EXPDIR/SETENV.commands << EOF
 setenv I_MPI_SHM_HEAP_VSIZE 512
 setenv PSM2_MEMORY large
 setenv PSM2_PATH_SELECTION adaptive
