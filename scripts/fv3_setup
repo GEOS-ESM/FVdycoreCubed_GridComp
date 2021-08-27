@@ -158,7 +158,7 @@ endif
 ASKHYDRO:
 
 set DEFAULT_NON_HYDROSTATIC = @CFG_NONHYDROSTATIC@
-echo "Do you wish to ${C1}NON-HYDROSTATIC${CN} dynamics? (Default: ${C2}${DEFAULT_NON_HYDROSTATIC}${CN})"
+echo "Do you wish to run ${C1}NON-HYDROSTATIC${CN} dynamics? (Default: ${C2}${DEFAULT_NON_HYDROSTATIC}${CN})"
 
 set   DO_NONHYDRO  = $<
 if( .$DO_NONHYDRO == . ) then
@@ -237,9 +237,10 @@ ASKPROC:
 if ( $SITE == 'NCCS' ) then
    echo "Enter the ${C1}Processor Type${CN} you wish to run on:"
    echo "   ${C2}hasw (Haswell)${CN} (default)"
-   if (-e /etc/os-release) then
-      echo "   ${C2}sky  (Skylake)${CN}"
-   endif
+   echo "   ${C2}sky  (Skylake)${CN}"
+   # Keep Cascade Lake hidden until in general use
+   #echo "   ${C2}cas  (Cascade Lake)${CN}"
+   echo " "
    set MODEL = `echo $<`
    set MODEL = `echo $MODEL | tr "[:upper:]" "[:lower:]"`
    if ( .$MODEL == .) then
@@ -247,36 +248,60 @@ if ( $SITE == 'NCCS' ) then
    endif
 
    if( $MODEL != 'hasw' & \
-       $MODEL != 'sky' ) goto ASKPROC
+       $MODEL != 'sky'  & \
+       $MODEL != 'cas' ) goto ASKPROC
 
    if (     $MODEL == 'hasw') then
       set NCPUS_PER_NODE = 28
    else if ($MODEL == 'sky') then
       set NCPUS_PER_NODE = 40
+   else if ($MODEL == 'cas') then
+      set NCPUS_PER_NODE = 48
    endif
 
 else if ( $SITE == 'NAS' ) then
+
+   # At NAS, if you build on Rome, we currently limit you to run on
+   # Rome; this is for two reasons. First, Romes are on SLES 15 and
+   # if you build on SLES 15, you can only run on SLES 15. Second,
+   # while a built-on-Rome GEOS might work on Intel processors, it
+   # will (probably) have a different output than if built on Intel
+   # due to different optimization flags.  This would violate the GEOS
+   # capability to get the same answers at NAS and NCCS
+
+   set BUILT_ON_ROME = @CFG_BUILT_ON_ROME@
+
    echo "Enter the ${C1}Processor Type${CN} you wish to run on:"
-   echo "   ${C2}has (Haswell)${CN}"
-   echo "   ${C2}bro (Broadwell)${CN}"
-   echo "   ${C2}sky (Skylake)${CN} (default)"
-   echo "   ${C2}cas (Cascade Lake)${CN}"
-   echo "   ${C2}rom (AMD Rome)${CN}"
-   echo " "
-   echo " NOTE: Due to how FV3 is compiled by default, Sandy Bridge"
-   echo "       and Ivy Bridge are not supported by current GEOS"
+   if( "$BUILT_ON_ROME" != "TRUE" ) then
+      echo "   ${C2}has (Haswell)${CN}"
+      echo "   ${C2}bro (Broadwell)${CN}"
+      echo "   ${C2}sky (Skylake)${CN} (default)"
+      echo "   ${C2}cas (Cascade Lake)${CN}"
+      echo " "
+      echo " NOTE: Due to how FV3 is compiled by default, Sandy Bridge"
+      echo "       and Ivy Bridge are not supported by current GEOS"
+   else
+      echo "   ${C2}rom (AMD Rome)${CN} (default)"
+   endif
    echo " "
    set MODEL = `echo $<`
    set MODEL = `echo $MODEL | tr "[:upper:]" "[:lower:]"`
    if ( .$MODEL == .) then
-      set MODEL = 'sky'
+      if( "$BUILT_ON_ROME" != "TRUE" ) then
+         set MODEL = 'sky'
+      else
+         set MODEL = 'rom'
+      endif
    endif
 
-   if( $MODEL != 'has' & \
-       $MODEL != 'bro' & \
-       $MODEL != 'sky' & \
-       $MODEL != 'cas' & \
-       $MODEL != 'rom' ) goto ASKPROC
+   if( "$BUILT_ON_ROME" != "TRUE" ) then
+      if( $MODEL != 'has' & \
+          $MODEL != 'bro' & \
+          $MODEL != 'sky' & \
+          $MODEL != 'cas' ) goto ASKPROC
+   else
+      if( $MODEL != 'rom' ) goto ASKPROC
+   endif
 
    # Some processors have weird names at NAS
    # ---------------------------------------
@@ -602,12 +627,10 @@ EOF
 else if( $MPI == mvapich2 ) then
 
 cat > $EXPDIR/SETENV.commands << EOF
-   #setenv MV2_ON_DEMAND_THRESHOLD 8192
-   #setenv MV2_USE_SHMEM_ALLREDUCE 0
-   #setenv MV2_USE_SHMEM_COLL      0
-   #setenv MV2_USE_UD_HYBRID       0
    setenv MV2_ENABLE_AFFINITY     0
    setenv SLURM_DISTRIBUTION block
+   setenv MV2_MPIRUN_TIMEOUT 100
+   setenv MV2_GATHERV_SSEND_THRESHOLD 256
 EOF
 
 else if( $MPI == mpt ) then
@@ -625,6 +648,8 @@ cat > $EXPDIR/SETENV.commands << EOF
    setenv MPI_XPMEM_ENABLED yes
    unsetenv SUPPRESS_XPMEM_TRIM_THRESH
 
+   setenv MPI_LAUNCH_TIMEOUT 40
+
    # For some reason, PMI_RANK is randomly set and interferes
    # with binarytile.x and other executables.
    unsetenv PMI_RANK
@@ -641,15 +666,28 @@ else if( $MPI == intelmpi ) then
 
 cat > $EXPDIR/SETENV.commands << EOF
 #setenv MPS_STAT_LEVEL 4
+setenv I_MPI_ADJUST_ALLREDUCE 12
+setenv I_MPI_ADJUST_GATHERV 3
+
+# This flag prints out the Intel MPI state. Uncomment if needed
+#setenv I_MPI_DEBUG 9
+EOF
+
+# These are options determined to be useful at NCCS
+# Not setting generally as they are more fabric/cluster
+# specific compared to the above adjustments
+if ( $SITE == 'NCCS' ) then
+
+cat >> $EXPDIR/SETENV.commands << EOF
+setenv I_MPI_SHM_HEAP_VSIZE 512
 setenv PSM2_MEMORY large
 setenv PSM2_PATH_SELECTION adaptive
-setenv I_MPI_ADJUST_GATHERV 3
-setenv I_MPI_ADJUST_ALLREDUCE 12
 setenv I_MPI_EXTRA_FILESYSTEM 1
 setenv I_MPI_EXTRA_FILESYSTEM_FORCE gpfs
 setenv ROMIO_FSTYPE_FORCE "gpfs:"
-#setenv I_MPI_DEBUG 6
 EOF
+
+endif # if NCCS
 
 endif # if mpi
 
