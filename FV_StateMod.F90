@@ -522,32 +522,32 @@ contains
      ! Cubed-sphere grid resolution and DT dependence 
      !              based on ideal remapping DT
       if (FV_Atm(1)%flagstruct%npx >= 48) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 90) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
-      endif
-      if (FV_Atm(1)%flagstruct%npx >= 180) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 450.0   )
-      endif
-      if (FV_Atm(1)%flagstruct%npx >= 360) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
       endif
+      if (FV_Atm(1)%flagstruct%npx >= 180) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 360) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
+      endif
       if (FV_Atm(1)%flagstruct%npx >= 720) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 112.5   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1440) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  56.25  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 2880) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75  )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  14.0625)
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,2)
-
-       FV_Atm(1)%flagstruct%fv_sg_adj = MAX(DT,MIN(450.0,DT*2.0))
+      if (FV_Atm(1)%flagstruct%npz == 72) then
+       FV_Atm(1)%flagstruct%fv_sg_adj = DT
      ! Monotonic Hydrostatic defaults
        FV_Atm(1)%flagstruct%hydrostatic = .true.
        FV_Atm(1)%flagstruct%make_nh = .false.
@@ -574,8 +574,36 @@ contains
          FV_Atm(1)%flagstruct%do_vort_damp = .true.
          FV_Atm(1)%flagstruct%vtdm4 = 0.02
        endif
+      else
+       FV_Atm(1)%flagstruct%fv_sg_adj = DT*4.0
+     ! Monotonic Hydrostatic defaults
+       FV_Atm(1)%flagstruct%hydrostatic = .false.
+       FV_Atm(1)%flagstruct%make_nh = .false.
+       FV_Atm(1)%flagstruct%vtdm4 = 0.0
+       FV_Atm(1)%flagstruct%do_vort_damp = .false.
+       FV_Atm(1)%flagstruct%d_con = 0.
+       FV_Atm(1)%flagstruct%hord_mt =  10
+       FV_Atm(1)%flagstruct%hord_vt =  10
+       FV_Atm(1)%flagstruct%hord_tm =  10
+       FV_Atm(1)%flagstruct%hord_dp =  10
+      ! This is the best/fastest option for tracers
+       FV_Atm(1)%flagstruct%hord_tr =  8
+     ! NonMonotonic defaults for c360 (~50km) and finer
+       if (FV_Atm(1)%flagstruct%npx >= 180) then
+         FV_Atm(1)%flagstruct%hord_mt =  6
+         FV_Atm(1)%flagstruct%hord_vt =  6
+         FV_Atm(1)%flagstruct%hord_tm =  6
+         FV_Atm(1)%flagstruct%hord_dp = -6
+       ! Must now include explicit vorticity damping
+         FV_Atm(1)%flagstruct%d_con = 1.
+         FV_Atm(1)%flagstruct%do_vort_damp = .true.
+         FV_Atm(1)%flagstruct%vtdm4 = 0.01
+       endif
      ! continue to adjust vorticity damping with
      ! increasing resolution
+       if (FV_Atm(1)%flagstruct%npx >= 360) then
+         FV_Atm(1)%flagstruct%vtdm4 = 0.02
+       endif
        if (FV_Atm(1)%flagstruct%npx >= 720) then
          FV_Atm(1)%flagstruct%vtdm4 = 0.03
        endif
@@ -588,6 +616,7 @@ contains
        if (FV_Atm(1)%flagstruct%npx >= 5760) then
          FV_Atm(1)%flagstruct%vtdm4 = 0.08
        endif
+      endif
    endif
 
 !! Start up FV                   
