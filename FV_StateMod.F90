@@ -484,6 +484,7 @@ contains
      FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
+   FV_Atm(1)%flagstruct%n_sponge = 0
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
    FV_Atm(1)%flagstruct%remap_option = 0
@@ -575,7 +576,7 @@ contains
          FV_Atm(1)%flagstruct%vtdm4 = 0.02
        endif
       else
-       FV_Atm(1)%flagstruct%fv_sg_adj = DT*4.0
+       FV_Atm(1)%flagstruct%fv_sg_adj = DT
      ! Monotonic Hydrostatic defaults
        FV_Atm(1)%flagstruct%hydrostatic = .false.
        FV_Atm(1)%flagstruct%make_nh = .false.
