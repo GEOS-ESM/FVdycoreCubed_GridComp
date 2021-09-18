@@ -1,17 +1,29 @@
+#define I_AM_MAIN
+
 #include "MAPL_Generic.h"
+#define _RC rc=status); _VERIFY(status
+
 program CreateInterpWeights
+   use MAPL
+   use CreateInterpWeights_GridCompMod,      only: SetServices
+   implicit none
 
-  !--------------------------------------------------------------------!
-  ! purpose: driver for MPI-IO test module                             !
-  !--------------------------------------------------------------------!
-  use MAPL
-  use CreateInterpWeights_GridCompMod,      only: SetServices
+!EOP
 
-  implicit none
+!EOC
 
-  integer :: status
+   character(*), parameter :: IAM = __FILE__
 
-   call MAPL_CAP(SetServices, rc=STATUS)
+   type (MAPL_Cap) :: cap
+   type (MAPL_FlapCLI) :: cli
+   type (MAPL_CapOptions) :: cap_options
+   integer :: status
 
-end program CreateInterpWeights
+   cli = MAPL_FlapCLI(description = 'Standalone Interp Weights',&
+                              authors      =  'W. Putman')
+   cap_options = MAPL_CapOptions(cli)
+   cap = MAPL_Cap('GCM', SetServices, cap_options = cap_options)
+   call cap%run(_RC)
+
+ end Program CreateInterpWeights
 

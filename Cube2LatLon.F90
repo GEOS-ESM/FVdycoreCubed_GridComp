@@ -1,3 +1,4 @@
+
 subroutine cube2latlon(npx, npy, nlon, nlat, data_cs, data_ll)
 
 #define REAL8 8
@@ -95,7 +96,7 @@ subroutine cube2latlon(npx, npy, nlon, nlat, data_cs, data_ll)
    allocate( id1(npx,npy) )
    allocate( id2(npx,npy) )
    allocate( jdc(npx,npy) )
-   allocate( l2c(4,nlon,nlat) )
+   allocate( l2c(4,npx,npy) )
    allocate( ee1(npx,npy,3))
    allocate( ee2(npx,npy,3))
    allocate( ff1(npx,npy,3))
@@ -104,6 +105,7 @@ subroutine cube2latlon(npx, npy, nlon, nlat, data_cs, data_ll)
    allocate( gg2(npx,npy,3))
 
    print*, 'GetWeights:', npx, npy, nlon, nlat
+ ! call GetWeights(npx, npy, nlat, nlon, id1, id2, jdc, l2c)
    call GetWeights(npx, npy, nlat, nlon, c2l_index, c2l_weight, id1, id2, jdc, l2c, &
      ee1, ee2, ff1, ff2, gg1, gg2, e1, e2, f1, f2, g1, g2, AmNodeRoot=.true., WriteNetcdf=.true.)
 

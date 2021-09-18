@@ -101,4 +101,10 @@ ecbuild_add_executable (
    LIBS ${this})
 set_target_properties (interp_restarts.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
 
+ecbuild_add_executable (
+  TARGET CreateInterpWeights.x
+  SOURCES CreateInterpWeights.F90
+  LIBS ${this})
+set_target_properties (CreateInterpWeights.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+
 add_subdirectory(scripts)

@@ -1,52 +1,7 @@
    
 !  $Id$
    
-!!!#define REAL8 8
-   
-   subroutine GetWeights_init (in_ntiles,in_ncnst,in_npx,in_npy,in_npz,&
-         in_nx,in_ny,in_hydro,in_mknh,comm)
-      use fms_mod,           only: fms_init, set_domain
-      use fv_control_mod,    only: fv_init1, fv_init2
-      use fv_arrays_mod,     only: REAL4, REAL8, FVPRC
-      use FV_StateMod,       only : FV_Atm  
-      implicit none
-      integer,intent(in) :: in_ntiles,in_ncnst
-      integer,intent(in) :: in_npx,in_npy,in_npz
-      integer,intent(in) :: in_nx,in_ny
-      logical,intent(in) :: in_hydro,in_mknh
-      integer            :: comm
-!#ifdef SINGLE_FV
-      real(FVPRC),    parameter :: dt_who_cares = 1800.
-!#else
-!      real*8,  parameter :: dt_who_cares = 1800.d0
-!#endif
-      integer :: p_split
-      logical, allocatable :: grids_on_my_pe(:)
-   
-      p_split = 1
-
-      call fms_init(comm)
-
-      call fv_init1(FV_atm, dt_who_cares, grids_on_my_pe, p_split)
-
-      FV_Atm(1)%flagstruct%ntiles = in_ntiles
-      FV_Atm(1)%flagstruct%hydrostatic = in_hydro
-      FV_Atm(1)%flagstruct%Make_NH     = in_mknh
-      FV_Atm(1)%flagstruct%ncnst  = in_ncnst ! nq
-      FV_Atm(1)%flagstruct%npx    = in_npx
-      FV_Atm(1)%flagstruct%npy    = in_npy
-      FV_Atm(1)%flagstruct%npz    = in_npz
-
-      FV_Atm(1)%flagstruct%npx=FV_Atm(1)%flagstruct%npx+1
-      FV_Atm(1)%flagstruct%npy=FV_Atm(1)%flagstruct%npy+1
-
-      call fv_init2(FV_atm, dt_who_cares, grids_on_my_pe, p_split)
-
-      call set_domain(FV_Atm(1)%domain)
-
-   end subroutine GetWeights_init
-
-   subroutine GetWeights(npx, npy, nlat, nlon, index, weight, id1, id2, jdc, l2c, &
+  subroutine GetWeights(npx, npy, nlat, nlon, index, weight, id1, id2, jdc, l2c, &
          ee1, ee2, ff1, ff2, gg1, gg2, e1, e2, f1, f2, g1, g2, sublons, sublats, AmNodeRoot, WriteNetcdf) 
 #include "MAPL_Generic.h"
 
@@ -60,6 +15,7 @@
       use GHOST_CUBSPH_mod,  only : B_grid, A_grid, ghost_cubsph_update
       use FV_StateMod,       only : FV_Atm  
       use fv_mp_mod,         only : is,js,ie,je, is_master
+      implicit none
 
       include "netcdf.inc"
 
@@ -101,7 +57,7 @@
       integer :: EE1_ID,EE2_ID,FF1_ID,FF2_ID,GG1_ID,GG2_ID
       integer :: STATUS
 
-      integer :: npts, n, l, j, j1
+      integer :: npts, n, l
 
       integer, parameter :: ntiles=6
       integer, parameter :: ndims=2
@@ -120,14 +76,15 @@
       real(REAL8), allocatable :: agrid(:,:,:)
       real(REAL8), allocatable :: slon(:), slat(:), clon(:), clat(:)
 
-
+      real(REAL8) :: a1, b1, d1, d2
+      integer  :: i,j, i1, i2, j1, jc, i0, j0
 
       if (AmNodeRoot) then
          write(c2l_fname,'("PE",i0,"x",i0,"-CF_c2l_PC",i0,"x",i0,"-DC.nc4")') npx,npy,nlon,nlat
          inquire(FILE=TRIM(c2l_fname), EXIST=c2l_file_exists)
          if (.not. c2l_file_exists) then
 
-            if (is_master()) print *, 'Computing weights for ', TRIM(c2l_fname)
+            print *, 'Computing weights for ', TRIM(c2l_fname)
 
             npts = npx + 1
 
@@ -261,7 +218,7 @@
 ! from cubed sphere to latlon grid            
 !---------------------------------------------
 
-            call remap_coef( agrid, xlon, ylat, id1, id2, jdc, l2c )
+            call remap_coef( agrid, npx, npy, nlon, nlat, xlon, ylat, id1, id2, jdc, l2c )
 
             deallocate ( xlon, ylat )
             deallocate ( agrid      )
@@ -271,7 +228,7 @@
             if (present(WriteNetcdf)) then
                if (WriteNetcdf) then
 
-                  if (is_master()) print *, 'Writing weights to ', TRIM(c2l_fname)
+                  print *, 'Writing weights to ', TRIM(c2l_fname)
                   STATUS = NF_CREATE (trim(c2l_fname), IOR(NF_CLOBBER,NF_NETCDF4), c2l_unit)
 
                   STATUS = NF_DEF_DIM(c2l_unit, 'lat', nlat, LATDIM)
@@ -319,7 +276,7 @@
 
          else  ! NOT WriteNetcdf, so read in the weights
 
-            if (is_master()) print *, 'Reading weights for ', TRIM(c2l_fname)
+            print *, 'Reading weights for ', TRIM(c2l_fname)
 
 ! read NETCDF weights file            
 !---------------------------------------------
@@ -392,28 +349,26 @@
 
    contains
 
-      subroutine remap_coef( agrid, lon, lat, id1, id2, jdc, l2c )
+      subroutine remap_coef( agrid, npx, npy, im, jm, lon, lat, id1, id2, jdc, l2c )
 
-         real(REAL8), intent(in)  :: agrid(:,:,:)
-         real(REAL8), intent(in)  :: lon(:), lat(:)
-         real(REAL8), intent(out) :: l2c(:,:,:)
-         integer,  intent(out) :: id1(:,:), id2(:,:), jdc(:,:)
+         integer,     intent(in)  :: npx, npy, im, jm
+         real(REAL8), intent(in)  :: agrid(npx, npy, 2)
+         real(REAL8), intent(in)  :: lon(im), lat(jm)
+         real(REAL8), intent(out) :: l2c(4, npx, npy)
+         integer,  intent(out) :: id1(npx, npy), id2(npx, npy), jdc(npx, npy)
 
 ! local:
 
          real(REAL8) :: a1, b1
-         integer  :: i,j, im, jm, i1, i2, jc, i0, j0
-         real(REAL8) :: slt(size(lat))
+         integer  :: i,j, i1, i2, jc, i0, j0
+         real(REAL8) :: slt(jm)
 
 ! Interpolate to cubed sphere cell center
 
-         im = size(lon)
-         jm = size(lat)
-
          slt = sin(lat)
 
-         do j=1,size(agrid,2)
-            do i=1,size(agrid,1)
+         do j=1,npy
+            do i=1,npx
 
                do i1= 1, im
                   i2 = mod(i1,im) + 1
@@ -457,7 +412,6 @@
          enddo
 
       end subroutine remap_coef
-
 
       subroutine CreateCube2LatLonRotation(grid, center, ee1, ee2, ff1, ff2, gg1, gg2)
 

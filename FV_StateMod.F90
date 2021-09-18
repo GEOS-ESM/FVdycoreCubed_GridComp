@@ -627,6 +627,11 @@ contains
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
+!! Check compatibility of remap_option and n_zfilter
+    if (FV_Atm(1)%flagstruct%remap_option == 2) then
+      _ASSERT(FV_Atm(1)%flagstruct%n_zfilter == 0, 'n_zfilter must be 0 with remap_option=2')
+    endif
+
 !! Setup GFDL microphysics module
     call gfdl_cloud_microphys_init()
 
