@@ -84,7 +84,7 @@
          inquire(FILE=TRIM(c2l_fname), EXIST=c2l_file_exists)
          if (.not. c2l_file_exists) then
 
-            print *, 'Computing weights for ', TRIM(c2l_fname)
+            if (is_master()) print *, 'Computing weights for ', TRIM(c2l_fname)
 
             npts = npx + 1
 
@@ -228,7 +228,7 @@
             if (present(WriteNetcdf)) then
                if (WriteNetcdf) then
 
-                  print *, 'Writing weights to ', TRIM(c2l_fname)
+                  if (is_master()) print *, 'Writing weights to ', TRIM(c2l_fname)
                   STATUS = NF_CREATE (trim(c2l_fname), IOR(NF_CLOBBER,NF_NETCDF4), c2l_unit)
 
                   STATUS = NF_DEF_DIM(c2l_unit, 'lat', nlat, LATDIM)
@@ -276,7 +276,7 @@
 
          else  ! NOT WriteNetcdf, so read in the weights
 
-            print *, 'Reading weights for ', TRIM(c2l_fname)
+            if (is_master()) print *, 'Reading weights for ', TRIM(c2l_fname)
 
 ! read NETCDF weights file            
 !---------------------------------------------

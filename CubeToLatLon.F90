@@ -199,6 +199,8 @@ interface deallocGlob
    module procedure deallocGlob_i4_4
    module procedure deallocGlob_r8_3
    module procedure deallocGlob_r8_4
+   module procedure deallocGlob_r4_3
+   module procedure deallocGlob_r4_4
 end interface deallocGlob
 
 interface deallocLoc
@@ -947,7 +949,7 @@ contains
 !-------
 
     integer               :: nx,j1,j2,status,itile
-    real(REAL64), allocatable :: var_cs(:,:,:)
+    real(REAL64), pointer :: var_cs(:,:,:)
 
     _ASSERT(Tr%Created,'needs informative message')
 
@@ -957,8 +959,13 @@ contains
     ! perform interpolation                                              !
     !--------------------------------------------------------------------!
 
-    allocate ( var_cs(0:nx+1,0:nx+1,ntiles),stat=status)
-    VERIFY_(STATUS)
+    if(MAPL_ShmInitialized) then
+        call MAPL_AllocNodeArray(var_cs,(/nx,nx,ntiles/),rc=STATUS)
+        VERIFY_(STATUS)
+    else
+        allocate ( var_cs(nx,nx,ntiles),stat=status)
+        VERIFY_(STATUS)
+    endif
 
     var_cs=0.
 
@@ -971,8 +978,12 @@ contains
        enddo
     end if
 
-    call L2CInterp(data_ll, var_cs, Tr%id1,  Tr%id2,  Tr%jdc, &
+    call L2CInterpR8(data_ll, var_cs, Tr%id1,  Tr%id2,  Tr%jdc, &
                    Tr%l2c, misval, transpose)
+
+    if(MAPL_ShmInitialized) then
+       call MAPL_SyncSharedMemory(rc=STATUS)
+    endif
 
     if(.not.transpose) then
        do itile=1,ntiles
@@ -982,8 +993,14 @@ contains
        enddo
     end if
 
-    deallocate ( var_cs ,STAT=STATUS)
-    VERIFY_(STATUS)
+    if(MAPL_ShmInitialized) then
+       call MAPL_SyncSharedMemory(rc=STATUS)
+       DEALLOCGLOB_(var_cs)
+       call MAPL_SyncSharedMemory(rc=STATUS)
+    else
+       deallocate ( var_cs ,STAT=STATUS)
+       VERIFY_(STATUS)
+    endif
 
     RETURN_(_SUCCESS)
   end subroutine LatLonToCuber8
@@ -991,8 +1008,8 @@ contains
   subroutine LatLonToCuber4( Tr, data_ll, data_cs, transpose, misval, rc)
 
     type(T_CubeLatLonTransform),  intent(in )   :: Tr
-    real,                         intent(inout) :: data_ll(:,:)
-    real,                         intent(inout) :: data_cs(:,:)
+    real(REAL32),                 intent(inout) :: data_ll(:,:)
+    real(REAL32),                 intent(inout) :: data_cs(:,:)
     logical, optional,            intent(in )   :: transpose
     real,    optional,            intent(in )   :: misval
     integer, optional,            intent(out)   :: rc
@@ -1001,84 +1018,59 @@ contains
 !-------
 
     integer               :: nx,j1,j2,status,itile
-    real(REAL64), allocatable :: data_cs8(:,:,:), data_ll8(:,:)
-!JK for conservative interp--------------
-    real(REAL64), allocatable :: cs8_data(:,:)
-!JK for conservative interp--------------
-
+    real(REAL32), pointer :: var_cs(:,:,:)
 
     _ASSERT(Tr%Created,'needs informative message')
 
     nx   = Tr%npx
 
-    allocate ( data_ll8(size(data_ll,1),size(data_ll,2)),stat=status)
-    VERIFY_(STATUS)
-    allocate ( data_cs8(0:nx+1,0:nx+1,ntiles),stat=status)
-    VERIFY_(STATUS)
-
-    if (DO_CONSERVATIVE) then   !JK for conservative interp--------------
-      allocate ( cs8_data(size(data_cs,1),size(data_cs,2)),stat=status )
-      VERIFY_(STATUS)
-    endif
-
     !--------------------------------------------------------------------!
     ! perform interpolation                                              !
     !--------------------------------------------------------------------!
 
-    data_cs8=0.
-
-    if(.not.transpose) then
-       data_ll8 = data_ll
-    end if
-
-    if(transpose) then
-       data_ll8=0.
-       do itile=1,ntiles
-          j1 = nx*(itile-1) + 1
-          j2 = nx*(itile-1) + nx
-          data_cs8(1:nx,1:nx,itile) = data_cs(:,j1:j2)
-       enddo
-
-       if (DO_CONSERVATIVE) cs8_data=data_cs !JK for conservative interp---
-
-    end if
-
-    if (DO_CONSERVATIVE) then !JK for conservative interp---
-
-    if(.not.transpose) then
-      call LToC_interp &
-         (cs8_data, data_ll8, NT_Tiles, Tr%nlat, Tr%nlon, Tr%npx, Tr%npy)
+    if(MAPL_ShmInitialized) then
+        call MAPL_AllocNodeArray(var_cs,(/nx,nx,ntiles/),rc=STATUS)
+        VERIFY_(STATUS)
     else
-      call LToC_interp_b&
-         (cs8_data, data_ll8, NT_Tiles, Tr%nlat, Tr%nlon, Tr%npx, Tr%npy)
+        allocate ( var_cs(nx,nx,ntiles),stat=status)
+        VERIFY_(STATUS)
     endif
 
-    else                     !JK for conservative interp---
-
-    call L2CInterp(data_ll8, data_cs8, Tr%id1,  Tr%id2,  Tr%jdc, &
-                   Tr%l2c, misval, transpose)
-
-    endif                    !JK for conservative interp---
-
-    if(.not.transpose) then
+    if (MAPL_AmNodeRoot .or. (.not. MAPL_ShmInitialized)) then
+    var_cs=0.
+    if(transpose) then
+       data_ll=0.
        do itile=1,ntiles
           j1 = nx*(itile-1) + 1
           j2 = nx*(itile-1) + nx
-          data_cs(:,j1:j2) = data_cs8(1:nx,1:nx,itile)
+          var_cs(:,:,itile) = data_cs(:,j1:j2)
        enddo
-
-       if (DO_CONSERVATIVE) data_cs=cs8_data !JK for conservative interp---
-
+    end if
+    call L2CInterpR4(data_ll, var_cs, Tr%id1,  Tr%id2,  Tr%jdc, &
+                   Tr%l2c, misval, transpose)
     end if
 
-    if(transpose) then
-       data_ll = data_ll8
+    if(MAPL_ShmInitialized) then
+       call MAPL_SyncSharedMemory(rc=STATUS)
+    endif                
+
+    if(.not.transpose) then
+       data_cs = reshape(var_cs,(/ nx, nx*ntiles /))
+      !do itile=1,ntiles
+      !   j1 = nx*(itile-1) + 1
+      !   j2 = nx*(itile-1) + nx
+      !   data_cs(:,j1:j2) = var_cs(:,:,itile)
+      !enddo
     end if
 
-    if (DO_CONSERVATIVE) deallocate ( cs8_data )
-
-    deallocate ( data_cs8 )
-    deallocate ( data_ll8 )
+    if(MAPL_ShmInitialized) then
+       call MAPL_SyncSharedMemory(rc=STATUS)
+       DEALLOCGLOB_(var_cs)
+       call MAPL_SyncSharedMemory(rc=STATUS)
+    else
+       deallocate ( var_cs ,STAT=STATUS)
+       VERIFY_(STATUS)
+    endif
 
     RETURN_(_SUCCESS)
   end subroutine LatLonToCuber4
@@ -1201,14 +1193,14 @@ contains
     return
   end subroutine C2LInterp
 
-  subroutine L2CInterp(latlon, cubsph, id1, id2, jdc, weight, misval, transpose)
+  subroutine L2CInterpR8(latlon, cubsph, id1, id2, jdc, weight, misval, transpose)
 
     !------------------------------------------------------------------!
     ! do bilinear interpolation from cubed sphere to latlon grid       !
     ! using precalculated weights from get_weight                  !
     !------------------------------------------------------------------!
 
-    real(REAL64), dimension(0:,0:,:), intent(inout) :: cubsph
+    real(REAL64), dimension(:,:,:), intent(inout) :: cubsph
     real(REAL64), dimension(:,:),   intent(inout) :: latlon
     real(REAL64), dimension(:,:,:), intent(in)    :: weight
     integer,  dimension(:,:),   intent(in)    :: id1, id2, jdc
@@ -1222,8 +1214,8 @@ contains
     integer       :: i, j, i1, i2, j1, nx, ny, nz, jx, k, nlon
     real(REAL64)      :: ww
 
-    nx   = size(cubsph,1)-2
-    ny   = size(cubsph,2)-2
+    nx   = size(cubsph,1)
+    ny   = size(cubsph,2)
     nz   = size(cubsph,3)
     nlon = size(latlon,1)
 
@@ -1289,7 +1281,97 @@ contains
     end do FACES
 
     return
-  end subroutine L2CInterp
+  end subroutine L2CInterpR8
+
+  subroutine L2CInterpR4(latlon, cubsph, id1, id2, jdc, weight, misval, transpose)
+
+    !------------------------------------------------------------------!
+    ! do bilinear interpolation from cubed sphere to latlon grid       !
+    ! using precalculated weights from get_weight                  !
+    !------------------------------------------------------------------!
+
+    real(REAL32), dimension(:,:,:), intent(inout) :: cubsph
+    real(REAL32), dimension(:,:),   intent(inout) :: latlon
+    real(REAL64), dimension(:,:,:), intent(in)    :: weight
+    integer,  dimension(:,:),   intent(in)    :: id1, id2, jdc
+    real, optional, intent(in)    :: misval
+    logical,                    intent(in)    :: transpose
+
+    !------------------------------------------------------------------!
+    ! local variables                                                  !
+    !------------------------------------------------------------------!
+
+    integer       :: i, j, i1, i2, j1, nx, ny, nz, jx, k, nlon
+    real(REAL64)      :: ww
+
+    nx   = size(cubsph,1)
+    ny   = size(cubsph,2)
+    nz   = size(cubsph,3)
+    nlon = size(latlon,1)
+
+    if(transpose) latlon = 0.0
+
+    FACES: do k=1,nz
+       FACE_Y: do jx=1,ny
+          FACE_X: do i=1,nx
+
+             j  = (k-1)*ny + jx
+             j1 = jdc(i,j)
+
+             i1 = id1(i,j)
+             i2 = id2(i,j)
+
+             ADJOINT: if(.not.transpose) then
+
+                UNDEF: if(.not. present(misval)) then
+                   cubsph(i,jx,k) = weight(1,i,j)*latlon(i1,j1  )   &
+                                  + weight(2,i,j)*latlon(i2,j1  )   &
+                                  + weight(3,i,j)*latlon(i2,j1+1)   &
+                                  + weight(4,i,j)*latlon(i1,j1+1)
+                else
+                   ww          = 0.0
+                   cubsph(i,jx,k) = 0.0
+
+                   if(latlon(i1,j1  )/=misval) then
+                      cubsph(i,jx,k) = cubsph(i,jx,k) + weight(1,i,j)*latlon(i1,j1  )
+                      ww             = ww             + weight(1,i,j)
+                   end if
+                   if(latlon(i2,j1  )/=misval) then
+                      cubsph(i,jx,k) = cubsph(i,jx,k) + weight(2,i,j)*latlon(i2,j1  )
+                      ww             = ww             + weight(2,i,j)
+                   end if
+                   if(latlon(i2,j1+1)/=misval) then
+                      cubsph(i,jx,k) = cubsph(i,jx,k) + weight(3,i,j)*latlon(i2,j1+1)
+                      ww             = ww             + weight(3,i,j)
+                   end if
+                   if(latlon(i1,j1+1)/=misval) then
+                      cubsph(i,jx,k) = cubsph(i,jx,k) + weight(4,i,j)*latlon(i1,j1+1)
+                      ww             = ww             + weight(4,i,j)
+                   end if
+
+                   if(ww==0.0) then
+                      cubsph(i,jx,k) = misval
+                   else
+                      cubsph(i,jx,k) = cubsph(i,jx,k) / ww
+                   end if
+
+                end if UNDEF
+
+             else
+
+                latlon(i1,j1  ) = latlon(i1,j1  ) + weight(1,i,j)*cubsph(i,jx,k)
+                latlon(i2,j1  ) = latlon(i2,j1  ) + weight(2,i,j)*cubsph(i,jx,k)
+                latlon(i2,j1+1) = latlon(i2,j1+1) + weight(3,i,j)*cubsph(i,jx,k)
+                latlon(i1,j1+1) = latlon(i1,j1+1) + weight(4,i,j)*cubsph(i,jx,k)
+
+             end if ADJOINT
+
+          enddo FACE_X
+       enddo FACE_Y
+    end do FACES
+
+    return
+  end subroutine L2CInterpR4
 
   
   subroutine GhostCube(x)
@@ -2229,6 +2311,44 @@ end subroutine ReStaggerWindsCube
      end if
 
   end subroutine deallocGlob_r8_4
+
+  subroutine deallocGlob_r4_3(a, status)
+     real(REAL32), pointer :: a(:,:,:)
+     integer, intent(out) :: status
+
+     if (associated(a)) then
+        a=0
+        if(MAPL_ShmInitialized) then
+           call MAPL_DeAllocNodeArray(a, rc=status)
+        else
+           deallocate(a, stat=status)
+        end if
+        if (status /= 0) return
+        nullify(a)
+     else
+        status = 0
+     end if
+
+  end subroutine deallocGlob_r4_3
+
+  subroutine deallocGlob_r4_4(a, status)
+     real(REAL32), pointer :: a(:,:,:,:)
+     integer, intent(out) :: status
+
+     if (associated(a)) then
+        a=0
+        if(MAPL_ShmInitialized) then
+           call MAPL_DeAllocNodeArray(a, rc=status)
+        else
+           deallocate(a, stat=status)
+        end if
+        if (status /= 0) return
+        nullify(a)
+     else
+        status = 0
+     end if
+
+  end subroutine deallocGlob_r4_4
 
   subroutine deallocLocl_r8_3(a, status)
      real(REAL64), pointer :: a(:,:,:)
