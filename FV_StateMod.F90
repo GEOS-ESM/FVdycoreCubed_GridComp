@@ -1231,11 +1231,11 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
            if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3 ! Tell FV3 about QV, QLIQ, QICE
          endif
-         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL plus QCLD
-         if (FV_Atm(1)%flagstruct%nwat == 6) FV_Atm(1)%flagstruct%do_sat_adj = .TRUE.
+         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 7 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL plus QCLD
+         if (FV_Atm(1)%flagstruct%nwat == 7) FV_Atm(1)%flagstruct%do_sat_adj = .TRUE.
        endif
        if (FV_Atm(1)%flagstruct%do_sat_adj) then
-          _ASSERT(FV_Atm(1)%flagstruct%nwat == 6, 'when using fv saturation adjustment NWAT must equal 6')
+          _ASSERT(FV_Atm(1)%flagstruct%nwat >= 6, 'when using fv saturation adjustment NWAT must >= 6')
        endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
@@ -1248,10 +1248,10 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
      NWAT_TEST = ( (FV_Atm(1)%flagstruct%nwat == 0) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 1) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 3) .OR. &
-                   (FV_Atm(1)%flagstruct%nwat == 6) )
+                   (FV_Atm(1)%flagstruct%nwat >= 6) )
      _ASSERT( NWAT_TEST , 'NWAT must be either 0, 1, 3 or 6')
      select case ( FV_Atm(1)%flagstruct%nwat )
-     case (6) 
+     case (6:7)
           FV_Atm(1)%ncnst = STATE%GRID%NQ + 3 ! NQ + Combined QLIQ,QICE,QCLD
      case (3)
           FV_Atm(1)%ncnst = STATE%GRID%NQ + 2 ! NQ + Combined QLIQ,QICE
@@ -1266,7 +1266,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
 
    select case ( FV_Atm(1)%flagstruct%nwat )
   ! Assign Tracer Indices for FV3
-   case (6)
+   case (6:7)
     sphu = 1
     qliq = 2
     qice = 3
@@ -1311,7 +1311,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     case (3)
        _ASSERT(FV_Atm(1)%ncnst >= 7, 'needs informative message')
        _ASSERT(FV_Atm(1)%ncnst == STATE%GRID%NQ + 2, 'needs informative message')
-    case (6)
+    case (6:7)
        _ASSERT(FV_Atm(1)%ncnst >= 13, 'needs informative message')
        _ASSERT(FV_Atm(1)%ncnst == STATE%GRID%NQ + 3, 'needs informative message')
     end select
@@ -1400,7 +1400,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          endif
        endif
      ! Extra species for 6-phase microphysics
-       if (FV_Atm(1)%flagstruct%nwat == 6) then
+       if (FV_Atm(1)%flagstruct%nwat >= 6) then
        if (TRIM(state%vars%tracer(n)%tname) == 'QRAIN') then
          RAIN_FILLED = .TRUE.
          nn = nn+1
@@ -1468,7 +1468,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     enddo
    ! Verify
     select case (FV_Atm(1)%flagstruct%nwat)
-    case (6)
+    case (6:7)
       _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
       _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled')
       _ASSERT(QICE_FILLED, 'QICE Not Filled')
@@ -1541,7 +1541,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
            endif
          endif
        enddo
-      case (6)
+      case (6:7)
        do n=1,STATE%GRID%NQ
          if ( (TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
@@ -1615,7 +1615,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
       call MAPL_TimerOn(MAPL,"--MASS_FIX")
 
       if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. &
-            ((.not. FV_Atm(1)%flagstruct%hydrostatic) .OR. FV_Atm(1)%flagstruct%nwat==6)  ) then
+            ((.not. FV_Atm(1)%flagstruct%hydrostatic) .OR. FV_Atm(1)%flagstruct%nwat>=6)  ) then
 
          call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
                     FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
@@ -1636,7 +1636,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
       enddo
       tqtot = 0.0
       if ( (.not. ADIABATIC) .AND. (FV_Atm(1)%flagstruct%nwat /= 0) ) then
-       if (FV_Atm(1)%flagstruct%nwat == 6) then
+       if (FV_Atm(1)%flagstruct%nwat >= 6) then
          do k=1,npz
             tqtot(:,:) = tqtot(:,:) + ( &
             FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
@@ -1805,7 +1805,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
         QLIQ_FILLED = .TRUE.
         QICE_FILLED = .TRUE.
       endif
-      if (FV_Atm(1)%flagstruct%nwat == 6) then
+      if (FV_Atm(1)%flagstruct%nwat >= 6) then
         nn = nn+3
         QLIQ_FILLED = .TRUE.
         QICE_FILLED = .TRUE.
@@ -1863,7 +1863,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
        endif
        endif ! nwat >= 1
        
-       if (FV_Atm(1)%flagstruct%nwat == 6) then
+       if (FV_Atm(1)%flagstruct%nwat >= 6) then
        if (TRIM(state%vars%tracer(n)%tname) == 'QRAIN') then
           RAIN_FILLED = .TRUE.
           nn = nn+1
@@ -1909,12 +1909,12 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
           endif
        endif
-       endif ! nwat == 6
+       endif ! nwat >= 6
      enddo
 
    ! Verify
     select case (FV_Atm(1)%flagstruct%nwat)
-    case (6)
+    case (6:7)
       _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
       _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled Out')
       _ASSERT(QICE_FILLED, 'QICE Not Filled Out')
@@ -1987,7 +1987,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          endif
         endif
        enddo
-      case (6)
+      case (6:7)
        do n=1,STATE%GRID%NQ
         if ((TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
             (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
