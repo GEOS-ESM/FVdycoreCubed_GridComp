@@ -25,7 +25,7 @@ endif ()
 
 esma_add_library (${this}
   SRCS ${srcs}
-  SUBCOMPONENTS @fvdycore
+  SUBCOMPONENTS fvdycore
   DEPENDENCIES ${dependencies}
   DEPENDENCIES ${GFDL}
   INCLUDES ${INC_ESMF})
