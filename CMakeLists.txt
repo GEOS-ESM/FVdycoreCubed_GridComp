@@ -1,5 +1,10 @@
 esma_set_this ()
 
+add_custom_target(
+  fvdynwrap_h
+  COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/fv_dynamics_wrapper.py
+  VERBATIM)
+
 set (srcs
   sw.f90 jw.f90 testcases_3_4_5_6_stand_alone.f90
   GetWeightsC2C.F90
@@ -15,6 +20,8 @@ set (srcs
   CubeToLatLon.F90 
   CubeGridPrototype.F90
   GEOS_FV3_Utilities.F90
+  fv_dynamics_interface.f90
+  fv_dynamics_interface.c
   )
 
 if (ESMA_USE_GFE_NAMESPACE)
@@ -29,6 +36,7 @@ esma_add_library (${this}
   DEPENDENCIES ${dependencies}
   DEPENDENCIES ${GFDL}
   INCLUDES ${INC_ESMF})
+add_dependencies(${this} fvdynwrap_h)
 
 if (FV_PRECISION STREQUAL R4)
    set (GFDL fms_r4)
@@ -67,6 +75,11 @@ ecbuild_add_executable (
   SOURCES StandAlone_FV3_Dycore.F90
   LIBS ${this})
 set_target_properties (StandAlone_FV3_Dycore.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+target_include_directories( # for fvdynwrap.h
+  StandAlone_FV3_Dycore.x
+  PRIVATE
+  ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(StandAlone_FV3_Dycore.x -L${CMAKE_CURRENT_BINARY_DIR} fvdynwrap)
 
 ecbuild_add_executable (
   TARGET rs_scale.x
