@@ -3610,7 +3610,7 @@ subroutine Run(gc, import, export, clock, rc)
 ! Add Diabatic Forcing from Analysis to State Variables
 ! -----------------------------------------------------
 
-      if (vars%nwat == 6) then
+      if (vars%nwat >= 6) then
         QDOLD = 1.0 - (QVOLD+QLOLD+QIOLD+QROLD+QSOLD+QGOLD)
         QDNEW = 1.0 - (QV   +QL   +QI   +QR   +QS   +QG   )
       else
@@ -6949,7 +6949,7 @@ end subroutine RunAddIncs
         rainwat = -1
         snowwat = -1
         graupel = -1
-    case(6)
+    case(6:7)
         sphum   = 1
         liq_wat = 2
         ice_wat = 3
@@ -7055,7 +7055,7 @@ end subroutine RunAddIncs
        !endif
 
        select case (nwat)
-       case (6)
+       case (6:7)
            CVM = (1.-( Q(:,:,:,  sphum)+Q(:,:,:,liq_wat)+Q(:,:,:,rainwat)+Q(:,:,:,ice_wat)+&
                        Q(:,:,:,snowwat)+Q(:,:,:,graupel) )               )*c_air + &
                       (Q(:,:,:,  sphum)                                  )*c_vap + &
