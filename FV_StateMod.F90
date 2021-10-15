@@ -1161,13 +1161,14 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
 
   type(ESMF_VM) :: vm
   integer :: comm
+  integer :: rank, mpierr, bin_file_handle
+  character(len=256) :: bin_file_name
 
 ! Begin
 
   ! MPI communicator
   call ESMF_VMGetCurrent(vm, rc=status)
   call ESMF_VMGet(vm, mpiCommunicator=comm)
-  print *, 'MPI Communicator (Fortran): ', comm
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
@@ -1717,11 +1718,50 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
     if (.not. FV_OFF) then
     call set_domain(FV_Atm(1)%domain)  ! needed for diagnostic output done in fv_dynamics
+
+    ! Dump data to a binary file (one per rank)
+    call MPI_Comm_rank(comm, rank, mpierr)
+    ! Scalars
+    write(bin_file_name, '(a12, i1, a4)') 'scalar_data.', rank, '.bin'
+    print *, 'bin file: ', trim(bin_file_name)
+    write(*, '(a15)', advance='no') 'writing scalar data...'
+    open(newunit = bin_file_handle, file = bin_file_name, form = 'unformatted', status = 'new')
+    ! Scalars - Domain dimensions
+    write(bin_file_handle) FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz
+    ! Scalars - Grid bounds
+    write(bin_file_handle) isd, ied, jsd, jed
+    ! Scalars - Rest
+    write(bin_file_handle) &
+         FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
+         FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+         kappa, cp, zvir, FV_Atm(1)%ptop, FV_Atm(1)%ks, &
+         FV_Atm(1)%flagstruct%ncnst, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+         FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%flagstruct%hybrid_z
+    close(bin_file_handle)
+    ! Arrays
+    write(bin_file_name, '(a11, i1, a4)') 'array_data.', rank, '.bin'
+    print *, 'bin file: ', trim(bin_file_name)
+    write(*, '(a15)', advance='no') 'writing array data...'
+    open(newunit = bin_file_handle, file = bin_file_name, form = 'unformatted', status = 'new')
+    write(bin_file_handle) &
+         FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
+         FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
+         FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
+         FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
+         FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
+         FV_Atm(1)%ak, FV_Atm(1)%bk, &
+         FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
+         FV_Atm(1)%ze0
+    close(bin_file_handle)
+    write(*, *) 'done.'
+    call MPI_Abort(comm, mpierr, status)
+
     call fv_dynamics_interface( &
          comm, &
          FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, &
-         myDT, FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, kappa, &
-         cp, zvir, FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+         isd, ied, jsd, jed, myDT, &
+         FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+         kappa, cp, zvir, FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
          FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
          FV_Atm(1)%flagstruct%hydrostatic, &
          FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &

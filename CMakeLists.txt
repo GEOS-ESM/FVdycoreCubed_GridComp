@@ -86,18 +86,33 @@ ecbuild_add_executable (
   SOURCES rs_scale.F90
   LIBS ${this})
 set_target_properties (rs_scale.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+target_include_directories( # for fvdynwrap.h
+  rs_scale.x
+  PRIVATE
+  ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(rs_scale.x -L${CMAKE_CURRENT_BINARY_DIR} fvdynwrap)
 
 ecbuild_add_executable (
    TARGET StandAlone_AdvCore.x
    SOURCES StandAlone_AdvCore.F90
    LIBS ${this})
 set_target_properties (StandAlone_AdvCore.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+target_include_directories( # for fvdynwrap.h
+  StandAlone_AdvCore.x
+  PRIVATE
+  ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(StandAlone_AdvCore.x -L${CMAKE_CURRENT_BINARY_DIR} fvdynwrap)
 
 ecbuild_add_executable (
    TARGET StandAlone_DynAdvCore.x
    SOURCES StandAlone_DynAdvCore.F90
    LIBS ${this})
 set_target_properties (StandAlone_DynAdvCore.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+target_include_directories( # for fvdynwrap.h
+  StandAlone_DynAdvCore.x
+  PRIVATE
+  ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(StandAlone_DynAdvCore.x -L${CMAKE_CURRENT_BINARY_DIR} fvdynwrap)
 
 ecbuild_add_executable (
    TARGET c2c.x
