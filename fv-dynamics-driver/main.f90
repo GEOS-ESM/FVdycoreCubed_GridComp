@@ -31,17 +31,26 @@ program main
   bd = scalars%get_grid_bounds()
   dim = scalars%get_domain_dimensions()
   write(input_file, '(a22, i1, a4)') 'input-data/array_data.', rank, '.bin'
-  arr = InputArrays_T(input_file, bd, dim)
-  
+  arr = InputArrays_T(input_file, bd, dim, scalars%ncnst)
+
   call fv_dynamics_interface( &
        MPI_COMM_WORLD, &
        dim%npx, dim%npy, dim%npz, scalars%nq_tot, scalars%ng, &
-       bd%isd, bd%ied, bd%jsd, bd%jed, scalars%dt, &
-       scalars%consv_te, scalars%fill, scalars%reproduce_sum, scalars%kappa, &
-       scalars%cp_air, scalars%zvir, scalars%ptop, scalars%ks, &
+       bd%is, bd%ie, bd%js, bd%je, &
+       bd%isd, bd%ied, bd%jsd, bd%jed, &
+       scalars%dt, scalars%consv_te, scalars%fill, scalars%reproduce_sum, &
+       scalars%kappa, scalars%cp_air, scalars%zvir, scalars%ptop, scalars%ks, &
        scalars%ncnst, scalars%n_split, scalars%q_split, &
-       arr%u, arr%v, arr%w)
-  
+       arr%u, arr%v, arr%w, arr%delz, &
+       scalars%hydrostatic, &
+       arr%pt, arr%delp, arr%q, &
+       arr%ps, arr%pe, arr%pk, arr%peln, arr%pkz, &
+       arr%phis, arr%q_con, arr%omga, &
+       arr%ua, arr%va, arr%uc, arr%vc, &
+       arr%ak, arr%bk, &
+       arr%mfx, arr%mfy, arr%cx, arr%cy, &
+       scalars%hybrid_z)
+
   call MPI_Finalize(mpierr)
   
 end program main

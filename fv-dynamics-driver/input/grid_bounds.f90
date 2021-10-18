@@ -6,8 +6,8 @@ module grid_bounds_mod
   public :: GridBounds_T
   
   type GridBounds_T
-     integer :: isd, ied
-     integer :: jsd, jed
+     integer :: is, ie, js, je
+     integer :: isd, ied, jsd, jed
    contains
      procedure :: wr1te
   end type GridBounds_T
@@ -20,6 +20,11 @@ contains
     class(GridBounds_T), intent(in) :: self
 
     ! Start
+    print *, 'is: ', self%is
+    print *, 'ie: ', self%ie
+    print *, 'js: ', self%js
+    print *, 'je: ', self%je
+
     print *, 'isd: ', self%isd
     print *, 'ied: ', self%ied
     print *, 'jsd: ', self%jsd

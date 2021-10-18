@@ -40,6 +40,7 @@ contains
     ! Start
     open(newunit = file_handle, file = file_name, form = 'unformatted', status = 'old')
     read(file_handle) scalars%dim%npx, scalars%dim%npy, scalars%dim%npz
+    read(file_handle) scalars%bd%is, scalars%bd%ie, scalars%bd%js, scalars%bd%je
     read(file_handle) scalars%bd%isd, scalars%bd%ied, scalars%bd%jsd, scalars%bd%jed
     read(file_handle) &
          scalars%nq_tot, scalars%ng, scalars%dt, &
