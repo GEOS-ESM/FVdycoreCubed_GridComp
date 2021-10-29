@@ -27,7 +27,7 @@ endif ()
 
 esma_add_library (${this}
   SRCS ${srcs}
-  SUBCOMPONENTS @fvdycore
+  SUBCOMPONENTS fvdycore
   DEPENDENCIES ${dependencies}
   DEPENDENCIES ${GFDL}
   INCLUDES ${INC_ESMF})
@@ -60,6 +60,9 @@ set (CMAKE_Fortran_FLAGS_RELEASE "${GEOS_Fortran_FLAGS_VECT}")
 if (CRAY_POINTER)
   set_target_properties (${this} PROPERTIES COMPILE_FLAGS ${CRAY_POINTER})
 endif()
+
+# Enable OpenMP
+target_link_libraries(${this} PRIVATE OpenMP::OpenMP_Fortran)
 
 add_definitions (-DSPMD -DMAPL_MODE)
 
