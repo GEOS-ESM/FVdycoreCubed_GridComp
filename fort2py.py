@@ -4,8 +4,9 @@ from math import prod
 import cffi
 
 TYPEMAP = {
-    'float': np.dtype('f4'),
-    'int': np.dtype('i4'),}
+    'float': np.float32,
+    'double': np.float64,
+    'int': np.int32,}
 
 def fort_to_numpy(ffi, ptr, dim):
     ftype = ffi.getctype(ffi.typeof(ptr).item)
@@ -13,10 +14,10 @@ def fort_to_numpy(ffi, ptr, dim):
     return np.frombuffer(
         ffi.buffer(ptr, prod(dim)*ffi.sizeof(ftype)),
         TYPEMAP[ftype],
-    ).reshape(tuple(reversed(dim)))
+    ).reshape(tuple(reversed(dim))).transpose().astype(np.float64)
 
 def fort_to_gt4py(ptr, dim, origin, backend):
     ffi = cffi.FFI()
-    nparr = fort_to_numpy(ffi, ptr, dim)
-    # return gt4py.storage.from_array(nparr, backend, origin)
-    return gt4py.storage.wrap_cpu_array(nparr, backend, origin)
+    nparr = fort_to_numpy(ffi, ptr, dim).transpose()
+    return gt4py.storage.from_array(nparr, backend, origin)
+    # return gt4py.storage.wrap_cpu_array(nparr, backend, origin)

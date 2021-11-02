@@ -13,73 +13,120 @@ else:
 
 source = '''
 from {} import ffi
+from datetime import datetime
 from mpi4py import MPI
 from fv_dynamics import fv_dynamics_top_level_function
 @ffi.def_extern()
 def fv_dynamics_py_wrapper(
-        comm_c,
-        npx, npy, npz, nq_tot, ng,
-        is1, ie, js, je,
-        isd, ied, jsd, jed,
-        bdt, consv_te, fill, reproduce_sum,
-        kappa, cp_air, zvir, ptop,
-        ks, ncnst, n_split, q_split,
-        u, v, w, delz,
-        hydrostatic,
-        pt, delp, q,
-        ps, pe, pk, peln, pkz,
-        phis, q_con, omga,
-        ua, va, uc, vc,
-        ak, bk,
-        mfx, mfy, cx, cy,
-        # ze0,
-        hybrid_z):
+    comm_c,
+    npx, npy, npz,
+    is_, ie, js, je,
+    isd, ied, jsd, jed,
+    bdt, nq_tot, ng, ptop, ks, layout_1, layout_2,
+    adiabatic,
+    hydrostatic, z_tracer, make_nh, fv_debug,
+    reproduce_sum, do_sat_adj, do_vort_damp, rf_fast, fill,
+    ncnst, n_split, k_split, fv_sg_adj, n_sponge, n_zfilter, nwat,
+    hord_tr, hord_tm, hord_dp, hord_mt, hord_vt,
+    nord, kord_tm, kord_tr, kord_wz, kord_mt,
+    d_ext, beta, vtdm4, ke_bg, d_con, d2_bg, d2_bg_k1, d2_bg_k2,
+    p_fac, a_imp, dddmp, d4_bg, rf_cutoff, tau, consv_te,
+    u, v, w, delz,
+    pt, delp, q,
+    ps, pe, pk, peln, pkz,
+    phis, q_con, omga,
+    ua, va, uc, vc,
+    ak, bk,
+    mfx, mfy, cx, cy, diss_est,
+    dx, dy, dxa, dya, dxc, dyc, rdx, rdy, rdxa, rdya, rdxc, rdyc,
+    cosa, cosa_s, sina_u, sina_v, cosa_u, cosa_v, rsin2, rsina, rsin_u, rsin_v,
+    sin_sg, cos_sg,
+    area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v,
+    agrid, bgrid,
+    edge_e, edge_w, edge_n, edge_s, nested, stretched_grid, da_min, da_min_c):
+
     # comm_c -> comm_py
     comm_py = MPI.Intracomm() # new comm, internal MPI_Comm handle is MPI_COMM_NULL
     comm_ptr = MPI._addressof(comm_py)  # internal MPI_Comm handle
     comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
     comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
-    print('fv_dynamics_py_wrapper')
+
+    if comm_py.Get_rank() == 0:
+        print('P:', datetime.now().isoformat(timespec='milliseconds'), '--in cffi wrapper')
+
     # Call top-level function for fv_dynamics
     fv_dynamics_top_level_function(
-        comm_py, 
-        npx, npy, npz, nq_tot, ng,
-        is1, ie, js, je,
+        comm_py,
+        npx, npy, npz,
+        is_, ie, js, je,
         isd, ied, jsd, jed,
-        bdt, consv_te, fill, reproduce_sum,
-        kappa, cp_air, zvir, ptop,
-        ks, ncnst, n_split, q_split,
+        bdt, nq_tot, ng, ptop, ks, layout_1, layout_2,
+        adiabatic,
+        hydrostatic, z_tracer, make_nh, fv_debug,
+        reproduce_sum, do_sat_adj, do_vort_damp, rf_fast, fill,
+        ncnst, n_split, k_split, fv_sg_adj, n_sponge, n_zfilter, nwat,
+        hord_tr, hord_tm, hord_dp, hord_mt, hord_vt,
+        nord, kord_tm, kord_tr, kord_wz, kord_mt,
+        d_ext, beta, vtdm4, ke_bg, d_con, d2_bg, d2_bg_k1, d2_bg_k2,
+        p_fac, a_imp, dddmp, d4_bg, rf_cutoff, tau, consv_te,
         u, v, w, delz,
-        hydrostatic,
         pt, delp, q,
         ps, pe, pk, peln, pkz,
         phis, q_con, omga,
         ua, va, uc, vc,
         ak, bk,
-        mfx, mfy, cx, cy,
-        # ze0,
-        hybrid_z)
+        mfx, mfy, cx, cy, diss_est,
+        dx, dy, dxa, dya, dxc, dyc, rdx, rdy, rdxa, rdya, rdxc, rdyc,
+        cosa, cosa_s, sina_u, sina_v, cosa_u, cosa_v, rsin2, rsina, rsin_u, rsin_v,
+        sin_sg, cos_sg,
+        area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v,
+        agrid, bgrid,
+        edge_e, edge_w, edge_n, edge_s, nested, stretched_grid, da_min, da_min_c)
 '''.format(TMPFILEBASE, _mpi_comm_t)
 
 header = '''
 extern void fv_dynamics_py_wrapper(
     {} comm_c,
-    int npx, int npy, int npz, int nq_tot, int ng,
-    int is1, int ie, int js, int je,
+    int npx, int npy, int npz,
+    int is_, int ie, int js, int je,
     int isd, int ied, int jsd, int jed,
-    float bdt, float consv_te, int fill, int reproduce_sum,
-    float kappa, float cp_air, float zvir, float ptop,
-    int ks, int ncnst, int n_split, int q_split,
+    float bdt, int nq_tot, int ng, float ptop, int ks, int layout_1, int layout_2,
+    int adiabatic,
+    int hydrostatic, int z_tracer, int make_nh, int fv_debug,
+    int reproduce_sum, int do_sat_adj, int do_vort_damp, int rf_fast, int fill,
+    int ncnst, int n_split, int k_split, int fv_sg_adj, int n_sponge, int n_zfilter, int nwat,
+    int hord_tr, int hord_tm, int hord_dp, int hord_mt, int hord_vt,
+    int nord, int kord_tm, int kord_tr, int kord_wz, int kord_mt,
+    float d_ext, float beta, float vtdm4, float ke_bg, float d_con,
+    float d2_bg, float d2_bg_k1, float d2_bg_k2,
+    float p_fac, float a_imp, float dddmp, float d4_bg, float rf_cutoff, float tau, float consv_te,
+    // input/output
     float* u, float* v, float* w, float* delz,
-    int hydrostatic,
     float* pt, float* delp, float* q,
     float* ps, float* pe, float* pk, float* peln, float* pkz,
-    float* phis, float* q_con, float* omga,
-    float* ua, float* va, float* uc, float* vc,
+    float* phis, float* q_con, float* omga, float* ua, float* va, float* uc, float* vc,
+    // input
     const float* ak, const float* bk,
-    float* mfx, float* mfy, float* cx, float* cy,
-    // float* ze0,
-    int hybrid_z);'''.format(_mpi_comm_t)
+    // input/output
+    float* mfx, float* mfy, float* cx, float* cy, float* diss_est,
+    // input
+    const float* dx, const float* dy,
+    const float* dxa, const float* dya,
+    const float* dxc, const float* dyc,
+    const float* rdx, const float* rdy,
+    const float* rdxa, const float* rdya,
+    const float* rdxc, const float* rdyc,
+    const float* cosa, const float* cosa_s, const float* sina_u, const float* sina_v,
+    const float* cosa_u, const float* cosa_v,
+    const float* rsin2, const float* rsina, const float* rsin_u, const float* rsin_v,
+    const float* sin_sg, const float* cos_sg,
+    const float* area, const float* rarea, const float* rarea_c, const float* f0, const float* fC,
+    const float* del6_u, const float* del6_v, const float* divg_u, const float* divg_v,
+    const float* agrid, const float* bgrid,
+    const double* edge_e, const double* edge_w, const double* edge_n, const double* edge_s,
+    int nested, int stretched_grid, double da_min, double da_min_c);
+'''.format(_mpi_comm_t)
+
 with open(TMPFILEBASE+'.h', 'w') as f:
     f.write(header)
 ffi.embedding_api(header)
