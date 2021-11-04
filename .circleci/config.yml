@@ -62,6 +62,7 @@ commands:
       compiler:
         type: string
     steps:
+      - name: "Versions, etc."
       - run: mpirun --version && << parameters.compiler >> --version && echo $BASEDIR && pwd && ls && echo "$(nproc)"
 
   checkout_fixture:
@@ -70,6 +71,7 @@ commands:
       repo:
         type: string
     steps:
+      - name: "Checkout fixture"
       - run: |
           cd ${CIRCLE_WORKING_DIRECTORY}
           git clone https://github.com/GEOS-ESM/<< parameters.repo >>.git
@@ -80,6 +82,7 @@ commands:
       repo:
         type: string
     steps:
+      - name: "Mepo clone external repos"
       - run: |
           cd ${CIRCLE_WORKING_DIRECTORY}/<< parameters.repo >>
           mepo clone
@@ -91,6 +94,7 @@ commands:
       repo:
         type: string
     steps:
+      - name: "Mepo develop GEOSgcm_GridComp GEOSgcm_App GMAO_Shared"
       - run: |
           cd ${CIRCLE_WORKING_DIRECTORY}/<< parameters.repo >>
           mepo develop GEOSgcm_GridComp GEOSgcm_App GMAO_Shared
@@ -102,6 +106,7 @@ commands:
       repo:
         type: string
     steps:
+      - name: "Mepo checkout-if-exists feature branch"
       - run: |
           cd ${CIRCLE_WORKING_DIRECTORY}/<< parameters.repo >>
           echo "${CIRCLE_BRANCH}"
@@ -119,6 +124,7 @@ commands:
       compiler:
         type: string
     steps:
+      - name: "Run CMake"
       - run: |
           mkdir -p /logfiles
           cd ${CIRCLE_WORKING_DIRECTORY}/<< parameters.repo >>
@@ -132,6 +138,7 @@ commands:
       repo:
         type: string
     steps:
+      - name: "Build and install"
       - run: |
           cd ${CIRCLE_WORKING_DIRECTORY}/workspace/build-<< parameters.repo >>
           make -j"$(nproc)" install |& tee /logfiles/make.log
