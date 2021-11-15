@@ -597,19 +597,19 @@ program interp_restarts
             if (rst_files(ifile)%has_edge .eqv. .false. &
             .and. rst_files(ifile)%has_center .eqv. .false. &
             .and. rst_files(ifile)%ungrid_size == -1) then
-                call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat'/),(/imc,jmc/),rc=status)
+                call MAPL_IOChangeRes(InCfg(1),OutCfg(1),['lon','lat'],[imc,jmc],rc=status)
             else if (rst_files(ifile)%has_edge .eqv. .false. &
             .and. rst_files(ifile)%has_center .eqv. .true. &
             .and. rst_files(ifile)%ungrid_size == -1) then
-               call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev'/),(/imc,jmc,npz/),rc=status)
+               call MAPL_IOChangeRes(InCfg(1),OutCfg(1),['lon','lat','lev'],[imc,jmc,npz],rc=status)
             else if (rst_files(ifile)%has_edge .eqv. .true. &
             .and. rst_files(ifile)%has_center .eqv. .true. &
             .and. rst_files(ifile)%ungrid_size == -1) then
-               call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon ','lat ','lev ','edge'/),(/imc,jmc,npz,npz+1/),rc=status)
+               call MAPL_IOChangeRes(InCfg(1),OutCfg(1),['lon ','lat ','lev ','edge'],[imc,jmc,npz,npz+1],rc=status)
             else if (rst_files(ifile)%has_edge .eqv. .false. &
             .and. rst_files(ifile)%has_center .eqv. .true. &
             .and. rst_files(ifile)%ungrid_size > 0) then
-               call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon ','lat ','lev ','unknown_dim1'/),(/imc,jmc,npz,rst_files(ifile)%ungrid_size/),rc=status)
+               call MAPL_IOChangeRes(InCfg(1),OutCfg(1),[character(len=12):: 'lon ','lat ','lev ','unknown_dim1'],[imc,jmc,npz,rst_files(ifile)%ungrid_size],rc=status)
             end if
      
 
