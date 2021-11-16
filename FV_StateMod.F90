@@ -522,11 +522,17 @@ contains
    if (FV_Atm(1)%flagstruct%ntiles == 6) then
      ! Cubed-sphere grid resolution and DT dependence 
      !              based on ideal remapping DT
+      if (FV_Atm(1)%flagstruct%npx >= 12) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0  )
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 24) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0  )
+      endif
       if (FV_Atm(1)%flagstruct%npx >= 48) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 90) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 450.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 180) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
