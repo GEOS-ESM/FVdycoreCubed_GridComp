@@ -84,7 +84,7 @@ program main
        arr%sin_sg, arr%cos_sg, &
        arr%area, arr%rarea, arr%rarea_c, arr%f0, arr%fC, &
        arr%del6_u, arr%del6_v, arr%divg_u, arr%divg_v, &
-       arr%agrid, arr%bgrid, &
+       arr%agrid, arr%bgrid, arr%a11, arr%a12, arr%a21, arr%a22, &
        arr%edge_e, arr%edge_w, arr%edge_n, arr%edge_s, &
        arr%nested, arr%stretched_grid, arr%da_min, arr%da_min_c)
 

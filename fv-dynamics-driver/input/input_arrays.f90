@@ -26,7 +26,7 @@ module input_arrays_mod
      real, allocatable :: sin_sg(:,:,:), cos_sg(:,:,:)
      real, allocatable :: area(:,:), rarea(:,:), rarea_c(:,:), f0(:,:), fC(:,:)
      real, allocatable :: del6_u(:,:), del6_v(:,:), divg_u(:,:), divg_v(:,:)
-     real, allocatable :: agrid(:,:,:), bgrid(:,:,:)
+     real, allocatable :: agrid(:,:,:), bgrid(:,:,:), a11(:,:), a12(:,:), a21(:,:), a22(:,:)
      real(kind=real64), allocatable :: edge_e(:), edge_w(:), edge_n(:), edge_s(:)
      logical :: nested, stretched_grid
      real(kind=real64) :: da_min, da_min_c
@@ -133,9 +133,14 @@ contains
     allocate(arr%del6_v(bd%isd:bd%ied+1, bd%jsd:bd%jed), source = undef)
     allocate(arr%divg_u(bd%isd:bd%ied, bd%jsd:bd%jed+1), source = undef)
     allocate(arr%divg_v(bd%isd:bd%ied+1, bd%jsd:bd%jed), source = undef)
-    !# agrid
+    !# agrid/bgrid
     allocate(arr%agrid(bd%isd:bd%ied, bd%jsd:bd%jed, 2), source = undef)
     allocate(arr%bgrid(bd%isd:bd%ied+1, bd%jsd:bd%jed+1, 2), source = undef)
+    !# a11/a12/a21/a22
+    allocate(arr%a11(bd%is-1:bd%ie+1, bd%js-1:bd%je+1), source = undef)
+    allocate(arr%a12(bd%is-1:bd%ie+1, bd%js-1:bd%je+1), source = undef)
+    allocate(arr%a21(bd%is-1:bd%ie+1, bd%js-1:bd%je+1), source = undef)
+    allocate(arr%a22(bd%is-1:bd%ie+1, bd%js-1:bd%je+1), source = undef)
     !# edge_e/w/n/s
     allocate(arr%edge_e(dim%npy), source = undef_real64)
     allocate(arr%edge_w(dim%npy), source = undef_real64)
@@ -159,7 +164,7 @@ contains
          arr%rsin2, arr%rsina, arr%rsin_u, arr%rsin_v, &
          arr%sin_sg, arr%cos_sg, arr%area, arr%rarea, arr%rarea_c, arr%f0, arr%fC, &
          arr%del6_u, arr%del6_v, arr%divg_u, arr%divg_v, &
-         arr%agrid, arr%bgrid, &
+         arr%agrid, arr%bgrid, arr%a11, arr%a12, arr%a21, arr%a22, &
          arr%edge_e, arr%edge_w, arr%edge_n, arr%edge_s, &
          arr%nested, arr%stretched_grid, arr%da_min, arr%da_min_c
     close(file_handle)
@@ -200,6 +205,7 @@ contains
          sum(self%f0), sum(self%fC)
     print *, 'del6_u: ', sum(self%del6_u), sum(self%del6_v), sum(self%divg_u), sum(self%divg_v)
     print *, 'agrid, bgrid: ', sum(self%agrid), sum(self%bgrid)
+    print *, 'a11/a12/a21/a22: ', sum(self%a11), sum(self%a12), sum(self%a21), sum(self%a22)
     print *, 'edge_e/w/n/s: ', &
          shape(self%edge_e), shape(self%edge_w), shape(self%edge_n), shape(self%edge_s), &
          sum(self%edge_e), sum(self%edge_w), sum(self%edge_n), sum(self%edge_s)

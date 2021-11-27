@@ -41,7 +41,7 @@ def fv_dynamics_top_level_function(
         sin_sg_ptr, cos_sg_ptr,
         area_ptr, rarea_ptr, rarea_c_ptr, f0_ptr, fC_ptr,
         del6_u_ptr, del6_v_ptr, divg_u_ptr, divg_v_ptr,
-        agrid_ptr, bgrid_ptr,
+        agrid_ptr, bgrid_ptr, a11_ptr, a12_ptr, a21_ptr, a22_ptr,
         edge_e_ptr, edge_w_ptr, edge_n_ptr, edge_s_ptr,
         nested_int, stretched_grid_int, da_min, da_min_c):
 
@@ -152,6 +152,11 @@ def fv_dynamics_top_level_function(
     agrid = fort_to_numpy(ffi, agrid_ptr, (ied-isd+1, jed-jsd+1, 2))
     bgrid = fort_to_numpy(ffi, bgrid_ptr, (ied+1-isd+1, jed+1-jsd+1, 2))
     # print('agrid, bgrid:', np.sum(agrid), np.sum(bgrid))
+    a11 = fort_to_numpy(ffi, a11_ptr, (ie+1-(is_-1)+1, je+1-(js-1)+1))
+    a12 = fort_to_numpy(ffi, a12_ptr, (ie+1-(is_-1)+1, je+1-(js-1)+1))
+    a21 = fort_to_numpy(ffi, a21_ptr, (ie+1-(is_-1)+1, je+1-(js-1)+1))
+    a22 = fort_to_numpy(ffi, a22_ptr, (ie+1-(is_-1)+1, je+1-(js-1)+1))
+    # print('a11, a12, a21, a22:', np.sum(a11), np.sum(a12), np.sum(a21), np.sum(a22))
     edge_e = fort_to_numpy(ffi, edge_e_ptr, (npy,))
     edge_w = fort_to_numpy(ffi, edge_w_ptr, (npy,))
     edge_n = fort_to_numpy(ffi, edge_n_ptr, (npx,))
@@ -276,63 +281,29 @@ def fv_dynamics_top_level_function(
         'npx': npx, 'npy': npy, 'npz': npz,
         'is_': is_, 'ie': ie, 'js': js, 'je': je,
         'isd': isd, 'ied': ied, 'jsd': jsd, 'jed': jed,
-        'dx': dx, #np.zeros((ied-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'dy': dy, #np.zeros((ied+1-isd+1, jed-jsd+1), np.float64, order='F'),
-        'dxa': dxa,
-        'dya': dya,
-        'dxc': dxc, #np.zeros((ied+1-isd+1, jed-jsd+1), np.float64, order='F'),
-        'dyc': dyc, #np.zeros((ied-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'rdx': rdx,
-        'rdy': rdy,
-        'rdxa': rdxa, #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'rdya': rdya, #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'rdxc': rdxc, #np.zeros((ied+1-isd+1, jed-jsd+1), np.float64, order='F'),
-        'rdyc': rdyc, #np.zeros((ied-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'cosa' : cosa, #np.zeros((ied+1-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'cosa_s': cosa_s, #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'sina_u': sina_u, #np.zeros((ied+1-isd+1, jed-jsd+1), np.float64, order='F'),
-        'sina_v': sina_v, #np.zeros((ied-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'cosa_u': cosa_u, #np.zeros((ied+1-isd+1, jed-jsd+1), np.float64, order='F'),
-        'cosa_v': cosa_v, #np.zeros((ied-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'rsin2': rsin2, #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'rsina': rsina, #np.zeros((ied+1-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'rsin_u': rsin_u, #np.zeros((ied+1-isd+1, jed-jsd+1), np.float64, order='F'),
-        'rsin_v': rsin_v, #np.zeros((ied-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'sin_sg1': sin_sg[:,:,0], #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'sin_sg2': sin_sg[:,:,1], #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'sin_sg3': sin_sg[:,:,2], #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'sin_sg4': sin_sg[:,:,3], #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'cos_sg1': cos_sg[:,:,0], #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'cos_sg2': cos_sg[:,:,1], #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'cos_sg3': cos_sg[:,:,2], #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'cos_sg4': cos_sg[:,:,3], #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'area': area, #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'area_64': area,
-        'rarea': rarea, #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'rarea_c': rarea_c, #np.zeros((ied+1-isd+1,jed+1-jsd+1), np.float64, order='F'),
-        'f0': f0, #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'fC': fC, #np.zeros((ied+1-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'del6_u': del6_u, #np.zeros((ied-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'del6_v': del6_v, #np.zeros((ied+1-isd+1, jed-jsd+1), np.float64, order='F'),
-        'divg_u': divg_u, #np.zeros((ied-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'divg_v': divg_v, #np.zeros((ied+1-isd+1, jed-jsd+1), np.float64, order='F'),
-        'agrid1': agrid[:,:,0], #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        'agrid2': agrid[:,:,1], #np.zeros((ied-isd+1, jed-jsd+1), np.float64, order='F'),
-        # TODO: where do the bgrid1/2 come from??
-        'bgrid1': bgrid[:,:,0], #np.zeros((ied+1-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'bgrid2': bgrid[:,:,1], #np.zeros((ied+1-isd+1, jed+1-jsd+1), np.float64, order='F'),
-        'edge_e': edge_e, #np.zeros((npy,), np.float64, order='F'),
-        'edge_w': edge_w, #np.zeros((npy,), np.float64, order='F'),
-        'edge_n': edge_n, #np.zeros((npx,), np.float64, order='F'),
-        'edge_s': edge_s, #np.zeros((npx,), np.float64, order='F'),
-        'a11': np.zeros((ie+1-(is_-1)+1, je+1-(js-1)+1), np.float64, order='F'),
-        'a12': np.zeros((ie+1-(is_-1)+1, je+1-(js-1)+1), np.float64, order='F'),
-        'a21': np.zeros((ie+1-(is_-1)+1, je+1-(js-1)+1), np.float64, order='F'),
-        'a22': np.zeros((ie+1-(is_-1)+1, je+1-(js-1)+1), np.float64, order='F'),
+        'dx': dx, 'dy': dy, 'dxa': dxa, 'dya': dya, 'dxc': dxc, 'dyc': dyc,
+        'rdx': rdx, 'rdy': rdy, 'rdxa': rdxa, 'rdya': rdya, 'rdxc': rdxc, 'rdyc': rdyc,
+        'cosa' : cosa, 'cosa_s': cosa_s,
+        'sina_u': sina_u, 'sina_v': sina_v, 'cosa_u': cosa_u, 'cosa_v': cosa_v,
+        'rsin2': rsin2, 'rsina': rsina, 'rsin_u': rsin_u, 'rsin_v': rsin_v,
+        'sin_sg1': sin_sg[:,:,0], 'sin_sg2': sin_sg[:,:,1],
+        'sin_sg3': sin_sg[:,:,2], 'sin_sg4': sin_sg[:,:,3],
+        'cos_sg1': cos_sg[:,:,0], 'cos_sg2': cos_sg[:,:,1],
+        'cos_sg3': cos_sg[:,:,2], 'cos_sg4': cos_sg[:,:,3],
+        'area': area, 'area_64': area, 'rarea': rarea, 'rarea_c': rarea_c,
+        'f0': f0, 'fC': fC,
+        'del6_u': del6_u, 'del6_v': del6_v, 'divg_u': divg_u, 'divg_v': divg_v,
+        'agrid1': agrid[:,:,0], 'agrid2': agrid[:,:,1],
+        'bgrid1': bgrid[:,:,0], 'bgrid2': bgrid[:,:,1],
+        # 'a11': np.zeros((ie+1-(is_-1)+1, je+1-(js-1)+1), np.float64, order='F'),
+        # 'a12': np.zeros((ie+1-(is_-1)+1, je+1-(js-1)+1), np.float64, order='F'),
+        # 'a21': np.zeros((ie+1-(is_-1)+1, je+1-(js-1)+1), np.float64, order='F'),
+        # 'a22': np.zeros((ie+1-(is_-1)+1, je+1-(js-1)+1), np.float64, order='F'),
+        'a11': a11, 'a12': a12, 'a21': a21, 'a22': a22,
+        'edge_e': edge_e, 'edge_w': edge_w, 'edge_n': edge_n, 'edge_s': edge_s,
         'nested': False if nested_int == 0 else True,
         'stretched_grid': False if stretched_grid_int == 0 else True,
-        'da_min': da_min,
-        'da_min_c': 0.0,}
+        'da_min': da_min, 'da_min_c': 0.0,} # grid_data
 
     if (rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'), '--wrapped data')
@@ -350,15 +321,16 @@ def fv_dynamics_top_level_function(
         'area', 'rarea', 'rarea_c', 'f0', 'fC',
         'del6_u', 'del6_v', 'divg_u', 'divg_v',
         'agrid1', 'agrid2', 'bgrid1', 'bgrid2',
+        'a11', 'a12', 'a21', 'a22',
         'edge_e', 'edge_w', 'edge_n', 'edge_s']
 
     if (spec.grid.rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'), '--created grid')
-        # hf = h5py.File('grid-data.h5', 'w')
-        # for var in grid_vars_to_write:
-        #     print('var:', var, grid.__dict__[var].shape, np.sum(grid.__dict__[var]))
-        #     hf.create_dataset(var, data=grid.__dict__[var])
-        # hf.close()
+        hf = h5py.File('grid-data.h5', 'w')
+        for var in grid_vars_to_write:
+            # print('var:', var, grid.__dict__[var].shape, np.sum(grid.__dict__[var]))
+            hf.create_dataset(var, data=grid.__dict__[var])
+        hf.close()
     driver_object = fv3core.testing.TranslateFVDynamics([grid])
     state = driver_object.state_from_inputs(input_data)
     # print('state.pe/state.q_con:', state['pe'].shape, state['q_con'].shape)
@@ -369,7 +341,7 @@ def fv_dynamics_top_level_function(
                      'pt', 'delp',
                      'ps', 'pe', 'pk', 'peln', 'pkz',
                      'phis', 'q_con', 'omga',
-                     'ak', 'bk']
+                     'ua', 'va', 'uc', 'vc']
     if (rank == 0):
         hf = h5py.File('state.h5', 'w')
         for var in vars_to_write:
@@ -393,7 +365,17 @@ def fv_dynamics_top_level_function(
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--instantiated DynamicalCore')
 
-    # print('After instantiation of DynamicalCore:', 'pt:', np.sum(state['pt']), ', pkz:', np.sum(state['pkz']), ', pkz non-zeros:', np.count_nonzero(state['pkz']))
+    if spec.namelist.fv_sg_adj > 0:
+        fv_subgrid_z = fv3core.DryConvectiveAdjustment(
+            spec.grid.grid_indexing,
+            spec.namelist.nwat,
+            spec.namelist.fv_sg_adj,
+            spec.namelist.n_sponge,
+            spec.namelist.hydrostatic,)
+        if (spec.grid.rank == 0):
+            print('P:', datetime.now().isoformat(timespec='milliseconds'),
+                  '--instantiated DryConvectiveAdjustment')
+
     # First timestep
     dycore.step_dynamics(
         state,

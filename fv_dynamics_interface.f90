@@ -42,7 +42,8 @@ module fv_dynamics_interface_mod
           dx, dy, dxa, dya, dxc, dyc, rdx, rdy, rdxa, rdya, rdxc, rdyc, &
           cosa, cosa_s, sina_u, sina_v, cosa_u, cosa_v, rsin2, rsina, rsin_u, rsin_v, &
           sin_sg, cos_sg, &
-          area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v, agrid, bgrid, &
+          area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v, &
+          agrid, bgrid, a11, a12, a21, a22, &
           edge_e, edge_w, edge_n, edge_s, nested, stretched_grid, da_min, da_min_c &
           ) bind(c, name='fv_dynamics_interface')
 
@@ -126,7 +127,7 @@ module fv_dynamics_interface_mod
        real(kind=c_float), dimension(*), intent(in) :: rsin2, rsina, rsin_u, rsin_v, sin_sg, cos_sg
        real(kind=c_float), dimension(*), intent(in) :: area, rarea, rarea_c, f0, fC
        real(kind=c_float), dimension(*), intent(in) :: del6_u, del6_v, divg_u, divg_v
-       real(kind=c_float), dimension(*), intent(in) :: agrid, bgrid
+       real(kind=c_float), dimension(*), intent(in) :: agrid, bgrid, a11, a12, a21, a22
        real(kind=c_double), dimension(*), intent(in) :: edge_e, edge_w, edge_n, edge_s
        logical, value, intent(in) :: nested, stretched_grid
        real(kind=c_double), value, intent(in) :: da_min, da_min_c

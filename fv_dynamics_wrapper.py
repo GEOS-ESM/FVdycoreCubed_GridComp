@@ -42,7 +42,7 @@ def fv_dynamics_py_wrapper(
     cosa, cosa_s, sina_u, sina_v, cosa_u, cosa_v, rsin2, rsina, rsin_u, rsin_v,
     sin_sg, cos_sg,
     area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v,
-    agrid, bgrid,
+    agrid, bgrid, a11, a12, a21, a22,
     edge_e, edge_w, edge_n, edge_s, nested, stretched_grid, da_min, da_min_c):
 
     # comm_c -> comm_py
@@ -80,7 +80,7 @@ def fv_dynamics_py_wrapper(
         cosa, cosa_s, sina_u, sina_v, cosa_u, cosa_v, rsin2, rsina, rsin_u, rsin_v,
         sin_sg, cos_sg,
         area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v,
-        agrid, bgrid,
+        agrid, bgrid, a11, a12, a21, a22,
         edge_e, edge_w, edge_n, edge_s, nested, stretched_grid, da_min, da_min_c)
 '''.format(TMPFILEBASE, _mpi_comm_t)
 
@@ -123,6 +123,7 @@ extern void fv_dynamics_py_wrapper(
     const float* area, const float* rarea, const float* rarea_c, const float* f0, const float* fC,
     const float* del6_u, const float* del6_v, const float* divg_u, const float* divg_v,
     const float* agrid, const float* bgrid,
+    const float* a11, const float* a12, const float* a21, const float* a22,
     const double* edge_e, const double* edge_w, const double* edge_n, const double* edge_s,
     int nested, int stretched_grid, double da_min, double da_min_c);
 '''.format(_mpi_comm_t)
