@@ -39,7 +39,6 @@
                            computeMassFluxes => fv_computeMassFluxes,&
                            getVerticalMassFlux => fv_getVerticalMassFlux,&
                            getOmega        => fv_getOmega,           &
-                           getPK           => fv_getPK,              &
                            getVorticity    => fv_getVorticity,       &
                            getDivergence   => fv_getdivergence,      &
                            getEPV          => fv_getEPV,             &
@@ -1591,6 +1590,7 @@ contains
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
      VERIFY_(STATUS)
 
+#ifdef SKIP_TRACERS
      do ntracer=1,ntracers
         do nlev=1,nlevs
            write(myTracer, "('Q',i5.5,'_',i3.3)") ntracer-1, plevs(nlev)
@@ -1611,6 +1611,7 @@ contains
              VLOCATION  = MAPL_VLocationCenter,               RC=STATUS  )
         VERIFY_(STATUS)
      enddo         
+#endif
 
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'UH25',                                      &
@@ -2689,6 +2690,7 @@ subroutine Run(gc, import, export, clock, rc)
     real(r8),     pointer :: phisxy(:,:)
     real(kind=4), pointer ::   phis(:,:)
 
+    real(r8), allocatable ::    plk(:,:,:) ! pl**kappa
     real(r8), allocatable ::   pkxy(:,:,:) ! pe**kappa
     real(r8), allocatable ::    pe0(:,:,:) ! edge-level pressure before dynamics
     real(r8), allocatable ::    pe1(:,:,:) ! edge-level pressure after dynamics
@@ -2793,7 +2795,6 @@ subroutine Run(gc, import, export, clock, rc)
     real(kind=4), allocatable :: tropt (:,:)   ! Tropopause Temperature
     real(kind=4), allocatable :: tropq (:,:)   ! Tropopause Specific Humidity
 
-    real(r8), allocatable :: pelnxz(:,:,:) ! log pressure (pe) at layer edges
     real(r8), allocatable :: omaxyz(:,:,:) ! vertical pressure velocity (pa/sec)
     real(r8), allocatable :: cptxyz(:,:,:) ! Cp*Tv
     real(r8), allocatable :: thvxyz(:,:,:) ! Thetav
@@ -3041,10 +3042,9 @@ subroutine Run(gc, import, export, clock, rc)
       ALLOCATE( dthdtremap  (ifirstxy:ilastxy,jfirstxy:jlastxy) )
       ALLOCATE( dthdtconsv  (ifirstxy:ilastxy,jfirstxy:jlastxy) )
 
-      ALLOCATE( pelnxz   (ifirstxy:ilastxy,km+1,jfirstxy:jlastxy) )
-
       ALLOCATE(  tmp2d   (ifirstxy:ilastxy,jfirstxy:jlastxy     ) )
       ALLOCATE( phisxy   (ifirstxy:ilastxy,jfirstxy:jlastxy     ) )
+      ALLOCATE(    plk   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE(   pkxy   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
       ALLOCATE(     zl   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE(    zle   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
@@ -3610,7 +3610,7 @@ subroutine Run(gc, import, export, clock, rc)
 ! Add Diabatic Forcing from Analysis to State Variables
 ! -----------------------------------------------------
 
-      if (vars%nwat == 6) then
+      if (vars%nwat >= 6) then
         QDOLD = 1.0 - (QVOLD+QLOLD+QIOLD+QROLD+QSOLD+QGOLD)
         QDNEW = 1.0 - (QV   +QL   +QI   +QR   +QS   +QG   )
       else
@@ -4159,7 +4159,8 @@ subroutine Run(gc, import, export, clock, rc)
   call Write_Profile(grid, vars%u, 'U-after-DynRun')
   call Write_Profile(grid, vars%v, 'V-after-DynRun')
 #endif
-      call getPK ( pkxy )
+      plk  = exp( kappa * log( 0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1)) ) )
+      pkxy = exp( kappa * log( vars%pe ) )
 
 !----------------------------------------------------------------------------
 
@@ -4353,12 +4354,13 @@ subroutine Run(gc, import, export, clock, rc)
       call FILLOUT3 (export, 'Q'      , qv      , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PL'     , pl      , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PLE'    , vars%pe , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'PLK'    , vars%pkz, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'PLK'    , plk     , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PKE'    , pkxy    , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PT'     , vars%pt , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PE'     , vars%pe , rc=status); VERIFY_(STATUS)
 
 
+#ifdef SKIP_TRACERS
       do ntracer=1,ntracers
          write(myTracer, "('Q',i5.5)") ntracer-1
          call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
@@ -4371,6 +4373,7 @@ subroutine Run(gc, import, export, clock, rc)
             endif
          endif
       enddo
+#endif
 
       call MAPL_GetPointer(export, temp3D, 'PV', rc=status)
       VERIFY_(STATUS)
@@ -5082,12 +5085,12 @@ subroutine Run(gc, import, export, clock, rc)
       DEALLOCATE( qsum1 )
       DEALLOCATE( qsum2 )
 
-      DEALLOCATE( ZL     )
-      DEALLOCATE( ZLE    )
-      DEALLOCATE( PKXY   )
+      DEALLOCATE( zl     )
+      DEALLOCATE( zle    )
+      DEALLOCATE( plk    )
+      DEALLOCATE( pkxy   )
       DEALLOCATE( tmp3d  )
       DEALLOCATE( tmp2d  )
-      DEALLOCATE( pelnxz )
       DEALLOCATE( omaxyz )
       DEALLOCATE( cptxyz )
       DEALLOCATE( thvxyz )
@@ -6119,8 +6122,8 @@ end subroutine RUN
     real(r8), allocatable ::  H500 (:,:)
     real(r8), allocatable ::  tmp2d(:,:)
     real(r8), allocatable ::  tmp3d(:,:,:)
+    real(r8), allocatable ::    plk(:,:,:)
     real(r8), allocatable ::    pke(:,:,:)
-    real(r8), allocatable ::   pkxy(:,:,:) ! pe**kappa
     real(r8), allocatable ::     pl(:,:,:)
     real(r8), allocatable ::     ua(:,:,:)
     real(r8), allocatable ::     va(:,:,:)
@@ -6219,6 +6222,7 @@ end subroutine RUN
     ALLOCATE(    thv(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
     ALLOCATE( tempxy(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
 
+    ALLOCATE(    plk(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
     ALLOCATE(    pke(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
     ALLOCATE(  logpe(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
     ALLOCATE(    zle(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
@@ -6341,7 +6345,8 @@ end subroutine RUN
           temp2D       = (dthdtphyint2-dthdtphyint1) * MAPL_P00**MAPL_KAPPA / (MAPL_GRAV*DT)
       endif
 
-    call getPK ( pke )
+    plk = exp( kappa * log( 0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1)) ) )
+    pke = exp( kappa * log( vars%pe ) )
 
     tempxy = vars%pt * vars%pkz   ! Dry Temperature
 
@@ -6356,7 +6361,7 @@ end subroutine RUN
     call FILLOUT3 (export, 'Q'      , qv      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'PL'     , pl      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'PLE'    , vars%pe , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'PLK'    , vars%pkz, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'PLK'    , plk     , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'PKE'    , pke     , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'THV'    , thv     , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'PT'     , vars%pt , rc=status); VERIFY_(STATUS)
@@ -6366,6 +6371,7 @@ end subroutine RUN
     VERIFY_(STATUS)
     if(associated(temp3d)) temp3d = (tempxy)*(p00/(0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1))))**kappa
 
+#ifdef SKIP_TRACERS
       do ntracer=1,ntracers
          write(myTracer, "('Q',i5.5)") ntracer-1
          call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
@@ -6378,6 +6384,7 @@ end subroutine RUN
             endif
          endif
       enddo
+#endif
 
 ! Compute Edge Heights
 ! --------------------
@@ -6731,6 +6738,7 @@ end subroutine RUN
     DEALLOCATE( tempxy )
 
     DEALLOCATE(    thv )
+    DEALLOCATE(    plk )
     DEALLOCATE(    pke )
     DEALLOCATE(  logpl )
     DEALLOCATE(  logpe )
@@ -6822,9 +6830,9 @@ end subroutine RunAddIncs
 ! **********************************************************************
 
    ! Determine how many water species we have
-    nwat = 0
+    nwat = state%vars%nwat
     nwat_tracers = 0
-    if (.not. ADIABATIC) then
+    if ((nwat==0) .AND. (.not. ADIABATIC)) then
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'Q'       ) nwat_tracers = nwat_tracers + 1
          if (TRIM(state%vars%tracer(n)%tname) == 'QLCN'    ) nwat_tracers = nwat_tracers + 1
@@ -6845,6 +6853,9 @@ end subroutine RunAddIncs
           if (nwat_tracers >= 5) nwat = 3 ! STATE has QV, QLIQ, QICE
           if (nwat_tracers == 8) nwat = 6 ! STATE has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
        endif
+    endif
+    if (.not. ADIABATIC) then
+       _ASSERT(nwat >= 1, 'expecting water species (nwat) to match')
     endif
     if (nwat >= 1) then
     ALLOCATE(   Q(is:ie,js:je,1:km,nwat) )
@@ -6938,7 +6949,7 @@ end subroutine RunAddIncs
         rainwat = -1
         snowwat = -1
         graupel = -1
-    case(6)
+    case(6:7)
         sphum   = 1
         liq_wat = 2
         ice_wat = 3
@@ -7044,7 +7055,7 @@ end subroutine RunAddIncs
        !endif
 
        select case (nwat)
-       case (6)
+       case (6:7)
            CVM = (1.-( Q(:,:,:,  sphum)+Q(:,:,:,liq_wat)+Q(:,:,:,rainwat)+Q(:,:,:,ice_wat)+&
                        Q(:,:,:,snowwat)+Q(:,:,:,graupel) )               )*c_air + &
                       (Q(:,:,:,  sphum)                                  )*c_vap + &
@@ -7081,7 +7092,8 @@ end subroutine RunAddIncs
        ! Update PKZ from hydrostatic pressures
        !  This isn't entirely necessary, FV3 overwrites this in fv_dynamics
        !  but we have to get back to PT here
-       call getPKZ(STATE%VARS%PKZ,STATE%VARS%PT,Q,STATE%VARS%PE,STATE%VARS%DZ,HYDROSTATIC)
+  !!   call getPKZ(STATE%VARS%PKZ,STATE%VARS%PT,Q,STATE%VARS%PE,STATE%VARS%DZ,HYDROSTATIC)
+       call getPKZ(STATE%VARS%PKZ,STATE%VARS%PE)
 
        ! Make T back into PT
        STATE%VARS%PT = STATE%VARS%PT/STATE%VARS%PKZ
