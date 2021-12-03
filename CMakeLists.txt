@@ -1,8 +1,8 @@
 esma_set_this ()
 
 add_custom_target(
-  fvdynwrap_h
-  COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/fv_dynamics_wrapper.py
+  fv_dynamics_interface_py_h
+  COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/fv_dynamics_interface.py
   VERBATIM)
 
 set (srcs
@@ -36,7 +36,7 @@ esma_add_library (${this}
   DEPENDENCIES ${dependencies}
   DEPENDENCIES ${GFDL}
   INCLUDES ${INC_ESMF})
-add_dependencies(${this} fvdynwrap_h)
+add_dependencies(${this} fv_dynamics_interface_py_h)
 
 if (FV_PRECISION STREQUAL R4)
    set (GFDL fms_r4)
@@ -75,44 +75,44 @@ ecbuild_add_executable (
   SOURCES StandAlone_FV3_Dycore.F90
   LIBS ${this})
 set_target_properties (StandAlone_FV3_Dycore.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
-target_include_directories( # for fvdynwrap.h
+target_include_directories( # for fv_dynamics_interface_py.h
   StandAlone_FV3_Dycore.x
   PRIVATE
   ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(StandAlone_FV3_Dycore.x -L${CMAKE_CURRENT_BINARY_DIR} fvdynwrap)
+target_link_libraries(StandAlone_FV3_Dycore.x -L${CMAKE_CURRENT_BINARY_DIR} fv_dynamics_interface_py)
 
 ecbuild_add_executable (
   TARGET rs_scale.x
   SOURCES rs_scale.F90
   LIBS ${this})
 set_target_properties (rs_scale.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
-target_include_directories( # for fvdynwrap.h
+target_include_directories( # for fv_dynamics_interface_py.h
   rs_scale.x
   PRIVATE
   ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(rs_scale.x -L${CMAKE_CURRENT_BINARY_DIR} fvdynwrap)
+target_link_libraries(rs_scale.x -L${CMAKE_CURRENT_BINARY_DIR} fv_dynamics_interface_py)
 
 ecbuild_add_executable (
    TARGET StandAlone_AdvCore.x
    SOURCES StandAlone_AdvCore.F90
    LIBS ${this})
 set_target_properties (StandAlone_AdvCore.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
-target_include_directories( # for fvdynwrap.h
+target_include_directories( # for fv_dynamics_interface_py.h
   StandAlone_AdvCore.x
   PRIVATE
   ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(StandAlone_AdvCore.x -L${CMAKE_CURRENT_BINARY_DIR} fvdynwrap)
+target_link_libraries(StandAlone_AdvCore.x -L${CMAKE_CURRENT_BINARY_DIR} fv_dynamics_interface_py)
 
 ecbuild_add_executable (
    TARGET StandAlone_DynAdvCore.x
    SOURCES StandAlone_DynAdvCore.F90
    LIBS ${this})
 set_target_properties (StandAlone_DynAdvCore.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
-target_include_directories( # for fvdynwrap.h
+target_include_directories( # for fv_dynamics_interface_py.h
   StandAlone_DynAdvCore.x
   PRIVATE
   ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(StandAlone_DynAdvCore.x -L${CMAKE_CURRENT_BINARY_DIR} fvdynwrap)
+target_link_libraries(StandAlone_DynAdvCore.x -L${CMAKE_CURRENT_BINARY_DIR} fv_dynamics_interface_py)
 
 ecbuild_add_executable (
    TARGET c2c.x
