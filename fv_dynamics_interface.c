@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <time.h>
 #include "mpi.h"
-#include "fvdynwrap.h"
+#include "fv_dynamics_interface_py.h"
 
-void fv_dynamics_interface(
+void fv_dynamics_interface_c(
     // input
     MPI_Fint comm_f,
     int npx, int npy, int npz,
@@ -61,9 +61,9 @@ void fv_dynamics_interface(
     strftime(buf, sizeof(buf), "%FT%T", localtime(&now));
     int rank;
     MPI_Comm_rank(comm_c, &rank);
-    if (rank == 0) printf("C: %s.xxx --calling wrapper\n", buf);
+    if (rank == 0) printf("C: %s.xxx --calling python interface\n", buf);
 
-    fv_dynamics_py_wrapper(
+    fv_dynamics_interface_py(
         comm_c,
         npx, npy, npz,
         is, ie, js, je,

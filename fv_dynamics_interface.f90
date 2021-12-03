@@ -5,11 +5,11 @@ module fv_dynamics_interface_mod
   implicit none
 
   private
-  public :: fv_dynamics_interface
+  public :: fv_dynamics_interface_f
 
   interface
 
-     subroutine fv_dynamics_interface( &
+     subroutine fv_dynamics_interface_f( &
           ! Input
           comm, &
           npx, npy, npz, &
@@ -45,7 +45,7 @@ module fv_dynamics_interface_mod
           area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v, &
           agrid, bgrid, a11, a12, a21, a22, &
           edge_e, edge_w, edge_n, edge_s, nested, stretched_grid, da_min, da_min_c &
-          ) bind(c, name='fv_dynamics_interface')
+          ) bind(c, name='fv_dynamics_interface_c')
 
        import c_int, c_float, c_double
 
@@ -132,7 +132,7 @@ module fv_dynamics_interface_mod
        logical, value, intent(in) :: nested, stretched_grid
        real(kind=c_double), value, intent(in) :: da_min, da_min_c
 
-     end subroutine fv_dynamics_interface
+     end subroutine fv_dynamics_interface_f
 
   end interface
 

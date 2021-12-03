@@ -13,8 +13,8 @@ find_package(MPI REQUIRED)
 set(exec dyn-driver)
 
 add_custom_target(
-  fvdynwrap_h
-  COMMAND Python3::Interpreter ${CMAKE_CURRENT_SOURCE_DIR}/../fv_dynamics_wrapper.py)
+  fv_dynamics_interface_py_h
+  COMMAND Python3::Interpreter ${CMAKE_CURRENT_SOURCE_DIR}/../fv_dynamics_interface.py)
 
 add_executable(
   ${exec}
@@ -25,7 +25,7 @@ add_executable(
   ../fv_dynamics_interface.c
   ../fv_dynamics_interface.f90
   main.f90)
-add_dependencies(${exec} fvdynwrap_h)
+add_dependencies(${exec} fv_dynamics_interface_py_h)
 target_link_libraries(${exec} MPI::MPI_Fortran MPI::MPI_C)
 target_include_directories(${exec} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(${exec} -L${CMAKE_CURRENT_BINARY_DIR} fvdynwrap)
+target_link_libraries(${exec} -L${CMAKE_CURRENT_BINARY_DIR} fv_dynamics_interface_py)

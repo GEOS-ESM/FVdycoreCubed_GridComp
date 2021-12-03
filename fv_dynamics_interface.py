@@ -1,7 +1,7 @@
 import cffi
 from mpi4py import MPI
 
-TMPFILEBASE = 'fvdynwrap'
+TMPFILEBASE = 'fv_dynamics_interface_py'
 
 ffi = cffi.FFI()
 
@@ -17,7 +17,7 @@ from datetime import datetime
 from mpi4py import MPI
 from fv_dynamics import fv_dynamics_top_level_function
 @ffi.def_extern()
-def fv_dynamics_py_wrapper(
+def fv_dynamics_interface_py(
     comm_c,
     npx, npy, npz,
     is_, ie, js, je,
@@ -85,7 +85,7 @@ def fv_dynamics_py_wrapper(
 '''.format(TMPFILEBASE, _mpi_comm_t)
 
 header = '''
-extern void fv_dynamics_py_wrapper(
+extern void fv_dynamics_interface_py(
     {} comm_c,
     int npx, int npy, int npz,
     int is_, int ie, int js, int je,

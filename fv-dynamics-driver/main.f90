@@ -6,7 +6,7 @@ program main
   use domain_dim_mod, only: DomainDim_T
   use input_scalars_mod, only: InputScalars_T
   use input_arrays_mod, only: InputArrays_T
-  use fv_dynamics_interface_mod, only: fv_dynamics_interface
+  use fv_dynamics_interface_mod, only: fv_dynamics_interface_f
 
   implicit none
 
@@ -44,9 +44,9 @@ program main
   if (rank == 0) then
      call date_and_time(values=dt)
      write(date_time_s, iso8601) dt(1:3), dt(5:8)
-     write(*, '(a2,1x,a23,1x,a19)') 'F:', date_time_s, '--calling interface'
+     write(*, '(a2,1x,a23,1x,a27)') 'F:', date_time_s, '--calling fortran interface'
   end if
-  call fv_dynamics_interface( &
+  call fv_dynamics_interface_f( &
        MPI_COMM_WORLD, &
        dim%npx, dim%npy, dim%npz, &
        bd%is, bd%ie, bd%js, bd%je, &
