@@ -29,3 +29,9 @@ add_dependencies(${exec} fv_dynamics_interface_py_h)
 target_link_libraries(${exec} MPI::MPI_Fortran MPI::MPI_C)
 target_include_directories(${exec} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(${exec} -L${CMAKE_CURRENT_BINARY_DIR} fv_dynamics_interface_py)
+
+set_property(
+  TARGET ${exec}
+  APPEND
+  PROPERTY ADDITIONAL_CLEAN_FILES fv_dynamics_interface_py.c fv_dynamics_interface_py.h fv_dynamics_interface_py.o libfv_dynamics_interface_py.so
+)
