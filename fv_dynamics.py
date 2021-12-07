@@ -313,7 +313,8 @@ def fv_dynamics_top_level_function(
         print('P:', datetime.now().isoformat(timespec='milliseconds'), '--translated data')
     spec.set_grid(grid)
     grid_vars_to_write = [
-        'dx', 'dy', 'dxa', 'dya', 'dxc', 'dyc', 'rdx', 'rdy', 'rdxa', 'rdya', 'rdxc', 'rdyc',
+        'dx', 'dy', 'dxa', 'dya', 'dxc', 'dyc',
+        'rdx', 'rdy', 'rdxa', 'rdya', 'rdxc', 'rdyc',
         'cosa', 'cosa_s', 'sina_u', 'sina_v', 'cosa_u', 'cosa_v',
         'rsin2', 'rsina', 'rsin_u', 'rsin_v',
         'sin_sg1', 'sin_sg2', 'sin_sg3', 'sin_sg4',
@@ -343,7 +344,7 @@ def fv_dynamics_top_level_function(
                      'phis', 'q_con', 'omga',
                      'ua', 'va', 'uc', 'vc']
     if (rank == 0):
-        hf = h5py.File('state.h5', 'w')
+        hf = h5py.File('state-initial.h5', 'w')
         for var in vars_to_write:
             hf.create_dataset(var, data=state[var])
         hf.close()
@@ -388,3 +389,9 @@ def fv_dynamics_top_level_function(
     if (spec.grid.rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--ran DynamicalCore::step_dynamics')
+
+    if (rank == 0):
+        hf = h5py.File('state-final.h5', 'w')
+        for var in vars_to_write:
+            hf.create_dataset(var, data=state[var])
+        hf.close()
