@@ -1,3 +1,4 @@
+#include "MAPL_ErrLog.h"
 module fv_regrid_c2c
 
 #ifdef MAPL_MODE
@@ -346,13 +347,15 @@ contains
          endif
          call print_memuse_stats('get_geos_cubed_ic: '//TRIM(fname1)//' being read')
          offset = 4
-         call parallel_read_file_r4(fname1, npts, is_i,ie_i, js_i,je_i, 1, offset, gz0(is_i:ie_i,js_i:je_i))
+         call read_topo_file(fname1,gz0,gridIn)
+         !call parallel_read_file_r4(fname1, npts, is_i,ie_i, js_i,je_i, 1, offset, gz0(is_i:ie_i,js_i:je_i))
          call mpp_update_domains(gz0, domain_i)
          gz0 = gz0*grav
 
 ! Read cubed-sphere phis from file since IMPORT is not ready yet
          offset = 4
-         call parallel_read_file_r4('topo_dynave.data', Atm(1)%npx-1, is,ie, js,je, 1, offset, Atm(1)%phis(is:ie,js:je))
+         !call parallel_read_file_r4('topo_dynave.data', Atm(1)%npx-1, is,ie, js,je, 1, offset, Atm(1)%phis(is:ie,js:je))
+         call read_topo_file('topo_dynave.data',atm(1)%phis,gridOut)
          call mpp_update_domains(Atm(1)%phis, Atm(1)%domain)
          Atm(1)%phis = Atm(1)%phis*grav
          call print_memuse_stats('get_geos_cubed_ic: phis')
@@ -1878,121 +1881,22 @@ contains
 ! ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ !
 !-------------------------------------------------------------------------------
 
-                     subroutine parallel_read_file_r8(fname, npts, is,ie, js,je, km, offset, var)
-                        character(len=*), intent(IN) :: fname
-                        integer,            intent(IN) :: npts, is,ie, js,je, km
-                        integer (kind=MPI_OFFSET_KIND), intent(INOUT) :: offset
-                        real(FVPRC),               intent(INOUT) :: var(is:ie, js:je, km)
-
-                        integer :: ntiles=6
-                        real(REAL64) :: var_r8(is:ie, js:je)
-                        integer :: k
-
-                        integer :: MUNIT=17
-                        integer :: lsize, gsizes(2), distribs(2), dargs(2), psizes(2)
-                        integer :: filetype
-                        integer :: mcol, mrow, irow, jcol, mpiio_rank
-                        integer :: rank, total_pes
-                        integer :: mpistatus(MPI_STATUS_SIZE)
-                        integer (kind=MPI_OFFSET_KIND) :: slice_2d
-
-                        real(FVPRC) :: xmod, ymod
-                        character(128) :: strErr
-
-                        xmod = mod(npts,npes_x)
-                        write(strErr, "(i4.4,' not evenly divisible by ',i4.4)") npts, npes_x
-                        if (xmod /= 0) call mpp_error(FATAL, strErr)
-                        ymod = mod(npts*6,npes_y)
-                        write(strErr, "(i4.4,' not evenly divisible by ',i4.4)") npts*6, npes_y
-                        if (ymod /= 0) call mpp_error(FATAL, strErr)
-
-                        call MPI_FILE_OPEN(MPI_COMM_WORLD, fname, MPI_MODE_RDONLY, MPI_INFO_NULL, MUNIT, STATUS)
-                        gsizes(1) = npts
-                        gsizes(2) = npts * 6
-                        distribs(1) = MPI_DISTRIBUTE_BLOCK
-                        distribs(2) = MPI_DISTRIBUTE_BLOCK
-                        dargs(1) = MPI_DISTRIBUTE_DFLT_DARG
-                        dargs(2) = MPI_DISTRIBUTE_DFLT_DARG
-                        psizes(1) = npes_x
-                        psizes(2) = npes_y * 6
-                        call MPI_COMM_SIZE(MPI_COMM_WORLD, total_pes, STATUS)
-                        call MPI_COMM_RANK(MPI_COMM_WORLD, rank, STATUS)
-                        mcol = npes_x
-                        mrow = npes_y*ntiles
-                        irow = rank/mcol       !! logical row number
-                        jcol = mod(rank, mcol) !! logical column number
-                        mpiio_rank = jcol*mrow + irow
-                        call MPI_TYPE_CREATE_DARRAY(total_pes, mpiio_rank, 2, gsizes, distribs, dargs, psizes, MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, filetype, STATUS)
-                        call MPI_TYPE_COMMIT(filetype, STATUS)
-                        lsize = (ie-is+1)*(je-js+1)
-                        slice_2d = npts*npts*ntiles
-                        do k=1,km
-                           call MPI_FILE_SET_VIEW(MUNIT, offset, MPI_DOUBLE_PRECISION, filetype, "native", MPI_INFO_NULL, STATUS)
-                           call MPI_FILE_READ_ALL(MUNIT, var_r8, lsize, MPI_DOUBLE_PRECISION, mpistatus, STATUS)
-                           var(:,:,k) = var_r8
-                           offset = offset + slice_2d*8 + 8
-                        enddo
-                        call MPI_FILE_CLOSE(MUNIT, STATUS) 
-
-                     end subroutine parallel_read_file_r8
-
-                     subroutine parallel_read_file_r4(fname, npts, is,ie, js,je, km, offset, var)
-                        character(len=*), intent(IN) :: fname
-                        integer,            intent(IN) :: npts, is,ie, js,je, km
-                        integer (kind=MPI_OFFSET_KIND), intent(INOUT) :: offset
-                        real(FVPRC),               intent(INOUT) :: var(is:ie, js:je, km)
-
-                        integer :: ntiles=6
-                        real(REAL4) :: var_r4(is:ie, js:je)
-                        integer :: k
-
-                        integer :: MUNIT=17
-                        integer :: lsize, gsizes(2), distribs(2), dargs(2), psizes(2)
-                        integer :: filetype
-                        integer :: mcol, mrow, irow, jcol, mpiio_rank
-                        integer :: rank, total_pes
-                        integer :: mpistatus(MPI_STATUS_SIZE)
-                        integer (kind=MPI_OFFSET_KIND) :: slice_2d
-
-                        real(FVPRC) :: xmod, ymod
-                        character(128) :: strErr
-
-                        xmod = mod(npts,npes_x)
-                        write(strErr, "(i4.4,' not evenly divisible by ',i4.4)") npts, npes_x
-                        if (xmod /= 0) call mpp_error(FATAL, strErr)
-                        ymod = mod(npts*6,npes_y)
-                        write(strErr, "(i4.4,' not evenly divisible by ',i4.4)") npts*6, npes_y
-                        if (ymod /= 0) call mpp_error(FATAL, strErr)
-
-                        call MPI_FILE_OPEN(MPI_COMM_WORLD, fname, MPI_MODE_RDONLY, MPI_INFO_NULL, MUNIT, STATUS)
-                        gsizes(1) = npts
-                        gsizes(2) = npts * 6
-                        distribs(1) = MPI_DISTRIBUTE_BLOCK
-                        distribs(2) = MPI_DISTRIBUTE_BLOCK
-                        dargs(1) = MPI_DISTRIBUTE_DFLT_DARG
-                        dargs(2) = MPI_DISTRIBUTE_DFLT_DARG
-                        psizes(1) = npes_x
-                        psizes(2) = npes_y * 6
-                        call MPI_COMM_SIZE(MPI_COMM_WORLD, total_pes, STATUS)
-                        call MPI_COMM_RANK(MPI_COMM_WORLD, rank, STATUS)
-                        mcol = npes_x
-                        mrow = npes_y*ntiles
-                        irow = rank/mcol       !! logical row number
-                        jcol = mod(rank, mcol) !! logical column number
-                        mpiio_rank = jcol*mrow + irow
-                        call MPI_TYPE_CREATE_DARRAY(total_pes, mpiio_rank, 2, gsizes, distribs, dargs, psizes, MPI_ORDER_FORTRAN, MPI_REAL, filetype, STATUS)
-                        call MPI_TYPE_COMMIT(filetype, STATUS)
-                        lsize = (ie-is+1)*(je-js+1)
-                        slice_2d = npts*npts*ntiles
-                        do k=1,km
-                           call MPI_FILE_SET_VIEW(MUNIT, offset, MPI_REAL, filetype, "native", MPI_INFO_NULL, STATUS)
-                           call MPI_FILE_READ_ALL(MUNIT, var_r4, lsize, MPI_REAL, mpistatus, STATUS)
-                           var(:,:,k) = var_r4
-                           offset = offset + slice_2d*4 + 8
-                        enddo
-                        call MPI_FILE_CLOSE(MUNIT, STATUS)
-
-                     end subroutine parallel_read_file_r4
+                     subroutine read_topo_file(fname,output,grid,rc)
+                        character(len=*), intent(in) :: fname
+                        type(ESMF_Grid), intent(in) :: grid
+                        real(real4), intent(inout) :: output(:,:)
+                        integer, intent(out), optional :: rc
+                        
+                        integer :: status,dims(3),funit
+                        real, allocatable :: input(:,:)
+                        call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
+                        allocate(input(dims(1),dims(2)))
+                        open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
+                        _VERIFY(status)
+                        read(funit)input
+                        call ArrayScatter(local_array=output,global_array=input,grid=grid,_RC)
+                        _RETURN(_SUCCESS)
+                     end subroutine read_topo_file
 
                   end module fv_regrid_c2c
 
