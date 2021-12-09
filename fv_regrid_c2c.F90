@@ -347,7 +347,7 @@ contains
          endif
          call print_memuse_stats('get_geos_cubed_ic: '//TRIM(fname1)//' being read')
          offset = 4
-         call read_topo_file(fname1,gz0,gridIn)
+         call read_topo_file(fname1,gz0(is_i:ie_i,js_i:je_i),gridIn)
          !call parallel_read_file_r4(fname1, npts, is_i,ie_i, js_i,je_i, 1, offset, gz0(is_i:ie_i,js_i:je_i))
          call mpp_update_domains(gz0, domain_i)
          gz0 = gz0*grav
@@ -355,7 +355,7 @@ contains
 ! Read cubed-sphere phis from file since IMPORT is not ready yet
          offset = 4
          !call parallel_read_file_r4('topo_dynave.data', Atm(1)%npx-1, is,ie, js,je, 1, offset, Atm(1)%phis(is:ie,js:je))
-         call read_topo_file('topo_dynave.data',atm(1)%phis,gridOut)
+         call read_topo_file('topo_dynave.data',atm(1)%phis(is:ie,js:je),gridOut)
          call mpp_update_domains(Atm(1)%phis, Atm(1)%domain)
          Atm(1)%phis = Atm(1)%phis*grav
          call print_memuse_stats('get_geos_cubed_ic: phis')
