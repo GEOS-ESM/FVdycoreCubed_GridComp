@@ -31,7 +31,7 @@ module FV_StateMod
    use fv_update_phys_mod, only: fv_update_phys
    use sw_core_mod, only: d2a2c_vect
    use fv_sg_mod, only: fv_subgrid_z
-   use gfdl_cloud_microphys_mod, only: gfdl_cloud_microphys_init
+   use gfdl_lin_cloud_microphys_mod, only: gfdl_cloud_microphys_init
 
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check
 
