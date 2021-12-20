@@ -236,15 +236,14 @@ ASKPROC:
 
 if ( $SITE == 'NCCS' ) then
    echo "Enter the ${C1}Processor Type${CN} you wish to run on:"
-   echo "   ${C2}hasw (Haswell)${CN} (default)"
-   echo "   ${C2}sky  (Skylake)${CN}"
-   # Keep Cascade Lake hidden until in general use
-   #echo "   ${C2}cas  (Cascade Lake)${CN}"
+   echo "   ${C2}hasw (Haswell)${CN}"
+   echo "   ${C2}sky  (Skylake)${CN} (default)"
+   echo "   ${C2}cas  (Cascade Lake)${CN}"
    echo " "
    set MODEL = `echo $<`
    set MODEL = `echo $MODEL | tr "[:upper:]" "[:lower:]"`
    if ( .$MODEL == .) then
-      set MODEL = 'hasw'
+      set MODEL = 'sky'
    endif
 
    if( $MODEL != 'hasw' & \
@@ -256,7 +255,13 @@ if ( $SITE == 'NCCS' ) then
    else if ($MODEL == 'sky') then
       set NCPUS_PER_NODE = 40
    else if ($MODEL == 'cas') then
-      set NCPUS_PER_NODE = 48
+      # NCCS currently recommends that users do not run with
+      # 48 cores per node on SCU16 due to OS issues and 
+      # recommends that CPU-intensive works run with 46 or less
+      # cores. As 45 is a multiple of 3, it's the best value
+      # that doesn't waste too much
+      #set NCPUS_PER_NODE = 48
+      set NCPUS_PER_NODE = 45
    endif
 
 else if ( $SITE == 'NAS' ) then
@@ -264,8 +269,8 @@ else if ( $SITE == 'NAS' ) then
    echo "Enter the ${C1}Processor Type${CN} you wish to run on:"
    echo "   ${C2}has (Haswell)${CN}"
    echo "   ${C2}bro (Broadwell)${CN}"
-   echo "   ${C2}sky (Skylake)${CN}"
-   echo "   ${C2}cas (Cascade Lake)${CN} (default)"
+   echo "   ${C2}sky (Skylake)${CN} (default)"
+   echo "   ${C2}cas (Cascade Lake)${CN}"
    echo "   ${C2}rom (AMD Rome)${CN}"
    echo " "
    echo " "
@@ -278,7 +283,7 @@ else if ( $SITE == 'NAS' ) then
    set MODEL = `echo $<`
    set MODEL = `echo $MODEL | tr "[:upper:]" "[:lower:]"`
    if ( .$MODEL == .) then
-      set MODEL = 'cas'
+      set MODEL = 'sky'
    endif
 
    if( $MODEL != 'has' & \
