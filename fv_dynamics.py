@@ -50,7 +50,7 @@ def fv_dynamics_top_level_function(
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--in top level function', flush=True)
 
-    backend = 'gtx86'
+    backend = 'gtcuda'
 
     origin = (ng, ng, 0) # fv3core.utils.gt4py_utils.origin
     origin0 = (0, 0, 0)
@@ -166,7 +166,7 @@ def fv_dynamics_top_level_function(
 
     if (rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--converted data (Fortran to NumPy)')
+              '--converted data (Fortran to NumPy)', flush=True)
         hf = h5py.File('incoming-data.h5', 'w')
         hf.create_dataset('u', data=u)
         hf.create_dataset('v', data=v)
@@ -306,11 +306,13 @@ def fv_dynamics_top_level_function(
         'da_min': da_min, 'da_min_c': 0.0,} # grid_data
 
     if (rank == 0):
-        print('P:', datetime.now().isoformat(timespec='milliseconds'), '--wrapped data')
+        print('P:', datetime.now().isoformat(timespec='milliseconds'),
+              '--wrapped data', flush=True)
 
     grid = fv3core.testing.TranslateGrid(grid_data, comm.Get_rank()).python_grid()
     if (rank == 0):
-        print('P:', datetime.now().isoformat(timespec='milliseconds'), '--translated data')
+        print('P:', datetime.now().isoformat(timespec='milliseconds'),
+              '--translated data', flush=True)
     spec.set_grid(grid)
     grid_vars_to_write = [
         'dx', 'dy', 'dxa', 'dya', 'dxc', 'dyc',
@@ -326,7 +328,8 @@ def fv_dynamics_top_level_function(
         'edge_e', 'edge_w', 'edge_n', 'edge_s']
 
     if (spec.grid.rank == 0):
-        print('P:', datetime.now().isoformat(timespec='milliseconds'), '--created grid')
+        print('P:', datetime.now().isoformat(timespec='milliseconds'),
+              '--created grid', flush=True)
         hf = h5py.File('grid-data.h5', 'w')
         for var in grid_vars_to_write:
             # print('var:', var, grid.__dict__[var].shape, np.sum(grid.__dict__[var]))
@@ -336,8 +339,9 @@ def fv_dynamics_top_level_function(
     state = driver_object.state_from_inputs(input_data)
     # print('state.pe/state.q_con:', state['pe'].shape, state['q_con'].shape)
     if (spec.grid.rank == 0):
-        print('P:', datetime.now().isoformat(timespec='milliseconds'), '--created state')
-        print(spec.namelist.dynamical_core)
+        print('P:', datetime.now().isoformat(timespec='milliseconds'),
+              '--created state', flush=True)
+        # print(spec.namelist.dynamical_core, flush=True)
     vars_to_write = ['u', 'v', 'w', 'delz',
                      'pt', 'delp',
                      'ps', 'pe', 'pk', 'peln', 'pkz',
@@ -364,7 +368,7 @@ def fv_dynamics_top_level_function(
         phis=state["surface_geopotential"],)
     if (spec.grid.rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--instantiated DynamicalCore')
+              '--instantiated DynamicalCore', flush=True)
 
     if spec.namelist.fv_sg_adj > 0:
         fv_subgrid_z = fv3core.DryConvectiveAdjustment(
@@ -375,7 +379,7 @@ def fv_dynamics_top_level_function(
             spec.namelist.hydrostatic,)
         if (spec.grid.rank == 0):
             print('P:', datetime.now().isoformat(timespec='milliseconds'),
-                  '--instantiated DryConvectiveAdjustment')
+                  '--instantiated DryConvectiveAdjustment', flush=True)
 
     # First timestep
     dycore.step_dynamics(
@@ -388,7 +392,7 @@ def fv_dynamics_top_level_function(
         input_data['ks'])
     if (spec.grid.rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--ran DynamicalCore::step_dynamics')
+              '--ran DynamicalCore::step_dynamics', flush=True)
 
     if (rank == 0):
         hf = h5py.File('state-final.h5', 'w')
