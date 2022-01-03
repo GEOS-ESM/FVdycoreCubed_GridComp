@@ -59,7 +59,48 @@ module fv_regrid_c2c
    integer :: IUNIT=15
    integer :: OUNIT=16
 
+   interface read_topo_file
+      module procedure read_topo_file_r4
+      module procedure read_topo_file_r8
+   end interface
+                        
 contains
+                        
+   subroutine read_topo_file_r4(fname,output,grid,rc)
+      character(len=*), intent(in) :: fname
+      type(ESMF_Grid), intent(in) :: grid
+      real(real4), intent(inout) :: output(:,:)
+      integer, intent(out), optional :: rc
+      
+      integer :: status,dims(3),funit
+      real, allocatable :: input(:,:)
+      call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
+      allocate(input(dims(1),dims(2)))
+      open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
+      _VERIFY(status)
+      read(funit)input
+      call ArrayScatter(local_array=output,global_array=input,grid=grid,_RC)
+      _RETURN(_SUCCESS)
+   end subroutine read_topo_file_r4
+
+   subroutine read_topo_file_r8(fname,output,grid,rc)
+      character(len=*), intent(in) :: fname
+      type(ESMF_Grid), intent(in) :: grid
+      real(real8), intent(inout) :: output(:,:)
+      integer, intent(out), optional :: rc
+      
+      integer :: status,dims(3),funit
+      real, allocatable :: input(:,:)
+      real(real8), allocatable :: input_r8(:,:)
+      call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
+      allocate(input(dims(1),dims(2)),input_r8(dims(2),dims(2)))
+      open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
+      _VERIFY(status)
+      read(funit)input
+      input_r8 = input      
+      call ArrayScatter(local_array=output,global_array=input_r8,grid=grid,_RC)
+      _RETURN(_SUCCESS)
+   end subroutine read_topo_file_r8
 
    subroutine get_geos_ic( Atm, extra_rst, rstcube, gridOut)
 
@@ -1880,23 +1921,6 @@ contains
 !
 ! ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ !
 !-------------------------------------------------------------------------------
-
-                     subroutine read_topo_file(fname,output,grid,rc)
-                        character(len=*), intent(in) :: fname
-                        type(ESMF_Grid), intent(in) :: grid
-                        real(real4), intent(inout) :: output(:,:)
-                        integer, intent(out), optional :: rc
                         
-                        integer :: status,dims(3),funit
-                        real, allocatable :: input(:,:)
-                        call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
-                        allocate(input(dims(1),dims(2)))
-                        open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
-                        _VERIFY(status)
-                        read(funit)input
-                        call ArrayScatter(local_array=output,global_array=input,grid=grid,_RC)
-                        _RETURN(_SUCCESS)
-                     end subroutine read_topo_file
-
                   end module fv_regrid_c2c
 
