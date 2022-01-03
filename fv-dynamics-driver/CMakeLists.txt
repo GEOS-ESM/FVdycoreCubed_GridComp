@@ -14,7 +14,7 @@ set(exec dyn-driver)
 
 add_custom_target(
   fv_dynamics_interface_py_h
-  COMMAND Python3::Interpreter ${CMAKE_CURRENT_SOURCE_DIR}/../fv_dynamics_interface.py)
+  COMMAND mpirun --n 1 python3 ${CMAKE_CURRENT_SOURCE_DIR}/../fv_dynamics_interface.py)
 
 add_executable(
   ${exec}
