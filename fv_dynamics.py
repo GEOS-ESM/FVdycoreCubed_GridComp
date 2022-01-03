@@ -46,11 +46,10 @@ def fv_dynamics_top_level_function(
         nested_int, stretched_grid_int, da_min, da_min_c):
 
     rank = comm.Get_rank()
+    backend = 'gtx86'
     if (rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--in top level function', flush=True)
-
-    backend = 'gtcuda'
+              '--in top level function with backend', backend, flush=True)
 
     origin = (ng, ng, 0) # fv3core.utils.gt4py_utils.origin
     origin0 = (0, 0, 0)
