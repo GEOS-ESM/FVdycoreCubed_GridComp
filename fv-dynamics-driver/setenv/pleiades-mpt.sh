@@ -1,7 +1,8 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-module load gcc/9.3
+
+module load comp-gcc/9.3.0-TOSS3
+module load mpi-hpe/mpt.2.25 mpi-mpt/2.25/gcc/9.3.0-TOSS3
 module load cuda/11.0
-module load mpi-hpe/mpt.2.25
 module use -a $NOBACKUP/sw/modulefiles
 module load pchakrab/python/3.8/gcc9.3.0-cuda11.0-mpt2.25-toss3
 
