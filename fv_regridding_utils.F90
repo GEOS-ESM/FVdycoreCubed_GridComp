@@ -73,17 +73,17 @@ contains
     integer :: km_use
 
     if (this%rank==2) then
-       allocate(this%ptr2d(is:ie,js:je),source=0.0)
+       allocate(this%ptr2d(is:ie,js:je),source=0.0_FVPRC)
     else if (this%rank==3) then
        if (this%n_ungrid > 0) then
-          allocate(this%ptr3d(is:ie,js:je,this%n_ungrid),source=0.0)
+          allocate(this%ptr3d(is:ie,js:je,this%n_ungrid),source=0.0_FVPRC)
        else if (this%n_ungrid == 0) then
           if (present(km)) then 
              km_use = km
           else
              km_use = this%nlev
           end if
-          allocate(this%ptr3d(is:ie,js:je,km_use),source=0.0)
+          allocate(this%ptr3d(is:ie,js:je,km_use),source=0.0_FVPRC)
        end if
     else if (this%rank == 4) then
        if (present(km)) then 
@@ -91,7 +91,7 @@ contains
        else
           km_use = this%nlev
        end if
-       allocate(this%ptr4d(is:ie,js:je,km_use,this%n_ungrid),source=0.0)
+       allocate(this%ptr4d(is:ie,js:je,km_use,this%n_ungrid),source=0.0_FVPRC)
     end if
     _RETURN(_SUCCESS)
 
