@@ -480,6 +480,16 @@ contains
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
     VERIFY_(STATUS)
 
+     call MAPL_AddImportSpec(GC,                             &
+        SHORT_NAME         = 'VARFLT',                            &
+        LONG_NAME          = 'variance_of_filtered_topography',   &
+        UNITS              = 'm+2',                               &
+        DIMS               = MAPL_DimsHorzOnly,                   &
+        VLOCATION          = MAPL_VLocationNone,                  &
+        RESTART    = MAPL_RestartSkip,                            &
+                                                       RC=STATUS  )
+     VERIFY_(STATUS)
+
     call MAPL_AddImportSpec( gc,                              &
         SHORT_NAME = 'TRADV',                                        &
         LONG_NAME  = 'advected_quantities',                        &

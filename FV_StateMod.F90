@@ -215,7 +215,7 @@ private
     real(REAL8)                             :: hlv      ! latent heat of evaporation
     real(FVPRC)                             :: zvir     ! RWV/RAIR-1
 
-  real(kind=4), pointer             :: phis(:,:)
+  real, pointer :: phis(:,:), varflt(:,:)
 
   logical :: fv_first_run = .true.
 
@@ -972,6 +972,10 @@ contains
   FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=REAL8)
   call mpp_update_domains(FV_Atm(1)%phis, FV_Atm(1)%domain, complete=.true.)
 
+  call MAPL_GetPointer ( import, varflt, 'VARFLT', RC=STATUS )
+  VERIFY_(STATUS)
+  FV_Atm(1)%varflt(isc:iec,jsc:jec) = varflt
+
   FV_Atm(1)%ak = ak
   FV_Atm(1)%bk = bk
   FV_Atm(1)%ptop = FV_Atm(1)%ak(1)
@@ -1248,6 +1252,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
      endif
     ! Set FV3 surface geopotential
      FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=FVPRC)
+     FV_Atm(1)%varflt(isc:iec,jsc:jec) = real(varflt,kind=FVPRC)
      call mpp_update_domains(FV_Atm(1)%phis, FV_Atm(1)%domain, complete=.true.)
     ! How many tracers do we really have?
      ! MAT GCC cannot handle multi-line asserts. For ease of reading,
@@ -1739,7 +1744,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
                      FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz,       &
                      FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, FV_Atm(1)%ps,       &
                      FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz,                         &
-                     FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc,  &
+                     FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc,  &
                      FV_Atm(1)%ak, FV_Atm(1)%bk, FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy,    &
                      FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
                      FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, FV_Atm(1)%diss_est, time_total)
@@ -4054,6 +4059,8 @@ end subroutine fv_getAgridWinds_2D
   if (mpp_pe()==0) print*,'--------------', TRIM(debug_txt), '--------------'
   DEBUG_ARRAY(:,:,1) = FV_Atm(1)%phis(isc:iec,jsc:jec)
   call prt_maxmin('PHIS', DEBUG_ARRAY  , isc, iec  , jsc, jec  , 0,   1, fac1   )
+  DEBUG_ARRAY(:,:,1) = FV_Atm(1)%varflt(isc:iec,jsc:jec)
+  call prt_maxmin('VARFLT', DEBUG_ARRAY  , isc, iec  , jsc, jec  , 0,   1, fac1   )
   DEBUG_ARRAY(:,:,1) = STATE%VARS%PE(:,:,NPZ+1)
   call prt_maxmin('PS  ', DEBUG_ARRAY  , isc, iec  , jsc, jec  , 0,   1, fac1em2)
   DEBUG_ARRAY(:,:,1:npz) = STATE%VARS%U
@@ -4333,6 +4340,7 @@ subroutine echo_fv3_setup()
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%consv_te ,format='("FV3 consv_te: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%delt_max ,format='("FV3 delt_max: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%ke_bg ,format='("FV3 ke_bg: ",(F7.5))' )
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%Beljaars_TOFD ,format='("FV3 Beljaars_TOFD: ",(A))' )
    call WRITE_PARALLEL ( 'FV3 Rayleigh Damping Options:' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%RF_fast ,format='("FV3 RF_fast: ",(A))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%tau ,format='("FV3 tau: ",(F7.4))' )
