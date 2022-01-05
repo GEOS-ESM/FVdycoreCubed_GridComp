@@ -97,14 +97,14 @@ contains
          if (extra_rst(i)%have_descriptor) then
             do j=1,size(extra_rst(i)%vars)
                if (extra_rst(i)%vars(j)%nLev/=1) then
-                  allocate(extra_rst(i)%vars(j)%ptr3d(isd:ied,jsd:jed,extra_rst(i)%vars(j)%nLev),source=0.0 )
+                  allocate(extra_rst(i)%vars(j)%ptr3d(isd:ied,jsd:jed,extra_rst(i)%vars(j)%nLev),source=0.0_FVPRC )
                else
-                  allocate(extra_rst(i)%vars(j)%ptr2d(isd:ied,jsd:jed), source=0.0 )
+                  allocate(extra_rst(i)%vars(j)%ptr2d(isd:ied,jsd:jed), source=0.0_FVPRC )
                end if
             enddo
          else
             do j=1,size(extra_rst(i)%vars) 
-               allocate(extra_rst(i)%vars(j)%ptr3d(isd:ied,jsd:jed,extra_rst(i)%vars(j)%nLev),source=0.0 )
+               allocate(extra_rst(i)%vars(j)%ptr3d(isd:ied,jsd:jed,extra_rst(i)%vars(j)%nLev),source=0.0_FVPRC )
             enddo 
          end if
       enddo
