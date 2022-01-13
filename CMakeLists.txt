@@ -22,9 +22,11 @@ set (srcs
   )
 
 if (ESMA_USE_GFE_NAMESPACE)
-  set(dependencies MAPL GFTL_SHARED::gftl-shared GMAO_hermes GEOS_Shared)
+  set(dependencies MAPL GFTL_SHARED::gftl-shared GMAO_hermes GEOS_Shared
+    $<$<NOT:$<BOOL:${USE_GFDL_MP_FROM_FV}>>:GEOSmoist_GridComp>)
 else ()
-  set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared)
+  set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared
+    $<$<NOT:$<BOOL:${USE_GFDL_MP_FROM_FV}>>:GEOSmoist_GridComp>)
 endif ()
 
 esma_add_library (${this}
@@ -53,6 +55,9 @@ elseif (FV_PRECISION MATCHES R4R8) # FV is R4 but FMS is R8
   target_compile_definitions (${this} PRIVATE -DSINGLE_FV -DOVERLOAD_R4)
 endif ()
 
+if (USE_GFDL_MP_FROM_FV)
+  target_compile_definitions (${this} PRIVATE USE_GFDL_MP_FROM_FV)
+endif ()
 
 set (CMAKE_Fortran_FLAGS_RELEASE "${GEOS_Fortran_FLAGS_VECT}")
 
