@@ -15,6 +15,10 @@ set (srcs
   CubeToLatLon.F90 
   CubeGridPrototype.F90
   GEOS_FV3_Utilities.F90
+  fv_regrid_c2c.F90
+  fv_regrid_c2c_bin.F90
+  fv_regridding_utils.F90
+  rs_scaleMod.F90
   )
 
 if (ESMA_USE_GFE_NAMESPACE)
@@ -25,7 +29,7 @@ endif ()
 
 esma_add_library (${this}
   SRCS ${srcs}
-  SUBCOMPONENTS @fvdycore
+  SUBCOMPONENTS fvdycore
   DEPENDENCIES ${dependencies}
   DEPENDENCIES ${GFDL}
   INCLUDES ${INC_ESMF})
@@ -55,6 +59,9 @@ set (CMAKE_Fortran_FLAGS_RELEASE "${GEOS_Fortran_FLAGS_VECT}")
 if (CRAY_POINTER)
   set_target_properties (${this} PROPERTIES COMPILE_FLAGS ${CRAY_POINTER})
 endif()
+
+# Enable OpenMP
+target_link_libraries(${this} PRIVATE OpenMP::OpenMP_Fortran)
 
 add_definitions (-DSPMD -DMAPL_MODE)
 
@@ -97,5 +104,11 @@ ecbuild_add_executable (
    SOURCES interp_restarts.F90
    LIBS ${this})
 set_target_properties (interp_restarts.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+
+ecbuild_add_executable (
+   TARGET interp_restarts_bin.x
+   SOURCES interp_restarts_bin.F90
+   LIBS ${this})
+set_target_properties (interp_restarts_bin.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
 
 add_subdirectory(scripts)
