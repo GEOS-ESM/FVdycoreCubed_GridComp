@@ -34,6 +34,8 @@ module FV_StateMod
    use gfdl_cloud_microphys_mod, only: gfdl_cloud_microphys_init
 
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
+
+   use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
    use fv_dynamics_interface_mod, only: fv_dynamics_interface
 
 implicit none
@@ -1163,6 +1165,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
   integer :: comm
   integer :: rank, mpierr, bin_file_handle
   character(len=256) :: bin_file_name
+  logical :: halting_mode(5)
 
 ! Begin
 
@@ -1719,61 +1722,75 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     if (.not. FV_OFF) then
     call set_domain(FV_Atm(1)%domain)  ! needed for diagnostic output done in fv_dynamics
 
-    ! ! Dump data to a binary file (one per rank)
-    ! call MPI_Comm_rank(comm, rank, mpierr)
-    ! ! Scalars
-    ! write(bin_file_name, '(a12, i1, a4)') 'scalar_data.', rank, '.bin'
-    ! print *, 'bin file: ', trim(bin_file_name)
-    ! write(*, '(a15)', advance='no') 'writing scalar data...'
-    ! open(newunit = bin_file_handle, file = bin_file_name, form = 'unformatted', status = 'new')
-    ! ! Scalars - Domain dimensions
-    ! write(bin_file_handle) FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz
-    ! ! Scalars - Grid bounds
-    ! write(bin_file_handle) FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je
-    ! write(bin_file_handle) isd, ied, jsd, jed
-    ! ! Scalars - Rest
-    ! write(bin_file_handle) &
-    !      FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
-    !      FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
-    !      kappa, cp, zvir, FV_Atm(1)%ptop, FV_Atm(1)%ks, &
-    !      FV_Atm(1)%flagstruct%ncnst, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
-    !      FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%flagstruct%hybrid_z
-    ! close(bin_file_handle)
-    ! ! Arrays
-    ! write(bin_file_name, '(a11, i1, a4)') 'array_data.', rank, '.bin'
-    ! print *, 'bin file: ', trim(bin_file_name)
-    ! write(*, '(a15)', advance='no') 'writing array data...'
-    ! open(newunit = bin_file_handle, file = bin_file_name, form = 'unformatted', status = 'new')
-    ! write(bin_file_handle) &
-    !      FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-    !      FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
-    !      FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
-    !      FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
-    !      FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
-    !      FV_Atm(1)%ak, FV_Atm(1)%bk, &
-    !      FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
-    !      FV_Atm(1)%ze0
-    ! close(bin_file_handle)
-    ! write(*, *) 'done.'
-    ! call MPI_Barrier(mpierr)
-    ! call MPI_Abort(comm, mpierr, status)
-
-    ! call fv_dynamics_interface( &
-    !      comm, &
-    !      FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, &
-    !      isd, ied, jsd, jed, myDT, &
-    !      FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
-    !      kappa, cp, zvir, FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
-    !      FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w) !, FV_Atm(1)%delz, &
-    !      ! FV_Atm(1)%flagstruct%hydrostatic, &
-    !      ! FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
-    !      ! FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
-    !      ! FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
-    !      ! FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
-    !      ! FV_Atm(1)%ak, FV_Atm(1)%bk, &
-    !      ! FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
-    !      ! FV_Atm(1)%ze0, &
-    !      ! FV_Atm(1)%flagstruct%hybrid_z)
+    ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
+    ! disable trapping of floating point exceptions temporarily, call the interface
+    ! to the Python function and resume trapping
+    call ieee_get_halting_mode(ieee_all, halting_mode)
+    call ieee_set_halting_mode(ieee_all, .false.)
+    call fv_dynamics_interface( &
+         comm, &
+         FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, &
+         is, ie, js, je, &
+         isd, ied, jsd, jed, &
+         myDT, FV_Atm(1)%ncnst, FV_Atm(1)%ng, FV_Atm(1)%ptop, FV_Atm(1)%ks, &
+         FV_Atm(1)%layout(1), FV_Atm%layout(2), adiabatic, &
+         ! input - flagstruct
+         FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%flagstruct%z_tracer, &
+         FV_Atm(1)%flagstruct%make_nh, FV_Atm(1)%flagstruct%fv_debug, &
+         FV_Atm(1)%flagstruct%reproduce_sum, FV_Atm(1)%flagstruct%do_sat_adj, &
+         FV_Atm(1)%flagstruct%do_vort_damp, FV_Atm(1)%flagstruct%rf_fast, &
+         FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%ncnst, &
+         FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%k_split, &
+         FV_Atm(1)%flagstruct%fv_sg_adj, FV_Atm(1)%flagstruct%n_sponge, &
+         FV_Atm(1)%flagstruct%n_zfilter, FV_Atm(1)%flagstruct%nwat, &
+         FV_Atm(1)%flagstruct%hord_tr, FV_Atm(1)%flagstruct%hord_tm, &
+         FV_Atm(1)%flagstruct%hord_dp, FV_Atm(1)%flagstruct%hord_mt, &
+         FV_Atm(1)%flagstruct%hord_vt, &
+         FV_Atm(1)%flagstruct%nord, &
+         FV_Atm(1)%flagstruct%kord_tm, FV_Atm(1)%flagstruct%kord_tr, &
+         FV_Atm(1)%flagstruct%kord_wz, FV_Atm(1)%flagstruct%kord_mt, &
+         FV_Atm(1)%flagstruct%d_ext, FV_Atm(1)%flagstruct%beta, &
+         FV_Atm(1)%flagstruct%vtdm4, FV_Atm(1)%flagstruct%ke_bg, &
+         FV_Atm(1)%flagstruct%d_con, FV_Atm(1)%flagstruct%d2_bg, &
+         FV_Atm(1)%flagstruct%d2_bg_k1, FV_Atm(1)%flagstruct%d2_bg_k2, &
+         FV_Atm(1)%flagstruct%p_fac, FV_Atm(1)%flagstruct%a_imp, &
+         FV_Atm(1)%flagstruct%dddmp, FV_Atm(1)%flagstruct%d4_bg, &
+         FV_Atm(1)%flagstruct%rf_cutoff, FV_Atm(1)%flagstruct%tau, &
+         FV_Atm(1)%flagstruct%consv_te, &
+         ! input/output
+         FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
+         FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
+         FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
+         FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
+         FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
+         ! input
+         FV_Atm(1)%ak, FV_Atm(1)%bk, &
+         ! input/output
+         FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est, &
+         ! input - gridstruct
+         FV_Atm(1)%gridstruct%dx, FV_Atm(1)%gridstruct%dy, &
+         FV_Atm(1)%gridstruct%dxa, FV_Atm(1)%gridstruct%dya, &
+         FV_Atm(1)%gridstruct%dxc, FV_Atm(1)%gridstruct%dyc, &
+         FV_Atm(1)%gridstruct%rdx, FV_Atm(1)%gridstruct%rdy, &
+         FV_Atm(1)%gridstruct%rdxa, FV_Atm(1)%gridstruct%rdya, &
+         FV_Atm(1)%gridstruct%rdxc, FV_Atm(1)%gridstruct%rdyc, &
+         FV_Atm(1)%gridstruct%cosa, FV_Atm(1)%gridstruct%cosa_s, &
+         FV_Atm(1)%gridstruct%sina_u, FV_Atm(1)%gridstruct%sina_v, &
+         FV_Atm(1)%gridstruct%cosa_u, FV_Atm(1)%gridstruct%cosa_v, &
+         FV_Atm(1)%gridstruct%rsin2, FV_Atm(1)%gridstruct%rsina, &
+         FV_Atm(1)%gridstruct%rsin_u, FV_Atm(1)%gridstruct%rsin_v, &
+         FV_Atm(1)%gridstruct%sin_sg, FV_Atm(1)%gridstruct%cos_sg, &
+         FV_Atm(1)%gridstruct%area, FV_Atm(1)%gridstruct%rarea, &
+         FV_Atm(1)%gridstruct%rarea_c, &
+         FV_Atm(1)%gridstruct%f0, FV_Atm(1)%gridstruct%fC, &
+         FV_Atm(1)%gridstruct%del6_u, FV_Atm(1)%gridstruct%del6_v, &
+         FV_Atm(1)%gridstruct%divg_u, FV_Atm(1)%gridstruct%divg_v, &
+         FV_Atm(1)%gridstruct%agrid, FV_Atm(1)%gridstruct%bgrid, &
+         FV_Atm(1)%gridstruct%edge_e, FV_Atm(1)%gridstruct%edge_w, &
+         FV_Atm(1)%gridstruct%edge_n, FV_Atm(1)%gridstruct%edge_s, &
+         FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%stretched_grid, &
+         FV_Atm(1)%gridstruct%da_min, FV_Atm(1)%gridstruct%da_min_c)
+    call ieee_set_halting_mode(ieee_all, halting_mode)
 
     call fv_dynamics(FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng,   &
                      myDT, FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, kappa,   &
