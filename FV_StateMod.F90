@@ -1730,7 +1730,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     call fv_dynamics_interface( &
          comm, &
          FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, &
-         is, ie, js, je, &
+         FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
          isd, ied, jsd, jed, &
          myDT, FV_Atm(1)%ncnst, FV_Atm(1)%ng, FV_Atm(1)%ptop, FV_Atm(1)%ks, &
          FV_Atm(1)%layout(1), FV_Atm%layout(2), adiabatic, &
