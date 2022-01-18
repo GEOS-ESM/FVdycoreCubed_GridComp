@@ -1163,8 +1163,6 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
 
   type(ESMF_VM) :: vm
   integer :: comm
-  integer :: rank, mpierr, bin_file_handle
-  character(len=256) :: bin_file_name
   logical :: halting_mode(5)
 
 ! Begin
