@@ -36,7 +36,7 @@ module FV_StateMod
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
 
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
-   use fv_dynamics_interface_mod, only: fv_dynamics_interface
+   use fv_dynamics_interface_mod, only: fv_dynamics_interface_f
 
 implicit none
 private
@@ -1725,13 +1725,13 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     ! to the Python function and resume trapping
     call ieee_get_halting_mode(ieee_all, halting_mode)
     call ieee_set_halting_mode(ieee_all, .false.)
-    call fv_dynamics_interface( &
+    call fv_dynamics_interface_f( &
          comm, &
          FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, &
          FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
          isd, ied, jsd, jed, &
          myDT, FV_Atm(1)%ncnst, FV_Atm(1)%ng, FV_Atm(1)%ptop, FV_Atm(1)%ks, &
-         FV_Atm(1)%layout(1), FV_Atm%layout(2), adiabatic, &
+         FV_Atm(1)%layout(1), FV_Atm(1)%layout(2), adiabatic, &
          ! input - flagstruct
          FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%flagstruct%z_tracer, &
          FV_Atm(1)%flagstruct%make_nh, FV_Atm(1)%flagstruct%fv_debug, &
@@ -1783,7 +1783,9 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          FV_Atm(1)%gridstruct%f0, FV_Atm(1)%gridstruct%fC, &
          FV_Atm(1)%gridstruct%del6_u, FV_Atm(1)%gridstruct%del6_v, &
          FV_Atm(1)%gridstruct%divg_u, FV_Atm(1)%gridstruct%divg_v, &
-         FV_Atm(1)%gridstruct%agrid, FV_Atm(1)%gridstruct%bgrid, &
+         FV_Atm(1)%gridstruct%agrid, FV_Atm(1)%gridstruct%grid, &
+         FV_Atm(1)%gridstruct%a11, FV_Atm(1)%gridstruct%a12, &
+         FV_Atm(1)%gridstruct%a21, FV_Atm(1)%gridstruct%a22, &
          FV_Atm(1)%gridstruct%edge_e, FV_Atm(1)%gridstruct%edge_w, &
          FV_Atm(1)%gridstruct%edge_n, FV_Atm(1)%gridstruct%edge_s, &
          FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%stretched_grid, &
