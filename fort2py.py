@@ -1,7 +1,6 @@
 import numpy as np
 import gt4py
 from math import prod
-import cffi
 
 TYPEMAP = {
     'float': np.float32,
@@ -16,8 +15,7 @@ def fort_to_numpy(ffi, ptr, dim):
         TYPEMAP[ftype],
     ).reshape(tuple(reversed(dim))).transpose().astype(np.float64)
 
-def fort_to_gt4py(ptr, dim, origin, backend):
-    ffi = cffi.FFI()
+def fort_to_gt4py(ffi, ptr, dim, origin, backend):
     nparr = fort_to_numpy(ffi, ptr, dim).transpose()
     return gt4py.storage.from_array(nparr, backend, origin)
     # return gt4py.storage.wrap_cpu_array(nparr, backend, origin)
