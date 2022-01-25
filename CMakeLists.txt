@@ -3,6 +3,7 @@ esma_set_this ()
 # The Python library creation requires mpiexec/mpirun to run on a
 # compute node. Probably a weird SLURM thing?
 find_package(MPI REQUIRED)
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 # Set up some variables in case names change
 set(FVDYN_INTERFACE_LIBRARY     ${CMAKE_CURRENT_BINARY_DIR}/libfv_dynamics_interface_py.so)
@@ -15,7 +16,7 @@ add_custom_command(
   # Note below is essentially:
   #  mpirun -np 1 python file
   # but we use the CMake options as much as we can for flexibility
-  COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ${Python_EXECUTABLE} ${FVDYN_INTERFACE_SRCS}
+  COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ${Python3_EXECUTABLE} ${FVDYN_INTERFACE_SRCS}
   BYPRODUCTS ${FVDYN_INTERFACE_HEADER_FILE}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   MAIN_DEPENDENCY ${FVDYN_INTERFACE_SRCS}
