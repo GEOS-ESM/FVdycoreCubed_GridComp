@@ -1743,8 +1743,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          FV_Atm(1)%flagstruct%n_zfilter, FV_Atm(1)%flagstruct%nwat, &
          FV_Atm(1)%flagstruct%hord_tr, FV_Atm(1)%flagstruct%hord_tm, &
          FV_Atm(1)%flagstruct%hord_dp, FV_Atm(1)%flagstruct%hord_mt, &
-         FV_Atm(1)%flagstruct%hord_vt, &
-         FV_Atm(1)%flagstruct%nord, &
+         FV_Atm(1)%flagstruct%hord_vt, FV_Atm(1)%flagstruct%nord, &
          FV_Atm(1)%flagstruct%kord_tm, FV_Atm(1)%flagstruct%kord_tr, &
          FV_Atm(1)%flagstruct%kord_wz, FV_Atm(1)%flagstruct%kord_mt, &
          FV_Atm(1)%flagstruct%d_ext, FV_Atm(1)%flagstruct%beta, &
