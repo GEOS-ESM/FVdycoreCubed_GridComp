@@ -3183,8 +3183,6 @@ subroutine fv_getVerticalMassFlux(mfx, mfy, mfz, dt)
   real(REAL8) :: conv(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
   real(REAL8) :: pit(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
 
-  real(REAL8) :: fac
-
   real(REAL8) :: wbuffer(FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,FV_Atm(1)%npz)
   real(REAL8) :: sbuffer(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%npz)
   real(REAL8) :: ebuffer(FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,FV_Atm(1)%npz)
@@ -3231,8 +3229,6 @@ subroutine fv_getVerticalMassFlux(mfx, mfy, mfz, dt)
      enddo
   end if
 
-  fac = 1.0/(dt*MAPL_GRAV)
-!
 ! Compute the vertical mass flux
 !
 !   Compute Convergence of the horizontal Mass flux
@@ -3240,7 +3236,7 @@ subroutine fv_getVerticalMassFlux(mfx, mfy, mfz, dt)
        do j=jsc,jec
           do i=isc,iec
              conv(i,j,k) = ( xfx(i,j,k) - xfx(i+1,j,k) +  &
-                             yfx(i,j,k) - yfx(i,j+1,k) ) * fac
+                             yfx(i,j,k) - yfx(i,j+1,k) )
           enddo
        enddo
     enddo
