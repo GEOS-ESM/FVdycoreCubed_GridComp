@@ -3,7 +3,7 @@ from datetime import datetime
 import cffi
 import numpy as np
 from mpi4py import MPI
-import h5py
+# import h5py
 
 import gt4py
 from fort2py import fort_to_numpy
@@ -46,7 +46,7 @@ def fv_dynamics_top_level_function(
         nested_int, stretched_grid_int, da_min, da_min_c):
 
     rank = comm.Get_rank()
-    backend = 'gtx86'
+    backend = 'gtcuda'
     if (rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--in top level function with backend', backend, flush=True)
@@ -58,135 +58,113 @@ def fv_dynamics_top_level_function(
     ffi = cffi.FFI()
     u = fort_to_numpy(ffi, u_ptr, (ied-isd+1, jed+1-jsd+1, npz))
     v = fort_to_numpy(ffi, v_ptr, (ied+1-isd+1, jed-jsd+1, npz))
-    # if rank == 0:
-    #     print(rank, np.sum(u), np.sum(v))
     w = fort_to_numpy(ffi, w_ptr, (ied-isd+1, jed-jsd+1, npz))
     delz = fort_to_numpy(ffi, delz_ptr, (ied-isd+1, jed-jsd+1, npz))
-    # print('delz:', delz[6,12,13], delz[7,12,13], delz[6,13,13])
-    # with np.printoptions(formatter={'float': lambda x: "{0:06.2f}".format(x)}, linewidth=10000):
-    # print('u, v, w, delz:', np.sum(u), np.sum(v), np.sum(w), np.sum(delz))
     pt = fort_to_numpy(ffi, pt_ptr, (ied-isd+1, jed-jsd+1, npz))
     delp = fort_to_numpy(ffi, delp_ptr, (ied-isd+1, jed-jsd+1, npz))
-    # print('delp:', delp[6,12,13], delp[7,12,13], delp[6,13,13])
-    q = fort_to_numpy(ffi, q_ptr, (ied-isd+1, jed-jsd+1, npz, ncnst))
-    # print('pt, delp, q:', np.sum(pt), np.sum(delp), np.sum(q))
+    q = fort_to_numpy(ffi, q_ptr, (ied-isd+1, jed-jsd+1, npz, nq_tot))
     ps = fort_to_numpy(ffi, ps_ptr, (ied-isd+1, jed-jsd+1))
     pe = fort_to_numpy(ffi, pe_ptr, (ie+1-(is_-1)+1, npz+1, je+1-(js-1)+1))
-    # pe = fort_to_numpy(ffi, pe_ptr, (ie+1-(is_-1)+1, je+1-(js-1)+1, npz+1))
-    # if (rank == 0): print('shape(pe):', pe.shape)
     pk = fort_to_numpy(ffi, pk_ptr, (ie-is_+1, je-js+1, npz+1))
     peln = fort_to_numpy(ffi, peln_ptr, (ie-is_+1, npz+1, je-js+1))
-    # peln = fort_to_numpy(ffi, peln_ptr, (ie-is_+1, je-js+1, npz+1))
     pkz = fort_to_numpy(ffi, pkz_ptr, (ie-is_+1, je-js+1, npz))
-    # print('ps/pe/pk/peln/pkz:', np.sum(ps), np.sum(pe), np.sum(pk), np.sum(peln), np.sum(pkz))
-    # print(ps.shape, pe.shape, pk.shape, peln.shape, pkz.shape)
     phis = fort_to_numpy(ffi, phis_ptr, (ied-isd+1, jed-jsd+1))
-    # with np.printoptions(formatter={'float': lambda x: "{0:013.3f}".format(x)}, linewidth=10000):
-    #      print(phis)
     q_con = fort_to_numpy(ffi, q_con_ptr, (ied-isd+1, jed-jsd+1, npz))
-    # print('q_con:', q_con.shape, np.sum(q_con))
     omga = fort_to_numpy(ffi, omga_ptr, (ied-isd+1, jed-jsd+1, npz))
-    # print('phis, q_con, omga:', np.sum(phis), np.sum(q_con), np.sum(omga))
     ua = fort_to_numpy(ffi, ua_ptr, (ied-isd+1, jed-jsd+1, npz))
     va = fort_to_numpy(ffi, va_ptr, (ied-isd+1, jed-jsd+1, npz))
     uc = fort_to_numpy(ffi, uc_ptr, (ied+1-isd+1, jed-jsd+1, npz))
     vc = fort_to_numpy(ffi, va_ptr, (ied-isd+1, jed+1-jsd+1, npz))
-    # print('ua, va, uc, vc:', np.sum(ua), np.sum(va), np.sum(uc), np.sum(vc))
     ak = fort_to_numpy(ffi, ak_ptr, (npz+1,))
     bk = fort_to_numpy(ffi, bk_ptr, (npz+1,))
-    # print('ak, bk:', np.sum(ak), np.sum(bk))
     mfxd = fort_to_numpy(ffi, mfxd_ptr, (ie+1-is_+1, je-js+1, npz))
     mfyd = fort_to_numpy(ffi, mfyd_ptr, (ie-is_+1, je+1-js+1, npz))
     cxd = fort_to_numpy(ffi, cxd_ptr, (ie+1-is_+1, jed-jsd+1, npz))
     cyd = fort_to_numpy(ffi, cyd_ptr, (ied-isd+1, je+1-js+1, npz))
-    # print('mfxd, mfyd, cxd, cyd:', np.sum(mfxd), np.sum(mfyd), np.sum(cxd), np.sum(cyd))
-    # ze0
     diss_estd = fort_to_numpy(ffi, diss_estd_ptr, (ied-isd+1, jed-jsd+1, npz))
-    # print('diss_estd:', np.sum(diss_estd))
+
     dx = fort_to_numpy(ffi, dx_ptr, (ied-isd+1, jed+1-jsd+1))
     dy = fort_to_numpy(ffi, dy_ptr, (ied+1-isd+1, jed-jsd+1))
     dxa = fort_to_numpy(ffi, dxa_ptr, (ied-isd+1, jed-jsd+1))
     dya = fort_to_numpy(ffi, dya_ptr, (ied-isd+1, jed-jsd+1))
     dxc = fort_to_numpy(ffi, dxc_ptr, (ied+1-isd+1, jed-jsd+1))
     dyc = fort_to_numpy(ffi, dyc_ptr, (ied-isd+1, jed+1-jsd+1))
-    # print('dx, dy, dxa, dya, dxc, dyc:',
-    #       np.sum(dx), np.sum(dy), np.sum(dxa), np.sum(dya), np.sum(dxc), np.sum(dyc))
     rdx = fort_to_numpy(ffi, rdx_ptr, (ied-isd+1, jed+1-jsd+1))
     rdy = fort_to_numpy(ffi, rdy_ptr, (ied+1-isd+1, jed-jsd+1))
     rdxa = fort_to_numpy(ffi, rdxa_ptr, (ied-isd+1, jed-jsd+1))
     rdya = fort_to_numpy(ffi, rdya_ptr, (ied-isd+1, jed-jsd+1))
     rdxc = fort_to_numpy(ffi, rdxc_ptr, (ied+1-isd+1, jed-jsd+1))
     rdyc = fort_to_numpy(ffi, rdyc_ptr, (ied-isd+1, jed+1-jsd+1))
-    # print('rdx, rdy, rdxa, rdya, rdxc, rdyc:',
-    #       np.sum(rdx), np.sum(rdy), np.sum(rdxa), np.sum(rdya), np.sum(rdxc), np.sum(rdyc))
     cosa = fort_to_numpy(ffi, cosa_ptr, (ied+1-isd+1, jed+1-jsd+1))
     cosa_s = fort_to_numpy(ffi, cosa_s_ptr, (ied-isd+1, jed-jsd+1))
-    # print('cosa, cosa_s:', np.sum(cosa), np.sum(cosa_s))
     sina_u = fort_to_numpy(ffi, sina_u_ptr, (ied+1-isd+1, jed-jsd+1))
     sina_v = fort_to_numpy(ffi, sina_v_ptr, (ied-isd+1, jed+1-jsd+1))
     cosa_u = fort_to_numpy(ffi, cosa_u_ptr, (ied+1-isd+1, jed-jsd+1))
     cosa_v = fort_to_numpy(ffi, cosa_v_ptr, (ied-isd+1, jed+1-jsd+1))
-    # print('sina_u, sina_v, cosa_u, cosa_v:',
-    #       np.sum(sina_u), np.sum(sina_v), np.sum(cosa_u), np.sum(cosa_v))
     rsin2 = fort_to_numpy(ffi, rsin2_ptr, (ied-isd+1, jed-jsd+1))
-    rsina = fort_to_numpy(ffi, rsina_ptr, (ied+1-isd+1, jed+1-jsd+1))
+    rsina = fort_to_numpy(ffi, rsina_ptr, (ie+1-is_+1, je+1-js+1))
     rsin_u = fort_to_numpy(ffi, rsin_u_ptr, (ied+1-isd+1, jed-jsd+1))
     rsin_v = fort_to_numpy(ffi, rsin_v_ptr, (ied-isd+1, jed+1-jsd+1))
     sin_sg = fort_to_numpy(ffi, sin_sg_ptr, (ied-isd+1, jed-jsd+1, 9))
     cos_sg = fort_to_numpy(ffi, cos_sg_ptr, (ied-isd+1, jed-jsd+1, 9))
-    # print('rsin2, rsina, rsin_u, rsin_v, sin_sg, cos_sg:',
-    #       np.sum(rsin2), np.sum(rsina), np.sum(rsin_u),
-    #       np.sum(rsin_v), np.sum(sin_sg), np.sum(cos_sg))
     area = fort_to_numpy(ffi, area_ptr, (ied-isd+1, jed-jsd+1))
     rarea = fort_to_numpy(ffi, rarea_ptr, (ied-isd+1, jed-jsd+1))
     rarea_c =  fort_to_numpy(ffi, rarea_c_ptr, (ied+1-isd+1,jed+1-jsd+1))
     f0 = fort_to_numpy(ffi, f0_ptr, (ied-isd+1, jed-jsd+1))
     fC = fort_to_numpy(ffi, fC_ptr, (ied+1-isd+1, jed+1-jsd+1))
-    # print('area, rarea, rarea_c, f0, fC:',
-    #       np.sum(area), np.sum(rarea), np.sum(rarea_c), np.sum(f0), np.sum(fC))
     del6_u = fort_to_numpy(ffi, del6_u_ptr, (ied-isd+1, jed+1-jsd+1))
     del6_v = fort_to_numpy(ffi, del6_v_ptr, (ied+1-isd+1, jed-jsd+1))
     divg_u = fort_to_numpy(ffi, divg_u_ptr, (ied-isd+1, jed+1-jsd+1))
     divg_v = fort_to_numpy(ffi, divg_v_ptr, (ied+1-isd+1, jed-jsd+1))
-    # print('del6_u, del6_v, divg_u, divg_v:',
-    #       np.sum(del6_u), np.sum(del6_v), np.sum(divg_u), np.sum(divg_v))
     agrid = fort_to_numpy(ffi, agrid_ptr, (ied-isd+1, jed-jsd+1, 2))
     bgrid = fort_to_numpy(ffi, bgrid_ptr, (ied+1-isd+1, jed+1-jsd+1, 2))
-    # print('agrid, bgrid:', np.sum(agrid), np.sum(bgrid))
     a11 = fort_to_numpy(ffi, a11_ptr, (ie+1-(is_-1)+1, je+1-(js-1)+1))
     a12 = fort_to_numpy(ffi, a12_ptr, (ie+1-(is_-1)+1, je+1-(js-1)+1))
     a21 = fort_to_numpy(ffi, a21_ptr, (ie+1-(is_-1)+1, je+1-(js-1)+1))
     a22 = fort_to_numpy(ffi, a22_ptr, (ie+1-(is_-1)+1, je+1-(js-1)+1))
-    # print('a11, a12, a21, a22:', np.sum(a11), np.sum(a12), np.sum(a21), np.sum(a22))
     edge_e = fort_to_numpy(ffi, edge_e_ptr, (npy,))
     edge_w = fort_to_numpy(ffi, edge_w_ptr, (npy,))
     edge_n = fort_to_numpy(ffi, edge_n_ptr, (npx,))
     edge_s = fort_to_numpy(ffi, edge_s_ptr, (npx,))
-    # print('edge_e/w/n/s:', np.sum(edge_e), np.sum(edge_w), np.sum(edge_n), np.sum(edge_s))
-    # print('nested, stretched, da_min, da_min_c:', nested_int, stretched_grid_int,da_min,da_min_c)
+
+    # if rank == 0:
+    #     with np.printoptions(formatter={'float': lambda x: "{0:06.2f}".format(x)}, linewidth=10000):
+    #         print('P: u/v/w/delz:', np.sum(u), np.sum(v), np.sum(w), np.sum(delz))
+    nranks = comm.Get_size()
+    for i in range(nranks):
+        if i == rank:
+            print('P: rank:', rank, flush=True)
+            print('P: u:', np.sum(u), np.sum(v), np.sum(w), np.sum(delz), flush=True)
+            print('P: pt:', np.sum(pt), np.sum(delp), np.sum(q), flush=True)
+            print('P: ps:', np.sum(ps), np.sum(pe), np.sum(pk), np.sum(peln), np.sum(pkz), flush=True)
+            print('P: phis:', np.sum(phis), np.sum(q_con), np.sum(omga), flush=True)
+            print('P: ua:', np.sum(ua), np.sum(va), np.sum(uc), np.sum(vc), flush=True)
+            print('P: mfx:', np.sum(mfxd), np.sum(mfyd), np.sum(cxd), np.sum(cyd), flush=True)
+            print('P: diss_est:', np.sum(diss_estd), flush=True)
+        comm.Barrier()
 
     if (rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--converted data (Fortran to NumPy)', flush=True)
-        hf = h5py.File('incoming-data.h5', 'w')
-        hf.create_dataset('u', data=u)
-        hf.create_dataset('v', data=v)
-        hf.create_dataset('w', data=w)
-        hf.create_dataset('delz', data=delz)
-        hf.create_dataset('pt', data=pt)
-        hf.create_dataset('delp', data=delp)
-        hf.create_dataset('q', data=q)
-        hf.create_dataset('ps', data=ps)
-        hf.create_dataset('pe', data=pe)
-        hf.create_dataset('pk', data=pk)
-        hf.create_dataset('peln', data=peln)
-        hf.create_dataset('pkz', data=pkz)
-        hf.create_dataset('phis', data=phis)
-        hf.create_dataset('q_con', data=q_con)
-        hf.create_dataset('omga', data=omga)
-        hf.create_dataset('ak', data=ak)
-        hf.create_dataset('bk', data=bk)
-        hf.close()
+        # hf = h5py.File('incoming-data.h5', 'w')
+        # hf.create_dataset('u', data=u)
+        # hf.create_dataset('v', data=v)
+        # hf.create_dataset('w', data=w)
+        # hf.create_dataset('delz', data=delz)
+        # hf.create_dataset('pt', data=pt)
+        # hf.create_dataset('delp', data=delp)
+        # hf.create_dataset('q', data=q)
+        # hf.create_dataset('ps', data=ps)
+        # hf.create_dataset('pe', data=pe)
+        # hf.create_dataset('pk', data=pk)
+        # hf.create_dataset('peln', data=peln)
+        # hf.create_dataset('pkz', data=pkz)
+        # hf.create_dataset('phis', data=phis)
+        # hf.create_dataset('q_con', data=q_con)
+        # hf.create_dataset('omga', data=omga)
+        # hf.create_dataset('ak', data=ak)
+        # hf.create_dataset('bk', data=bk)
+        # hf.close()
 
     fv3core.set_backend(backend)
     fv3core.set_rebuild(False)
@@ -219,16 +197,12 @@ def fv_dynamics_top_level_function(
         'hord_mt': hord_mt,
         'hord_vt': hord_vt,
         'nord': nord,
-        'kord_tm': -9, #kord_tm,
+        'kord_tm': kord_tm,
         'kord_tr': kord_tr,
         'kord_wz': kord_wz,
         'kord_mt': kord_mt,
         'd_ext': d_ext,
         'beta': beta,
-        # To get around the error:
-        # File "/discover/nobackup/pchakrab/code/ext/vulcan/fv3core/fv3core/stencils/updatedzd.py", line 207, in __init__
-        # raise NotImplementedError("damp <= 1e-5 in column_cols is untested")
-        # NotImplementedError: damp <= 1e-5 in column_cols is untested
         'vtdm4': vtdm4,
         'ke_bg': ke_bg,
         'd_con': d_con,
@@ -237,10 +211,10 @@ def fv_dynamics_top_level_function(
         'd2_bg_k2': d2_bg_k2,
         'p_fac': p_fac,
         'a_imp': a_imp,
-        'dddmp': 0.2,
-        'd4_bg': 0.12,
-        'rf_cutoff': 750.0,
-        'tau': 0.0,
+        'dddmp': dddmp,
+        'd4_bg': d4_bg,
+        'rf_cutoff': rf_cutoff,
+        'tau': tau,
         'delt_max': 0.002}) # namelist
 
     # Grid dependent helper structure
@@ -265,8 +239,9 @@ def fv_dynamics_top_level_function(
         'qsnow': q[:,:,:,4],
         'qgraupel': q[:,:,:,5],
         'qcld': q[:,:,:,6],
-        'qo3mr': q[:,:,:,7],
-        'qsgs_tke': q[:,:,:,8],
+        # GEOS does not provide qo3mr and qsgs_tke - setting those to zero
+        'qo3mr': np.zeros(q[:,:,:,0].shape),
+        'qsgs_tke': np.zeros(q[:,:,:,0].shape),
         'do_adiabatic_init': True, # Has to be True
         'consv_te': consv_te,
         'bdt': bdt,
@@ -296,10 +271,6 @@ def fv_dynamics_top_level_function(
         'del6_u': del6_u, 'del6_v': del6_v, 'divg_u': divg_u, 'divg_v': divg_v,
         'agrid1': agrid[:,:,0], 'agrid2': agrid[:,:,1],
         'bgrid1': bgrid[:,:,0], 'bgrid2': bgrid[:,:,1],
-        # 'a11': np.zeros((ie+1-(is_-1)+1, je+1-(js-1)+1), np.float64, order='F'),
-        # 'a12': np.zeros((ie+1-(is_-1)+1, je+1-(js-1)+1), np.float64, order='F'),
-        # 'a21': np.zeros((ie+1-(is_-1)+1, je+1-(js-1)+1), np.float64, order='F'),
-        # 'a22': np.zeros((ie+1-(is_-1)+1, je+1-(js-1)+1), np.float64, order='F'),
         'a11': a11, 'a12': a12, 'a21': a21, 'a22': a22,
         'edge_e': edge_e, 'edge_w': edge_w, 'edge_n': edge_n, 'edge_s': edge_s,
         'nested': False if nested_int == 0 else True,
@@ -331,28 +302,28 @@ def fv_dynamics_top_level_function(
     if (spec.grid.rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--created grid', flush=True)
-        hf = h5py.File('grid-data.h5', 'w')
-        for var in grid_vars_to_write:
-            # print('var:', var, grid.__dict__[var].shape, np.sum(grid.__dict__[var]))
-            hf.create_dataset(var, data=grid.__dict__[var])
-        hf.close()
+        # hf = h5py.File('grid-data.h5', 'w')
+        # for var in grid_vars_to_write:
+        #     # print('var:', var, grid.__dict__[var].shape, np.sum(grid.__dict__[var]))
+        #     hf.create_dataset(var, data=grid.__dict__[var])
+        # hf.close()
     driver_object = fv3core.testing.TranslateFVDynamics([grid])
     state = driver_object.state_from_inputs(input_data)
     # print('state.pe/state.q_con:', state['pe'].shape, state['q_con'].shape)
     if (spec.grid.rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--created state', flush=True)
-        # print(spec.namelist.dynamical_core, flush=True)
+        print(spec.namelist.dynamical_core, flush=True)
     vars_to_write = ['u', 'v', 'w', 'delz',
                      'pt', 'delp',
                      'ps', 'pe', 'pk', 'peln', 'pkz',
                      'phis', 'q_con', 'omga',
                      'ua', 'va', 'uc', 'vc']
-    if (rank == 0):
-        hf = h5py.File('state-initial.h5', 'w')
-        for var in vars_to_write:
-            hf.create_dataset(var, data=state[var])
-        hf.close()
+    # if (rank == 0):
+    #     hf = h5py.File('state-initial.h5', 'w')
+    #     for var in vars_to_write:
+    #         hf.create_dataset(var, data=state[var])
+    #     hf.close()
 
     # print('pe after  translating:', state['pe'].shape, np.sum(state['pe']))
     # print(state.keys())
@@ -371,16 +342,16 @@ def fv_dynamics_top_level_function(
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--instantiated DynamicalCore', flush=True)
 
-    if spec.namelist.fv_sg_adj > 0:
-        fv_subgrid_z = fv3core.DryConvectiveAdjustment(
-            spec.grid.grid_indexing,
-            spec.namelist.nwat,
-            spec.namelist.fv_sg_adj,
-            spec.namelist.n_sponge,
-            spec.namelist.hydrostatic,)
-        if (spec.grid.rank == 0):
-            print('P:', datetime.now().isoformat(timespec='milliseconds'),
-                  '--instantiated DryConvectiveAdjustment', flush=True)
+    # if spec.namelist.fv_sg_adj > 0:
+    #     fv_subgrid_z = fv3core.DryConvectiveAdjustment(
+    #         spec.grid.grid_indexing,
+    #         spec.namelist.nwat,
+    #         spec.namelist.fv_sg_adj,
+    #         spec.namelist.n_sponge,
+    #         spec.namelist.hydrostatic,)
+    #     if (spec.grid.rank == 0):
+    #         print('P:', datetime.now().isoformat(timespec='milliseconds'),
+    #               '--instantiated DryConvectiveAdjustment', flush=True)
 
     # First timestep
     dycore.step_dynamics(
@@ -398,32 +369,11 @@ def fv_dynamics_top_level_function(
     # Retrieve output data from state
     output_data = driver_object.outputs_from_state(state)
 
-
     if (spec.grid.rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--retrieved output data from state', flush=True)
 
-    if (rank == 0):
-        hf = h5py.File('output.h5', 'w')
-        for var in output_data:
-            hf.create_dataset(var, data=output_data[var])
-        hf.close()
-
-    u_out_f = output_data['u'].astype(np.float32).flatten(order='F')
-    ffi.memmove(u_ptr, u_out_f, 4*u_out_f.size)
-    v_out_f = output_data['v'].astype(np.float32).flatten(order='F')
-    ffi.memmove(v_ptr, v_out_f, 4*v_out_f.size)
-    w_out_f = output_data['w'].astype(np.float32).flatten(order='F')
-    ffi.memmove(w_ptr, w_out_f, 4*w_out_f.size)
-    delz_out_f = output_data['delz'].astype(np.float32).flatten(order='F')
-    ffi.memmove(delz_ptr, delz_out_f, 4*delz_out_f.size)
-
-
-    pt_out_f = output_data['pt'].astype(np.float32).flatten(order='F')
-    ffi.memmove(pt_ptr, pt_out_f, 4*pt_out_f.size)
-    delp_out_f = output_data['delp'].astype(np.float32).flatten(order='F')
-    ffi.memmove(delp_ptr, delp_out_f, 4*delp_out_f.size)
-    # q needs special handling
+    # q needs special handling - no need to include qo3mr and qsgs_tks
     q[:,:,:,0] = output_data['qvapor']
     q[:,:,:,1] = output_data['qliquid']
     q[:,:,:,2] = output_data['qice']
@@ -431,48 +381,112 @@ def fv_dynamics_top_level_function(
     q[:,:,:,4] = output_data['qsnow']
     q[:,:,:,5] = output_data['qgraupel']
     q[:,:,:,6] = output_data['qcld']
-    q[:,:,:,7] = output_data['qo3mr']
-    q[:,:,:,8] = output_data['qsgs_tke']
-    q_out_f = q.astype(np.float32).flatten(order='F')
-    ffi.memmove(q_ptr, q_out_f, 4*q_out_f.size)
 
-    ps_out_f = output_data['ps'].astype(np.float32).flatten(order='F')
-    ffi.memmove(ps_ptr, ps_out_f, 4*ps_out_f.size)
-    pe_out_f = output_data['pe'].astype(np.float32).flatten(order='F')
-    ffi.memmove(pe_ptr, pe_out_f, 4*pe_out_f.size)
-    pk_out_f = output_data['pk'].astype(np.float32).flatten(order='F')
-    ffi.memmove(pk_ptr, pk_out_f, 4*pk_out_f.size)
-    peln_out_f = output_data['peln'].astype(np.float32).flatten(order='F')
-    ffi.memmove(peln_ptr, peln_out_f, 4*peln_out_f.size)
-    pkz_out_f = output_data['pkz'].astype(np.float32).flatten(order='F')
-    ffi.memmove(pkz_ptr, pkz_out_f, 4*pkz_out_f.size)
+    nranks = comm.Get_size()
+    for i in range(nranks):
+        if i == rank:
+            print('P: rank:', rank, flush=True)
+            print('P: u:',
+                  np.sum(output_data['u']),
+                  np.sum(output_data['v']),
+                  np.sum(output_data['w']),
+                  np.sum(output_data['delz']),
+                  flush=True)
+            print('P: pt:', np.sum(output_data['pt']), np.sum(output_data['delp']), np.sum(q), q.shape, flush=True)
+            print('P: ps:',
+                  np.sum(output_data['ps']),
+                  np.sum(output_data['pe']),
+                  np.sum(output_data['pk']),
+                  np.sum(output_data['peln']),
+                  np.sum(output_data['pkz']),
+                  flush=True)
+            print('P: phis:',
+                  np.sum(output_data['phis']),
+                  np.sum(output_data['q_con']),
+                  np.sum(output_data['omga']),
+                  flush=True)
+            print('P: ua:',
+                  np.sum(output_data['ua']),
+                  np.sum(output_data['va']),
+                  np.sum(output_data['uc']),
+                  np.sum(output_data['vc']),
+                  flush=True)
+            print('P: mfx:',
+                  np.sum(output_data['mfxd']),
+                  np.sum(output_data['mfyd']),
+                  np.sum(output_data['cxd']),
+                  np.sum(output_data['cyd']),
+                  flush=True)
+            print('P: diss_est:', np.sum(output_data['diss_estd']), flush=True)
+        comm.Barrier()
 
-    phis_out_f = output_data['phis'].astype(np.float32).flatten(order='F')
-    ffi.memmove(phis_ptr, phis_out_f, 4*phis_out_f.size)
-    q_con_out_f = output_data['q_con'].astype(np.float32).flatten(order='F')
-    ffi.memmove(q_con_ptr, q_con_out_f, 4*q_con_out_f.size)
-    omga_out_f = output_data['omga'].astype(np.float32).flatten(order='F')
-    ffi.memmove(omga_ptr, omga_out_f, 4*omga_out_f.size)
+    # if (rank == 0):
+    #     hf = h5py.File('output.h5', 'w')
+    #     for var in output_data:
+    #         hf.create_dataset(var, data=output_data[var])
+    #     hf.close()
 
-    ua_out_f = output_data['ua'].astype(np.float32).flatten(order='F')
-    ffi.memmove(ua_ptr, ua_out_f, 4*ua_out_f.size)
-    va_out_f = output_data['va'].astype(np.float32).flatten(order='F')
-    ffi.memmove(va_ptr, va_out_f, 4*va_out_f.size)
-    uc_out_f = output_data['uc'].astype(np.float32).flatten(order='F')
-    ffi.memmove(uc_ptr, uc_out_f, 4*uc_out_f.size)
-    vc_out_f = output_data['vc'].astype(np.float32).flatten(order='F')
-    ffi.memmove(vc_ptr, vc_out_f, 4*vc_out_f.size)
+    # u_out_f = output_data['u'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(u_ptr, u_out_f, 4*u_out_f.size)
+    # v_out_f = output_data['v'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(v_ptr, v_out_f, 4*v_out_f.size)
+    # w_out_f = output_data['w'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(w_ptr, w_out_f, 4*w_out_f.size)
+    # delz_out_f = output_data['delz'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(delz_ptr, delz_out_f, 4*delz_out_f.size)
 
-    mfxd_out_f = output_data['mfxd'].astype(np.float32).flatten(order='F')
-    ffi.memmove(mfxd_ptr, mfxd_out_f, 4*mfxd_out_f.size)
-    mfyd_out_f = output_data['mfyd'].astype(np.float32).flatten(order='F')
-    ffi.memmove(mfyd_ptr, mfyd_out_f, 4*mfyd_out_f.size)
-    cxd_out_f = output_data['cxd'].astype(np.float32).flatten(order='F')
-    ffi.memmove(cxd_ptr, cxd_out_f, 4*cxd_out_f.size)
-    cyd_out_f = output_data['cyd'].astype(np.float32).flatten(order='F')
-    ffi.memmove(cyd_ptr, cyd_out_f, 4*cyd_out_f.size)
-    diss_estd_out_f = output_data['diss_estd'].astype(np.float32).flatten(order='F')
-    ffi.memmove(diss_estd_ptr, diss_estd_out_f, 4*diss_estd_out_f.size)
+    # pt_out_f = output_data['pt'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(pt_ptr, pt_out_f, 4*pt_out_f.size)
+    # delp_out_f = output_data['delp'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(delp_ptr, delp_out_f, 4*delp_out_f.size)
+    # # q needs special handling - no need to include qo3mr and qsgs_tks
+    # q[:,:,:,0] = output_data['qvapor']
+    # q[:,:,:,1] = output_data['qliquid']
+    # q[:,:,:,2] = output_data['qice']
+    # q[:,:,:,3] = output_data['qrain']
+    # q[:,:,:,4] = output_data['qsnow']
+    # q[:,:,:,5] = output_data['qgraupel']
+    # q[:,:,:,6] = output_data['qcld']
+    # q_out_f = q.astype(np.float32).flatten(order='F')
+    # ffi.memmove(q_ptr, q_out_f, 4*q_out_f.size)
+
+    # ps_out_f = output_data['ps'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(ps_ptr, ps_out_f, 4*ps_out_f.size)
+    # pe_out_f = output_data['pe'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(pe_ptr, pe_out_f, 4*pe_out_f.size)
+    # pk_out_f = output_data['pk'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(pk_ptr, pk_out_f, 4*pk_out_f.size)
+    # peln_out_f = output_data['peln'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(peln_ptr, peln_out_f, 4*peln_out_f.size)
+    # pkz_out_f = output_data['pkz'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(pkz_ptr, pkz_out_f, 4*pkz_out_f.size)
+
+    # phis_out_f = output_data['phis'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(phis_ptr, phis_out_f, 4*phis_out_f.size)
+    # q_con_out_f = output_data['q_con'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(q_con_ptr, q_con_out_f, 4*q_con_out_f.size)
+    # omga_out_f = output_data['omga'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(omga_ptr, omga_out_f, 4*omga_out_f.size)
+
+    # ua_out_f = output_data['ua'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(ua_ptr, ua_out_f, 4*ua_out_f.size)
+    # va_out_f = output_data['va'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(va_ptr, va_out_f, 4*va_out_f.size)
+    # uc_out_f = output_data['uc'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(uc_ptr, uc_out_f, 4*uc_out_f.size)
+    # vc_out_f = output_data['vc'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(vc_ptr, vc_out_f, 4*vc_out_f.size)
+
+    # mfxd_out_f = output_data['mfxd'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(mfxd_ptr, mfxd_out_f, 4*mfxd_out_f.size)
+    # mfyd_out_f = output_data['mfyd'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(mfyd_ptr, mfyd_out_f, 4*mfyd_out_f.size)
+    # cxd_out_f = output_data['cxd'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(cxd_ptr, cxd_out_f, 4*cxd_out_f.size)
+    # cyd_out_f = output_data['cyd'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(cyd_ptr, cyd_out_f, 4*cyd_out_f.size)
+    # diss_estd_out_f = output_data['diss_estd'].astype(np.float32).flatten(order='F')
+    # ffi.memmove(diss_estd_ptr, diss_estd_out_f, 4*diss_estd_out_f.size)
 
     if (spec.grid.rank == 0):
         print('P:', datetime.now().isoformat(timespec='milliseconds'),

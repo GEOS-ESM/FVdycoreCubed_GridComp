@@ -1162,14 +1162,16 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
   logical :: NWAT_TEST
 
   type(ESMF_VM) :: vm
-  integer :: comm
+  integer :: comm, rank, nranks, mpierr
   logical :: halting_mode(5)
+  real :: start, finish
 
 ! Begin
 
   ! MPI communicator
   call ESMF_VMGetCurrent(vm, rc=status)
   call ESMF_VMGet(vm, mpiCommunicator=comm)
+  call MPI_Comm_rank(comm, rank, mpierr)
 
 ! Retrieve the pointer to the state
 ! ---------------------------------
@@ -1720,11 +1722,70 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     if (.not. FV_OFF) then
     call set_domain(FV_Atm(1)%domain)  ! needed for diagnostic output done in fv_dynamics
 
+    call cpu_time(start)
     ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
     ! disable trapping of floating point exceptions temporarily, call the interface
     ! to the Python function and resume trapping
     call ieee_get_halting_mode(ieee_all, halting_mode)
     call ieee_set_halting_mode(ieee_all, .false.)
+
+    call MPI_Comm_size(MPI_COMM_WORLD, nranks, mpierr)
+    do i = 0, nranks-1
+       if (i == rank) then
+          print *, 'F: (before) rank: ', rank
+          print *, 'F: (before) u: ', sum(FV_Atm(1)%u), sum(FV_Atm(1)%v), sum(FV_Atm(1)%w), sum(FV_Atm(1)%delz)
+          print *, 'F: (before) pt: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), sum(FV_Atm(1)%q)
+          print *, 'F: (before) ps: ', &
+               sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
+          print *, 'F: (before) phis: ', sum(FV_Atm(1)%phis), sum(FV_Atm(1)%q_con), sum(FV_Atm(1)%omga)
+          print *, 'F: (before) ua: ', sum(FV_Atm(1)%ua), sum(FV_Atm(1)%va), sum(FV_Atm(1)%uc), sum(FV_Atm(1)%vc)
+          print *, 'F: (before) mfx: ', sum(FV_Atm(1)%mfx), sum(FV_Atm(1)%mfy), sum(FV_Atm(1)%cx), sum(FV_Atm(1)%cy)
+          print *, 'F: (before) diss_est: ', sum(FV_Atm(1)%diss_est)
+       end if
+       call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+    end do
+
+    ! print *, 'F: pt/delp/q: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), sum(FV_Atm(1)%q)
+    ! print *, 'F: ps/pe/pk/peln/pkz: ', &
+    !      sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
+    ! print *, 'F: phis/q_con/omga: ', sum(FV_Atm(1)%phis), sum(FV_Atm(1)%q_con), sum(FV_Atm(1)%omga)
+    ! print *, 'F: ua/va/uc/vc: ', sum(FV_Atm(1)%ua), sum(FV_Atm(1)%va), sum(FV_Atm(1)%uc), sum(FV_Atm(1)%vc)
+    ! print *, 'F: logicals: ', adiabatic, &
+    !      FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%flagstruct%z_tracer, &
+    !      FV_Atm(1)%flagstruct%make_nh, FV_Atm(1)%flagstruct%fv_debug, &
+    !      FV_Atm(1)%flagstruct%reproduce_sum, FV_Atm(1)%flagstruct%do_sat_adj, &
+    !      FV_Atm(1)%flagstruct%do_vort_damp, FV_Atm(1)%flagstruct%rf_fast, &
+    !      FV_Atm(1)%flagstruct%fill
+    ! print *, 'F: dx/dy/dxa/dya/dxc/dyc: ', &
+    !      sum(FV_Atm(1)%gridstruct%dx), sum(FV_Atm(1)%gridstruct%dy), &
+    !      sum(FV_Atm(1)%gridstruct%dxa), sum(FV_Atm(1)%gridstruct%dya), &
+    !      sum(FV_Atm(1)%gridstruct%dxc), sum(FV_Atm(1)%gridstruct%dyc)
+    ! print *, 'F: rdx/rdy/rdxa/rdya/rdxc/rdyc: ', &
+    !      sum(FV_Atm(1)%gridstruct%rdx), sum(FV_Atm(1)%gridstruct%rdy), &
+    !      sum(FV_Atm(1)%gridstruct%rdxa), sum(FV_Atm(1)%gridstruct%rdya), &
+    !      sum(FV_Atm(1)%gridstruct%rdxc), sum(FV_Atm(1)%gridstruct%rdyc)
+    ! print *, 'F: cosa/cosa_s: ', sum(FV_Atm(1)%gridstruct%cosa), sum(FV_Atm(1)%gridstruct%cosa_s)
+    ! print *, 'F: sina_u/v: ', sum(FV_Atm(1)%gridstruct%sina_u), sum(FV_Atm(1)%gridstruct%sina_v)
+    ! print *, 'F: cosa_u/v: ', sum(FV_Atm(1)%gridstruct%cosa_u), sum(FV_Atm(1)%gridstruct%cosa_v)
+    ! print *, 'F: rsin2/rsina: ', sum(FV_Atm(1)%gridstruct%rsin2), sum(FV_Atm(1)%gridstruct%rsina)
+    ! print *, 'F: rsin_u/v: ', sum(FV_Atm(1)%gridstruct%rsin_u), sum(FV_Atm(1)%gridstruct%rsin_v)
+    ! print *, 'F: sin/cos_sg: ', sum( FV_Atm(1)%gridstruct%sin_sg), sum(FV_Atm(1)%gridstruct%cos_sg)
+    ! print *, 'F: area, rarea, rarea_c: ', &
+    !      sum(FV_Atm(1)%gridstruct%area), sum(FV_Atm(1)%gridstruct%rarea), sum(FV_Atm(1)%gridstruct%rarea_c)
+    ! print *, 'F: f0/C: ', sum(FV_Atm(1)%gridstruct%f0), sum(FV_Atm(1)%gridstruct%fC)
+    ! print *, 'F: del6_u/v: ', sum(FV_Atm(1)%gridstruct%del6_u), sum(FV_Atm(1)%gridstruct%del6_v)
+    ! print *, 'F: divg_u/v: ', sum(FV_Atm(1)%gridstruct%divg_u), sum(FV_Atm(1)%gridstruct%divg_v)
+    ! print *, 'F: a/bgrid: ', sum(FV_Atm(1)%gridstruct%agrid), sum(FV_Atm(1)%gridstruct%grid)
+    ! print *, 'F: a11/a12/a21/a22: ', &
+    !      sum(FV_Atm(1)%gridstruct%a11), sum(FV_Atm(1)%gridstruct%a12), &
+    !      sum(FV_Atm(1)%gridstruct%a21), sum(FV_Atm(1)%gridstruct%a22)
+    ! print *, 'F: edge_e/w/n/s: ', &
+    !      sum(FV_Atm(1)%gridstruct%edge_e), sum(FV_Atm(1)%gridstruct%edge_w), &
+    !      sum(FV_Atm(1)%gridstruct%edge_n), sum(FV_Atm(1)%gridstruct%edge_s)
+    ! print *, 'F: nested, stretched_grid, da_min, da_min_c: ', &
+    !      FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%stretched_grid, &
+    !      FV_Atm(1)%gridstruct%da_min, FV_Atm(1)%gridstruct%da_min_c
+
     call fv_dynamics_interface_f( &
          comm, &
          FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, &
@@ -1790,7 +1851,10 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%stretched_grid, &
          FV_Atm(1)%gridstruct%da_min, FV_Atm(1)%gridstruct%da_min_c)
     call ieee_set_halting_mode(ieee_all, halting_mode)
+    call cpu_time(finish)
+    print *, rank, ', fv_dynamics_interface_f: time taken = ', finish - start, 's'
 
+    call cpu_time(start)
     call fv_dynamics(FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng,   &
                      myDT, FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, kappa,   &
                      cp, zvir, FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
@@ -1801,6 +1865,25 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
                      FV_Atm(1)%ak, FV_Atm(1)%bk, FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy,    &
                      FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
                      FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, FV_Atm(1)%diss_est, time_total)
+    call cpu_time(finish)
+    print *, rank, ', fv_dynamics: time taken = ', finish - start, 's'
+    call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
+    call MPI_Comm_size(MPI_COMM_WORLD, nranks, mpierr)
+    do i = 0, nranks-1
+       if (i == rank) then
+          print *, 'F: (after) rank: ', rank
+          print *, 'F: (after) u: ', sum(FV_Atm(1)%u), sum(FV_Atm(1)%v), sum(FV_Atm(1)%w), sum(FV_Atm(1)%delz)
+          print *, 'F: (after) pt: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), sum(FV_Atm(1)%q)
+          print *, 'F: (after) ps: ', &
+               sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
+          print *, 'F: (after) phis: ', sum(FV_Atm(1)%phis), sum(FV_Atm(1)%q_con), sum(FV_Atm(1)%omga)
+          print *, 'F: (after) ua: ', sum(FV_Atm(1)%ua), sum(FV_Atm(1)%va), sum(FV_Atm(1)%uc), sum(FV_Atm(1)%vc)
+          print *, 'F: (after) mfx: ', sum(FV_Atm(1)%mfx), sum(FV_Atm(1)%mfy), sum(FV_Atm(1)%cx), sum(FV_Atm(1)%cy)
+          print *, 'F: (after) diss_est: ', sum(FV_Atm(1)%diss_est)
+       end if
+       call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+    end do
 
     if ( FV_Atm(1)%flagstruct%fv_sg_adj > 0 ) then
          allocate ( u_dt(isd:ied,jsd:jed,npz) )

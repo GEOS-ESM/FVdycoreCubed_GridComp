@@ -46,6 +46,15 @@ program main
      write(date_time_s, iso8601) dt(1:3), dt(5:8)
      write(*, '(a2,1x,a23,1x,a27)') 'F:', date_time_s, '--calling fortran interface'
   end if
+
+  scalars%kord_tm = -9
+  scalars%tau = 0.0
+
+  if (rank == 0) print*, 'rank, sum(u), sum(v), sum(w), sum(delz)'
+  call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+  print *, rank, sum(arr%u), sum (arr%v), sum(arr%w), sum(arr%delz)
+  call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
   call fv_dynamics_interface_f( &
        MPI_COMM_WORLD, &
        dim%npx, dim%npy, dim%npz, &
@@ -87,6 +96,11 @@ program main
        arr%agrid, arr%bgrid, arr%a11, arr%a12, arr%a21, arr%a22, &
        arr%edge_e, arr%edge_w, arr%edge_n, arr%edge_s, &
        arr%nested, arr%stretched_grid, arr%da_min, arr%da_min_c)
+
+  if (rank == 0) print*, 'rank, sum(u), sum(v), sum(w), sum(delz)'
+  call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+  print *, rank, sum(arr%u), sum (arr%v), sum(arr%w), sum(arr%delz)
+  call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
   call MPI_Finalize(mpierr)
 
