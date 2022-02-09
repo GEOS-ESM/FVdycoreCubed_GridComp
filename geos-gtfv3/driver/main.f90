@@ -6,7 +6,7 @@ program main
   use domain_dim_mod, only: DomainDim_T
   use input_scalars_mod, only: InputScalars_T
   use input_arrays_mod, only: InputArrays_T
-  use fv_dynamics_interface_mod, only: fv_dynamics_interface_f
+  use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
 
   implicit none
 
@@ -55,7 +55,7 @@ program main
   print *, rank, sum(arr%u), sum (arr%v), sum(arr%w), sum(arr%delz)
   call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
-  call fv_dynamics_interface_f( &
+  call geos_gtfv3_interface_f( &
        MPI_COMM_WORLD, &
        dim%npx, dim%npy, dim%npz, &
        bd%is, bd%ie, bd%js, bd%je, &

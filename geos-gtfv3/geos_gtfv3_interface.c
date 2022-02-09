@@ -1,10 +1,9 @@
-
 #include <stdio.h>
 #include <time.h>
 #include "mpi.h"
-#include "fv_dynamics_interface_py.h"
+#include "geos_gtfv3_interface_py.h"
 
-void fv_dynamics_interface_c(
+void geos_gtfv3_interface_c(
     // input
     MPI_Fint comm_f,
     int npx, int npy, int npz,
@@ -63,7 +62,7 @@ void fv_dynamics_interface_c(
     MPI_Comm_rank(comm_c, &rank);
     if (rank == 0) printf("C: %s.xxx --calling python interface\n", buf);
 
-    fv_dynamics_interface_py(
+    geos_gtfv3_interface_py(
         comm_c,
         npx, npy, npz,
         is, ie, js, je,

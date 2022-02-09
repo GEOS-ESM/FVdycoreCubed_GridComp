@@ -13,8 +13,10 @@ find_package(MPI REQUIRED)
 set(exec dyn-driver)
 
 add_custom_target(
-  fv_dynamics_interface_py_h
-  COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../fv_dynamics_interface.py)
+  geos_gtfv3_interface_py_h
+  # mpirun -np 1
+  COMMAND ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1
+  ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../geos_gtfv3_interface.py)
 
 add_executable(
   ${exec}
@@ -22,16 +24,16 @@ add_executable(
   input/domain_dim.f90
   input/input_scalars.f90
   input/input_arrays.f90
-  ../fv_dynamics_interface.c
-  ../fv_dynamics_interface.f90
+  ../geos_gtfv3_interface.c
+  ../geos_gtfv3_interface.f90
   main.f90)
-add_dependencies(${exec} fv_dynamics_interface_py_h)
+add_dependencies(${exec} geos_gtfv3_interface_py_h)
 target_link_libraries(${exec} MPI::MPI_Fortran MPI::MPI_C)
 target_include_directories(${exec} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(${exec} -L${CMAKE_CURRENT_BINARY_DIR} fv_dynamics_interface_py)
+target_link_libraries(${exec} -L${CMAKE_CURRENT_BINARY_DIR} geos_gtfv3_interface_py)
 
 set_property(
   TARGET ${exec}
   APPEND
-  PROPERTY ADDITIONAL_CLEAN_FILES fv_dynamics_interface_py.c fv_dynamics_interface_py.h fv_dynamics_interface_py.o libfv_dynamics_interface_py.so
+  PROPERTY ADDITIONAL_CLEAN_FILES geos_gtfv3_interface_py.c geos_gtfv3_interface_py.h geos_gtfv3_interface_py.o libgeos_gtfv3_interface_py.so
 )

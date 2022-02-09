@@ -1,7 +1,7 @@
 import cffi
 from mpi4py import MPI
 
-TMPFILEBASE = 'fv_dynamics_interface_py'
+TMPFILEBASE = 'geos_gtfv3_interface_py'
 
 ffi = cffi.FFI()
 
@@ -15,9 +15,12 @@ source = '''
 from {} import ffi
 from datetime import datetime
 from mpi4py import MPI
-from fv_dynamics import fv_dynamics_top_level_function
+from f_py_conversion import fortran_input_data_to_numpy
+from f_py_conversion import fortran_grid_data_to_numpy
+from f_py_conversion import numpy_output_data_to_fortran
+from geos_gtfv3 import geos_gtfv3
 @ffi.def_extern()
-def fv_dynamics_interface_py(
+def geos_gtfv3_interface_py(
     comm_c,
     npx, npy, npz,
     is_, ie, js, je,
@@ -51,11 +54,43 @@ def fv_dynamics_interface_py(
     comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
     comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
 
-    if comm_py.Get_rank() == 0:
+    rank = comm_py.Get_rank()
+
+    if rank == 0:
         print('P:', datetime.now().isoformat(timespec='milliseconds'), '--in cffi wrapper')
 
-    # Call top-level function for fv_dynamics
-    fv_dynamics_top_level_function(
+    # Convert Fortran arrays to NumPy
+    fv3_input_data = fortran_input_data_to_numpy(
+        npx, npy, npz,
+        is_, ie, js, je, isd, ied, jsd, jed,
+        ncnst,
+        # input/output arrays
+        u, v, w, delz,
+        pt, delp, q,
+        ps, pe, pk, peln, pkz,
+        phis, q_con, omga,
+        ua, va, uc, vc,
+        mfx, mfy, cx, cy, diss_est)
+
+    grid_data = fortran_grid_data_to_numpy(
+        npx, npy, npz,
+        is_, ie, js, je, isd, ied, jsd, jed,
+        # input arrays - ak/bk
+        ak, bk,
+        # input arrays - grid data
+        dx, dy, dxa, dya, dxc, dyc, rdx, rdy, rdxa, rdya, rdxc, rdyc,
+        cosa, cosa_s, sina_u, sina_v, cosa_u, cosa_v, rsin2, rsina, rsin_u, rsin_v,
+        sin_sg, cos_sg,
+        area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v,
+        agrid, bgrid, a11, a12, a21, a22,
+        edge_e, edge_w, edge_n, edge_s)
+
+    if rank == 0:
+        print('P:', datetime.now().isoformat(timespec='milliseconds'),
+              '--converted Fortran arrays to NumPy', flush=True)
+
+    # Call top-level function for gtFV3
+    gtfv3_output_data = geos_gtfv3(
         comm_py,
         npx, npy, npz,
         is_, ie, js, je,
@@ -69,23 +104,26 @@ def fv_dynamics_interface_py(
         nord, kord_tm, kord_tr, kord_wz, kord_mt,
         d_ext, beta, vtdm4, ke_bg, d_con, d2_bg, d2_bg_k1, d2_bg_k2,
         p_fac, a_imp, dddmp, d4_bg, rf_cutoff, tau, consv_te,
-        u, v, w, delz,
-        pt, delp, q,
-        ps, pe, pk, peln, pkz,
-        phis, q_con, omga,
-        ua, va, uc, vc,
-        ak, bk,
-        mfx, mfy, cx, cy, diss_est,
-        dx, dy, dxa, dya, dxc, dyc, rdx, rdy, rdxa, rdya, rdxc, rdyc,
-        cosa, cosa_s, sina_u, sina_v, cosa_u, cosa_v, rsin2, rsina, rsin_u, rsin_v,
-        sin_sg, cos_sg,
-        area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v,
-        agrid, bgrid, a11, a12, a21, a22,
-        edge_e, edge_w, edge_n, edge_s, nested, stretched_grid, da_min, da_min_c)
+        fv3_input_data, grid_data,
+        nested, stretched_grid, da_min, da_min_c)
+
+    # Convert NumPy arrays back to Fortran
+    # numpy_output_data_to_fortran(
+    #     gtfv3_output_data,
+    #     u, v, w, delz,
+    #     pt, delp, q,
+    #     ps, pe, pk, peln, pkz,
+    #     phis, q_con, omga,
+    #     ua, va, uc, vc,
+    #     mfx, mfy, cx, cy, diss_est)
+
+    if rank == 0:
+        print('P:', datetime.now().isoformat(timespec='milliseconds'),
+              '--converted NumPy arrays to Fortran', flush=True)
 '''.format(TMPFILEBASE, _mpi_comm_t)
 
 header = '''
-extern void fv_dynamics_interface_py(
+extern void geos_gtfv3_interface_py(
     {} comm_c,
     int npx, int npy, int npz,
     int is_, int ie, int js, int je,

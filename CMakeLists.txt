@@ -6,26 +6,26 @@ find_package(MPI REQUIRED)
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 # Set up some variables in case names change
-set(FVDYN_INTERFACE_LIBRARY     ${CMAKE_CURRENT_BINARY_DIR}/libfv_dynamics_interface_py.so)
-set(FVDYN_INTERFACE_HEADER_FILE ${CMAKE_CURRENT_BINARY_DIR}/fv_dynamics_interface_py.h)
-set(FVDYN_INTERFACE_SRCS        ${CMAKE_CURRENT_SOURCE_DIR}/fv_dynamics_interface.py)
+set(GEOS_GTFV3_INTERFACE_LIBRARY     ${CMAKE_CURRENT_BINARY_DIR}/libgeos_gtfv3_interface_py.so)
+set(GEOS_GTFV3_INTERFACE_HEADER_FILE ${CMAKE_CURRENT_BINARY_DIR}/geos_gtfv3_interface_py.h)
+set(GEOS_GTFV3_INTERFACE_SRCS        ${CMAKE_CURRENT_SOURCE_DIR}/geos-gtfv3/geos_gtfv3_interface.py)
 
 # This command creates the shared object library from Python
 add_custom_command(
-  OUTPUT ${FVDYN_INTERFACE_LIBRARY}
+  OUTPUT ${GEOS_GTFV3_INTERFACE_LIBRARY}
   # Note below is essentially:
   #  mpirun -np 1 python file
   # but we use the CMake options as much as we can for flexibility
-  COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ${Python3_EXECUTABLE} ${FVDYN_INTERFACE_SRCS}
-  BYPRODUCTS ${FVDYN_INTERFACE_HEADER_FILE}
+  COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ${Python3_EXECUTABLE} ${GEOS_GTFV3_INTERFACE_SRCS}
+  BYPRODUCTS ${GEOS_GTFV3_INTERFACE_HEADER_FILE}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  MAIN_DEPENDENCY ${FVDYN_INTERFACE_SRCS}
-  COMMENT "Building fvdynamics interface library with Python"
+  MAIN_DEPENDENCY ${GEOS_GTFV3_INTERFACE_SRCS}
+  COMMENT "Building gtfv3 interface library with Python"
   VERBATIM
   )
 
 # This creates a target we can use for dependencies and post build
-add_custom_target(generate_python_interface_library DEPENDS ${FVDYN_INTERFACE_LIBRARY})
+add_custom_target(generate_python_interface_library DEPENDS ${GEOS_GTFV3_INTERFACE_LIBRARY})
 
 # Because of the weird hacking of INTERFACE libraries below, we cannot
 # use the "usual" CMake calls to install() the .so. I think it's because
@@ -39,31 +39,31 @@ add_custom_command(TARGET generate_python_interface_library
   # of a race condition (if install/lib/ isn't mkdir'd first)
   COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_INSTALL_PREFIX}/lib
   # Now we copy the file (if different...though not sure if this is useful)
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FVDYN_INTERFACE_LIBRARY}" ${CMAKE_INSTALL_PREFIX}/lib
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${GEOS_GTFV3_INTERFACE_LIBRARY}" ${CMAKE_INSTALL_PREFIX}/lib
   )
 
 # We use INTERFACE libraries to create a sort of "fake" target library we can use
 # to make libFVdycoreCubed_GridComp.a depend on. It seems to work!
-add_library(fv_dynamics_interface_py INTERFACE)
+add_library(geos_gtfv3_interface_py INTERFACE)
 
 # The target_include_directories bits were essentially stolen from the esma_add_library
 # code...
-target_include_directories(fv_dynamics_interface_py INTERFACE
+target_include_directories(geos_gtfv3_interface_py INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}> # stubs
   # modules and copied *.h, *.inc
   $<BUILD_INTERFACE:${esma_include}/${this}>
   $<INSTALL_INTERFACE:include/${this}>
   )
-target_link_libraries(fv_dynamics_interface_py INTERFACE ${FVDYN_INTERFACE_LIBRARY})
+target_link_libraries(geos_gtfv3_interface_py INTERFACE ${GEOS_GTFV3_INTERFACE_LIBRARY})
 
 # This makes sure the library is built first
-add_dependencies(fv_dynamics_interface_py generate_python_interface_library)
+add_dependencies(geos_gtfv3_interface_py generate_python_interface_library)
 
 # This bit is to resolve an issue and Google told me to do this. I'm not
 # sure that the LIBRARY DESTINATION bit actually does anything since
 # this is using INTERFACE
-install(TARGETS fv_dynamics_interface_py
+install(TARGETS geos_gtfv3_interface_py
   EXPORT ${PROJECT_NAME}-targets
   LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
   )
@@ -83,8 +83,8 @@ set (srcs
   CubeToLatLon.F90 
   CubeGridPrototype.F90
   GEOS_FV3_Utilities.F90
-  fv_dynamics_interface.f90
-  fv_dynamics_interface.c
+  geos-gtfv3/geos_gtfv3_interface.f90
+  geos-gtfv3/geos_gtfv3_interface.c
   )
 
 if (ESMA_USE_GFE_NAMESPACE)
@@ -98,7 +98,7 @@ esma_add_library (${this}
   SUBCOMPONENTS @fvdycore
   DEPENDENCIES ${dependencies}
   DEPENDENCIES ${GFDL}
-  DEPENDENCIES fv_dynamics_interface_py # Now we make the main library depend on the Python library
+  DEPENDENCIES geos_gtfv3_interface_py # Now we make the main library depend on the Python library
   INCLUDES ${INC_ESMF})
 
 if (FV_PRECISION STREQUAL R4)

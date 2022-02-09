@@ -36,7 +36,7 @@ module FV_StateMod
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
 
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
-   use fv_dynamics_interface_mod, only: fv_dynamics_interface_f
+   use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
 
 implicit none
 private
@@ -1734,7 +1734,10 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
        if (i == rank) then
           print *, 'F: (before) rank: ', rank
           print *, 'F: (before) u: ', sum(FV_Atm(1)%u), sum(FV_Atm(1)%v), sum(FV_Atm(1)%w), sum(FV_Atm(1)%delz)
-          print *, 'F: (before) pt: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), sum(FV_Atm(1)%q)
+          print *, 'F: (before) pt: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), &
+               sum(FV_Atm(1)%q(:,:,:,1)), sum(FV_Atm(1)%q(:,:,:,2)), sum(FV_Atm(1)%q(:,:,:,3)), &
+               sum(FV_Atm(1)%q(:,:,:,4)), sum(FV_Atm(1)%q(:,:,:,5)), sum(FV_Atm(1)%q(:,:,:,6)), &
+               sum(FV_Atm(1)%q(:,:,:,7))
           print *, 'F: (before) ps: ', &
                sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
           print *, 'F: (before) phis: ', sum(FV_Atm(1)%phis), sum(FV_Atm(1)%q_con), sum(FV_Atm(1)%omga)
@@ -1786,7 +1789,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     !      FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%stretched_grid, &
     !      FV_Atm(1)%gridstruct%da_min, FV_Atm(1)%gridstruct%da_min_c
 
-    call fv_dynamics_interface_f( &
+    call geos_gtfv3_interface_f( &
          comm, &
          FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, &
          FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
@@ -1852,7 +1855,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          FV_Atm(1)%gridstruct%da_min, FV_Atm(1)%gridstruct%da_min_c)
     call ieee_set_halting_mode(ieee_all, halting_mode)
     call cpu_time(finish)
-    print *, rank, ', fv_dynamics_interface_f: time taken = ', finish - start, 's'
+    print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
 
     call cpu_time(start)
     call fv_dynamics(FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng,   &
@@ -1874,7 +1877,10 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
        if (i == rank) then
           print *, 'F: (after) rank: ', rank
           print *, 'F: (after) u: ', sum(FV_Atm(1)%u), sum(FV_Atm(1)%v), sum(FV_Atm(1)%w), sum(FV_Atm(1)%delz)
-          print *, 'F: (after) pt: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), sum(FV_Atm(1)%q)
+          print *, 'F: (after) pt: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), &
+               sum(FV_Atm(1)%q(:,:,:,1)), sum(FV_Atm(1)%q(:,:,:,2)), sum(FV_Atm(1)%q(:,:,:,3)), &
+               sum(FV_Atm(1)%q(:,:,:,4)), sum(FV_Atm(1)%q(:,:,:,5)), sum(FV_Atm(1)%q(:,:,:,6)), &
+               sum(FV_Atm(1)%q(:,:,:,7))
           print *, 'F: (after) ps: ', &
                sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
           print *, 'F: (after) phis: ', sum(FV_Atm(1)%phis), sum(FV_Atm(1)%q_con), sum(FV_Atm(1)%omga)
