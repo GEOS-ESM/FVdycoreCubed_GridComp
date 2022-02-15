@@ -20,10 +20,13 @@ def fort_to_numpy(fptr, dim):
         TYPEMAP[ftype],
     ).reshape(tuple(reversed(dim))).transpose().astype(np.float64)
 
+
+
 def fortran_input_data_to_numpy(
         npx, npy, npz,
         is_, ie, js, je, isd, ied, jsd, jed,
-        ncnst,
+        ncnst, consv_te, bdt, ptop, n_split, ks,
+        ak_ptr, bk_ptr,
         # input/output arrays
         u_ptr, v_ptr, w_ptr, delz_ptr,
         pt_ptr, delp_ptr, q_ptr,
@@ -34,13 +37,20 @@ def fortran_input_data_to_numpy(
     '''
     Convert Fortran arrays pointed to by *_ptr to NumPy arrays
     Input: Pointers to Fortran arrays *_ptr
-    Output: dict where dict[key] is a NumPy array
+    Output: dict where dict[key] is a NumPy array plus consv_te etc.
     '''
-    
+
     # 'q' requires special handling
     q = fort_to_numpy(q_ptr, (ied-isd+1, jed-jsd+1, npz, ncnst))
 
     inout_data = {
+        'do_adiabatic_init': True, # REQUIRED (TODO???)
+        'consv_te': consv_te, 'bdt': bdt, 'ptop': ptop,
+        'n_split': n_split, 'ks': ks,
+
+        'ak': fort_to_numpy(ak_ptr, (npz+1,)),
+        'bk': fort_to_numpy(bk_ptr, (npz+1,)),
+
         'u': fort_to_numpy(u_ptr, (ied-isd+1, jed+1-jsd+1, npz)),
         'v': fort_to_numpy(v_ptr, (ied+1-isd+1, jed-jsd+1, npz)),
         'w': fort_to_numpy(w_ptr, (ied-isd+1, jed-jsd+1, npz)),
@@ -85,8 +95,7 @@ def fortran_input_data_to_numpy(
 def fortran_grid_data_to_numpy(
         npx, npy, npz,
         is_, ie, js, je, isd, ied, jsd, jed,
-        # input arrays - ak/bk
-        ak_ptr, bk_ptr,
+        nested_int, stretched_grid_int, da_min, da_min_c,
         # input arrays - grid data
         dx_ptr, dy_ptr, dxa_ptr, dya_ptr, dxc_ptr, dyc_ptr,
         rdx_ptr, rdy_ptr, rdxa_ptr, rdya_ptr, rdxc_ptr, rdyc_ptr,
@@ -112,8 +121,13 @@ def fortran_grid_data_to_numpy(
     bgrid = fort_to_numpy(bgrid_ptr, (ied+1-isd+1, jed+1-jsd+1, 2))
 
     grid_data = {
-        'ak': fort_to_numpy(ak_ptr, (npz+1,)),
-        'bk': fort_to_numpy(bk_ptr, (npz+1,)),
+        'npx': npx, 'npy': npy, 'npz': npz,
+        'is_': is_, 'ie': ie, 'js': js, 'je': je,
+        'isd': isd, 'ied': ied, 'jsd': jsd, 'jed': jed,
+
+        'nested': False if nested_int == 0 else True,
+        'stretched_grid': False if stretched_grid_int == 0 else True,
+        'da_min': da_min, 'da_min_c': 0.0,
 
         'dx': fort_to_numpy(dx_ptr, (ied-isd+1, jed+1-jsd+1)),
         'dy': fort_to_numpy(dy_ptr, (ied+1-isd+1, jed-jsd+1)),
@@ -166,7 +180,7 @@ def fortran_grid_data_to_numpy(
         'a12': fort_to_numpy(a12_ptr, (ie+1-(is_-1)+1, je+1-(js-1)+1)),
         'a21': fort_to_numpy(a21_ptr, (ie+1-(is_-1)+1, je+1-(js-1)+1)),
         'a22': fort_to_numpy(a22_ptr, (ie+1-(is_-1)+1, je+1-(js-1)+1)),
-        
+
         'edge_e': fort_to_numpy(edge_e_ptr, (npy,)),
         'edge_w': fort_to_numpy(edge_w_ptr, (npy,)),
         'edge_n': fort_to_numpy(edge_n_ptr, (npx,)),
@@ -182,7 +196,7 @@ def numpy_output_data_to_fortran(
         phis_ptr, q_con_ptr, omga_ptr,
         ua_ptr, va_ptr, uc_ptr, vc_ptr,
         mfxd_ptr, mfyd_ptr, cxd_ptr, cyd_ptr, diss_estd_ptr):
-    
+
     # NumPy -> Fortran
     u_out_f = output_data['u'].astype(np.float32).flatten(order='F')
     ffi.memmove(u_ptr, u_out_f, 4*u_out_f.size)

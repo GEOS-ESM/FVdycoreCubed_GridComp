@@ -1,14 +1,9 @@
-import numpy as np
-
-import gt4py
-import fv3core
-import fv3core._config as spec
-import fv3core.testing
-import fv3gfs.util as util
-
 from datetime import datetime
-
-# import h5py
+from f_py_conversion import fortran_input_data_to_numpy
+from f_py_conversion import numpy_output_data_to_fortran
+import geos_gtfv3_initialize
+from geos_gtfv3_run import geos_gtfv3_run
+from geos_gtfv3_debug import write_sum_of_untranslated_arrays
 
 def geos_gtfv3(
         comm,
@@ -16,223 +11,118 @@ def geos_gtfv3(
         is_, ie, js, je,
         isd, ied, jsd, jed,
         bdt, nq_tot, ng, ptop, ks, layout_1, layout_2,
-        adiabatic_int,
-        hydrostatic_int, z_tracer_int, make_nh_int, fv_debug_int,
-        reproduce_sum_int, do_sat_adj_int, do_vort_damp_int, rf_fast_int, fill_int,
+        adiabatic,
+        hydrostatic, z_tracer, make_nh, fv_debug,
+        reproduce_sum, do_sat_adj, do_vort_damp, rf_fast, fill,
         ncnst, n_split, k_split, fv_sg_adj, n_sponge, n_zfilter, nwat,
         hord_tr, hord_tm, hord_dp, hord_mt, hord_vt,
         nord, kord_tm, kord_tr, kord_wz, kord_mt,
         d_ext, beta, vtdm4, ke_bg, d_con, d2_bg, d2_bg_k1, d2_bg_k2,
         p_fac, a_imp, dddmp, d4_bg, rf_cutoff, tau, consv_te,
-        fv3_input_data, grid_data,
-        nested_int, stretched_grid_int, da_min, da_min_c):
+        u, v, w, delz,
+        pt, delp, q,
+        ps, pe, pk, peln, pkz,
+        phis, q_con, omga,
+        ua, va, uc, vc,
+        ak, bk,
+        mfx, mfy, cx, cy, diss_est,
+        dx, dy, dxa, dya, dxc, dyc, rdx, rdy, rdxa, rdya, rdxc, rdyc,
+        cosa, cosa_s, sina_u, sina_v, cosa_u, cosa_v, rsin2, rsina, rsin_u, rsin_v,
+        sin_sg, cos_sg,
+        area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v,
+        agrid, bgrid, a11, a12, a21, a22,
+        edge_e, edge_w, edge_n, edge_s, nested, stretched_grid, da_min, da_min_c):
+    
+    BACKEND = 'gtcuda'
 
     rank = comm.Get_rank()
-    backend = 'gtx86'
-    if (rank == 0):
-        print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--in top level function with backend', backend, flush=True)
 
-    nranks = comm.Get_size()
-    for i in range(nranks):
-        if i == rank:
-            print('P: rank:', rank, flush=True)
-            print('P: q:',
-                  np.sum(fv3_input_data['qvapor']),
-                  np.sum(fv3_input_data['qliquid']),
-                  np.sum(fv3_input_data['qice']),
-                  np.sum(fv3_input_data['qrain']),
-                  np.sum(fv3_input_data['qsnow']),
-                  np.sum(fv3_input_data['qgraupel']),
-                  np.sum(fv3_input_data['qcld']),
-                  flush=True)
-        comm.Barrier()
-
-    fv3core.set_backend(backend)
-    fv3core.set_rebuild(False)
-    fv3core.set_validate_args(True)
-    # fv3core.utils.global_config.set_do_halo_exchange(True)
-
-    spec.set_namelist_from_dict({
-        'npx': npx, 'npy': npy, 'npz': npz,
-        'layout': [layout_1, layout_2],
-        'adiabatic': False if adiabatic_int == 0 else True,
-        'hydrostatic': False if hydrostatic_int == 0 else True,
-        'z_tracer': False if z_tracer_int == 0 else True,
-        'make_nh': False if make_nh_int == 0 else True,
-        'fv_debug': False if fv_debug_int == 0 else True,
-        # reproduce_sum
-        'do_sat_adj': False if do_sat_adj_int == 0 else True,
-        'do_vort_damp': False if do_vort_damp_int == 0 else True,
-        'rf_fast': False if rf_fast_int == 0 else True,
-        'fill': False if fill_int == 0 else True,
-        # 'ncnst': ncnst,
-        'n_split': n_split,
-        'k_split': k_split,
-        'fv_sg_adj': fv_sg_adj,
-        'n_sponge': n_sponge,
-        'n_zfilter': n_zfilter,
-        'nwat': nwat,
-        'hord_tr': hord_tr,
-        'hord_tm': hord_tm,
-        'hord_dp': hord_dp,
-        'hord_mt': hord_mt,
-        'hord_vt': hord_vt,
-        'nord': nord,
-        'kord_tm': kord_tm,
-        'kord_tr': kord_tr,
-        'kord_wz': kord_wz,
-        'kord_mt': kord_mt,
-        'd_ext': d_ext,
-        'beta': beta,
-        'vtdm4': vtdm4,
-        'ke_bg': ke_bg,
-        'd_con': d_con,
-        'd2_bg': d2_bg,
-        'd2_bg_k1': d2_bg_k1,
-        'd2_bg_k2': d2_bg_k2,
-        'p_fac': p_fac,
-        'a_imp': a_imp,
-        'dddmp': dddmp,
-        'd4_bg': d4_bg,
-        'rf_cutoff': rf_cutoff,
-        'tau': tau,
-        'delt_max': 0.002}) # namelist
-
-    layout = spec.namelist.layout
-    partitioner = util.CubedSpherePartitioner(util.TilePartitioner(layout))
-    communicator = util.CubedSphereCommunicator(comm, partitioner)
-
-    # Create dicts of input and grid data
-    fv3_input_data.update({
-        'ak': grid_data['ak'], 'bk': grid_data['bk'],
-        'do_adiabatic_init': True, # Has to be True
-        'consv_te': consv_te, 'bdt': bdt, 'ptop': ptop,
-        'n_split': n_split, # Need n_split here as well
-        'ks': ks, 'comm': communicator}) # fv3_input_data
-    grid_data.update({
-        'npx': npx, 'npy': npy, 'npz': npz,
-        'is_': is_, 'ie': ie, 'js': js, 'je': je,
-        'isd': isd, 'ied': ied, 'jsd': jsd, 'jed': jed,
-        'nested': False if nested_int == 0 else True,
-        'stretched_grid': False if stretched_grid_int == 0 else True,
-        'da_min': da_min, 'da_min_c': 0.0,}) # grid_data
     if rank == 0:
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--created input and grid data', flush=True)
+              '--in top level geos-gtfv3, backend:', BACKEND, flush=True)
 
-    # Create grid
-    grid = fv3core.testing.TranslateGrid(grid_data, comm.Get_rank()).python_grid()
+    # Initialize namelist - set global var spec
+    # This function gets exercised only the first timestep
+    geos_gtfv3_initialize.initialize_namelist(
+        npx, npy, npz, layout_1, layout_2,
+        adiabatic, hydrostatic, z_tracer,
+        do_sat_adj, do_vort_damp, rf_fast, fill,
+        n_split, k_split, fv_sg_adj, n_sponge, n_zfilter, nwat,
+        hord_tr, hord_tm, hord_dp, hord_mt, hord_vt,
+        nord, kord_tm, kord_tr, kord_wz, kord_mt,
+        d_ext, beta, vtdm4, ke_bg, d_con, d2_bg, d2_bg_k1, d2_bg_k2,
+        p_fac, a_imp, dddmp, d4_bg, rf_cutoff, tau)
+    assert geos_gtfv3_initialize.spec is not None
+
     if rank == 0:
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--translated data', flush=True)
-    spec.set_grid(grid)
+              '--created namelist', flush=True)
+
+    # Convert Fortran arrays to NumPy
+    # This function gets exercised at every timestep
+    fv3_input_data = fortran_input_data_to_numpy(
+        npx, npy, npz,
+        is_, ie, js, je, isd, ied, jsd, jed,
+        ncnst, consv_te, bdt, ptop, n_split, ks,
+        ak, bk,
+        # input/output arrays
+        u, v, w, delz,
+        pt, delp, q,
+        ps, pe, pk, peln, pkz,
+        phis, q_con, omga,
+        ua, va, uc, vc,
+        mfx, mfy, cx, cy, diss_est)
+    # write_sum_of_untranslated_arrays(comm, fv3_input_data)
+
     if rank == 0:
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--created grid', flush=True)
+              '--created input data', flush=True)
 
-    # Create state
-    driver_object = fv3core.testing.TranslateFVDynamics([grid])
-    state = driver_object.state_from_inputs(fv3_input_data)
+    # Initialize dycore - set global vars driver_object and dycore
+    # This function gets exercised only the first timestep
+    geos_gtfv3_initialize.initialize_dycore(
+        BACKEND, comm,
+        npx, npy, npz,
+        is_, ie, js, je, isd, ied, jsd, jed,
+        # grid data
+        dx, dy, dxa, dya, dxc, dyc,
+        rdx, rdy, rdxa, rdya, rdxc, rdyc,
+        cosa, cosa_s, sina_u, sina_v,
+        cosa_u, cosa_v, rsin2, rsina, rsin_u, rsin_v,
+        sin_sg, cos_sg,
+        area, rarea, rarea_c, f0, fC,
+        del6_u, del6_v, divg_u, divg_v,
+        agrid, bgrid, a11, a12, a21, a22,
+        edge_e, edge_w, edge_n, edge_s,
+        nested, stretched_grid, da_min, da_min_c,
+        # input data
+        fv3_input_data)
+    assert geos_gtfv3_initialize.driver_object is not None, 'driver_object is None'
+    assert geos_gtfv3_initialize.dycore is not None, 'dycore is None'
+
     if rank == 0:
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--created state', flush=True)
+              '--initialized dycore', flush=True)
 
-    # Instantiate DynamicalCore
-    dycore = fv3core.DynamicalCore(
-        communicator,
-        grid_data=spec.grid.grid_data,
-        grid_indexing=spec.grid.grid_indexing,
-        damping_coefficients=spec.grid.damping_coefficients,
-        config=spec.namelist.dynamical_core,
-        ak=state["atmosphere_hybrid_a_coordinate"],
-        bk=state["atmosphere_hybrid_b_coordinate"],
-        phis=state["surface_geopotential"],)
+    # Run gtFV3
+    gtfv3_output_data = geos_gtfv3_run(
+        comm,
+        geos_gtfv3_initialize.spec,
+        geos_gtfv3_initialize.driver_object,
+        geos_gtfv3_initialize.dycore,
+        fv3_input_data)
+    # write_sum_of_untranslated_arrays(comm, gtfv3_output_data)
+
+    # Convert NumPy arrays back to Fortran
+    numpy_output_data_to_fortran(
+        gtfv3_output_data,
+        u, v, w, delz,
+        pt, delp, q,
+        ps, pe, pk, peln, pkz,
+        phis, q_con, omga,
+        ua, va, uc, vc,
+        mfx, mfy, cx, cy, diss_est)
+
     if rank == 0:
-        print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--instantiated DynamicalCore', flush=True)
-
-    # # Instantiate DryConvectiveAdjustment
-    # if spec.namelist.fv_sg_adj > 0:
-    #     fv_subgrid_z = fv3core.DryConvectiveAdjustment(
-    #         spec.grid.grid_indexing,
-    #         spec.namelist.nwat,
-    #         spec.namelist.fv_sg_adj,
-    #         spec.namelist.n_sponge,
-    #         spec.namelist.hydrostatic,)
-    #     if (spec.grid.rank == 0):
-    #         print('P:', datetime.now().isoformat(timespec='milliseconds'),
-    #               '--instantiated DryConvectiveAdjustment', flush=True)
-
-    # Run a single timestep of DynamicalCore
-    dycore.step_dynamics(
-        state,
-        fv3_input_data['consv_te'],
-        fv3_input_data['do_adiabatic_init'],
-        fv3_input_data['bdt'],
-        fv3_input_data['ptop'],
-        fv3_input_data['n_split'],
-        fv3_input_data['ks'])
-    if (spec.grid.rank == 0):
-        print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--ran DynamicalCore::step_dynamics', flush=True)
-
-    # Retrieve output data from state
-    gtfv3_output_data = driver_object.outputs_from_state(state)
-    if rank == 0:
-        print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--retrieved output data from state', flush=True)
-        # hf = h5py.File('output.h5', 'w')
-        # for var in gtfv3_output_data:
-        #     hf.create_dataset(var, data=gtfv3_output_data[var])
-        # hf.close()
-
-    nranks = comm.Get_size()
-    for i in range(nranks):
-        if i == rank:
-            print('P: rank:', rank, flush=True)
-            print('P: u:',
-                  np.sum(gtfv3_output_data['u']),
-                  np.sum(gtfv3_output_data['v']),
-                  np.sum(gtfv3_output_data['w']),
-                  np.sum(gtfv3_output_data['delz']),
-                  flush=True)
-            print('P: pt:',
-                  np.sum(gtfv3_output_data['pt']),
-                  np.sum(gtfv3_output_data['delp']),
-                  np.sum(gtfv3_output_data['qvapor']),
-                  np.sum(gtfv3_output_data['qliquid']),
-                  np.sum(gtfv3_output_data['qice']),
-                  np.sum(gtfv3_output_data['qrain']),
-                  np.sum(gtfv3_output_data['qsnow']),
-                  np.sum(gtfv3_output_data['qgraupel']),
-                  np.sum(gtfv3_output_data['qcld']),
-                  flush=True)
-            print('P: ps:',
-                  np.sum(gtfv3_output_data['ps']),
-                  np.sum(gtfv3_output_data['pe']),
-                  np.sum(gtfv3_output_data['pk']),
-                  np.sum(gtfv3_output_data['peln']),
-                  np.sum(gtfv3_output_data['pkz']),
-                  flush=True)
-            print('P: phis:',
-                  np.sum(gtfv3_output_data['phis']),
-                  np.sum(gtfv3_output_data['q_con']),
-                  np.sum(gtfv3_output_data['omga']),
-                  flush=True)
-            print('P: ua:',
-                  np.sum(gtfv3_output_data['ua']),
-                  np.sum(gtfv3_output_data['va']),
-                  np.sum(gtfv3_output_data['uc']),
-                  np.sum(gtfv3_output_data['vc']),
-                  flush=True)
-            print('P: mfx:',
-                  np.sum(gtfv3_output_data['mfxd']),
-                  np.sum(gtfv3_output_data['mfyd']),
-                  np.sum(gtfv3_output_data['cxd']),
-                  np.sum(gtfv3_output_data['cyd']),
-                  flush=True)
-            print('P: diss_est:', np.sum(gtfv3_output_data['diss_estd']), flush=True)
-        comm.Barrier()
-
-    return gtfv3_output_data
+       print('P:', datetime.now().isoformat(timespec='milliseconds'),
+             '--converted NumPy arrays to Fortran', flush=True)
