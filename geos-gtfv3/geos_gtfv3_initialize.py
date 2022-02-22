@@ -19,7 +19,7 @@ def initialize_namelist(
         npx, npy, npz, layout_1, layout_2,
         adiabatic_int, hydrostatic_int, z_tracer_int,
         do_sat_adj_int, do_vort_damp_int, rf_fast_int, fill_int,
-        n_split, k_split, fv_sg_adj, n_sponge, n_zfilter, nwat,
+        ntiles, n_split, k_split, fv_sg_adj, n_sponge, n_zfilter, nwat,
         hord_tr, hord_tm, hord_dp, hord_mt, hord_vt,
         nord, kord_tm, kord_tr, kord_wz, kord_mt,
         d_ext, beta, vtdm4, ke_bg, d_con, d2_bg, d2_bg_k1, d2_bg_k2,
@@ -54,7 +54,7 @@ def initialize_namelist(
             'd2_bg': d2_bg, 'd2_bg_k1': d2_bg_k1, 'd2_bg_k2': d2_bg_k2,
             'p_fac': p_fac, 'a_imp': a_imp, 'dddmp': dddmp, 'd4_bg': d4_bg,
             'rf_cutoff': rf_cutoff, 'tau': tau,
-            'delt_max': 0.002, 'ntiles': 6}) # namelist
+            'delt_max': 0.002, 'ntiles': ntiles}) # namelist TODO: delt_max
         __initialized_namelist = True
 
 

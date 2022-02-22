@@ -26,6 +26,7 @@ program main
   character(len=23) :: date_time_s
   character(len=*), parameter :: iso8601 = '(i4, 2("-", i2.2), "T", 2(i0.2, ":"), i0.2, ".", i0.3)'
   real :: start, finish
+  integer :: ntiles
 
   ! Start
   call MPI_Init(mpierr)
@@ -50,6 +51,7 @@ program main
 
   scalars%kord_tm = -9
   scalars%tau = 0.0
+  ntiles = 6
 
   ! if (rank == 0) print*, 'rank, sum(u), sum(v), sum(w), sum(delz)'
   ! call MPI_Barrier(MPI_COMM_WORLD, mpierr)
@@ -69,7 +71,7 @@ program main
           scalars%hydrostatic, scalars%z_tracer, scalars%make_nh, scalars%fv_debug, &
           scalars%reproduce_sum, scalars%do_sat_adj, &
           scalars%do_vort_damp, scalars%rf_fast, scalars%fill, &
-          scalars%ncnst, scalars%n_split, scalars%k_split, &
+          ntiles, scalars%ncnst, scalars%n_split, scalars%k_split, &
           scalars%fv_sg_adj, scalars%n_sponge, scalars%n_zfilter, scalars%nwat, &
           scalars%hord_tr, scalars%hord_tm, scalars%hord_dp, scalars%hord_mt, scalars%hord_vt, &
           scalars%nord, scalars%kord_tm, scalars%kord_tr, scalars%kord_wz, scalars%kord_mt, &

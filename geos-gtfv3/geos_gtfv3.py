@@ -14,7 +14,7 @@ def geos_gtfv3(
         adiabatic,
         hydrostatic, z_tracer, make_nh, fv_debug,
         reproduce_sum, do_sat_adj, do_vort_damp, rf_fast, fill,
-        ncnst, n_split, k_split, fv_sg_adj, n_sponge, n_zfilter, nwat,
+        ntiles, ncnst, n_split, k_split, fv_sg_adj, n_sponge, n_zfilter, nwat,
         hord_tr, hord_tm, hord_dp, hord_mt, hord_vt,
         nord, kord_tm, kord_tr, kord_wz, kord_mt,
         d_ext, beta, vtdm4, ke_bg, d_con, d2_bg, d2_bg_k1, d2_bg_k2,
@@ -32,8 +32,8 @@ def geos_gtfv3(
         area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v,
         agrid, bgrid, a11, a12, a21, a22,
         edge_e, edge_w, edge_n, edge_s, nested, stretched_grid, da_min, da_min_c):
-    
-    BACKEND = 'gtcuda'
+
+    BACKEND = 'gtx86'
 
     rank = comm.Get_rank()
 
@@ -47,7 +47,7 @@ def geos_gtfv3(
         npx, npy, npz, layout_1, layout_2,
         adiabatic, hydrostatic, z_tracer,
         do_sat_adj, do_vort_damp, rf_fast, fill,
-        n_split, k_split, fv_sg_adj, n_sponge, n_zfilter, nwat,
+        ntiles, n_split, k_split, fv_sg_adj, n_sponge, n_zfilter, nwat,
         hord_tr, hord_tm, hord_dp, hord_mt, hord_vt,
         nord, kord_tm, kord_tr, kord_wz, kord_mt,
         d_ext, beta, vtdm4, ke_bg, d_con, d2_bg, d2_bg_k1, d2_bg_k2,

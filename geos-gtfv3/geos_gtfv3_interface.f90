@@ -20,7 +20,7 @@ module geos_gtfv3_interface_mod
           ! flagstruct data
           hydrostatic, z_tracer, make_nh, fv_debug, &
           reproduce_sum, do_sat_adj, do_vort_damp, rf_fast, fill, &
-          ncnst, n_split, k_split, fv_sg_adj, n_sponge, n_zfilter, nwat, &
+          ntiles, ncnst, n_split, k_split, fv_sg_adj, n_sponge, n_zfilter, nwat, &
           hord_tr, hord_tm, hord_dp, hord_mt, hord_vt, &
           nord, kord_tm, kord_tr, kord_wz, kord_mt, &
           d_ext, beta, vtdm4, ke_bg, d_con, d2_bg, d2_bg_k1, d2_bg_k2, &
@@ -74,6 +74,7 @@ module geos_gtfv3_interface_mod
        logical, value, intent(in) :: rf_fast
        logical, value, intent(in) :: fill
 
+       integer(kind=c_int), value, intent(in) :: ntiles
        integer(kind=c_int), value, intent(in) :: ncnst
        integer(kind=c_int), value, intent(in) :: n_split
        integer(kind=c_int), value, intent(in) :: k_split

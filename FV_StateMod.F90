@@ -1801,7 +1801,8 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          FV_Atm(1)%flagstruct%make_nh, FV_Atm(1)%flagstruct%fv_debug, &
          FV_Atm(1)%flagstruct%reproduce_sum, FV_Atm(1)%flagstruct%do_sat_adj, &
          FV_Atm(1)%flagstruct%do_vort_damp, FV_Atm(1)%flagstruct%rf_fast, &
-         FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%ncnst, &
+         FV_Atm(1)%flagstruct%fill, &
+         FV_Atm(1)%flagstruct%ntiles, FV_Atm(1)%flagstruct%ncnst, &
          FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%k_split, &
          FV_Atm(1)%flagstruct%fv_sg_adj, FV_Atm(1)%flagstruct%n_sponge, &
          FV_Atm(1)%flagstruct%n_zfilter, FV_Atm(1)%flagstruct%nwat, &
