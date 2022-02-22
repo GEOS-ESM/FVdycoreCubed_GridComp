@@ -1,6 +1,6 @@
 import numpy as np
 
-def write_sum_of_untranslated_arrays(comm, output_data):
+def write_sum_of_untranslated_arrays(comm, data):
 
     rank = comm.Get_rank()
     nranks = comm.Get_size()
@@ -9,45 +9,45 @@ def write_sum_of_untranslated_arrays(comm, output_data):
         if i == rank:
             print('P: rank:', rank, flush=True)
             print('P: u:',
-                  np.sum(output_data['u']),
-                  np.sum(output_data['v']),
-                  np.sum(output_data['w']),
-                  np.sum(output_data['delz']),
+                  np.sum(data['u']),
+                  np.sum(data['v']),
+                  np.sum(data['w']),
+                  np.sum(data['delz']),
                   flush=True)
             print('P: pt:',
-                  np.sum(output_data['pt']),
-                  np.sum(output_data['delp']),
-                  np.sum(output_data['qvapor']),
-                  np.sum(output_data['qliquid']),
-                  np.sum(output_data['qice']),
-                  np.sum(output_data['qrain']),
-                  np.sum(output_data['qsnow']),
-                  np.sum(output_data['qgraupel']),
-                  np.sum(output_data['qcld']),
+                  np.sum(data['pt']),
+                  np.sum(data['delp']),
+                  np.sum(data['qvapor']),
+                  np.sum(data['qliquid']),
+                  np.sum(data['qice']),
+                  np.sum(data['qrain']),
+                  np.sum(data['qsnow']),
+                  np.sum(data['qgraupel']),
+                  np.sum(data['qcld']),
                   flush=True)
             print('P: ps:',
-                  np.sum(output_data['ps']),
-                  np.sum(output_data['pe']),
-                  np.sum(output_data['pk']),
-                  np.sum(output_data['peln']),
-                  np.sum(output_data['pkz']),
+                  np.sum(data['ps']),
+                  np.sum(data['pe']),
+                  np.sum(data['pk']),
+                  np.sum(data['peln']),
+                  np.sum(data['pkz']),
                   flush=True)
             print('P: phis:',
-                  np.sum(output_data['phis']),
-                  np.sum(output_data['q_con']),
-                  np.sum(output_data['omga']),
+                  np.sum(data['phis']),
+                  np.sum(data['q_con']),
+                  np.sum(data['omga']),
                   flush=True)
             print('P: ua:',
-                  np.sum(output_data['ua']),
-                  np.sum(output_data['va']),
-                  np.sum(output_data['uc']),
-                  np.sum(output_data['vc']),
+                  np.sum(data['ua']),
+                  np.sum(data['va']),
+                  np.sum(data['uc']),
+                  np.sum(data['vc']),
                   flush=True)
             print('P: mfx:',
-                  np.sum(output_data['mfxd']),
-                  np.sum(output_data['mfyd']),
-                  np.sum(output_data['cxd']),
-                  np.sum(output_data['cyd']),
+                  np.sum(data['mfxd']),
+                  np.sum(data['mfyd']),
+                  np.sum(data['cxd']),
+                  np.sum(data['cyd']),
                   flush=True)
-            print('P: diss_est:', np.sum(output_data['diss_estd']), flush=True)
+            print('P: diss_est:', np.sum(data['diss_estd']), flush=True)
         comm.Barrier()
