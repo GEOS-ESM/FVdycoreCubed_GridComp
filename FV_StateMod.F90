@@ -552,7 +552,7 @@ contains
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75  )
       endif
-      FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,2)
+      FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       if (FV_Atm(1)%flagstruct%npz == 72) then
        FV_Atm(1)%flagstruct%fv_sg_adj = DT
      ! Monotonic Hydrostatic defaults
