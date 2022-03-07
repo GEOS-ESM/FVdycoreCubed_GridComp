@@ -1722,13 +1722,6 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     if (.not. FV_OFF) then
     call set_domain(FV_Atm(1)%domain)  ! needed for diagnostic output done in fv_dynamics
 
-    call cpu_time(start)
-    ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
-    ! disable trapping of floating point exceptions temporarily, call the interface
-    ! to the Python function and resume trapping
-    call ieee_get_halting_mode(ieee_all, halting_mode)
-    call ieee_set_halting_mode(ieee_all, .false.)
-
     call MPI_Comm_size(MPI_COMM_WORLD, nranks, mpierr)
     do i = 0, nranks-1
        if (i == rank) then
@@ -1789,6 +1782,12 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     !      FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%stretched_grid, &
     !      FV_Atm(1)%gridstruct%da_min, FV_Atm(1)%gridstruct%da_min_c
 
+    ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
+    ! disable trapping of floating point exceptions temporarily, call the interface
+    ! to the Python function and resume trapping
+    call ieee_get_halting_mode(ieee_all, halting_mode)
+    call ieee_set_halting_mode(ieee_all, .false.)
+    call cpu_time(start)
     call geos_gtfv3_interface_f( &
          comm, &
          FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, &
@@ -1854,8 +1853,8 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          FV_Atm(1)%gridstruct%edge_n, FV_Atm(1)%gridstruct%edge_s, &
          FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%stretched_grid, &
          FV_Atm(1)%gridstruct%da_min, FV_Atm(1)%gridstruct%da_min_c)
-    call ieee_set_halting_mode(ieee_all, halting_mode)
     call cpu_time(finish)
+    call ieee_set_halting_mode(ieee_all, halting_mode)
     print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
 
     call cpu_time(start)
@@ -1871,8 +1870,8 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
                      FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, FV_Atm(1)%diss_est, time_total)
     call cpu_time(finish)
     print *, rank, ', fv_dynamics: time taken = ', finish - start, 's'
-    call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
+    call MPI_Barrier(MPI_COMM_WORLD, mpierr)
     call MPI_Comm_size(MPI_COMM_WORLD, nranks, mpierr)
     do i = 0, nranks-1
        if (i == rank) then
