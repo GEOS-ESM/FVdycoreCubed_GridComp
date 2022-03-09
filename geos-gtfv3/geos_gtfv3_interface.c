@@ -45,7 +45,8 @@ void geos_gtfv3_interface_c(
     const float* cosa_u, const float* cosa_v,
     const float* rsin2, const float* rsina, const float* rsin_u, const float* rsin_v,
     const float* sin_sg, const float* cos_sg,
-    const float* area, const float* rarea, const float* rarea_c, const float* f0, const float* fC,
+    const float* area, const double* area_64, const float* rarea, const float* rarea_c,
+    const float* f0, const float* fC,
     const float* del6_u, const float* del6_v, const float* divg_u, const float* divg_v,
     const float* agrid, const float* bgrid,
     const float* a11, const float* a12, const float* a21, const float* a22,
@@ -90,7 +91,7 @@ void geos_gtfv3_interface_c(
         dx, dy, dxa, dya, dxc, dyc, rdx, rdy, rdxa, rdya, rdxc, rdyc,
         cosa, cosa_s, sina_u, sina_v, cosa_u, cosa_v, rsin2, rsina, rsin_u, rsin_v,
         sin_sg, cos_sg,
-        area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v,
+        area, area_64, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v,
         agrid, bgrid, a11, a12, a21, a22,
         edge_e, edge_w, edge_n, edge_s, nested, stretched_grid, da_min, da_min_c);
 }

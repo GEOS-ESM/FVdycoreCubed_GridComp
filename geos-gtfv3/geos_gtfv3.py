@@ -3,7 +3,7 @@ from f_py_conversion import fortran_input_data_to_numpy
 from f_py_conversion import numpy_output_data_to_fortran
 import geos_gtfv3_initialize
 from geos_gtfv3_run import geos_gtfv3_run
-from geos_gtfv3_debug import write_sum_of_untranslated_arrays
+from geos_gtfv3_debug import write_sum_of_vars
 
 def geos_gtfv3(
         comm,
@@ -29,7 +29,7 @@ def geos_gtfv3(
         dx, dy, dxa, dya, dxc, dyc, rdx, rdy, rdxa, rdya, rdxc, rdyc,
         cosa, cosa_s, sina_u, sina_v, cosa_u, cosa_v, rsin2, rsina, rsin_u, rsin_v,
         sin_sg, cos_sg,
-        area, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v,
+        area, area_64, rarea, rarea_c, f0, fC, del6_u, del6_v, divg_u, divg_v,
         agrid, bgrid, a11, a12, a21, a22,
         edge_e, edge_w, edge_n, edge_s, nested, stretched_grid, da_min, da_min_c):
 
@@ -72,7 +72,7 @@ def geos_gtfv3(
         phis, q_con, omga,
         ua, va, uc, vc,
         mfx, mfy, cx, cy, diss_est)
-    # write_sum_of_untranslated_arrays(comm, fv3_input_data)
+    write_sum_of_vars(comm, fv3_input_data)
 
     if rank == 0:
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
@@ -90,7 +90,7 @@ def geos_gtfv3(
         cosa, cosa_s, sina_u, sina_v,
         cosa_u, cosa_v, rsin2, rsina, rsin_u, rsin_v,
         sin_sg, cos_sg,
-        area, rarea, rarea_c, f0, fC,
+        area, area_64, rarea, rarea_c, f0, fC,
         del6_u, del6_v, divg_u, divg_v,
         agrid, bgrid, a11, a12, a21, a22,
         edge_e, edge_w, edge_n, edge_s,
@@ -111,18 +111,18 @@ def geos_gtfv3(
         geos_gtfv3_initialize.driver_object,
         geos_gtfv3_initialize.dycore,
         fv3_input_data)
-    # write_sum_of_untranslated_arrays(comm, gtfv3_output_data)
+    write_sum_of_vars(comm, gtfv3_output_data)
 
-    # Convert NumPy arrays back to Fortran
-    numpy_output_data_to_fortran(
-        gtfv3_output_data,
-        u, v, w, delz,
-        pt, delp, q,
-        ps, pe, pk, peln, pkz,
-        phis, q_con, omga,
-        ua, va, uc, vc,
-        mfx, mfy, cx, cy, diss_est)
+    # # Convert NumPy arrays back to Fortran
+    # numpy_output_data_to_fortran(
+    #     gtfv3_output_data,
+    #     u, v, w, delz,
+    #     pt, delp, q,
+    #     ps, pe, pk, peln, pkz,
+    #     phis, q_con, omga,
+    #     ua, va, uc, vc,
+    #     mfx, mfy, cx, cy, diss_est)
 
-    if rank == 0:
-       print('P:', datetime.now().isoformat(timespec='milliseconds'),
-             '--converted NumPy arrays to Fortran', flush=True)
+    # if rank == 0:
+    #    print('P:', datetime.now().isoformat(timespec='milliseconds'),
+    #          '--converted NumPy arrays to Fortran', flush=True)

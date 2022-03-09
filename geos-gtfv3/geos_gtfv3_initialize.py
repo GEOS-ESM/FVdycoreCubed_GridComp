@@ -1,13 +1,13 @@
 from datetime import datetime
 
-from f_py_conversion import fortran_grid_data_to_numpy
-
 import gt4py
 import fv3core
 import fv3core._config as spec
 import fv3core.testing
 import fv3gfs.util as util
 
+from f_py_conversion import fortran_grid_data_to_numpy
+from geos_gtfv3_debug import write_sum_of_vars
 
 __initialized_dycore = False
 __initialized_namelist = False
@@ -68,7 +68,7 @@ def initialize_dycore(
         cosa_ptr, cosa_s_ptr, sina_u_ptr, sina_v_ptr,
         cosa_u_ptr, cosa_v_ptr, rsin2_ptr, rsina_ptr, rsin_u_ptr, rsin_v_ptr,
         sin_sg_ptr, cos_sg_ptr,
-        area_ptr, rarea_ptr, rarea_c_ptr, f0_ptr, fC_ptr,
+        area_ptr, area_64_ptr, rarea_ptr, rarea_c_ptr, f0_ptr, fC_ptr,
         del6_u_ptr, del6_v_ptr, divg_u_ptr, divg_v_ptr,
         agrid_ptr, bgrid_ptr, a11_ptr, a12_ptr, a21_ptr, a22_ptr,
         edge_e_ptr, edge_w_ptr, edge_n_ptr, edge_s_ptr,
@@ -100,10 +100,11 @@ def initialize_dycore(
             cosa_ptr, cosa_s_ptr, sina_u_ptr, sina_v_ptr,
             cosa_u_ptr, cosa_v_ptr, rsin2_ptr, rsina_ptr, rsin_u_ptr, rsin_v_ptr,
             sin_sg_ptr, cos_sg_ptr,
-            area_ptr, rarea_ptr, rarea_c_ptr, f0_ptr, fC_ptr,
+            area_ptr, area_64_ptr, rarea_ptr, rarea_c_ptr, f0_ptr, fC_ptr,
             del6_u_ptr, del6_v_ptr, divg_u_ptr, divg_v_ptr,
             agrid_ptr, bgrid_ptr, a11_ptr, a12_ptr, a21_ptr, a22_ptr,
             edge_e_ptr, edge_w_ptr, edge_n_ptr, edge_s_ptr)
+        write_sum_of_vars(comm, grid_data)
 
         # Create grid
         grid = fv3core.testing.TranslateGrid(grid_data, comm.Get_rank()).python_grid()

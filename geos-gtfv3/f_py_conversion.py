@@ -102,7 +102,7 @@ def fortran_grid_data_to_numpy(
         cosa_ptr, cosa_s_ptr, sina_u_ptr, sina_v_ptr,
         cosa_u_ptr, cosa_v_ptr, rsin2_ptr, rsina_ptr, rsin_u_ptr, rsin_v_ptr,
         sin_sg_ptr, cos_sg_ptr,
-        area_ptr, rarea_ptr, rarea_c_ptr, f0_ptr, fC_ptr,
+        area_ptr, area_64_ptr, rarea_ptr, rarea_c_ptr, f0_ptr, fC_ptr,
         del6_u_ptr, del6_v_ptr, divg_u_ptr, divg_v_ptr,
         agrid_ptr, bgrid_ptr, a11_ptr, a12_ptr, a21_ptr, a22_ptr,
         edge_e_ptr, edge_w_ptr, edge_n_ptr, edge_s_ptr):
@@ -127,7 +127,7 @@ def fortran_grid_data_to_numpy(
 
         'nested': False if nested_int == 0 else True,
         'stretched_grid': False if stretched_grid_int == 0 else True,
-        'da_min': da_min, 'da_min_c': 0.0,
+        'da_min': da_min, 'da_min_c': da_min_c,
 
         'dx': fort_to_numpy(dx_ptr, (ied-isd+1, jed+1-jsd+1)),
         'dy': fort_to_numpy(dy_ptr, (ied+1-isd+1, jed-jsd+1)),
@@ -162,7 +162,7 @@ def fortran_grid_data_to_numpy(
         'cos_sg3': cos_sg[:,:,2], 'cos_sg4': cos_sg[:,:,3],
 
         'area': fort_to_numpy(area_ptr, (ied-isd+1, jed-jsd+1)),
-        'area_64': fort_to_numpy(area_ptr, (ied-isd+1, jed-jsd+1)), # TODO: area_64 = area??
+        'area_64': fort_to_numpy(area_64_ptr, (ied-isd+1, jed-jsd+1)), # TODO: area_64 = area??
         'rarea': fort_to_numpy(rarea_ptr, (ied-isd+1, jed-jsd+1)),
         'rarea_c':  fort_to_numpy(rarea_c_ptr, (ied+1-isd+1,jed+1-jsd+1)),
         'f0': fort_to_numpy(f0_ptr, (ied-isd+1, jed-jsd+1)),
