@@ -2883,7 +2883,6 @@ subroutine Run(gc, import, export, clock, rc)
     integer nx_ana, ny_ana
 
     logical, save                       :: firstime=.true.
-    integer, save                       :: nq_saved = 0
     logical                             :: adjustTracers
     type(ESMF_Alarm)                    :: predictorAlarm
     type(ESMF_Grid)                     :: bgrid
@@ -3223,19 +3222,6 @@ subroutine Run(gc, import, export, clock, rc)
 ! Get tracers from IMPORT State (Note: Contains Updates from Analysis)
 !---------------------------------------------------------------------
       call PULL_Q ( STATE, IMPORT, qqq, NXQ, RC=rc )
-
-! Report total number and names of advected tracers
-!--------------------------------------------------
-      if (STATE%GRID%NQ > 0) then
-        if (STATE%GRID%NQ /= NQ_SAVED) then
-           NQ_SAVED = STATE%GRID%NQ
-           write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", STATE%GRID%NQ, " tracers:"
-           call WRITE_PARALLEL( trim(STRING)   )
-           do k=1,STATE%GRID%NQ
-              call WRITE_PARALLEL( trim(STATE%VARS%TRACER(k)%TNAME) )
-           end do
-        end if
-      endif
 
 !-----------------------------
 ! end of fewer_tracers-section
