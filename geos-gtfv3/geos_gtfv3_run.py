@@ -37,7 +37,7 @@ def geos_gtfv3_run(comm, spec, driver_object, dycore, fv3_input_data):
     #         spec.namelist.fv_sg_adj,
     #         spec.namelist.n_sponge,
     #         spec.namelist.hydrostatic,)
-    #     if (spec.grid.rank == 0):
+    #     if rank == 0:
     #         print('P:', datetime.now().isoformat(timespec='milliseconds'),
     #               '--instantiated DryConvectiveAdjustment', flush=True)
 
@@ -50,7 +50,7 @@ def geos_gtfv3_run(comm, spec, driver_object, dycore, fv3_input_data):
         fv3_input_data['ptop'],
         fv3_input_data['n_split'],
         fv3_input_data['ks'])
-    if (spec.grid.rank == 0):
+    if rank == 0:
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--ran DynamicalCore::step_dynamics', flush=True)
 
