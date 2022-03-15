@@ -1783,8 +1783,8 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
                sum(FV_Atm(1)%q(:,:,:,1)), sum(FV_Atm(1)%q(:,:,:,2)), sum(FV_Atm(1)%q(:,:,:,3)), &
                sum(FV_Atm(1)%q(:,:,:,4)), sum(FV_Atm(1)%q(:,:,:,5)), sum(FV_Atm(1)%q(:,:,:,6)), &
                sum(FV_Atm(1)%q(:,:,:,7))
-          print *, 'F: (before) ps: ', &
-               sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
+          ! print *, 'F: (before) ps: ', &
+          !      sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
           print *, 'F: (before) phis: ', sum(FV_Atm(1)%phis), sum(FV_Atm(1)%q_con), sum(FV_Atm(1)%omga)
           print *, 'F: (before) ua: ', sum(FV_Atm(1)%ua), sum(FV_Atm(1)%va), sum(FV_Atm(1)%uc), sum(FV_Atm(1)%vc)
           print *, 'F: (before) mfx: ', sum(FV_Atm(1)%mfx), sum(FV_Atm(1)%mfy), sum(FV_Atm(1)%cx), sum(FV_Atm(1)%cy)
@@ -1801,34 +1801,11 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     call cpu_time(start)
     call geos_gtfv3_interface_f( &
          comm, &
-         FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, &
+         FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
          FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
          isd, ied, jsd, jed, &
          myDT, FV_Atm(1)%ncnst, FV_Atm(1)%ng, FV_Atm(1)%ptop, FV_Atm(1)%ks, &
          FV_Atm(1)%layout(1), FV_Atm(1)%layout(2), adiabatic, &
-         ! input - flagstruct
-         FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%flagstruct%z_tracer, &
-         FV_Atm(1)%flagstruct%make_nh, FV_Atm(1)%flagstruct%fv_debug, &
-         FV_Atm(1)%flagstruct%reproduce_sum, FV_Atm(1)%flagstruct%do_sat_adj, &
-         FV_Atm(1)%flagstruct%do_vort_damp, FV_Atm(1)%flagstruct%rf_fast, &
-         FV_Atm(1)%flagstruct%fill, &
-         FV_Atm(1)%flagstruct%ntiles, FV_Atm(1)%flagstruct%ncnst, &
-         FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%k_split, &
-         FV_Atm(1)%flagstruct%fv_sg_adj, FV_Atm(1)%flagstruct%n_sponge, &
-         FV_Atm(1)%flagstruct%n_zfilter, FV_Atm(1)%flagstruct%nwat, &
-         FV_Atm(1)%flagstruct%hord_tr, FV_Atm(1)%flagstruct%hord_tm, &
-         FV_Atm(1)%flagstruct%hord_dp, FV_Atm(1)%flagstruct%hord_mt, &
-         FV_Atm(1)%flagstruct%hord_vt, FV_Atm(1)%flagstruct%nord, &
-         FV_Atm(1)%flagstruct%kord_tm, FV_Atm(1)%flagstruct%kord_tr, &
-         FV_Atm(1)%flagstruct%kord_wz, FV_Atm(1)%flagstruct%kord_mt, &
-         FV_Atm(1)%flagstruct%d_ext, FV_Atm(1)%flagstruct%beta, &
-         FV_Atm(1)%flagstruct%vtdm4, FV_Atm(1)%flagstruct%ke_bg, &
-         FV_Atm(1)%flagstruct%d_con, FV_Atm(1)%flagstruct%d2_bg, &
-         FV_Atm(1)%flagstruct%d2_bg_k1, FV_Atm(1)%flagstruct%d2_bg_k2, &
-         FV_Atm(1)%flagstruct%p_fac, FV_Atm(1)%flagstruct%a_imp, &
-         FV_Atm(1)%flagstruct%dddmp, FV_Atm(1)%flagstruct%d4_bg, &
-         FV_Atm(1)%flagstruct%rf_cutoff, FV_Atm(1)%flagstruct%tau, &
-         FV_Atm(1)%flagstruct%consv_te, &
          ! input/output
          FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
          FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
@@ -1838,32 +1815,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          ! input
          FV_Atm(1)%ak, FV_Atm(1)%bk, &
          ! input/output
-         FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est, &
-         ! input - gridstruct
-         FV_Atm(1)%gridstruct%dx, FV_Atm(1)%gridstruct%dy, &
-         FV_Atm(1)%gridstruct%dxa, FV_Atm(1)%gridstruct%dya, &
-         FV_Atm(1)%gridstruct%dxc, FV_Atm(1)%gridstruct%dyc, &
-         FV_Atm(1)%gridstruct%rdx, FV_Atm(1)%gridstruct%rdy, &
-         FV_Atm(1)%gridstruct%rdxa, FV_Atm(1)%gridstruct%rdya, &
-         FV_Atm(1)%gridstruct%rdxc, FV_Atm(1)%gridstruct%rdyc, &
-         FV_Atm(1)%gridstruct%cosa, FV_Atm(1)%gridstruct%cosa_s, &
-         FV_Atm(1)%gridstruct%sina_u, FV_Atm(1)%gridstruct%sina_v, &
-         FV_Atm(1)%gridstruct%cosa_u, FV_Atm(1)%gridstruct%cosa_v, &
-         FV_Atm(1)%gridstruct%rsin2, FV_Atm(1)%gridstruct%rsina, &
-         FV_Atm(1)%gridstruct%rsin_u, FV_Atm(1)%gridstruct%rsin_v, &
-         FV_Atm(1)%gridstruct%sin_sg, FV_Atm(1)%gridstruct%cos_sg, &
-         FV_Atm(1)%gridstruct%area, FV_Atm(1)%gridstruct%area_64, &
-         FV_Atm(1)%gridstruct%rarea, FV_Atm(1)%gridstruct%rarea_c, &
-         FV_Atm(1)%gridstruct%f0, FV_Atm(1)%gridstruct%fC, &
-         FV_Atm(1)%gridstruct%del6_u, FV_Atm(1)%gridstruct%del6_v, &
-         FV_Atm(1)%gridstruct%divg_u, FV_Atm(1)%gridstruct%divg_v, &
-         FV_Atm(1)%gridstruct%agrid, FV_Atm(1)%gridstruct%grid, &
-         FV_Atm(1)%gridstruct%a11, FV_Atm(1)%gridstruct%a12, &
-         FV_Atm(1)%gridstruct%a21, FV_Atm(1)%gridstruct%a22, &
-         FV_Atm(1)%gridstruct%edge_e, FV_Atm(1)%gridstruct%edge_w, &
-         FV_Atm(1)%gridstruct%edge_n, FV_Atm(1)%gridstruct%edge_s, &
-         FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%stretched_grid, &
-         FV_Atm(1)%gridstruct%da_min, FV_Atm(1)%gridstruct%da_min_c)
+         FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
     call cpu_time(finish)
     call ieee_set_halting_mode(ieee_all, halting_mode)
     print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
