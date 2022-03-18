@@ -33,7 +33,8 @@ module FV_StateMod
    use fv_sg_mod, only: fv_subgrid_z
    use gfdl_lin_cloud_microphys_mod, only: gfdl_cloud_microphys_init
 
-   use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check
+   use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check, &
+                                 get_vorticity, updraft_helicity
 
 implicit none
 private
@@ -85,7 +86,7 @@ private
 
   public debug_fv_state
 
-  public INTERP_DGRID_TO_AGRID
+  public fv_getAllWinds
   public INTERP_AGRID_TO_DGRID
 
   interface fv_computeMassFluxes
@@ -93,10 +94,10 @@ private
      module procedure fv_computeMassFluxes_r8
   end interface  
 
-  INTERFACE INTERP_DGRID_TO_AGRID
+  INTERFACE fv_getAllWinds
 
-   MODULE PROCEDURE fv_getAgridWinds_3D
-   MODULE PROCEDURE fv_getAgridWinds_2D
+   MODULE PROCEDURE fv_getAllWinds_3D
+   MODULE PROCEDURE fv_getAllWinds_2D
 
   END INTERFACE
 
@@ -3713,7 +3714,6 @@ end subroutine fv_getDivergence
 
 subroutine fv_getUpdraftHelicity(uh25)
    use constants_mod, only: fms_grav=>grav
-   use fv_diagnostics_mod, only: get_vorticity, updraft_helicity
 ! made this REAL4
    real(REAL4), intent(OUT) :: uh25(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
 
@@ -3724,14 +3724,14 @@ subroutine fv_getUpdraftHelicity(uh25)
    ! introduced these two variables for the literals
    real(FVPRC) :: z_bot, z_top
 
-   z_bot = 2.e3
-   z_top = 5.e3
    call get_vorticity(FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, &
                       FV_Atm(1)%bd%isd, FV_Atm(1)%bd%ied, FV_Atm(1)%bd%jsd, FV_Atm(1)%bd%jed, &
                       FV_Atm(1)%npz, FV_Atm(1)%u, FV_Atm(1)%v, vort, &
                       FV_Atm(1)%gridstruct%dx, FV_Atm(1)%gridstruct%dy, FV_Atm(1)%gridstruct%rarea)
 
 ! call this with uh25_tmp which is of FVPRC
+   z_bot = 2.e3
+   z_top = 5.e3
    call updraft_helicity(FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, FV_Atm(1)%ng, FV_Atm(1)%npz, &
                      zvir, sphum, uh25_tmp, &
                      FV_Atm(1)%w, vort, FV_Atm(1)%delz, FV_Atm(1)%q,   &
@@ -3773,8 +3773,6 @@ subroutine fv_getEPV(pt, vort, ua, va, epv)
   jsc=FV_Atm(1)%bd%jsc ; jec=FV_Atm(1)%bd%jec
   npz = FV_Atm(1)%npz
 
-   pt_g(isc:iec,jsc:jec,:) = pt(isc:iec,jsc:jec,:)
-   call mpp_update_domains(pt_g, FV_Atm(1)%domain, complete=.true.)
 ! Get PT/UA/VA at layer edges
    do j=jsc,jec
       call ppme(pt(isc:iec,j,:),pt_e(isc:iec,j,:),FV_Atm(1)%delp(isc:iec,j,:),iec-isc+1,npz)
@@ -3784,6 +3782,8 @@ subroutine fv_getEPV(pt, vort, ua, va, epv)
 
    if (.not. FV_HYDROSTATIC) then
       dz_g(isc:iec,jsc:jec,:) = FV_Atm(1)%delz(isc:iec,jsc:jec,:)
+      pt_g(isc:iec,jsc:jec,:) = pt(isc:iec,jsc:jec,:)
+      call mpp_update_domains(pt_g, FV_Atm(1)%domain, complete=.false.)
       call mpp_update_domains(dz_g, FV_Atm(1)%domain, complete=.false.)
       call mpp_update_domains(FV_Atm(1)%w,  FV_Atm(1)%domain, complete=.true.)
       do k=1,npz
@@ -3832,6 +3832,8 @@ subroutine fv_getEPV(pt, vort, ua, va, epv)
         enddo
       enddo
    else
+      pt_g(isc:iec,jsc:jec,:) = pt(isc:iec,jsc:jec,:)
+      call mpp_update_domains(pt_g, FV_Atm(1)%domain, complete=.true.)
       do k=1,npz
         do j=jsc,jec
           do i=isc,iec
@@ -3862,11 +3864,11 @@ end subroutine fv_getEPV
 !------------------------------------------------------------------------------
 !BOP         
 !
-! !IROUTINE: fv_getAgridWinds_3D
+! !IROUTINE: fv_getAllWinds_3D
 !
 ! !INTERFACE:
 !    
-subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
+subroutine fv_getAllWinds_3D(u, v, ua, va, uc, vc, ur, vr, vort, divg, rotate)
 
 ! !INPUT PARAMETERS:
   real(REAL8), intent(IN)  ::  u(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
@@ -3874,10 +3876,17 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
   logical, optional, intent(IN) :: rotate
 ! 
 ! !OUTPUT PARAMETERS:
-  real(REAL8),           intent(OUT) :: ua(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
-  real(REAL8),           intent(OUT) :: va(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
+ ! non-rotated winds
+  real(REAL8), optional, intent(OUT) :: ua(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
+  real(REAL8), optional, intent(OUT) :: va(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
   real(REAL8), optional, intent(OUT) :: uc(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
   real(REAL8), optional, intent(OUT) :: vc(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
+ ! rotated winds
+  real(REAL8), optional, intent(OUT) :: ur(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
+  real(REAL8), optional, intent(OUT) :: vr(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
+ ! vorticity/divergence
+  real(FVPRC), optional, intent(OUT) :: vort(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
+  real(FVPRC), optional, intent(OUT) :: divg(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
 !
 ! !DESCRIPTION:
 ! 
@@ -3916,7 +3925,6 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
   vatemp = 0
   uctemp = 0
   vctemp = 0
-
   if (FV_Atm(1)%flagstruct%grid_type>=4) then
   ! Doubly Periodic
     uatemp(isc:iec,jsc:jec,:) = u
@@ -3944,8 +3952,15 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
        enddo  
     enddo   
   endif
-
   call mpp_update_domains(utemp, vtemp, FV_Atm(1)%domain, gridtype=DGRID_NE, complete=.true.)
+
+  if (present(vort)) then
+     call get_vorticity(isc, iec, jsc, jec, &
+                        isd, ied, jsd, jed, &
+                        npz, utemp, vtemp, vort, &
+                        FV_Atm(1)%gridstruct%dx, FV_Atm(1)%gridstruct%dy, FV_Atm(1)%gridstruct%rarea)
+  endif
+
   do k=1,npz
    call d2a2c_vect(utemp(:,:,k),  vtemp(:,:,k), &
                    uatemp(:,:,k), vatemp(:,:,k), &
@@ -3953,41 +3968,84 @@ subroutine fv_getAgridWinds_3D(u, v, ua, va, uc, vc, rotate)
                    FV_Atm(1)%gridstruct,FV_Atm(1)%bd, FV_Atm(1)%flagstruct%npx, FV_Atm(1)%flagstruct%npy, &
                    FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%grid_type)
   enddo
-  if (FV_Atm(1)%flagstruct%grid_type<4 .AND. present(rotate)) then 
-   if (rotate) call cubed_to_latlon(utemp  , vtemp  , &
-                                    uatemp , vatemp , &
-                                    FV_Atm(1)%gridstruct, &
-                                    FV_Atm(1)%flagstruct%npx, FV_Atm(1)%flagstruct%npy, FV_Atm(1)%flagstruct%npz, -1, &
-                                    FV_Atm(1)%gridstruct%grid_type, &
-                                    FV_Atm(1)%domain,FV_Atm(1)%gridstruct%nested,FV_Atm(1)%flagstruct%c2l_ord,FV_Atm(1)%bd)
-  endif
-
-  ua(:,:,:) = uatemp(isc:iec,jsc:jec,:)
-  va(:,:,:) = vatemp(isc:iec,jsc:jec,:)
+  if (present(ua)) ua(:,:,:) = uatemp(isc:iec,jsc:jec,:)
+  if (present(va)) va(:,:,:) = vatemp(isc:iec,jsc:jec,:)
   if (present(uc)) uc(:,:,:) = uctemp(isc:iec,jsc:jec,:)
   if (present(vc)) vc(:,:,:) = vctemp(isc:iec,jsc:jec,:)
 
+! Calc Divergence
+  if (present(divg)) then
+    do k=1,npz
+        call compute_utvt(uctemp(isd,jsd,k), vctemp(isd,jsd,k), ut(isd,jsd), vt(isd,jsd), 1.0)
+        do j=jsc,jec
+           do i=isc,iec+1
+              if ( ut(i,j) > 0. ) then
+                   ut(i,j) = fv_atm(1)%gridstruct%dy(i,j)*ut(i,j)*fv_atm(1)%gridstruct%sin_sg(i-1,j,3)
+              else
+                   ut(i,j) = fv_atm(1)%gridstruct%dy(i,j)*ut(i,j)*fv_atm(1)%gridstruct%sin_sg(i,j,1)
+             endif
+           enddo
+        enddo
+        do j=jsc,jec+1
+           do i=isc,iec
+              if ( vt(i,j) > 0. ) then
+                   vt(i,j) = fv_atm(1)%gridstruct%dx(i,j)*vt(i,j)*fv_atm(1)%gridstruct%sin_sg(i,j-1,4)
+              else
+                   vt(i,j) = fv_atm(1)%gridstruct%dx(i,j)*vt(i,j)*fv_atm(1)%gridstruct%sin_sg(i,j,2)
+              endif
+           enddo
+        enddo
+        do j=jsc,jec
+           do i=isc,iec
+              divg(i,j,k) = fv_atm(1)%gridstruct%rarea(i,j)*( ut(i+1,j)-ut(i,j) + &
+                                                              vt(i,j+1)-vt(i,j) )
+           enddo
+        enddo
+    enddo
+  endif
+
+  if (FV_Atm(1)%flagstruct%grid_type<4 .AND. present(rotate)) then 
+     if (rotate) then
+         call cubed_to_latlon(utemp  , vtemp  , &
+                              uatemp , vatemp , &
+                              FV_Atm(1)%gridstruct, &
+                              FV_Atm(1)%flagstruct%npx, FV_Atm(1)%flagstruct%npy, FV_Atm(1)%flagstruct%npz, -1, &
+                              FV_Atm(1)%gridstruct%grid_type, &
+                              FV_Atm(1)%domain,FV_Atm(1)%gridstruct%nested,FV_Atm(1)%flagstruct%c2l_ord,FV_Atm(1)%bd)
+        if (present(ur)) ur = uatemp(isc:iec,jsc:jec,:)
+        if (present(vr)) vr = vatemp(isc:iec,jsc:jec,:)
+     endif
+  endif
+
   return
-end subroutine fv_getAgridWinds_3D
+end subroutine fv_getAllWinds_3D
 !EOC
 !------------------------------------------------------------------------------
 !BOP
 !
-! !IROUTINE: fv_getAgridWinds_2D
+! !IROUTINE: fv_getAllWinds_2D
 !
 ! !INTERFACE:
 !
-subroutine fv_getAgridWinds_2D(u, v, ua, va, rotate)
+subroutine fv_getAllWinds_2D(u, v, ua, va, uc, vc, ur, vr, vort, divg, rotate)
 
 !
 ! !INPUT PARAMETERS:
-  real(REAL8), intent(IN)  ::  u(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
-  real(REAL8), intent(IN)  ::  v(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
-  logical, optional, intent(IN) :: rotate
+  real(REAL8),           intent(IN   )  ::  u(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+  real(REAL8),           intent(IN   )  ::  v(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+  logical,     optional, intent(IN   )  :: rotate
 !
 ! !OUTPUT PARAMETERS:
-  real(REAL8), intent(OUT) :: ua(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
-  real(REAL8), intent(OUT) :: va(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+  real(REAL8), optional, intent(OUT) :: ua(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+  real(REAL8), optional, intent(OUT) :: va(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+  real(REAL8), optional, intent(OUT) :: uc(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+  real(REAL8), optional, intent(OUT) :: vc(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+ ! rotated winds
+  real(REAL8), optional, intent(OUT)  :: ur(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+  real(REAL8), optional, intent(OUT)  :: vr(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+ ! vorticity/divergence
+  real(REAL8), optional, intent(OUT)  :: vort(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+  real(REAL8), optional, intent(OUT)  :: divg(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
 !
 ! !DESCRIPTION:
 !
@@ -4055,21 +4113,24 @@ subroutine fv_getAgridWinds_2D(u, v, ua, va, rotate)
                   uctemp(:,:), vctemp(:,:), ut, vt, .true., &
                   FV_Atm(1)%gridstruct,FV_Atm(1)%bd, FV_Atm(1)%flagstruct%npx, FV_Atm(1)%flagstruct%npy, &
                   FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%grid_type)
+  if (present(ua)) ua(:,:) = uatemp(isc:iec,jsc:jec)
+  if (present(va)) va(:,:) = vatemp(isc:iec,jsc:jec)
 
   if (FV_Atm(1)%flagstruct%grid_type<4 .AND. present(rotate)) then 
-   if (rotate) call cubed_to_latlon(utemp  , vtemp  , &
-                                    uatemp , vatemp , &
-                                    FV_Atm(1)%gridstruct, &
-                                    FV_Atm(1)%flagstruct%npx, FV_Atm(1)%flagstruct%npy, 1, -1, &
-                                    FV_Atm(1)%gridstruct%grid_type, &
-                                    FV_Atm(1)%domain,FV_Atm(1)%gridstruct%nested,FV_Atm(1)%flagstruct%c2l_ord,FV_Atm(1)%bd)
+     if (rotate) then
+         call cubed_to_latlon(utemp  , vtemp  , &
+                              uatemp , vatemp , &
+                              FV_Atm(1)%gridstruct, &
+                              FV_Atm(1)%flagstruct%npx, FV_Atm(1)%flagstruct%npy, 1, -1, &
+                              FV_Atm(1)%gridstruct%grid_type, &
+                              FV_Atm(1)%domain,FV_Atm(1)%gridstruct%nested,FV_Atm(1)%flagstruct%c2l_ord,FV_Atm(1)%bd)
+        if (present(ur)) ur = uatemp(isc:iec,jsc:jec)
+        if (present(vr)) vr = vatemp(isc:iec,jsc:jec)
+     endif
   endif
 
-  ua(:,:) = uatemp(isc:iec,jsc:jec)
-  va(:,:) = vatemp(isc:iec,jsc:jec)
-
   return
-end subroutine fv_getAgridWinds_2D
+end subroutine fv_getAllWinds_2D
 !EOC
 !------------------------------------------------------------------------------
 
