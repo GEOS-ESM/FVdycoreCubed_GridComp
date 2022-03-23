@@ -16,14 +16,12 @@ program StandAlone_DynAdvCore
    character(*), parameter :: IAM = __FILE__
 
    type (MAPL_Cap) :: cap
-   type (MAPL_FlapCLI) :: cli
    type (MAPL_CapOptions) :: cap_options
    integer :: status
 
-   cli = MAPL_FlapCLI( &
+   cap_options = FlapCLI( &
         description = 'FV Standalone DyAdvCore', &
         authors     = 'S.J. Lin, R. Rood, W. Putman')
-   cap_options = MAPL_CapOptions(cli)
    cap = MAPL_Cap('Standalone FV3 DynAdvCore', SetServices, cap_options = cap_options)
    call cap%run(_RC)
 
