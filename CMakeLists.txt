@@ -9,10 +9,10 @@ set (srcs
   AdvCore_GridCompMod.F90
   DynCore_GridCompMod.F90 CreateInterpWeights_GridCompMod.F90
   StandAlone_DynAdvCore_GridCompMod.F90
-  CubeToLatLonRegridder.F90 
-  LatLonToCubeRegridder.F90 
+  CubeToLatLonRegridder.F90
+  LatLonToCubeRegridder.F90
   CubeToCubeRegridder.F90
-  CubeToLatLon.F90 
+  CubeToLatLon.F90
   CubeGridPrototype.F90
   GEOS_FV3_Utilities.F90
   fv_regrid_c2c.F90
@@ -21,18 +21,13 @@ set (srcs
   rs_scaleMod.F90
   )
 
-if (ESMA_USE_GFE_NAMESPACE)
-  set(dependencies MAPL GFTL_SHARED::gftl-shared GMAO_hermes GEOS_Shared)
-else ()
-  set(dependencies MAPL gftl-shared GMAO_hermes GEOS_Shared)
-endif ()
+set(dependencies MAPL GFTL_SHARED::gftl-shared GMAO_hermes GEOS_Shared esmf OpenMP::OpenMP_Fortran)
 
 esma_add_library (${this}
   SRCS ${srcs}
   SUBCOMPONENTS fvdycore
   DEPENDENCIES ${dependencies}
-  DEPENDENCIES ${GFDL}
-  INCLUDES ${INC_ESMF})
+  DEPENDENCIES ${GFDL})
 
 if (FV_PRECISION STREQUAL R4)
    set (GFDL fms_r4)
@@ -60,9 +55,6 @@ if (CRAY_POINTER)
   set_target_properties (${this} PROPERTIES COMPILE_FLAGS ${CRAY_POINTER})
 endif()
 
-# Enable OpenMP
-target_link_libraries(${this} PRIVATE OpenMP::OpenMP_Fortran)
-
 add_definitions (-DSPMD -DMAPL_MODE)
 
 foreach(flag ${tmp})
@@ -72,43 +64,36 @@ endforeach()
 ecbuild_add_executable (
   TARGET StandAlone_FV3_Dycore.x
   SOURCES StandAlone_FV3_Dycore.F90
-  LIBS ${this})
-set_target_properties (StandAlone_FV3_Dycore.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+  LIBS ${this} OpenMP::OpenMP_Fortran)
 
 ecbuild_add_executable (
   TARGET rs_scale.x
   SOURCES rs_scale.F90
-  LIBS ${this})
-set_target_properties (rs_scale.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+  LIBS ${this} OpenMP::OpenMP_Fortran)
 
 ecbuild_add_executable (
    TARGET StandAlone_AdvCore.x
    SOURCES StandAlone_AdvCore.F90
-   LIBS ${this})
-set_target_properties (StandAlone_AdvCore.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+   LIBS ${this} OpenMP::OpenMP_Fortran)
 
 ecbuild_add_executable (
    TARGET StandAlone_DynAdvCore.x
    SOURCES StandAlone_DynAdvCore.F90
-   LIBS ${this})
-set_target_properties (StandAlone_DynAdvCore.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+   LIBS ${this} OpenMP::OpenMP_Fortran)
 
 ecbuild_add_executable (
    TARGET c2c.x
    SOURCES c2c.F90
-   LIBS ${this})
-set_target_properties (c2c.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+   LIBS ${this} OpenMP::OpenMP_Fortran)
 
 ecbuild_add_executable (
    TARGET interp_restarts.x
    SOURCES interp_restarts.F90
-   LIBS ${this})
-set_target_properties (interp_restarts.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+   LIBS ${this} OpenMP::OpenMP_Fortran)
 
 ecbuild_add_executable (
    TARGET interp_restarts_bin.x
    SOURCES interp_restarts_bin.F90
-   LIBS ${this})
-set_target_properties (interp_restarts_bin.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
+   LIBS ${this} OpenMP::OpenMP_Fortran)
 
 add_subdirectory(scripts)
