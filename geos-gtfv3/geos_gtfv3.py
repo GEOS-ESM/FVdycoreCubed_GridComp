@@ -77,18 +77,18 @@ def geos_gtfv3(
         driver_object,
         dycore,
         state_in)
-    write_sum_of_vars(comm, state_out)
+    # write_sum_of_vars(comm, state_out)
 
-    # # Convert NumPy arrays back to Fortran
-    # numpy_output_data_to_fortran(
-    #     state_out,
-    #     u, v, w, delz,
-    #     pt, delp, q,
-    #     ps, pe, pk, peln, pkz,
-    #     phis, q_con, omga,
-    #     ua, va, uc, vc,
-    #     mfx, mfy, cx, cy, diss_est)
+    # Convert NumPy arrays back to Fortran
+    numpy_output_data_to_fortran(
+        state_out,
+        u, v, w, delz,
+        pt, delp, q,
+        ps, pe, pk, peln, pkz,
+        phis, q_con, omga,
+        ua, va, uc, vc,
+        mfx, mfy, cx, cy, diss_est)
 
-    # if rank == 0:
-    #    print('P:', datetime.now().isoformat(timespec='milliseconds'),
-    #          '--converted NumPy arrays to Fortran', flush=True)
+    if rank == 0:
+       print('P:', datetime.now().isoformat(timespec='milliseconds'),
+             '--converted NumPy arrays to Fortran', flush=True)
