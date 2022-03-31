@@ -1,6 +1,5 @@
+import time
 import numpy as np
-
-from datetime import datetime
 
 def geos_gtfv3_run(comm, dycore_config, driver_object, dycore, state_in):
     '''
@@ -16,15 +15,8 @@ def geos_gtfv3_run(comm, dycore_config, driver_object, dycore, state_in):
 
     rank = comm.Get_rank()
 
-    # if rank == 0:
-    #     print('P:', datetime.now().isoformat(timespec='milliseconds'),
-    #           '--running step dynamics', flush=True)
-
     # Create state
     state = driver_object.state_from_inputs(state_in)
-    # if rank == 0:
-    #     print('P:', datetime.now().isoformat(timespec='milliseconds'),
-    #           '--created state', flush=True)
 
     # # Instantiate DryConvectiveAdjustment
     # if spec.namelist.fv_sg_adj > 0:
@@ -34,25 +26,19 @@ def geos_gtfv3_run(comm, dycore_config, driver_object, dycore, state_in):
     #         spec.namelist.fv_sg_adj,
     #         spec.namelist.n_sponge,
     #         spec.namelist.hydrostatic,)
-    #     if rank == 0:
-    #         print('P:', datetime.now().isoformat(timespec='milliseconds'),
-    #               '--instantiated DryConvectiveAdjustment', flush=True)
 
     # Run a single timestep of DynamicalCore
+    start = time.time()
     dycore.step_dynamics(
         state,
         conserve_total_energy = dycore_config.consv_te,
         do_adiabatic_init = True,
         timestep = state_in['bdt'],
         n_split = dycore_config.n_split)
-    # if rank == 0:
-    #     print('P:', datetime.now().isoformat(timespec='milliseconds'),
-    #           '--ran DynamicalCore::step_dynamics', flush=True)
+    end = time.time()
+    print('[{:02d}] Time taken by dycore.step_dynamics: {:.5f}s'.format(rank, end-start), flush=True)
 
     # Retrieve output data from state
     state_out = driver_object.outputs_from_state(state)
-    # if rank == 0:
-    #     print('P:', datetime.now().isoformat(timespec='milliseconds'),
-    #           '--retrieved output data from state', flush=True)
 
     return state_out
