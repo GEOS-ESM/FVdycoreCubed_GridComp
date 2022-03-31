@@ -2915,7 +2915,7 @@ subroutine fv_computeMassFluxes_r4(ucI, vcI, ple, mfx, mfy, cx, cy, dt)
     ! Prepare pressures for Mass Flux calculations
      delp(is:ie,js:je) = ple(:,:,k+1)-ple(:,:,k)
 
-     call compute_utvt(uc(isd,jsd,k), vc(isd,jsd,k), ut(isd,jsd), vt(isd,jsd), dt)
+     call compute_utvt(isd,ied, jsd,jed, uc(isd,jsd,k), vc(isd,jsd,k), ut(isd,jsd), vt(isd,jsd), dt)
      do j=jsd,jed
         do i=is,ie+1
            xfx(i,j) = dt*ut(i,j)
@@ -3098,7 +3098,7 @@ subroutine fv_computeMassFluxes_r8(ucI, vcI, ple, mfx, mfy, cx, cy, dt)
     ! Prepare pressures for Mass Flux calculations
      delp(is:ie,js:je) = ple(:,:,k+1)-ple(:,:,k)
 
-     call compute_utvt(uc(isd,jsd,k), vc(isd,jsd,k), ut(isd,jsd), vt(isd,jsd), dt)
+     call compute_utvt(isd,ied, jsd,jed, uc(isd,jsd,k), vc(isd,jsd,k), ut(isd,jsd), vt(isd,jsd), dt)
      do j=jsd,jed
         do i=is,ie+1
            xfx(i,j) = dt*ut(i,j)
@@ -3331,19 +3331,27 @@ subroutine fv_getVerticalMassFlux(mfx, mfy, mfz, dt)
 return
 end subroutine fv_getVerticalMassFlux
 
-subroutine compute_utvt(uc, vc, ut, vt, dt)
- use fv_mp_mod,         only: is,js,ie,je, isd,jsd,ied,jed
-  real(FVPRC), intent(IN   ) ::  uc(isd:ied+1,jsd:jed  )
-  real(FVPRC), intent(IN   ) ::  vc(isd:ied  ,jsd:jed+1)
-  real(FVPRC), intent(INOUT) ::  ut(isd:ied+1,jsd:jed  )
-  real(FVPRC), intent(INOUT) ::  vt(isd:ied  ,jsd:jed+1)
+subroutine compute_utvt(isd,ied, jsd,jed, uc, vc, ut, vt, dt)
+  integer,     intent(IN   ) :: isd,ied, jsd,jed
+  real(FVPRC), intent(IN   ) :: uc(isd:ied+1,jsd:jed  )
+  real(FVPRC), intent(IN   ) :: vc(isd:ied  ,jsd:jed+1)
+  real(FVPRC), intent(INOUT) :: ut(isd:ied+1,jsd:jed  )
+  real(FVPRC), intent(INOUT) :: vt(isd:ied  ,jsd:jed+1)
   real(FVPRC), intent(IN   ) :: dt
 ! Local vars
   real(FVPRC) :: damp
   integer i,j,npx,npy
-  
+  integer is ,ie ,js ,je 
+!BOC
+
+  is =FV_Atm(1)%bd%isc ; ie =FV_Atm(1)%bd%iec
+  js =FV_Atm(1)%bd%jsc ; je =FV_Atm(1)%bd%jec
+ 
   npx = FV_Atm(1)%flagstruct%npx
   npy = FV_Atm(1)%flagstruct%npy
+
+  ut = 0.0
+  vt = 0.0
 
   if ( FV_Atm(1)%flagstruct%grid_type < 3 ) then
 
@@ -3684,7 +3692,7 @@ subroutine fv_getDivergence(uc, vc, divg)
 ! Calc Divergence
     dt = 1.0
     do k=1,npz
-        call compute_utvt(uctemp(isd,jsd,k), vctemp(isd,jsd,k), ut(isd,jsd), vt(isd,jsd), dt)
+        call compute_utvt(isd,ied, jsd,jed, uctemp(isd,jsd,k), vctemp(isd,jsd,k), ut(isd,jsd), vt(isd,jsd), dt)
         do j=jsc,jec
            do i=isc,iec+1
               if ( ut(i,j) > 0. ) then
@@ -3976,7 +3984,7 @@ subroutine fv_getAllWinds_3D(u, v, ua, va, uc, vc, ur, vr, vort, divg, rotate)
 ! Calc Divergence
   if (present(divg)) then
     do k=1,npz
-        call compute_utvt(uctemp(isd,jsd,k), vctemp(isd,jsd,k), ut(isd,jsd), vt(isd,jsd), 1.0)
+        call compute_utvt(isd,ied, jsd,jed, uctemp(isd,jsd,k), vctemp(isd,jsd,k), ut(isd,jsd), vt(isd,jsd), 1.0)
         do j=jsc,jec
            do i=isc,iec+1
               if ( ut(i,j) > 0. ) then
