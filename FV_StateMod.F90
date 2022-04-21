@@ -488,7 +488,7 @@ contains
    FV_Atm(1)%flagstruct%n_sponge = 0
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
-   FV_Atm(1)%flagstruct%remap_option = 0
+   FV_Atm(1)%flagstruct%remap_option = 2
    FV_Atm(1)%flagstruct%kord_tm =  9
    FV_Atm(1)%flagstruct%kord_mt =  9
    FV_Atm(1)%flagstruct%kord_wz =  9
@@ -496,7 +496,7 @@ contains
    FV_Atm(1)%flagstruct%z_tracer = .true.
   ! Some default horizontal flags
    FV_Atm(1)%flagstruct%adjust_dry_mass = fix_mass
-   FV_Atm(1)%flagstruct%consv_te = 1.
+   FV_Atm(1)%flagstruct%consv_te = 0.
    FV_Atm(1)%flagstruct%consv_am = .false.
    FV_Atm(1)%flagstruct%fill = .true.
    FV_Atm(1)%flagstruct%dwind_2d = .false.
@@ -634,10 +634,9 @@ contains
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
-!! Check compatibility of remap_option and n_zfilter
+!! Force compatibility of remap_option and n_zfilter
     if (FV_Atm(1)%flagstruct%remap_option == 2) then
-    !         FV_Atm(1)%flagstruct%n_zfilter = 0
-    ! _ASSERT(FV_Atm(1)%flagstruct%n_zfilter == 0, 'n_zfilter must be 0 with remap_option=2')
+              FV_Atm(1)%flagstruct%n_zfilter = 0
     endif
 
 !! Setup GFDL microphysics module
