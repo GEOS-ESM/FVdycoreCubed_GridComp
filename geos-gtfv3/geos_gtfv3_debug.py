@@ -1,6 +1,6 @@
 import numpy as np
 
-def write_sum_of_vars(comm, data):
+def write_sum_of_vars(comm, data, var_list=None):
 
     rank = comm.Get_rank()
     nranks = comm.Get_size()
@@ -9,6 +9,8 @@ def write_sum_of_vars(comm, data):
         if i == rank:
             print()
             print('P: rank:', rank, flush=True)
-            for varname in data:
-                print('P:', varname, ':', np.sum(data[varname]), flush=True)
+            if var_list is None:
+                var_list = data.keys()
+            for varname in var_list:
+                print('P:', varname, ':', data[varname].shape, np.sum(data[varname]), flush=True)
         comm.Barrier()
