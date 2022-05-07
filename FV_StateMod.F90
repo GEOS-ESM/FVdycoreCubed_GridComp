@@ -488,7 +488,7 @@ contains
    FV_Atm(1)%flagstruct%n_sponge = 0
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
-   FV_Atm(1)%flagstruct%remap_option = 2
+   FV_Atm(1)%flagstruct%remap_option = 0
    FV_Atm(1)%flagstruct%kord_tm =  9
    FV_Atm(1)%flagstruct%kord_mt =  9
    FV_Atm(1)%flagstruct%kord_wz =  9
@@ -496,7 +496,7 @@ contains
    FV_Atm(1)%flagstruct%z_tracer = .true.
   ! Some default horizontal flags
    FV_Atm(1)%flagstruct%adjust_dry_mass = fix_mass
-   FV_Atm(1)%flagstruct%consv_te = 0.
+   FV_Atm(1)%flagstruct%consv_te = 0.70
    FV_Atm(1)%flagstruct%consv_am = .false.
    FV_Atm(1)%flagstruct%fill = .true.
    FV_Atm(1)%flagstruct%dwind_2d = .false.
