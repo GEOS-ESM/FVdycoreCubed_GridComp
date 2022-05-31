@@ -1086,6 +1086,46 @@ contains
 
 end subroutine FV_InitState
 
+subroutine rel_err_3d(a, aprime, err_linf, err_l2)
+
+  real, intent(in) :: a(:,:,:), aprime(:,:,:)
+  real, intent(out) :: err_linf, err_l2
+
+  err_linf = maxval(abs(a - aprime))/maxval(abs(a))
+  err_l2 = norm2(a - aprime)/norm2(a)
+
+end subroutine rel_err_3d
+
+subroutine rel_err_2d(a, aprime, err_linf, err_l2)
+
+  real, intent(in) :: a(:,:), aprime(:,:)
+  real, intent(out) :: err_linf, err_l2
+
+  err_linf = maxval(abs(a - aprime))/maxval(abs(a))
+  err_l2 = norm2(a - aprime)/norm2(a)
+
+end subroutine rel_err_2d
+
+subroutine abs_err_3d(a, aprime, err_linf, err_l2)
+
+  real, intent(in) :: a(:,:,:), aprime(:,:,:)
+  real, intent(out) :: err_linf, err_l2
+
+  err_linf = maxval(abs(a - aprime))
+  err_l2 = norm2(a - aprime)
+
+end subroutine abs_err_3d
+
+subroutine abs_err_2d(a, aprime, err_linf, err_l2)
+
+  real, intent(in) :: a(:,:), aprime(:,:)
+  real, intent(out) :: err_linf, err_l2
+
+  err_linf = maxval(abs(a - aprime))
+  err_l2 = norm2(a - aprime)
+
+end subroutine abs_err_2d
+
 subroutine FV_Run (STATE, CLOCK, GC, RC)
 
   type (T_FVDYCORE_STATE),pointer              :: STATE
@@ -1164,7 +1204,18 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
   type(ESMF_VM) :: vm
   integer :: comm, rank, nranks, mpierr
   logical :: halting_mode(5)
-  real :: start, finish
+  real :: start, finish, err_linf, err_l2
+  integer :: is, ie, js, je, itracer, icol
+  character(len=*), parameter :: fmt_f = '(i4, 1x, a1, 1x, a8, 1x, a1, 1x, f19.9, 1x, a1, 1x, f19.9)'
+  character(len=*), parameter :: fmt_e = '(i4, 1x, a1, 1x, a8, 1x, a1, 1x, e19.9, 1x, a1, 1x, e19.9)'
+  character(len=*), parameter :: fmt_e1 = '(i4, 1x, a1, 1x, a8, 1x, a1, 1x, e19.9, 1x, a1, 1x, e19.9, 1x, a)'
+
+  ! pchakrab: duplicates, for comparison
+  real, allocatable, dimension(:,:,:) :: u_tmp, v_tmp, w_tmp, delz_tmp, pt_tmp, delp_tmp
+  real, allocatable, dimension(:,:,:) :: q_con_tmp, omga_tmp, pe_tmp, pk_tmp, peln_tmp, pkz_tmp
+  real, allocatable, dimension(:,:,:) :: ua_tmp, va_tmp, uc_tmp, vc_tmp
+  real, allocatable, dimension(:,:,:) :: mfx_tmp, mfy_tmp, cx_tmp, cy_tmp, diss_est_tmp
+  real, allocatable :: q_tmp(:,:,:,:), ps_tmp(:,:), phis_tmp(:,:)
 
 ! Begin
 
@@ -1186,6 +1237,11 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
 
   time_total = days*86400. + seconds
 
+  is = FV_Atm(1)%bd%is
+  ie = FV_Atm(1)%bd%ie
+  js = FV_Atm(1)%bd%js
+  je = FV_Atm(1)%bd%je
+  
   isc = FV_Atm(1)%bd%isc
   iec = FV_Atm(1)%bd%iec
   jsc = FV_Atm(1)%bd%jsc
@@ -1724,74 +1780,60 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
 
     call MPI_Comm_size(MPI_COMM_WORLD, nranks, mpierr)
 
+    ! ! do i = 0, nranks-1
+    ! if (1 == rank) then
+    !    print *, ''
+    !    print *, 'F: (before) rank: ', rank
+    !    print *, 'ptop: ', FV_Atm(1)%ptop, ', ks: ', FV_Atm(1)%ks
+    !    print *, 'ak: ', FV_Atm(1)%ak
+    !    print *, 'bk: ', FV_Atm(1)%bk
+    ! end if
+    ! call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+    ! end do
+
     ! do i = 0, nranks-1
     !    if (i == rank) then
     !       print *, ''
     !       print *, 'F: (before) rank: ', rank
-    !       print *, 'F: logicals: ', adiabatic, &
-    !            FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%flagstruct%z_tracer, &
-    !            FV_Atm(1)%flagstruct%make_nh, FV_Atm(1)%flagstruct%fv_debug, &
-    !            FV_Atm(1)%flagstruct%reproduce_sum, FV_Atm(1)%flagstruct%do_sat_adj, &
-    !            FV_Atm(1)%flagstruct%do_vort_damp, FV_Atm(1)%flagstruct%rf_fast, &
-    !            FV_Atm(1)%flagstruct%fill
-    !       print *, 'F: dx/dy/dxa/dya/dxc/dyc: ', &
-    !            FV_Atm(1)%gridstruct%dx(-2,-2), FV_Atm(1)%gridstruct%dy(-2,-2), &
-    !            FV_Atm(1)%gridstruct%dxa(-2,-2), FV_Atm(1)%gridstruct%dya(-2,-2), &
-    !            FV_Atm(1)%gridstruct%dxc(-2,-2), FV_Atm(1)%gridstruct%dyc(-2,-2)
-    !       print *, 'F: rdx/rdy/rdxa/rdya/rdxc/rdyc: ', &
-    !            FV_Atm(1)%gridstruct%rdx(-2,-2), FV_Atm(1)%gridstruct%rdy(-2,-2), &
-    !            FV_Atm(1)%gridstruct%rdxa(-2,-2), FV_Atm(1)%gridstruct%rdya(-2,-2), &
-    !            FV_Atm(1)%gridstruct%rdxc(-2,-2), FV_Atm(1)%gridstruct%rdyc(-2,-2)
-    !       print *, 'F: cosa/cosa_s: ', FV_Atm(1)%gridstruct%cosa(-2,-2), FV_Atm(1)%gridstruct%cosa_s(-2,-2)
-    !       print *, 'F: sina_u/v: ', FV_Atm(1)%gridstruct%sina_u(-2,-2), FV_Atm(1)%gridstruct%sina_v(-2,-2)
-    !       print *, 'F: cosa_u/v: ', FV_Atm(1)%gridstruct%cosa_u(-2,-2), FV_Atm(1)%gridstruct%cosa_v(-2,-2)
-    !       print *, 'F: rsin2/rsina: ', FV_Atm(1)%gridstruct%rsin2(-2,-2), FV_Atm(1)%gridstruct%rsina(-2,-2)
-    !       print *, 'F: rsin_u/v: ', FV_Atm(1)%gridstruct%rsin_u(-2,-2), FV_Atm(1)%gridstruct%rsin_v(-2,-2)
-    !       print *, 'F: sin/cos_sg: ', &
-    !            FV_Atm(1)%gridstruct%sin_sg(1,1,1), FV_Atm(1)%gridstruct%sin_sg(1,1,2), &
-    !            FV_Atm(1)%gridstruct%sin_sg(1,1,3), FV_Atm(1)%gridstruct%sin_sg(1,1,4), &
-    !            FV_Atm(1)%gridstruct%cos_sg(1,1,1), FV_Atm(1)%gridstruct%cos_sg(1,1,2), &
-    !            FV_Atm(1)%gridstruct%cos_sg(1,1,3), FV_Atm(1)%gridstruct%cos_sg(1,1,4)
-    !       print *, 'F: area, area_64, rarea, rarea_c: ', &
-    !            FV_Atm(1)%gridstruct%area(1,1), FV_Atm(1)%gridstruct%area_64(1,1), &
-    !            FV_Atm(1)%gridstruct%rarea(1,1), FV_Atm(1)%gridstruct%rarea_c(1,1)
-    !       print *, 'F: f0/C: ', FV_Atm(1)%gridstruct%f0(1,1), FV_Atm(1)%gridstruct%fC(1,1)
-    !       print *, 'F: del6_u/v: ', FV_Atm(1)%gridstruct%del6_u(1,1), FV_Atm(1)%gridstruct%del6_v(1,1)
-    !       print *, 'F: divg_u/v: ', FV_Atm(1)%gridstruct%divg_u(1,1), FV_Atm(1)%gridstruct%divg_v(1,1)
-    !       print *, 'F: a/bgrid: ', &
-    !            FV_Atm(1)%gridstruct%agrid(1,1,1), FV_Atm(1)%gridstruct%agrid(1,1,2), &
-    !            FV_Atm(1)%gridstruct%grid(1,1,1), FV_Atm(1)%gridstruct%grid(1,1,2)
-    !       print *, 'F: a11/a12/a21/a22: ', &
-    !            FV_Atm(1)%gridstruct%a11(0,0), FV_Atm(1)%gridstruct%a12(0,0), &
-    !            FV_Atm(1)%gridstruct%a21(0,0), FV_Atm(1)%gridstruct%a22(0,0)
-    !       print *, 'F: edge_e/w/n/s: ', &
-    !            FV_Atm(1)%gridstruct%edge_e(1), FV_Atm(1)%gridstruct%edge_w(1), &
-    !            FV_Atm(1)%gridstruct%edge_n(1), FV_Atm(1)%gridstruct%edge_s(1)
-    !       print *, 'F: nested, stretched_grid, da_min, da_min_c: ', &
-    !            FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%stretched_grid, &
-    !            FV_Atm(1)%gridstruct%da_min, FV_Atm(1)%gridstruct%da_min_c
+    !       print *, 'F: (before) u: ', sum(FV_Atm(1)%u), sum(FV_Atm(1)%v), sum(FV_Atm(1)%w), sum(FV_Atm(1)%delz)
+    !       print *, 'F: (before) pt: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), &
+    !            sum(FV_Atm(1)%q(:,:,:,1)), sum(FV_Atm(1)%q(:,:,:,2)), sum(FV_Atm(1)%q(:,:,:,3)), &
+    !            sum(FV_Atm(1)%q(:,:,:,4)), sum(FV_Atm(1)%q(:,:,:,5)), sum(FV_Atm(1)%q(:,:,:,6)), &
+    !            sum(FV_Atm(1)%q(:,:,:,7))
+    !       ! print *, 'F: (before) ps: ', &
+    !       !      sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
+    !       print *, 'F: (before) phis: ', sum(FV_Atm(1)%phis), sum(FV_Atm(1)%q_con), sum(FV_Atm(1)%omga)
+    !       print *, 'F: (before) ua: ', sum(FV_Atm(1)%ua), sum(FV_Atm(1)%va), sum(FV_Atm(1)%uc), sum(FV_Atm(1)%vc)
+    !       print *, 'F: (before) mfx: ', sum(FV_Atm(1)%mfx), sum(FV_Atm(1)%mfy), sum(FV_Atm(1)%cx), sum(FV_Atm(1)%cy)
+    !       print *, 'F: (before) diss_est: ', sum(FV_Atm(1)%diss_est)
     !    end if
     !    call MPI_Barrier(MPI_COMM_WORLD, mpierr)
     ! end do
 
-    do i = 0, nranks-1
-       if (i == rank) then
-          print *, ''
-          print *, 'F: (before) rank: ', rank
-          print *, 'F: (before) u: ', sum(FV_Atm(1)%u), sum(FV_Atm(1)%v), sum(FV_Atm(1)%w), sum(FV_Atm(1)%delz)
-          print *, 'F: (before) pt: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), &
-               sum(FV_Atm(1)%q(:,:,:,1)), sum(FV_Atm(1)%q(:,:,:,2)), sum(FV_Atm(1)%q(:,:,:,3)), &
-               sum(FV_Atm(1)%q(:,:,:,4)), sum(FV_Atm(1)%q(:,:,:,5)), sum(FV_Atm(1)%q(:,:,:,6)), &
-               sum(FV_Atm(1)%q(:,:,:,7))
-          ! print *, 'F: (before) ps: ', &
-          !      sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
-          print *, 'F: (before) phis: ', sum(FV_Atm(1)%phis), sum(FV_Atm(1)%q_con), sum(FV_Atm(1)%omga)
-          print *, 'F: (before) ua: ', sum(FV_Atm(1)%ua), sum(FV_Atm(1)%va), sum(FV_Atm(1)%uc), sum(FV_Atm(1)%vc)
-          print *, 'F: (before) mfx: ', sum(FV_Atm(1)%mfx), sum(FV_Atm(1)%mfy), sum(FV_Atm(1)%cx), sum(FV_Atm(1)%cy)
-          print *, 'F: (before) diss_est: ', sum(FV_Atm(1)%diss_est)
-       end if
-       call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-    end do
+    allocate(u_tmp, source = FV_Atm(1)%u)
+    allocate(v_tmp, source = FV_Atm(1)%v)
+    allocate(w_tmp, source = FV_Atm(1)%w)
+    allocate(delz_tmp, source = FV_Atm(1)%delz)
+    allocate(pt_tmp, source = FV_Atm(1)%pt)
+    allocate(delp_tmp, source = FV_Atm(1)%delp)
+    allocate(q_tmp, source = FV_Atm(1)%q)
+    allocate(ps_tmp, source = FV_Atm(1)%ps)
+    allocate(pe_tmp, source = FV_Atm(1)%pe)
+    allocate(pk_tmp, source = FV_Atm(1)%pk)
+    allocate(peln_tmp, source = FV_Atm(1)%peln)
+    allocate(pkz_tmp, source = FV_Atm(1)%pkz)
+    allocate(phis_tmp, source = FV_Atm(1)%phis)
+    allocate(q_con_tmp, source = FV_Atm(1)%q_con)
+    allocate(omga_tmp, source = FV_Atm(1)%omga)
+    allocate(ua_tmp, source = FV_Atm(1)%ua)
+    allocate(va_tmp, source = FV_Atm(1)%va)
+    allocate(uc_tmp, source = FV_Atm(1)%uc)
+    allocate(vc_tmp, source = FV_Atm(1)%vc)
+    allocate(mfx_tmp, source = FV_Atm(1)%mfx)
+    allocate(mfy_tmp, source = FV_Atm(1)%mfy)
+    allocate(cx_tmp, source = FV_Atm(1)%cx)
+    allocate(cy_tmp, source = FV_Atm(1)%cy)
+    allocate(diss_est_tmp, source = FV_Atm(1)%diss_est)
 
     ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
     ! disable trapping of floating point exceptions temporarily, call the interface
@@ -1799,6 +1841,23 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     call ieee_get_halting_mode(ieee_all, halting_mode)
     call ieee_set_halting_mode(ieee_all, .false.)
     call cpu_time(start)
+    ! call geos_gtfv3_interface_f( &
+    !      comm, &
+    !      FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
+    !      FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
+    !      isd, ied, jsd, jed, &
+    !      myDT, FV_Atm(1)%ncnst, FV_Atm(1)%ng, FV_Atm(1)%ptop, FV_Atm(1)%ks, &
+    !      FV_Atm(1)%layout(1), FV_Atm(1)%layout(2), adiabatic, &
+    !      ! input/output
+    !      FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
+    !      FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
+    !      FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
+    !      FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
+    !      FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
+    !      ! input
+    !      FV_Atm(1)%ak, FV_Atm(1)%bk, &
+    !      ! input/output
+    !      FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
     call geos_gtfv3_interface_f( &
          comm, &
          FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
@@ -1807,19 +1866,20 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          myDT, FV_Atm(1)%ncnst, FV_Atm(1)%ng, FV_Atm(1)%ptop, FV_Atm(1)%ks, &
          FV_Atm(1)%layout(1), FV_Atm(1)%layout(2), adiabatic, &
          ! input/output
-         FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-         FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
-         FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
-         FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
-         FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
+         u_tmp, v_tmp, w_tmp, delz_tmp, &
+         pt_tmp, delp_tmp, q_tmp, &
+         ps_tmp, pe_tmp, pk_tmp, peln_tmp, pkz_tmp, &
+         phis_tmp, q_con_tmp, omga_tmp, &
+         ua_tmp, va_tmp, uc_tmp, vc_tmp, &
          ! input
          FV_Atm(1)%ak, FV_Atm(1)%bk, &
          ! input/output
-         FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
+         mfx_tmp, mfy_tmp, cx_tmp, cy_tmp, diss_est_tmp)
     call cpu_time(finish)
     call ieee_set_halting_mode(ieee_all, halting_mode)
     print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
-
+    call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+    
     call cpu_time(start)
     call fv_dynamics(FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng,   &
                      myDT, FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, kappa,   &
@@ -1834,25 +1894,169 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     call cpu_time(finish)
     print *, rank, ', fv_dynamics: time taken = ', finish - start, 's'
 
+    ! block
+
+    !   character(len=256) :: out_file
+    !   integer :: unit
+
+    !   write(out_file, '(a8, i1, a4)') 'out-fv3.', rank, '.bin'
+    !   open(newunit=unit, file=out_file, form='unformatted', status='new')
+    !   write(unit) isd, ied, jsd, jed, is, ie, js, je, npz
+    !   write(unit) FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz
+    !   write(unit) FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,1:7)
+    !   write(unit) FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz
+    !   write(unit) FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga
+    !   write(unit) FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc
+    !   write(unit) FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est
+    !   close(unit)
+
+    ! end block
+    
     call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-    call MPI_Comm_size(MPI_COMM_WORLD, nranks, mpierr)
+    if (rank == 0) then
+       write(*, '(a59)') 'rank | variable | L^infty(rel. error) |     L^2(rel. error)'
+       write(*, '(a59)') '-----|----------|---------------------|--------------------'
+    end if
+
     do i = 0, nranks-1
        if (i == rank) then
-          print *, 'F: (after) rank: ', rank
-          print *, 'F: (after) u: ', sum(FV_Atm(1)%u), sum(FV_Atm(1)%v), sum(FV_Atm(1)%w), sum(FV_Atm(1)%delz)
-          print *, 'F: (after) pt: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), &
-               sum(FV_Atm(1)%q(:,:,:,1)), sum(FV_Atm(1)%q(:,:,:,2)), sum(FV_Atm(1)%q(:,:,:,3)), &
-               sum(FV_Atm(1)%q(:,:,:,4)), sum(FV_Atm(1)%q(:,:,:,5)), sum(FV_Atm(1)%q(:,:,:,6)), &
-               sum(FV_Atm(1)%q(:,:,:,7))
-          print *, 'F: (after) ps: ', &
-               sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
-          print *, 'F: (after) phis: ', sum(FV_Atm(1)%phis), sum(FV_Atm(1)%q_con), sum(FV_Atm(1)%omga)
-          print *, 'F: (after) ua: ', sum(FV_Atm(1)%ua), sum(FV_Atm(1)%va), sum(FV_Atm(1)%uc), sum(FV_Atm(1)%vc)
-          print *, 'F: (after) mfx: ', sum(FV_Atm(1)%mfx), sum(FV_Atm(1)%mfy), sum(FV_Atm(1)%cx), sum(FV_Atm(1)%cy)
-          print *, 'F: (after) diss_est: ', sum(FV_Atm(1)%diss_est)
+          ! do icol = 1, 91
+          ! call rel_err_2d(FV_Atm(1)%u(is:ie, js:je+1, icol), u_tmp(is:ie, js:je+1, icol), err_linf, err_l2)
+          call rel_err_3d(FV_Atm(1)%u(is:ie, js:je+1, :), u_tmp(is:ie, js:je+1, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'u', '|', err_linf, '|', err_l2
+          ! end do
+          ! print *, FV_Atm(1)%u(2, 7, 91), u_tmp(2, 7, 91)
+          
+          call rel_err_3d(FV_Atm(1)%v(is:ie+1, js:je, :), v_tmp(is:ie+1, js:je, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'v', '|', err_linf, '|', err_l2
+          ! print *, FV_Atm(1)%v(2, 7, 91), v_tmp(2, 7, 91)
+          
+          call rel_err_3d(FV_Atm(1)%w(is:ie, js:je, :), w_tmp(is:ie, js:je, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'w', '|', err_linf, '|', err_l2
+          ! print *, FV_Atm(1)%w(2, 7, 91), w_tmp(2, 7, 91)
+
+          call rel_err_3d(FV_Atm(1)%delz(is:ie, js:je, :), delz_tmp(is:ie, js:je, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'delz', '|', err_linf, '|', err_l2
+          ! print *, FV_Atm(1)%delz(2, 7, 91), delz_tmp(2, 7, 91)
+
+          call rel_err_3d(FV_Atm(1)%pt(is:ie, js:je, :), pt_tmp(is:ie, js:je, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'pt', '|', err_linf, '|', err_l2
+          
+          call rel_err_3d(FV_Atm(1)%delp(is:ie, js:je, :), delp_tmp(is:ie, js:je, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'delp', '|', err_linf, '|', err_l2
+
+          do itracer = 1, 7
+             call abs_err_3d(FV_Atm(1)%q(is:ie, js:je, :, itracer), q_tmp(is:ie, js:je, :, itracer), err_linf, err_l2)
+             write(*, fmt_e1) rank, '|', 'qi', '|', err_linf, '|', err_l2, '(absolute)'
+          end do
+          ! write(*, fmt_e1) rank, '|', 'q(1:7)', '|', &
+          !      maxval(abs(FV_Atm(1)%q(is:ie, js:je, :, 1:7)-q_tmp(is:ie, js:je, :, 1:7))), '|', &
+          !      norm2(FV_Atm(1)%q(is:ie, js:je, :, 1:7)-q_tmp(is:ie, js:je, :, 1:7)), '(absolute)'
+
+          call rel_err_2d(FV_Atm(1)%ps(is:ie, js:je), ps_tmp(is:ie, js:je), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'ps', '|', err_linf, '|', err_l2
+
+          call rel_err_3d(FV_Atm(1)%pe, pe_tmp, err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'pe', '|', err_linf, '|', err_l2
+
+          call rel_err_3d(FV_Atm(1)%pk, pk_tmp, err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'pk', '|', err_linf, '|', err_l2
+
+          call rel_err_3d(FV_Atm(1)%peln, peln_tmp, err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'peln', '|', err_linf, '|', err_l2
+
+          call rel_err_3d(FV_Atm(1)%pkz, pkz_tmp, err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'pkz', '|', err_linf, '|', err_l2
+
+          call abs_err_2d(FV_Atm(1)%phis(is:ie, js:je), phis_tmp(is:ie, js:je), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'phis', '|', err_linf, '|', err_l2
+          ! write(*, fmt_e1) rank, '|', 'phis', '|', &
+          !      maxval(abs(FV_Atm(1)%phis(is:ie, js:je)-phis_tmp(is:ie, js:je))), '|', &
+          !      norm2(FV_Atm(1)%phis(is:ie, js:je)-phis_tmp(is:ie, js:je)), '(absolute)'
+          
+          call abs_err_3d(FV_Atm(1)%q_con(is:ie, js:je, :), q_con_tmp(is:ie, js:je, :), err_linf, err_l2)
+          write(*, fmt_e1) rank, '|', 'q_con', '|', err_linf, '|', err_l2, '(absolute)'
+          ! write(*, fmt_e1) rank, '|', 'q_con', '|', &
+          !      maxval(abs(FV_Atm(1)%q_con(is:ie, js:je, :)-q_con_tmp(is:ie, js:je, :))), '|', &
+          !      norm2(FV_Atm(1)%q_con(is:ie, js:je, :)-q_con_tmp(is:ie, js:je, :)), '(absolute)'
+
+          call rel_err_3d(FV_Atm(1)%omga(is:ie, js:je, :), omga_tmp(is:ie, js:je, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'omga', '|', err_linf, '|', err_l2
+          ! print *, FV_Atm(1)%omga(2, 7, 91), omga_tmp(2, 7, 91)
+
+          call rel_err_3d(FV_Atm(1)%ua(is:ie, js:je, :), ua_tmp(is:ie, js:je, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'ua', '|', err_linf, '|', err_l2
+          ! print *, FV_Atm(1)%ua(2, 7, 91), ua_tmp(2, 7, 91)
+
+          call rel_err_3d(FV_Atm(1)%va(is:ie, js:je, :), va_tmp(is:ie, js:je, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'va', '|', err_linf, '|', err_l2
+          ! print *, FV_Atm(1)%va(2, 7, 91), va_tmp(2, 7, 91)
+
+          call rel_err_3d(FV_Atm(1)%uc(is:ie+1, js:je, :), uc_tmp(is:ie+1, js:je, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'uc', '|', err_linf, '|', err_l2
+          ! print *, FV_Atm(1)%uc(2, 7, 91), uc_tmp(2, 7, 91)          
+          ! print *, 'sum[uc(:,:,1:3)]: ', sum(FV_Atm(1)%uc(is:ie+1, js:je, 1:3)), sum(uc_tmp(is:ie+1, js:je, 1:3))
+
+          call rel_err_3d(FV_Atm(1)%vc(is:ie, js:je+1, :), vc_tmp(is:ie, js:je+1, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'vc', '|', err_linf, '|', err_l2
+          ! print *, FV_Atm(1)%vc(2, 7, 91), vc_tmp(2, 7, 91)          
+          ! print *, 'sum[vc(:,:,1:3)]: ', sum(FV_Atm(1)%vc(is:ie, js:je+1, 1:3)), sum(vc_tmp(is:ie, js:je+1, 1:3))
+
+          call rel_err_3d(FV_Atm(1)%mfx(:, :, :), mfx_tmp(:, :, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'mfx', '|', err_linf, '|', err_l2
+          ! do icol = 1, 91
+          !    call rel_err_2d(FV_Atm(1)%mfx(:, :, icol), mfx_tmp(:, :, icol), err_linf, err_l2)
+          !    write(*, fmt_e) rank, '|', 'mfx', '|', err_linf, '|', err_l2
+          ! end do
+          
+          call rel_err_3d(FV_Atm(1)%mfy(:, :, :), mfy_tmp(:, :, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'mfy', '|', err_linf, '|', err_l2
+          ! print *, FV_Atm(1)%mfy(2, 7, 91), mfy_tmp(2, 7, 91)          
+          
+          call rel_err_3d(FV_Atm(1)%cx(:, js:je, :), cx_tmp(:, js:je, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'cx', '|', err_linf, '|', err_l2
+          ! print *, FV_Atm(1)%cx(2, 7, 91), cx_tmp(2, 7, 91)          
+
+          call rel_err_3d(FV_Atm(1)%cy(is:ie, :, :), cy_tmp(is:ie, :, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'cy', '|', err_linf, '|', err_l2
+          ! print *, FV_Atm(1)%cy(2, 7, 91), cy_tmp(2, 7, 91)          
+
+          call rel_err_3d(FV_Atm(1)%diss_est(is:ie, js:je, :), diss_est_tmp(is:ie, js:je, :), err_linf, err_l2)
+          write(*, fmt_e) rank, '|', 'diss_est', '|', err_linf, '|', err_l2
+          ! print *, FV_Atm(1)%diss_est(2, 7, 91), diss_est_tmp(2, 7, 91)          
+          
+          write(*, '(a59)') '-----|----------|---------------------|--------------------'
        end if
        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+       call sleep(1)
     end do
+
+    deallocate(u_tmp, v_tmp, w_tmp, delz_tmp)
+    deallocate(pt_tmp, delp_tmp, q_tmp)
+    deallocate(ps_tmp, pe_tmp, pk_tmp, peln_tmp, pkz_tmp)
+    deallocate(phis_tmp, q_con_tmp, omga_tmp)
+    deallocate(ua_tmp, va_tmp, uc_tmp, vc_tmp)
+    deallocate(mfx_tmp, mfy_tmp, cx_tmp, cy_tmp, diss_est_tmp)
+    
+    ! call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+    ! call MPI_Comm_size(MPI_COMM_WORLD, nranks, mpierr)
+    ! do i = 0, nranks-1
+    !    if (i == rank) then
+    !       print *, 'F: (after) rank: ', rank
+    !       print *, 'F: (after) u: ', sum(FV_Atm(1)%u), sum(FV_Atm(1)%v), sum(FV_Atm(1)%w), sum(FV_Atm(1)%delz)
+    !       print *, 'F: (after) pt: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), &
+    !            sum(FV_Atm(1)%q(:,:,:,1)), sum(FV_Atm(1)%q(:,:,:,2)), sum(FV_Atm(1)%q(:,:,:,3)), &
+    !            sum(FV_Atm(1)%q(:,:,:,4)), sum(FV_Atm(1)%q(:,:,:,5)), sum(FV_Atm(1)%q(:,:,:,6)), &
+    !            sum(FV_Atm(1)%q(:,:,:,7))
+    !       print *, 'F: (after) ps: ', &
+    !            sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
+    !       print *, 'F: (after) phis: ', sum(FV_Atm(1)%phis), sum(FV_Atm(1)%q_con), sum(FV_Atm(1)%omga)
+    !       print *, 'F: (after) ua: ', sum(FV_Atm(1)%ua), sum(FV_Atm(1)%va), sum(FV_Atm(1)%uc), sum(FV_Atm(1)%vc)
+    !       print *, 'F: (after) mfx: ', sum(FV_Atm(1)%mfx), sum(FV_Atm(1)%mfy), sum(FV_Atm(1)%cx), sum(FV_Atm(1)%cy)
+    !       print *, 'F: (after) diss_est: ', sum(FV_Atm(1)%diss_est)
+    !    end if
+    !    call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+    ! end do
 
     if ( FV_Atm(1)%flagstruct%fv_sg_adj > 0 ) then
          allocate ( u_dt(isd:ied,jsd:jed,npz) )
