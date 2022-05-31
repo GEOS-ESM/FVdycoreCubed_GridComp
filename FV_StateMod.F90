@@ -485,6 +485,7 @@ contains
      FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
+   FV_Atm(1)%flagstruct%n_sponge = 0
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
    FV_Atm(1)%flagstruct%remap_option = 0
@@ -503,7 +504,7 @@ contains
    FV_Atm(1)%flagstruct%ke_bg = 0.0
   ! Rayleigh Damping
    FV_Atm(1)%flagstruct%RF_fast = .false.
-   FV_Atm(1)%flagstruct%tau = 5
+   FV_Atm(1)%flagstruct%tau = 2
    FV_Atm(1)%flagstruct%rf_cutoff = 7.5e2
   ! Some default damping options
    FV_Atm(1)%flagstruct%nord = 2
