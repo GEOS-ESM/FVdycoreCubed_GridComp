@@ -1724,75 +1724,6 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
 
     call MPI_Comm_size(MPI_COMM_WORLD, nranks, mpierr)
 
-    ! do i = 0, nranks-1
-    !    if (i == rank) then
-    !       print *, ''
-    !       print *, 'F: (before) rank: ', rank
-    !       print *, 'F: logicals: ', adiabatic, &
-    !            FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%flagstruct%z_tracer, &
-    !            FV_Atm(1)%flagstruct%make_nh, FV_Atm(1)%flagstruct%fv_debug, &
-    !            FV_Atm(1)%flagstruct%reproduce_sum, FV_Atm(1)%flagstruct%do_sat_adj, &
-    !            FV_Atm(1)%flagstruct%do_vort_damp, FV_Atm(1)%flagstruct%rf_fast, &
-    !            FV_Atm(1)%flagstruct%fill
-    !       print *, 'F: dx/dy/dxa/dya/dxc/dyc: ', &
-    !            FV_Atm(1)%gridstruct%dx(-2,-2), FV_Atm(1)%gridstruct%dy(-2,-2), &
-    !            FV_Atm(1)%gridstruct%dxa(-2,-2), FV_Atm(1)%gridstruct%dya(-2,-2), &
-    !            FV_Atm(1)%gridstruct%dxc(-2,-2), FV_Atm(1)%gridstruct%dyc(-2,-2)
-    !       print *, 'F: rdx/rdy/rdxa/rdya/rdxc/rdyc: ', &
-    !            FV_Atm(1)%gridstruct%rdx(-2,-2), FV_Atm(1)%gridstruct%rdy(-2,-2), &
-    !            FV_Atm(1)%gridstruct%rdxa(-2,-2), FV_Atm(1)%gridstruct%rdya(-2,-2), &
-    !            FV_Atm(1)%gridstruct%rdxc(-2,-2), FV_Atm(1)%gridstruct%rdyc(-2,-2)
-    !       print *, 'F: cosa/cosa_s: ', FV_Atm(1)%gridstruct%cosa(-2,-2), FV_Atm(1)%gridstruct%cosa_s(-2,-2)
-    !       print *, 'F: sina_u/v: ', FV_Atm(1)%gridstruct%sina_u(-2,-2), FV_Atm(1)%gridstruct%sina_v(-2,-2)
-    !       print *, 'F: cosa_u/v: ', FV_Atm(1)%gridstruct%cosa_u(-2,-2), FV_Atm(1)%gridstruct%cosa_v(-2,-2)
-    !       print *, 'F: rsin2/rsina: ', FV_Atm(1)%gridstruct%rsin2(-2,-2), FV_Atm(1)%gridstruct%rsina(-2,-2)
-    !       print *, 'F: rsin_u/v: ', FV_Atm(1)%gridstruct%rsin_u(-2,-2), FV_Atm(1)%gridstruct%rsin_v(-2,-2)
-    !       print *, 'F: sin/cos_sg: ', &
-    !            FV_Atm(1)%gridstruct%sin_sg(1,1,1), FV_Atm(1)%gridstruct%sin_sg(1,1,2), &
-    !            FV_Atm(1)%gridstruct%sin_sg(1,1,3), FV_Atm(1)%gridstruct%sin_sg(1,1,4), &
-    !            FV_Atm(1)%gridstruct%cos_sg(1,1,1), FV_Atm(1)%gridstruct%cos_sg(1,1,2), &
-    !            FV_Atm(1)%gridstruct%cos_sg(1,1,3), FV_Atm(1)%gridstruct%cos_sg(1,1,4)
-    !       print *, 'F: area, area_64, rarea, rarea_c: ', &
-    !            FV_Atm(1)%gridstruct%area(1,1), FV_Atm(1)%gridstruct%area_64(1,1), &
-    !            FV_Atm(1)%gridstruct%rarea(1,1), FV_Atm(1)%gridstruct%rarea_c(1,1)
-    !       print *, 'F: f0/C: ', FV_Atm(1)%gridstruct%f0(1,1), FV_Atm(1)%gridstruct%fC(1,1)
-    !       print *, 'F: del6_u/v: ', FV_Atm(1)%gridstruct%del6_u(1,1), FV_Atm(1)%gridstruct%del6_v(1,1)
-    !       print *, 'F: divg_u/v: ', FV_Atm(1)%gridstruct%divg_u(1,1), FV_Atm(1)%gridstruct%divg_v(1,1)
-    !       print *, 'F: a/bgrid: ', &
-    !            FV_Atm(1)%gridstruct%agrid(1,1,1), FV_Atm(1)%gridstruct%agrid(1,1,2), &
-    !            FV_Atm(1)%gridstruct%grid(1,1,1), FV_Atm(1)%gridstruct%grid(1,1,2)
-    !       print *, 'F: a11/a12/a21/a22: ', &
-    !            FV_Atm(1)%gridstruct%a11(0,0), FV_Atm(1)%gridstruct%a12(0,0), &
-    !            FV_Atm(1)%gridstruct%a21(0,0), FV_Atm(1)%gridstruct%a22(0,0)
-    !       print *, 'F: edge_e/w/n/s: ', &
-    !            FV_Atm(1)%gridstruct%edge_e(1), FV_Atm(1)%gridstruct%edge_w(1), &
-    !            FV_Atm(1)%gridstruct%edge_n(1), FV_Atm(1)%gridstruct%edge_s(1)
-    !       print *, 'F: nested, stretched_grid, da_min, da_min_c: ', &
-    !            FV_Atm(1)%gridstruct%nested, FV_Atm(1)%gridstruct%stretched_grid, &
-    !            FV_Atm(1)%gridstruct%da_min, FV_Atm(1)%gridstruct%da_min_c
-    !    end if
-    !    call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-    ! end do
-
-    do i = 0, nranks-1
-       if (i == rank) then
-          print *, ''
-          print *, 'F: (before) rank: ', rank
-          print *, 'F: (before) u: ', sum(FV_Atm(1)%u), sum(FV_Atm(1)%v), sum(FV_Atm(1)%w), sum(FV_Atm(1)%delz)
-          print *, 'F: (before) pt: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), &
-               sum(FV_Atm(1)%q(:,:,:,1)), sum(FV_Atm(1)%q(:,:,:,2)), sum(FV_Atm(1)%q(:,:,:,3)), &
-               sum(FV_Atm(1)%q(:,:,:,4)), sum(FV_Atm(1)%q(:,:,:,5)), sum(FV_Atm(1)%q(:,:,:,6)), &
-               sum(FV_Atm(1)%q(:,:,:,7))
-          ! print *, 'F: (before) ps: ', &
-          !      sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
-          print *, 'F: (before) phis: ', sum(FV_Atm(1)%phis), sum(FV_Atm(1)%q_con), sum(FV_Atm(1)%omga)
-          print *, 'F: (before) ua: ', sum(FV_Atm(1)%ua), sum(FV_Atm(1)%va), sum(FV_Atm(1)%uc), sum(FV_Atm(1)%vc)
-          print *, 'F: (before) mfx: ', sum(FV_Atm(1)%mfx), sum(FV_Atm(1)%mfy), sum(FV_Atm(1)%cx), sum(FV_Atm(1)%cy)
-          print *, 'F: (before) diss_est: ', sum(FV_Atm(1)%diss_est)
-       end if
-       call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-    end do
-
     ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
     ! disable trapping of floating point exceptions temporarily, call the interface
     ! to the Python function and resume trapping
@@ -1833,26 +1764,6 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
                      FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, FV_Atm(1)%diss_est, time_total)
     call cpu_time(finish)
     print *, rank, ', fv_dynamics: time taken = ', finish - start, 's'
-
-    call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-    call MPI_Comm_size(MPI_COMM_WORLD, nranks, mpierr)
-    do i = 0, nranks-1
-       if (i == rank) then
-          print *, 'F: (after) rank: ', rank
-          print *, 'F: (after) u: ', sum(FV_Atm(1)%u), sum(FV_Atm(1)%v), sum(FV_Atm(1)%w), sum(FV_Atm(1)%delz)
-          print *, 'F: (after) pt: ', sum(FV_Atm(1)%pt), sum(FV_Atm(1)%delp), &
-               sum(FV_Atm(1)%q(:,:,:,1)), sum(FV_Atm(1)%q(:,:,:,2)), sum(FV_Atm(1)%q(:,:,:,3)), &
-               sum(FV_Atm(1)%q(:,:,:,4)), sum(FV_Atm(1)%q(:,:,:,5)), sum(FV_Atm(1)%q(:,:,:,6)), &
-               sum(FV_Atm(1)%q(:,:,:,7))
-          print *, 'F: (after) ps: ', &
-               sum(FV_Atm(1)%ps), sum(FV_Atm(1)%pe), sum(FV_Atm(1)%pk), sum(FV_Atm(1)%peln), sum(FV_Atm(1)%pkz)
-          print *, 'F: (after) phis: ', sum(FV_Atm(1)%phis), sum(FV_Atm(1)%q_con), sum(FV_Atm(1)%omga)
-          print *, 'F: (after) ua: ', sum(FV_Atm(1)%ua), sum(FV_Atm(1)%va), sum(FV_Atm(1)%uc), sum(FV_Atm(1)%vc)
-          print *, 'F: (after) mfx: ', sum(FV_Atm(1)%mfx), sum(FV_Atm(1)%mfy), sum(FV_Atm(1)%cx), sum(FV_Atm(1)%cy)
-          print *, 'F: (after) diss_est: ', sum(FV_Atm(1)%diss_est)
-       end if
-       call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-    end do
 
     if ( FV_Atm(1)%flagstruct%fv_sg_adj > 0 ) then
          allocate ( u_dt(isd:ied,jsd:jed,npz) )
