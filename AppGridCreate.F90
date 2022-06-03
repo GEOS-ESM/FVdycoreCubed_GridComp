@@ -4,8 +4,7 @@ subroutine AppCSEdgeCreateF(IM_WORLD, LonEdge,LatEdge, LonCenter, LatCenter, rc)
 #include "MAPL_Generic.h"
 
    use ESMF
-   use MAPL
-   use MAPL_ConstantsMod, only : pi=> MAPL_PI_R8
+   use MAPL, pi=> MAPL_PI_R8
    use fv_arrays_mod,     only: REAL4, REAL8, R_GRID
    use fv_grid_utils_mod, only: gnomonic_grids, cell_center2, direct_transform
    use fv_grid_tools_mod, only: mirror_grid

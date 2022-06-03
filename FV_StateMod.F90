@@ -727,6 +727,7 @@ contains
   real,                 pointer :: LONS (:,:)
 
   type (ESMF_TimeInterval)     :: Time2Run
+  type (ESMF_Time)             :: current_time
   type (ESMF_VM)               :: VM
   type (T_FVDYCORE_GRID) , pointer :: GRID
   integer              :: status
@@ -903,8 +904,10 @@ contains
                             S=nint(STATE%DT), rc=status)
   VERIFY_(status)
 
+  call ESMF_ClockGet(clock,currTime=current_time,_RC)
   STATE%ALARMS(TIME_TO_RUN) = ESMF_AlarmCreate(name="Time2Run", clock=clock, &
                               ringInterval=Time2Run, &
+                              ringTime=current_time, &
                               Enabled=.TRUE., rc=status) ; VERIFY_(status)
   call ESMF_AlarmEnable(STATE%ALARMS(TIME_TO_RUN), rc=status); VERIFY_(status)
   call ESMF_AlarmRingerOn(STATE%ALARMS(TIME_TO_RUN), rc=status); VERIFY_(status)
@@ -937,7 +940,6 @@ contains
      name         = trim(Iam)//"_MassAlarm",  &
      RingInterval = MassAlarmInt,             &
      RingTime     = fv_time,                  &
-     RefTime      = fv_time,                  &
      Enabled      = .true.,                   &
      sticky       = .false.,                  &
      RC           = STATUS                    )
