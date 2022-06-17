@@ -488,7 +488,8 @@ contains
    FV_Atm(1)%flagstruct%n_sponge = 0
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
-   FV_Atm(1)%flagstruct%remap_option = 0
+   FV_Atm(1)%flagstruct%remap_option = 2 ! Remap TE in LogP
+   FV_Atm(1)%flagstruct%gmao_remap = 3   ! GMAO Cubic
    FV_Atm(1)%flagstruct%kord_tm =  9
    FV_Atm(1)%flagstruct%kord_mt =  9
    FV_Atm(1)%flagstruct%kord_wz =  9
@@ -502,16 +503,6 @@ contains
    FV_Atm(1)%flagstruct%dwind_2d = .false.
    FV_Atm(1)%flagstruct%delt_max = 0.002
    FV_Atm(1)%flagstruct%ke_bg = 0.0
-  ! Rayleigh Damping
-   FV_Atm(1)%flagstruct%RF_fast = .false.
-   FV_Atm(1)%flagstruct%tau = 2
-   FV_Atm(1)%flagstruct%rf_cutoff = 7.5e2
-  ! Some default damping options
-   FV_Atm(1)%flagstruct%nord = 2
-   FV_Atm(1)%flagstruct%dddmp = 0.2
-   FV_Atm(1)%flagstruct%d4_bg = 0.12
-   FV_Atm(1)%flagstruct%d2_bg = 0.0
-   FV_Atm(1)%flagstruct%d_ext = 0.0
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%n_split = 0
    FV_Atm(1)%flagstruct%k_split = 1
@@ -555,9 +546,20 @@ contains
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       FV_Atm(1)%flagstruct%fv_sg_adj = DT*2
-    ! Monotonic Hydrostatic defaults
-      FV_Atm(1)%flagstruct%hydrostatic = .false.
+    ! Rayleigh Damping
+      FV_Atm(1)%flagstruct%RF_fast = .false.
+      FV_Atm(1)%flagstruct%tau = 2
+      FV_Atm(1)%flagstruct%rf_cutoff = 7.5e2
+    ! Hydrostatici defaults
+      FV_Atm(1)%flagstruct%hydrostatic = .true.
       FV_Atm(1)%flagstruct%make_nh = .false.
+    ! 2nd order damping options
+      FV_Atm(1)%flagstruct%nord = 0
+      FV_Atm(1)%flagstruct%dddmp = 0.2
+      FV_Atm(1)%flagstruct%d4_bg = 0.0
+      FV_Atm(1)%flagstruct%d2_bg = 0.0075
+      FV_Atm(1)%flagstruct%d_ext = 0.0
+    ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%vtdm4 = 0.0
       FV_Atm(1)%flagstruct%do_vort_damp = .false.
       FV_Atm(1)%flagstruct%d_con = 0.
@@ -567,8 +569,18 @@ contains
       FV_Atm(1)%flagstruct%hord_dp =  10
      ! This is the best/fastest option for tracers
       FV_Atm(1)%flagstruct%hord_tr =  8
-    ! NonMonotonic defaults for c360 (~50km) and finer
-      if (FV_Atm(1)%flagstruct%npx >= 180) then
+    ! Non-Hydrostatic defaults for c720 (~12km) and finer
+      if (FV_Atm(1)%flagstruct%npx >= 720) then
+      ! Non-Hydrostatic
+        FV_Atm(1)%flagstruct%hydrostatic = .false.
+        FV_Atm(1)%flagstruct%make_nh = .false.
+      ! 6th order damping options
+        FV_Atm(1)%flagstruct%nord = 2
+        FV_Atm(1)%flagstruct%dddmp = 0.2
+        FV_Atm(1)%flagstruct%d4_bg = 0.12
+        FV_Atm(1)%flagstruct%d2_bg = 0.0
+        FV_Atm(1)%flagstruct%d_ext = 0.0
+      ! non-monotonic advection schemes
         FV_Atm(1)%flagstruct%hord_mt =  6
         FV_Atm(1)%flagstruct%hord_vt =  6
         FV_Atm(1)%flagstruct%hord_tm =  6
@@ -577,23 +589,20 @@ contains
         FV_Atm(1)%flagstruct%d_con = 1.
         FV_Atm(1)%flagstruct%do_vort_damp = .true.
         FV_Atm(1)%flagstruct%vtdm4 = 0.01
-      endif
-    ! continue to adjust vorticity damping with
-    ! increasing resolution
-      if (FV_Atm(1)%flagstruct%npx >= 360) then
-        FV_Atm(1)%flagstruct%vtdm4 = 0.02
-      endif
-      if (FV_Atm(1)%flagstruct%npx >= 720) then
-        FV_Atm(1)%flagstruct%vtdm4 = 0.03
-      endif
-      if (FV_Atm(1)%flagstruct%npx >= 1440) then
-        FV_Atm(1)%flagstruct%vtdm4 = 0.04
-      endif
-      if (FV_Atm(1)%flagstruct%npx >= 2880) then
-        FV_Atm(1)%flagstruct%vtdm4 = 0.06
-      endif
-      if (FV_Atm(1)%flagstruct%npx >= 5760) then
-        FV_Atm(1)%flagstruct%vtdm4 = 0.08
+      ! continue to adjust vorticity damping with
+      ! increasing resolution
+        if (FV_Atm(1)%flagstruct%npx >= 720) then
+          FV_Atm(1)%flagstruct%vtdm4 = 0.03
+        endif
+        if (FV_Atm(1)%flagstruct%npx >= 1440) then
+          FV_Atm(1)%flagstruct%vtdm4 = 0.04
+        endif
+        if (FV_Atm(1)%flagstruct%npx >= 2880) then
+          FV_Atm(1)%flagstruct%vtdm4 = 0.06
+        endif
+        if (FV_Atm(1)%flagstruct%npx >= 5760) then
+          FV_Atm(1)%flagstruct%vtdm4 = 0.08
+        endif
       endif
    endif
 
@@ -604,8 +613,8 @@ contains
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
-!! Force compatibility of remap_option and n_zfilter
-    if (FV_Atm(1)%flagstruct%remap_option == 2) then
+!! Force compatibility of gmao_remap and n_zfilter
+    if (FV_Atm(1)%flagstruct%gmao_remap > 0) then
               FV_Atm(1)%flagstruct%n_zfilter = 0
     endif
 
@@ -4460,6 +4469,7 @@ subroutine echo_fv3_setup()
 !   logical :: srf_init  = .false.
 !   logical :: mountain  = .true.
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%remap_option ,format='("FV3 remap_option: ",(I4))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%gmao_remap ,format='("FV3 gmao_remap: ",(I4))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%z_tracer ,format='("FV3 z_tracer: ",(A))' )
 !   logical :: old_divg_damp = .false. ! parameter to revert damping parameters back to values
 !   logical :: fv_land = .false.       ! To cold starting the model with USGS terrain
