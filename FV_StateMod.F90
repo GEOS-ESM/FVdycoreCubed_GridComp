@@ -549,7 +549,7 @@ contains
     ! Rayleigh Damping
       FV_Atm(1)%flagstruct%RF_fast = .false.
       FV_Atm(1)%flagstruct%tau = 2
-      FV_Atm(1)%flagstruct%rf_cutoff = 7.5e2
+      FV_Atm(1)%flagstruct%rf_cutoff = 0.25e2
     ! Hydrostatici defaults
       FV_Atm(1)%flagstruct%hydrostatic = .true.
       FV_Atm(1)%flagstruct%make_nh = .false.
