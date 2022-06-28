@@ -64,6 +64,7 @@ private
   logical :: fix_mass = .true.
   integer :: CASE_ID = 11
   integer :: AdvCore_Advection = 0
+  character(LEN=ESMF_MAXSTR) :: FV3_CONFIG  
 
   public FV_Atm
   public FV_Setup, FV_InitState, FV_Run, FV_Finalize, FV_DA_Incs
@@ -115,20 +116,20 @@ private
 
   type T_TRACERS
        logical                                   :: is_r4
-       real(REAL8), dimension(:,:,:  ), pointer     :: content
-       real(REAL4), dimension(:,:,:  ), pointer     :: content_r4
-       character(LEN=ESMF_MAXSTR)                          :: tname
+       real(REAL8), dimension(:,:,:  ), pointer  :: content
+       real(REAL4), dimension(:,:,:  ), pointer  :: content_r4
+       character(LEN=ESMF_MAXSTR)                :: tname
   end type T_TRACERS
 
 ! T_FVDYCORE_VARS contains the prognostic variables for FVdycore
   type T_FVDYCORE_VARS
-       real(REAL8), dimension(:,:,:  ), pointer     :: U      => NULL() ! U winds (D-grid)
-       real(REAL8), dimension(:,:,:  ), pointer     :: V      => NULL() ! V winds (D-grid)
-       real(REAL8), dimension(:,:,:  ), pointer     :: PT     => NULL() ! scaled virtual pot. temp.
-       real(REAL8), dimension(:,:,:  ), pointer     :: PE     => NULL() ! Pressure at layer edges
-       real(REAL8), dimension(:,:,:  ), pointer     :: PKZ    => NULL() ! P^kappa mean
-       real(REAL8), dimension(:,:,:  ), pointer     :: DZ     => NULL() ! Height Thickness
-       real(REAL8), dimension(:,:,:  ), pointer     :: W      => NULL() ! Vertical Velocity
+       real(REAL8), dimension(:,:,:  ), pointer  :: U      => NULL() ! U winds (D-grid)
+       real(REAL8), dimension(:,:,:  ), pointer  :: V      => NULL() ! V winds (D-grid)
+       real(REAL8), dimension(:,:,:  ), pointer  :: PT     => NULL() ! scaled virtual pot. temp.
+       real(REAL8), dimension(:,:,:  ), pointer  :: PE     => NULL() ! Pressure at layer edges
+       real(REAL8), dimension(:,:,:  ), pointer  :: PKZ    => NULL() ! P^kappa mean
+       real(REAL8), dimension(:,:,:  ), pointer  :: DZ     => NULL() ! Height Thickness
+       real(REAL8), dimension(:,:,:  ), pointer  :: W      => NULL() ! Vertical Velocity
        type(T_TRACERS), dimension(:), pointer    :: tracer => NULL() ! Tracers
        integer :: nwat ! Number of water species
   end type T_FVDYCORE_VARS
@@ -404,9 +405,17 @@ contains
   VERIFY_(STATUS)
 
   call MAPL_GetResource( MAPL, INT_fix_mass,    label='fix_mass:'    , default=INT_fix_mass, rc=status )
+  VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, INT_check_mass,  label='check_mass:'  , default=INT_check_mass, rc=status )
+  VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, INT_ADIABATIC,   label='ADIABATIC:'   , default=INT_adiabatic, rc=status )
+  VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, INT_FV_OFF,      label='FV_OFF:'      , default=INT_FV_OFF, rc=status )
+  VERIFY_(STATUS)
+
+  ! option to enable MERRA-2 configurations for FV3
+  call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='STOCK', rc=status )
+  VERIFY_(STATUS)
 
   ! MAT The Fortran Standard, and thus gfortran, *does not allow* the use
   !     of if (integer). So, we must convert integer resources to logicals
@@ -455,6 +464,7 @@ contains
   ! Number of water species for FV3 determined later
   ! when reading the tracer bundle in fv_first_run 
    FV_Atm(1)%flagstruct%nwat = 0
+   FV_Atm(1)%flagstruct%do_sat_adj = .true. ! only valid when nwat >= 6
   ! Veritical resolution dependencies
    FV_Atm(1)%flagstruct%external_eta = .true.
    if (FV_Atm(1)%flagstruct%npz >= 70) then
@@ -488,8 +498,8 @@ contains
    FV_Atm(1)%flagstruct%n_sponge = 0
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
-   FV_Atm(1)%flagstruct%remap_option = 2 ! Remap TE in LogP
-   FV_Atm(1)%flagstruct%gmao_remap = 3   ! GMAO Cubic
+   FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
+   FV_Atm(1)%flagstruct%gmao_remap = 0   ! GMAO Cubic
    FV_Atm(1)%flagstruct%kord_tm =  9
    FV_Atm(1)%flagstruct%kord_mt =  9
    FV_Atm(1)%flagstruct%kord_wz =  9
@@ -503,6 +513,16 @@ contains
    FV_Atm(1)%flagstruct%dwind_2d = .false.
    FV_Atm(1)%flagstruct%delt_max = 0.002
    FV_Atm(1)%flagstruct%ke_bg = 0.0
+  ! Rayleigh Damping
+   FV_Atm(1)%flagstruct%RF_fast = .false.
+   FV_Atm(1)%flagstruct%tau = 2
+   FV_Atm(1)%flagstruct%rf_cutoff = 0.25e2
+  ! 6th order default damping options
+   FV_Atm(1)%flagstruct%nord = 2
+   FV_Atm(1)%flagstruct%dddmp = 0.2
+   FV_Atm(1)%flagstruct%d4_bg = 0.12
+   FV_Atm(1)%flagstruct%d2_bg = 0.0
+   FV_Atm(1)%flagstruct%d_ext = 0.0
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%n_split = 0
    FV_Atm(1)%flagstruct%k_split = 1
@@ -545,64 +565,62 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75  )
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
-      FV_Atm(1)%flagstruct%fv_sg_adj = DT*2
-    ! Rayleigh Damping
-      FV_Atm(1)%flagstruct%RF_fast = .false.
-      FV_Atm(1)%flagstruct%tau = 2
-      FV_Atm(1)%flagstruct%rf_cutoff = 0.25e2
-    ! Hydrostatici defaults
-      FV_Atm(1)%flagstruct%hydrostatic = .true.
-      FV_Atm(1)%flagstruct%make_nh = .false.
-    ! 2nd order damping options
-      FV_Atm(1)%flagstruct%nord = 0
-      FV_Atm(1)%flagstruct%dddmp = 0.2
-      FV_Atm(1)%flagstruct%d4_bg = 0.0
-      FV_Atm(1)%flagstruct%d2_bg = 0.0075
-      FV_Atm(1)%flagstruct%d_ext = 0.0
     ! Monotonic Hydrostatic defaults
-      FV_Atm(1)%flagstruct%vtdm4 = 0.0
-      FV_Atm(1)%flagstruct%do_vort_damp = .false.
-      FV_Atm(1)%flagstruct%d_con = 0.
-      FV_Atm(1)%flagstruct%hord_mt =  10
-      FV_Atm(1)%flagstruct%hord_vt =  10
-      FV_Atm(1)%flagstruct%hord_tm =  10
-      FV_Atm(1)%flagstruct%hord_dp =  10
+      FV_Atm(1)%flagstruct%hydrostatic = .false.
+      FV_Atm(1)%flagstruct%make_nh = .false.
      ! This is the best/fastest option for tracers
       FV_Atm(1)%flagstruct%hord_tr =  8
-    ! Non-Hydrostatic defaults for c720 (~12km) and finer
+    ! Non-Monotonic advection with 6th order damping
+      FV_Atm(1)%flagstruct%hord_mt =  6
+      FV_Atm(1)%flagstruct%hord_vt =  6
+      FV_Atm(1)%flagstruct%hord_tm =  6
+      FV_Atm(1)%flagstruct%hord_dp = -6
+    ! Must now include explicit vorticity damping
+      FV_Atm(1)%flagstruct%d_con = 1.
+      FV_Atm(1)%flagstruct%do_vort_damp = .true.
+      FV_Atm(1)%flagstruct%vtdm4 = 0.01
+    ! continue to adjust vorticity damping with
+    ! increasing resolution
       if (FV_Atm(1)%flagstruct%npx >= 720) then
-      ! Non-Hydrostatic
-        FV_Atm(1)%flagstruct%hydrostatic = .false.
-        FV_Atm(1)%flagstruct%make_nh = .false.
-      ! 6th order damping options
-        FV_Atm(1)%flagstruct%nord = 2
+        FV_Atm(1)%flagstruct%vtdm4 = 0.02
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 720) then
+        FV_Atm(1)%flagstruct%vtdm4 = 0.03
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 1440) then
+        FV_Atm(1)%flagstruct%vtdm4 = 0.04
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 2880) then
+        FV_Atm(1)%flagstruct%vtdm4 = 0.06
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 5760) then
+        FV_Atm(1)%flagstruct%vtdm4 = 0.08
+      endif
+      if (trim(FV3_CONFIG) == "MERRA-2") then
+       ! Override FV3 defaults with MERRA-2 hydrostatic configuration
+        FV_Atm(1)%flagstruct%hydrostatic = .true.
+       ! disable subgrid dz adjustment
+        FV_Atm(1)%flagstruct%fv_sg_adj = -1
+       ! Monotonic advection schemes
+        FV_Atm(1)%flagstruct%hord_mt =  10
+        FV_Atm(1)%flagstruct%hord_vt =  10
+        FV_Atm(1)%flagstruct%hord_tm =  10
+        FV_Atm(1)%flagstruct%hord_dp =  10
+       ! 2nd order damping
+        FV_Atm(1)%flagstruct%nord = 0
         FV_Atm(1)%flagstruct%dddmp = 0.2
-        FV_Atm(1)%flagstruct%d4_bg = 0.12
-        FV_Atm(1)%flagstruct%d2_bg = 0.0
+        FV_Atm(1)%flagstruct%d4_bg = 0.0
+        FV_Atm(1)%flagstruct%d2_bg = 0.0075
         FV_Atm(1)%flagstruct%d_ext = 0.0
-      ! non-monotonic advection schemes
-        FV_Atm(1)%flagstruct%hord_mt =  6
-        FV_Atm(1)%flagstruct%hord_vt =  6
-        FV_Atm(1)%flagstruct%hord_tm =  6
-        FV_Atm(1)%flagstruct%hord_dp = -6
-      ! Must now include explicit vorticity damping
-        FV_Atm(1)%flagstruct%d_con = 1.
-        FV_Atm(1)%flagstruct%do_vort_damp = .true.
-        FV_Atm(1)%flagstruct%vtdm4 = 0.01
-      ! continue to adjust vorticity damping with
-      ! increasing resolution
-        if (FV_Atm(1)%flagstruct%npx >= 720) then
-          FV_Atm(1)%flagstruct%vtdm4 = 0.03
-        endif
-        if (FV_Atm(1)%flagstruct%npx >= 1440) then
-          FV_Atm(1)%flagstruct%vtdm4 = 0.04
-        endif
-        if (FV_Atm(1)%flagstruct%npx >= 2880) then
-          FV_Atm(1)%flagstruct%vtdm4 = 0.06
-        endif
-        if (FV_Atm(1)%flagstruct%npx >= 5760) then
-          FV_Atm(1)%flagstruct%vtdm4 = 0.08
-        endif
+       ! disable vorticity damping
+        FV_Atm(1)%flagstruct%vtdm4 = 0.0
+        FV_Atm(1)%flagstruct%do_vort_damp = .false.
+        FV_Atm(1)%flagstruct%d_con = 0.
+       ! Use GMAO cubic remapping for TE
+        FV_Atm(1)%flagstruct%remap_option = 2 ! Remap TE in LogP
+        FV_Atm(1)%flagstruct%gmao_remap = 3   ! GMAO Cubic
+       ! do TE conservation just in the GMAO cubic remap
+        FV_Atm(1)%flagstruct%consv_te = 0.0
       endif
    endif
 
@@ -1225,9 +1243,9 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          endif
          if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL plus QCLD
        endif
-       if (FV_Atm(1)%flagstruct%do_sat_adj) then
-          _ASSERT(FV_Atm(1)%flagstruct%nwat >= 6, 'when using fv saturation adjustment NWAT must >= 6')
-       endif
+      !if (FV_Atm(1)%flagstruct%do_sat_adj) then
+      !   _ASSERT(FV_Atm(1)%flagstruct%nwat >= 6, 'when using fv saturation adjustment NWAT must >= 6')
+      !endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
     ! Set FV3 surface geopotential
