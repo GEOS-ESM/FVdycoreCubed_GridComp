@@ -565,6 +565,7 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75  )
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
+      FV_Atm(1)%flagstruct%fv_sg_adj = 2*DT
     ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%hydrostatic = .false.
       FV_Atm(1)%flagstruct%make_nh = .false.
