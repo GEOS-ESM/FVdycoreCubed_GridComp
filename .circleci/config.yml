@@ -18,7 +18,8 @@ workflows:
               compiler: [ifort, gfortran]
           baselibs_version: *baselibs_version
           repo: GEOSgcm
-          mepodevelop: false
+          checkout_fixture: true
+          mepodevelop: true
           persist_workspace: true # Needs to be true to run fv3/gcm experiment, costs extra
       - ci/run_fv3:
           name: run-FV3-on-<< matrix.compiler >>
