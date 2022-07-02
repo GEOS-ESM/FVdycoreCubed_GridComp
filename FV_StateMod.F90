@@ -321,7 +321,6 @@ contains
   integer              :: status
   real(FVPRC) :: DT
 
-  integer   :: ks                 !  True # press. levs
   integer   :: ndt,nx,ny
 
   type (MAPL_MetaComp),          pointer :: MAPL  => NULL()
@@ -519,10 +518,10 @@ contains
    FV_Atm(1)%flagstruct%rf_cutoff = 0.25e2
   ! 6th order default damping options
    FV_Atm(1)%flagstruct%nord = 2
-   FV_Atm(1)%flagstruct%dddmp = 0.2
+   FV_Atm(1)%flagstruct%dddmp = 0.0
    FV_Atm(1)%flagstruct%d4_bg = 0.12
    FV_Atm(1)%flagstruct%d2_bg = 0.0
-   FV_Atm(1)%flagstruct%d_ext = 0.0
+   FV_Atm(1)%flagstruct%d_ext = 0.02
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%n_split = 0
    FV_Atm(1)%flagstruct%k_split = 1
@@ -612,7 +611,7 @@ contains
         FV_Atm(1)%flagstruct%dddmp = 0.2
         FV_Atm(1)%flagstruct%d4_bg = 0.0
         FV_Atm(1)%flagstruct%d2_bg = 0.0075
-        FV_Atm(1)%flagstruct%d_ext = 0.0
+        FV_Atm(1)%flagstruct%d_ext = 0.02
        ! disable vorticity damping
         FV_Atm(1)%flagstruct%vtdm4 = 0.0
         FV_Atm(1)%flagstruct%do_vort_damp = .false.
@@ -648,14 +647,6 @@ contains
 
   call WRITE_PARALLEL((/FV_Atm(1)%flagstruct%npx,FV_Atm(1)%flagstruct%npy,FV_Atm(1)%flagstruct%npz/)       , &
     format='("Resolution of dynamics restart     =",3I5)'  )
-
-  ks = FV_Atm(1)%ks ! ALT: this was the value when we read "old" style FV_internal restart
-                    !      if needed, we could compute, ks by count(BK==0.0)
-                    !      then FV will try to run slightly more efficient code
-                    !      So far, GEOS-5 has used ks = 0
-  _ASSERT(ks <= FV_Atm(1)%flagstruct%NPZ+1,'ks must be smaller than NPZ+1')
-  call WRITE_PARALLEL(ks                          , &
-     format='("Number of true pressure levels =", I5)'   )
 
   FV_HYDROSTATIC = FV_Atm(1)%flagstruct%hydrostatic
   DEBUG          = FV_Atm(1)%flagstruct%fv_debug
@@ -860,6 +851,10 @@ contains
   if(.not.associated(GRID%BK)) allocate(GRID%BK(size(bk)))
   GRID%AK     = ak
   GRID%BK     = bk
+
+  FV_Atm(1)%ks = count(bk == 0.0) - 1
+  _ASSERT(FV_Atm(1)%ks <= FV_Atm(1)%flagstruct%NPZ+1,'ks must be smaller than NPZ+1')
+  call WRITE_PARALLEL(FV_Atm(1)%ks, format='("Number of true pressure levels =", I5)'   )
 
 ! Local Copy of dimensions
 
