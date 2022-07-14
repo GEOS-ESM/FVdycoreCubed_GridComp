@@ -116,20 +116,20 @@ private
 
   type T_TRACERS
        logical                                   :: is_r4
-       real(REAL8), dimension(:,:,:  ), pointer  :: content
-       real(REAL4), dimension(:,:,:  ), pointer  :: content_r4
-       character(LEN=ESMF_MAXSTR)                :: tname
+       real(REAL8), dimension(:,:,:  ), pointer     :: content
+       real(REAL4), dimension(:,:,:  ), pointer     :: content_r4
+       character(LEN=ESMF_MAXSTR)                          :: tname
   end type T_TRACERS
 
 ! T_FVDYCORE_VARS contains the prognostic variables for FVdycore
   type T_FVDYCORE_VARS
-       real(REAL8), dimension(:,:,:  ), pointer  :: U      => NULL() ! U winds (D-grid)
-       real(REAL8), dimension(:,:,:  ), pointer  :: V      => NULL() ! V winds (D-grid)
-       real(REAL8), dimension(:,:,:  ), pointer  :: PT     => NULL() ! scaled virtual pot. temp.
-       real(REAL8), dimension(:,:,:  ), pointer  :: PE     => NULL() ! Pressure at layer edges
-       real(REAL8), dimension(:,:,:  ), pointer  :: PKZ    => NULL() ! P^kappa mean
-       real(REAL8), dimension(:,:,:  ), pointer  :: DZ     => NULL() ! Height Thickness
-       real(REAL8), dimension(:,:,:  ), pointer  :: W      => NULL() ! Vertical Velocity
+       real(REAL8), dimension(:,:,:  ), pointer     :: U      => NULL() ! U winds (D-grid)
+       real(REAL8), dimension(:,:,:  ), pointer     :: V      => NULL() ! V winds (D-grid)
+       real(REAL8), dimension(:,:,:  ), pointer     :: PT     => NULL() ! scaled virtual pot. temp.
+       real(REAL8), dimension(:,:,:  ), pointer     :: PE     => NULL() ! Pressure at layer edges
+       real(REAL8), dimension(:,:,:  ), pointer     :: PKZ    => NULL() ! P^kappa mean
+       real(REAL8), dimension(:,:,:  ), pointer     :: DZ     => NULL() ! Height Thickness
+       real(REAL8), dimension(:,:,:  ), pointer     :: W      => NULL() ! Vertical Velocity
        type(T_TRACERS), dimension(:), pointer    :: tracer => NULL() ! Tracers
        integer :: nwat ! Number of water species
   end type T_FVDYCORE_VARS
@@ -495,10 +495,11 @@ contains
      FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
    FV_Atm(1)%flagstruct%n_sponge = 0
-   FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
-   FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
+   FV_Atm(1)%flagstruct%n_zfilter = FV_Atm(1)%flagstruct%npz
+   FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
+   FV_Atm(1)%flagstruct%d2_bg_k2 = 0.02
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
-   FV_Atm(1)%flagstruct%gmao_remap = 0   ! GMAO Cubic
+   FV_Atm(1)%flagstruct%gmao_remap = 0   ! Do not use GMAO schemes
    FV_Atm(1)%flagstruct%kord_tm =  9
    FV_Atm(1)%flagstruct%kord_mt =  9
    FV_Atm(1)%flagstruct%kord_wz =  9
@@ -506,7 +507,7 @@ contains
    FV_Atm(1)%flagstruct%z_tracer = .true.
   ! Some default horizontal flags
    FV_Atm(1)%flagstruct%adjust_dry_mass = fix_mass
-   FV_Atm(1)%flagstruct%consv_te = 0.70
+   FV_Atm(1)%flagstruct%consv_te = 0.7
    FV_Atm(1)%flagstruct%consv_am = .false.
    FV_Atm(1)%flagstruct%fill = .true.
    FV_Atm(1)%flagstruct%dwind_2d = .false.
@@ -514,13 +515,13 @@ contains
    FV_Atm(1)%flagstruct%ke_bg = 0.0
   ! Rayleigh Damping
    FV_Atm(1)%flagstruct%RF_fast = .false.
-   FV_Atm(1)%flagstruct%tau = 2
+   FV_Atm(1)%flagstruct%tau = 2.5
    FV_Atm(1)%flagstruct%rf_cutoff = 0.25e2
   ! 6th order default damping options
    FV_Atm(1)%flagstruct%nord = 2
-   FV_Atm(1)%flagstruct%dddmp = 0.0
-   FV_Atm(1)%flagstruct%d4_bg = 0.12
-   FV_Atm(1)%flagstruct%d2_bg = 0.0
+   FV_Atm(1)%flagstruct%dddmp = 0.2
+   FV_Atm(1)%flagstruct%d4_bg = 0.16
+   FV_Atm(1)%flagstruct%d2_bg = 0.0075
    FV_Atm(1)%flagstruct%d_ext = 0.02
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%n_split = 0
@@ -528,7 +529,7 @@ contains
   ! default NonHydrostatic settings (irrelavent to Hydrostatic)
    FV_Atm(1)%flagstruct%beta = 0.0
    FV_Atm(1)%flagstruct%a_imp = 1.0
-   FV_Atm(1)%flagstruct%p_fac = 0.1
+   FV_Atm(1)%flagstruct%p_fac = 0.05
   ! Cubed-Sphere Global Resolution Specific adjustments
    if (FV_Atm(1)%flagstruct%ntiles == 6) then
      ! Cubed-sphere grid resolution and DT dependence 
@@ -543,60 +544,75 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 90) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
-      endif
-      if (FV_Atm(1)%flagstruct%npx >= 180) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 360) then
+      if (FV_Atm(1)%flagstruct%npx >= 180) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 720) then
+      if (FV_Atm(1)%flagstruct%npx >= 360) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 1440) then
+      if (FV_Atm(1)%flagstruct%npx >= 720) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0   )
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 2880) then
+      if (FV_Atm(1)%flagstruct%npx >= 1440) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5   )
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 5760) then
+      if (FV_Atm(1)%flagstruct%npx >= 2880) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75  )
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 5760) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       FV_Atm(1)%flagstruct%fv_sg_adj = 2*DT
-    ! Monotonic Hydrostatic defaults
+     ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%hydrostatic = .false.
-      FV_Atm(1)%flagstruct%make_nh = .false.
+       FV_Atm(1)%flagstruct%make_nh = .false.
      ! This is the best/fastest option for tracers
       FV_Atm(1)%flagstruct%hord_tr =  8
-    ! Non-Monotonic advection with 6th order damping
-      FV_Atm(1)%flagstruct%hord_mt =  6
-      FV_Atm(1)%flagstruct%hord_vt =  6
-      FV_Atm(1)%flagstruct%hord_tm =  6
-      FV_Atm(1)%flagstruct%hord_dp = -6
-    ! Must now include explicit vorticity damping
-      FV_Atm(1)%flagstruct%d_con = 1.
-      FV_Atm(1)%flagstruct%do_vort_damp = .true.
-      FV_Atm(1)%flagstruct%vtdm4 = 0.01
-    ! continue to adjust vorticity damping with
-    ! increasing resolution
-      if (FV_Atm(1)%flagstruct%npx >= 720) then
-        FV_Atm(1)%flagstruct%vtdm4 = 0.02
-      endif
-      if (FV_Atm(1)%flagstruct%npx >= 720) then
-        FV_Atm(1)%flagstruct%vtdm4 = 0.03
-      endif
-      if (FV_Atm(1)%flagstruct%npx >= 1440) then
-        FV_Atm(1)%flagstruct%vtdm4 = 0.04
-      endif
-      if (FV_Atm(1)%flagstruct%npx >= 2880) then
-        FV_Atm(1)%flagstruct%vtdm4 = 0.06
-      endif
-      if (FV_Atm(1)%flagstruct%npx >= 5760) then
-        FV_Atm(1)%flagstruct%vtdm4 = 0.08
-      endif
-      if (trim(FV3_CONFIG) == "MERRA-2") then
+      if (index(FV3_CONFIG,"MONOTONIC") > 0) then
+       ! Monotonic advection schemes
+       FV_Atm(1)%flagstruct%hord_mt =  10
+       FV_Atm(1)%flagstruct%hord_vt =  10
+       FV_Atm(1)%flagstruct%hord_tm =  10
+       FV_Atm(1)%flagstruct%hord_dp =  10
+       ! disable vorticity damping
+       FV_Atm(1)%flagstruct%vtdm4 = 0.0
+       FV_Atm(1)%flagstruct%do_vort_damp = .false.
+       FV_Atm(1)%flagstruct%d_con = 0.
+      else
+      ! Non-Monotonic advection 
+         FV_Atm(1)%flagstruct%hord_mt =  6
+         FV_Atm(1)%flagstruct%hord_vt =  6
+         FV_Atm(1)%flagstruct%hord_tm =  6
+         FV_Atm(1)%flagstruct%hord_dp = -6
+       ! Must now include explicit vorticity damping
+         FV_Atm(1)%flagstruct%d_con = 1.
+         FV_Atm(1)%flagstruct%do_vort_damp = .true.
+         FV_Atm(1)%flagstruct%vtdm4 = 0.01
+     ! continue to adjust vorticity damping with
+     ! increasing resolution
+        if (FV_Atm(1)%flagstruct%npx >= 180) then
+         FV_Atm(1)%flagstruct%vtdm4 = 0.02
+       endif
+        if (FV_Atm(1)%flagstruct%npx >= 360) then
+         FV_Atm(1)%flagstruct%vtdm4 = 0.03
+       endif
+        if (FV_Atm(1)%flagstruct%npx >= 720) then
+         FV_Atm(1)%flagstruct%vtdm4 = 0.04
+       endif
+        if (FV_Atm(1)%flagstruct%npx >= 1440) then
+          FV_Atm(1)%flagstruct%vtdm4 = 0.05
+        endif
+       if (FV_Atm(1)%flagstruct%npx >= 2880) then
+         FV_Atm(1)%flagstruct%vtdm4 = 0.06
+       endif
+       if (FV_Atm(1)%flagstruct%npx >= 5760) then
+          FV_Atm(1)%flagstruct%vtdm4 = 0.07
+        endif
+       endif
+      if (index(FV3_CONFIG,"MERRA-2") > 0) then
        ! Override FV3 defaults with MERRA-2 hydrostatic configuration
         FV_Atm(1)%flagstruct%hydrostatic = .true.
        ! disable subgrid dz adjustment
@@ -1104,10 +1120,10 @@ contains
 
 end subroutine FV_InitState
 
-subroutine FV_Run (STATE, CLOCK, GC, RC)
+subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   type (T_FVDYCORE_STATE),pointer              :: STATE
-
+  type (ESMF_State),             intent(INOUT) :: EXPORT
   type (ESMF_Clock), target,     intent(IN   ) :: CLOCK
   type (ESMF_GridComp)         , intent(INOUT) :: GC
   integer, optional            , intent(OUT  ) :: RC
@@ -1130,6 +1146,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
   real(FVPRC), allocatable :: u_dt(:,:,:)
   real(FVPRC), allocatable :: v_dt(:,:,:)
   real(FVPRC), allocatable :: t_dt(:,:,:)
+  real(FVPRC), allocatable :: w_dt(:,:,:)
   real(FVPRC), allocatable :: q_dt(:,:,:,:)
   real(FVPRC), allocatable :: u_srf(:,:)
   real(FVPRC), allocatable :: v_srf(:,:)
@@ -1139,6 +1156,8 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
   real(REAL8), allocatable :: ratio(:)
   real(REAL8) :: dpd
   real(FVPRC) :: FQC
+
+  real(REAL4), pointer     :: PTR3D(:,:,:)
 
 ! Splitting for Pure Advection
   real(FVPRC) :: myDT, lnp, rdg, pek, ak1
@@ -1782,21 +1801,33 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
                      FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, FV_Atm(1)%diss_est, time_total)
 
     if ( FV_Atm(1)%flagstruct%fv_sg_adj > 0 ) then
-         allocate ( u_dt(isd:ied,jsd:jed,npz) )
-         allocate ( v_dt(isd:ied,jsd:jed,npz) )
+         allocate ( u_dt(isc:iec,jsc:jec,npz) )
+         allocate ( v_dt(isc:iec,jsc:jec,npz) )
          allocate ( t_dt(isc:iec,jsc:jec,npz) )
+         allocate ( w_dt(isc:iec,jsc:jec,npz) )
          u_dt(:,:,:) = 0.0
          v_dt(:,:,:) = 0.0
          t_dt(:,:,:) = 0.0
+         w_dt(:,:,:) = 0.0
          call fv_subgrid_z(isd, ied, jsd, jed, isc, iec, jsc, jec, FV_Atm(1)%npz, &
                            FV_Atm(1)%ncnst, myDT, FV_Atm(1)%flagstruct%fv_sg_adj,      &
                            FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%delp, FV_Atm(1)%pe,     &
                            FV_Atm(1)%peln, FV_Atm(1)%pkz, FV_Atm(1)%pt, FV_Atm(1)%q,       &
                            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%flagstruct%hydrostatic,&
-                           FV_Atm(1)%w, FV_Atm(1)%delz, u_dt, v_dt, t_dt, FV_Atm(1)%flagstruct%n_zfilter)
+                           FV_Atm(1)%w, FV_Atm(1)%delz, u_dt, v_dt, t_dt, w_dt,          &
+                           FV_Atm(1)%flagstruct%n_zfilter)
+        call MAPL_GetPointer ( export, PTR3D, 'DUDTSUBZ', rc=status ); VERIFY_(STATUS)
+        if( associated(PTR3D) ) PTR3D = u_dt
+        call MAPL_GetPointer ( export, PTR3D, 'DVDTSUBZ', rc=status ); VERIFY_(STATUS)
+        if( associated(PTR3D) ) PTR3D = v_dt
+        call MAPL_GetPointer ( export, PTR3D, 'DTDTSUBZ', rc=status ); VERIFY_(STATUS)
+        if( associated(PTR3D) ) PTR3D = t_dt
+        call MAPL_GetPointer ( export, PTR3D, 'DWDTSUBZ', rc=status ); VERIFY_(STATUS)
+        if( associated(PTR3D) ) PTR3D = w_dt
          deallocate ( u_dt )
          deallocate ( v_dt )
          deallocate ( t_dt )
+         deallocate ( w_dt )
     endif
 
     call nullify_domain()

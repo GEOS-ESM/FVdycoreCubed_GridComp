@@ -1075,6 +1075,41 @@ contains
      VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                       &
+         SHORT_NAME = 'DUDTSUBZ',                                        &
+         LONG_NAME  = 'tendency_of_eastward_wind_due_to_subgrid_dz',      &
+         UNITS      = 'm/s/s',                                      &
+         DIMS       = MAPL_DimsHorzVert,                                &
+         FIELD_TYPE = MAPL_VectorField,                                 &
+         VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                       &
+         SHORT_NAME = 'DVDTSUBZ',                                        &
+         LONG_NAME  = 'tendency_of_northward_wind_due_to_subgrid_dz',     &
+         UNITS      = 'm/s/s',                                      &
+         DIMS       = MAPL_DimsHorzVert,                                &
+         FIELD_TYPE = MAPL_VectorField,                                 &
+         VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                       &
+         SHORT_NAME = 'DTDTSUBZ',                                        &
+         LONG_NAME  = 'tendency_of_air_temperature_due_to_subgrid_dz',    &
+         UNITS      = 'K s-1',                                        &
+         DIMS       = MAPL_DimsHorzVert,                                &
+         VLOCATION  = MAPL_VLocationCenter,                RC=STATUS    )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                       &
+         SHORT_NAME = 'DWDTSUBZ',                                        &
+         LONG_NAME  = 'tendency_of_vertical_velocity_due_to_subgrid_dz',     &
+         UNITS      = 'm/s/s',                                      &
+         DIMS       = MAPL_DimsHorzVert,                                &
+         FIELD_TYPE = MAPL_VectorField,                                 &
+         VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                       &
          SHORT_NAME = 'DUDTANA',                                        &
          LONG_NAME  = 'tendency_of_eastward_wind_due_to_analysis',      &
          UNITS      = 'm/s/s',                                      &
@@ -4132,7 +4167,7 @@ subroutine Run(gc, import, export, clock, rc)
 
       call MAPL_TimerOn(MAPL,"-DYN_CORE")
       t1 = MPI_Wtime(status)
-      call DynRun (STATE, CLOCK, GC, RC=STATUS)
+      call DynRun (STATE, EXPORT, CLOCK, GC, RC=STATUS)
       VERIFY_(STATUS)
       t2 = MPI_Wtime(status)
       dyn_run_timer = t2-t1
