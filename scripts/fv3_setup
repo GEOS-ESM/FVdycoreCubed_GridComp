@@ -459,7 +459,7 @@ else if( $SITE == 'NCCS' ) then
 
    setenv WRKDIR /discover/nobackup/$LOGNAME # user work directory
 
-else if( $SITE == 'AWS ) then
+else if( $SITE == 'AWS' ) then
    setenv BATCH_CMD        "sbatch"             # SLURM Batch command
    setenv BATCH_GROUP      "DELETE"             # SLURM Syntax for account name
    setenv BATCH_TIME       "SBATCH --time="     # SLURM Syntax for walltime
