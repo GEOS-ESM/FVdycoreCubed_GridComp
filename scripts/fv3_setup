@@ -45,7 +45,7 @@ set GEOSDEF  = `dirname $BINDIR`
 set ETCDIR   = ${GEOSDEF}/etc
 
 # Test if StandAlone_FV3_Dycore.x is here which means you are in install directory
-if (! -x StandAlone_FV3_Dycore.x) then
+if (! -x ${BINDIR}/StandAlone_FV3_Dycore.x) then
    echo "You are trying to run $0 in the Applications/StandAlone_FV3_Dycore directory"
    echo "This is no longer supported. Please run from the bin/ directory"
    echo "in your installation"
@@ -82,7 +82,7 @@ while ( $#argv > 0 )
 end
 
 #######################################################################
-#           CVS: Use CVS functionality only at NCCS or NAS
+#                        Determine site
 #######################################################################
 
 setenv NODE `uname -n`
@@ -97,6 +97,8 @@ setenv BASEDIR `awk '{print $2}' $ETCDIR/BASEDIR.rc`
 
      if ( `echo $BASEDIR | grep -i mvapich2` != '') then
    set MPI = mvapich2
+else if ( `echo $BASEDIR | grep -i mpich`    != '') then
+   set MPI = mpich
 else if ( `echo $BASEDIR | grep -i openmpi`  != '') then
    set MPI = openmpi
 else if ( `echo $BASEDIR | grep -i hpcx`     != '') then
@@ -109,7 +111,7 @@ else if ( `echo $BASEDIR | grep -i mpt`      != '') then
    set MPI = mpt
 else
    # Assume default is Intel MPI in case of older baselibs
-   set MPI = intelmpi 
+   set MPI = intelmpi
 endif
 
 #######################################################################
@@ -256,7 +258,7 @@ if ( $SITE == 'NCCS' ) then
       set NCPUS_PER_NODE = 40
    else if ($MODEL == 'cas') then
       # NCCS currently recommends that users do not run with
-      # 48 cores per node on SCU16 due to OS issues and 
+      # 48 cores per node on SCU16 due to OS issues and
       # recommends that CPU-intensive works run with 46 or less
       # cores. As 45 is a multiple of 3, it's the best value
       # that doesn't waste too much
@@ -272,7 +274,6 @@ else if ( $SITE == 'NAS' ) then
    echo "   ${C2}sky (Skylake)${CN} (default)"
    echo "   ${C2}cas (Cascade Lake)${CN}"
    echo "   ${C2}rom (AMD Rome)${CN}"
-   echo " "
    echo " "
    echo " NOTE 1: Due to how FV3 is compiled by default, Sandy Bridge"
    echo "         and Ivy Bridge are not supported by current GEOS"
@@ -326,11 +327,6 @@ endif
 # Set DEFAULT SHMEM Parameter
 # ---------------------------
      set USE_SHMEM = 0
-
-# Set IAU-Forcing and Bias Correction OFF
-# ---------------------------------------
-     set FORCEDAS = "#"
-     set FORCEGCM = "#"
 
 # Set Default Readers and Writers
 # -------------------------------
@@ -429,60 +425,77 @@ endif
 setenv     RUN_N  $EXPID # RUN Job Name
 
 if( $SITE == 'NAS' ) then
-              setenv     RUN_N  `echo $EXPID | cut -b1-200`_RUN                         # RUN      Job Name
-              setenv BATCH_CMD "qsub"                 # PBS Batch command
-              setenv BATCH_GROUP "PBS -W group_list=" # PBS Syntax for GROUP
-              setenv BATCH_TIME "PBS -l walltime="    # PBS Syntax for walltime
-              setenv BATCH_JOBNAME "PBS -N "          # PBS Syntax for job name
-              setenv BATCH_OUTPUTNAME "PBS -o "       # PBS Syntax for job output name
-              setenv BATCH_JOINOUTERR "PBS -j oe -k oed "    # PBS Syntax for joining output and error
-              setenv     RUN_T  "1:00:00"             # Wallclock Time   for fv3.j
-              set QTYPE = "normal"                 # Queue to use
+   setenv RUN_N            `echo $EXPID | cut -b1-200`_RUN # RUN Job Name
+   setenv BATCH_CMD        "qsub"                          # PBS Batch command
+   setenv BATCH_GROUP      "PBS -W group_list="            # PBS Syntax for GROUP
+   setenv BATCH_TIME       "PBS -l walltime="              # PBS Syntax for walltime
+   setenv BATCH_JOBNAME    "PBS -N"                        # PBS Syntax for job name
+   setenv BATCH_OUTPUTNAME "PBS -o"                        # PBS Syntax for job output name
+   setenv BATCH_JOINOUTERR "PBS -j oe -k oed"              # PBS Syntax for joining output and error
+   setenv RUN_T            "1:00:00"                       # Wallclock Time for fv3.j
 
-              #@ NODES  = `echo "($MODEL_NPES + $NCPUS_PER_NODE - 1)/$NCPUS_PER_NODE" | bc`
-              @ NODES  = `echo "( ($MODEL_NPES + $NCPUS_PER_NODE) + ($IOS_NDS * $NCPUS_PER_NODE) - 1)/$NCPUS_PER_NODE" | bc`
+   set QTYPE = "normal" # Queue to use
 
-              setenv     RUN_Q  "PBS -q ${QTYPE}"                                                                              # batch queue name for fv3.j
-              setenv     RUN_P  "PBS -l select=${NODES}:ncpus=${NCPUS_PER_NODE}:mpiprocs=${NCPUS_PER_NODE}:model=${MODEL}"     # PE Configuration for fv3.j
+   @ NODES  = `echo "( ($MODEL_NPES + $NCPUS_PER_NODE) + ($IOS_NDS * $NCPUS_PER_NODE) - 1)/$NCPUS_PER_NODE" | bc`
 
-              setenv WRKDIR     /nobackup/$LOGNAME                                     # user work directory
-              setenv CPEXEC    'mcp -a'                                                # Copy utility for large copies
-              setenv TAREXEC    mtar                                                   # Tar utility for large archives
+   setenv RUN_Q "PBS -q ${QTYPE}"                                                                              # batch queue name for fv3.j
+   setenv RUN_P "PBS -l select=${NODES}:ncpus=${NCPUS_PER_NODE}:mpiprocs=${NCPUS_PER_NODE}:model=${MODEL}"     # PE Configuration for fv3.j
+
+   setenv WRKDIR /nobackup/$LOGNAME # user work directory
+
 else if( $SITE == 'NCCS' ) then
-              setenv BATCH_CMD "sbatch"                                                # SLURM Batch command
-              setenv BATCH_GROUP "SBATCH --account="                                   # SLURM Syntax for account name
-              setenv BATCH_TIME "SBATCH --time="                                       # SLURM Syntax for walltime
-              setenv BATCH_JOBNAME "SBATCH --job-name="                                # SLURM Syntax for job name
-              setenv BATCH_OUTPUTNAME "SBATCH --output="                               # SLURM Syntax for job output name
-              setenv BATCH_JOINOUTERR "DELETE"                                         # SLURM joins out and err by default
-              setenv     RUN_T  "01:00:00"                                             # Wallclock Time   for fv3.j
+   setenv BATCH_CMD        "sbatch"             # SLURM Batch command
+   setenv BATCH_GROUP      "SBATCH --account="  # SLURM Syntax for account name
+   setenv BATCH_TIME       "SBATCH --time="     # SLURM Syntax for walltime
+   setenv BATCH_JOBNAME    "SBATCH --job-name=" # SLURM Syntax for job name
+   setenv BATCH_OUTPUTNAME "SBATCH --output="   # SLURM Syntax for job output name
+   setenv BATCH_JOINOUTERR "DELETE"             # SLURM joins out and err by default
+   setenv RUN_T            "01:00:00"           # Wallclock Time   for fv3.j
 
-              #@ NODES  = `echo "($MODEL_NPES + $NCPUS_PER_NODE - 1)/$NCPUS_PER_NODE" | bc`
-              @ NODES  = `echo "( ($MODEL_NPES + $NCPUS_PER_NODE) + ($IOS_NDS * $NCPUS_PER_NODE) - 1)/$NCPUS_PER_NODE" | bc`
+   @ NODES  = `echo "( ($MODEL_NPES + $NCPUS_PER_NODE) + ($IOS_NDS * $NCPUS_PER_NODE) - 1)/$NCPUS_PER_NODE" | bc`
 
-              setenv    RUN_Q   "SBATCH --constraint=${MODEL}"                                # batch queue name for fv3.j
-              setenv    RUN_P   "SBATCH --nodes=${NODES} --ntasks-per-node=${NCPUS_PER_NODE}" # PE Configuration for fv3.j
+   setenv RUN_Q "SBATCH --constraint=${MODEL}"                                # batch queue name for fv3.j
+   setenv RUN_P "SBATCH --nodes=${NODES} --ntasks-per-node=${NCPUS_PER_NODE}" # PE Configuration for fv3.j
 
-              setenv WRKDIR     /discover/nobackup/$LOGNAME                            # user work directory
-              setenv CPEXEC     /bin/cp                                                # Copy utility for large copies
-              setenv TAREXEC    tar
+   setenv WRKDIR /discover/nobackup/$LOGNAME # user work directory
+
+else if( $SITE == 'AWS ) then
+   setenv BATCH_CMD        "sbatch"             # SLURM Batch command
+   setenv BATCH_GROUP      "DELETE"             # SLURM Syntax for account name
+   setenv BATCH_TIME       "SBATCH --time="     # SLURM Syntax for walltime
+   setenv BATCH_JOBNAME    "SBATCH --job-name=" # SLURM Syntax for job name
+   setenv BATCH_OUTPUTNAME "SBATCH --output="   # SLURM Syntax for job output name
+   setenv BATCH_JOINOUTERR "DELETE"             # SLURM joins out and err by default
+   setenv RUN_T            "01:00:00"           # Wallclock Time   for fv3.j
+
+   setenv RUN_Q "DELETE"
+   setenv RUN_P "SBATCH --ntasks=${MODEL_NPES}" # PE Configuration for fv3.j
+
+   # By default on AWS, just ignore IOSERVER for now until testing
+   set USE_IOSERVER   = 0
+   set IOS_NDS        = 0
+   set NCPUS_PER_NODE = 0
+
+   setenv WRKDIR /home/$LOGNAME # user work directory
 else
 # These are defaults for others (assume slurm)
-              setenv BATCH_CMD "sbatch"                                                # SLURM Batch command
-              setenv BATCH_GROUP "SBATCH --account="                                   # SLURM Syntax for account name
-              setenv BATCH_TIME "SBATCH --time="                                       # SLURM Syntax for walltime
-              setenv BATCH_JOBNAME "SBATCH --job-name="                                # SLURM Syntax for job name
-              setenv BATCH_OUTPUTNAME "SBATCH --output="                               # SLURM Syntax for job output name
-              setenv BATCH_JOINOUTERR "DELETE"                                         # SLURM joins out and err by default
-              setenv     RUN_T  "01:00:00"                                             # Wallclock Time   for fv3.j
+   setenv BATCH_CMD        "sbatch"             # SLURM Batch command
+   setenv BATCH_GROUP      "SBATCH --account="  # SLURM Syntax for account name
+   setenv BATCH_TIME       "SBATCH --time="     # SLURM Syntax for walltime
+   setenv BATCH_JOBNAME    "SBATCH --job-name=" # SLURM Syntax for job name
+   setenv BATCH_OUTPUTNAME "SBATCH --output="   # SLURM Syntax for job output name
+   setenv BATCH_JOINOUTERR "DELETE"             # SLURM joins out and err by default
+   setenv RUN_T            "01:00:00"           # Wallclock Time   for fv3.j
 
-              setenv    RUN_Q   "DELETE"
-              setenv    RUN_P   "SBATCH --ntasks=${MODEL_NPES}" # PE Configuration for fv3.j
-              setenv NCPUS_PER_NODE NULL # sed needs something
+   setenv RUN_Q "DELETE"
+   setenv RUN_P "SBATCH --ntasks=${MODEL_NPES}" # PE Configuration for fv3.j
+   
+   # By default on desktop, just ignore IOSERVER for now until testing
+   set USE_IOSERVER   = 0
+   set IOS_NDS        = 0
+   set NCPUS_PER_NODE = 0
 
-              setenv WRKDIR     /home/$LOGNAME                                         # user work directory
-              setenv CPEXEC     /bin/cp                                                # Copy utility for large copies
-              setenv TAREXEC    tar                                                    # Tar utility for large archives
+   setenv WRKDIR /home/$LOGNAME # user work directory
 endif
 
 #######################################################################
@@ -540,7 +553,7 @@ if( -e $HOME/.EXPDIRroot ) /bin/rm $HOME/.EXPDIRroot
 echo $EXPDIRroot > $HOME/.EXPDIRroot
 
 #######################################################################
-#                      Set Build Directory  
+#                       Locate Build Directory
 #######################################################################
 
 set     GEOSDIR  = $GEOSDEF
@@ -591,7 +604,7 @@ else
 endif
 
 #######################################################################
-#                      Create SETENV Commands
+#               Set Recommended MPI Stack Settings
 #######################################################################
 
 /bin/rm -f $EXPDIR/SETENV.commands
@@ -627,7 +640,7 @@ cat > $EXPDIR/SETENV.commands << EOF
 
    #setenv MPI_DISPLAY_SETTINGS 1
    #setenv MPI_VERBOSE 1
-   
+
    unsetenv MPI_MEMMAP_OFF
    unsetenv MPI_NUM_MEMORY_REGIONS
    setenv MPI_XPMEM_ENABLED yes
@@ -666,10 +679,8 @@ if ( $SITE == 'NCCS' ) then
 cat >> $EXPDIR/SETENV.commands << EOF
 setenv I_MPI_SHM_HEAP_VSIZE 512
 setenv PSM2_MEMORY large
-setenv PSM2_PATH_SELECTION adaptive
 setenv I_MPI_EXTRA_FILESYSTEM 1
 setenv I_MPI_EXTRA_FILESYSTEM_FORCE gpfs
-setenv ROMIO_FSTYPE_FORCE "gpfs:"
 EOF
 
 endif # if NCCS
@@ -743,9 +754,6 @@ s/@AGCM_JM/$AGCM_JM/g
 s/@AGCM_LM/$AGCM_LM/g
 s/@HIST_IM/$HIST_IM/g
 s/@HIST_JM/$HIST_JM/g
-
-s?@CPEXEC?$CPEXEC?g
-s?@TAREXEC?$TAREXEC?g
 
 EOF
 
@@ -831,9 +839,9 @@ CONTACTMATT:
 cat <<EOF
 
 It appears your environment is not set correctly to
-run with the GPUs. If you wish to build and run the 
+run with the GPUs. If you wish to build and run the
 model using GPUs, please contact Matt Thompson at:
-    
+
             matthew.thompson@nasa.gov
 
 EOF
@@ -886,9 +894,7 @@ fv3_setup, a setup script for the GEOS-5 FV3 Standalone
 
    If invoked alone, the script runs as normal.
 
-   For more information, please contact Larry Takacs.
-
-   Note: fv3_setup must be run on a machine with CVS access.
+   For more information, please contact Matt Thompson.
 
 EOF
 exit 1
