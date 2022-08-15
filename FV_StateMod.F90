@@ -495,7 +495,7 @@ contains
      FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
    FV_Atm(1)%flagstruct%n_sponge = 0
-   FV_Atm(1)%flagstruct%n_zfilter = FV_Atm(1)%flagstruct%npz
+!!!FV_Atm(1)%flagstruct%n_zfilter = FV_Atm(1)%flagstruct%npz
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.02
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
@@ -519,10 +519,10 @@ contains
    FV_Atm(1)%flagstruct%rf_cutoff = 0.25e2
   ! 6th order default damping options
    FV_Atm(1)%flagstruct%nord = 2
-   FV_Atm(1)%flagstruct%dddmp = 0.2
+   FV_Atm(1)%flagstruct%dddmp = 0.0
    FV_Atm(1)%flagstruct%d4_bg = 0.16
    FV_Atm(1)%flagstruct%d2_bg = 0.0075
-   FV_Atm(1)%flagstruct%d_ext = 0.02
+   FV_Atm(1)%flagstruct%d_ext = 0.0
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%n_split = 0
    FV_Atm(1)%flagstruct%k_split = 1
@@ -550,25 +550,25 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 360) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 720) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 112.5   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1440) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 2880) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5   )
       endif
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75  )
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       FV_Atm(1)%flagstruct%fv_sg_adj = 2*DT
      ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%hydrostatic = .false.
-       FV_Atm(1)%flagstruct%make_nh = .false.
+      FV_Atm(1)%flagstruct%make_nh = .false.
      ! This is the best/fastest option for tracers
       FV_Atm(1)%flagstruct%hord_tr =  8
       if (index(FV3_CONFIG,"MONOTONIC") > 0) then
@@ -610,8 +610,8 @@ contains
        endif
        if (FV_Atm(1)%flagstruct%npx >= 5760) then
           FV_Atm(1)%flagstruct%vtdm4 = 0.07
-        endif
        endif
+      endif
       if (index(FV3_CONFIG,"MERRA-2") > 0) then
        ! Override FV3 defaults with MERRA-2 hydrostatic configuration
         FV_Atm(1)%flagstruct%hydrostatic = .true.
