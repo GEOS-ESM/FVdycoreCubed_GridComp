@@ -2355,7 +2355,7 @@ contains
   character (len=ESMF_MAXSTR)        :: layout_file
 
   type (ESMF_Field)                  :: field
-  real, pointer                      :: pref(:), ak4(:), bk4(:)
+  real(r4), pointer                      :: pref(:), ak4(:), bk4(:)
 
   real(r8), pointer                  ::  ak(:)
   real(r8), pointer                  ::  bk(:)
@@ -2385,7 +2385,7 @@ contains
 
   type (ESMF_State)                  :: INTERNAL
   type (DynGrid),  pointer           :: DycoreGrid
-  real, pointer                      :: temp2d(:,:)
+  real(r4), pointer                      :: temp2d(:,:)
 
   integer                            :: ifirst
   integer                            :: ilast
@@ -7475,8 +7475,8 @@ subroutine Coldstart(gc, import, export, clock, rc)
     real(REAL8), pointer                 :: PE     (:,:,:)
     real(REAL8), pointer                 :: PKZ    (:,:,:)
     real(kind=4), pointer             :: phis   (:,:)
-    real, pointer                     :: LONS   (:,:)
-    real, pointer                     :: LATS   (:,:)
+    real(REAL4), pointer                     :: LONS   (:,:)
+    real(REAL4), pointer                     :: LATS   (:,:)
     real                              :: T0
     integer                           :: L
     type(ESMF_Config)                 :: CF
