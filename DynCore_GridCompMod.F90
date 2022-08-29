@@ -1105,8 +1105,41 @@ contains
          LONG_NAME  = 'tendency_of_vertical_velocity_due_to_subgrid_dz',     &
          UNITS      = 'm/s/s',                                      &
          DIMS       = MAPL_DimsHorzVert,                                &
-         FIELD_TYPE = MAPL_VectorField,                                 &
          VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DTDT_RAY',                                  &
+        LONG_NAME  = 'air_temperature_tendency_due_to_Rayleigh_friction',        &
+        UNITS      = 'K s-1',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DUDT_RAY',                                  &
+        LONG_NAME  = 'tendency_of_eastward_wind_due_to_Rayleigh_friction',       &
+        UNITS      = 'm s-2',                                     &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        FIELD_TYPE = MAPL_VectorField,                                 &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DVDT_RAY',                                  &
+        LONG_NAME  = 'tendency_of_northward_wind_due_to_Rayleigh_friction',      &
+        UNITS      = 'm s-2',                                     &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        FIELD_TYPE = MAPL_VectorField,                                 &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DWDT_RAY',                                  &     
+        LONG_NAME  = 'vertical_velocity_tendency_due_to_Rayleigh_friction',        &
+        UNITS      = 'm/s/s',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           & 
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )     
      VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                       &
@@ -2558,7 +2591,7 @@ contains
     allocate( UR(ifirst:ilast,jfirst:jlast,km) )
     allocate( VR(ifirst:ilast,jfirst:jlast,km) )
 
-    call getAllWinds( UD, VD, UR=UR, VR=VR, rotate=.true.)
+    call getAllWinds( UD, VD, UR=UR, VR=VR)
 
       U = UR
       V = VR
@@ -3476,7 +3509,7 @@ subroutine Run(gc, import, export, clock, rc)
 
 !! Get A-grid winds
 !! ----------------
-      call getAllWinds(vars%u, vars%v, UR=ur, VR=vr, rotate=.true.)
+      call getAllWinds(vars%u, vars%v, UR=ur, VR=vr)
 
       delp   = vars%pe(:,:,2:)  -vars%pe(:,:,:km)   ! Pressure Thickness
       dmdt   = vars%pe(:,:,km+1)-vars%pe(:,:,1)     ! Psurf-Ptop
@@ -3786,7 +3819,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if( associated(temp2D) ) temp2D = ( (vars%pe(:,:,km+1)-vars%pe(:,:,1)) - dmdt )/(grav*dt)
 
-      call getAllWinds(vars%u, vars%v, UC=uc0, VC=vc0, UR=ur, VR=vr, rotate=.true.)
+      call getAllWinds(vars%u, vars%v, UC=uc0, VC=vc0, UR=ur, VR=vr)
 
       dmdt = vars%pe(:,:,km+1)-vars%pe(:,:,1)     ! Psurf-Ptop
 
@@ -3959,7 +3992,7 @@ subroutine Run(gc, import, export, clock, rc)
          endif
        enddo
       endif
-      call getAllWinds(vars%u, vars%v, UC=uc0, VC=vc0, UR=ur, VR=vr, rotate=.true.)
+      call getAllWinds(vars%u, vars%v, UC=uc0, VC=vc0, UR=ur, VR=vr)
       delp   = vars%pe(:,:,2:)  -vars%pe(:,:,:km)   ! Pressure Thickness
       dmdt   = vars%pe(:,:,km+1)-vars%pe(:,:,1)     ! Psurf-Ptop
       tempxy = vars%pt * (1.0+eps*qv)
@@ -4203,7 +4236,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) temp2d =  vars%pe(:,:,km+1)/GRAV
 
-      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr, rotate=.true.)
+      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
       call FILLOUT3 (export, 'U_DGRID', vars%u  , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'V_DGRID', vars%v  , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'U_CGRID', uc      , rc=status); VERIFY_(STATUS)
@@ -4256,7 +4289,7 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Get all wind derivatives
 ! ------------------------
-      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr, vort=vort, divg=divg, rotate=.true.)
+      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr, vort=vort, divg=divg)
 
 ! Compute absolute vorticity on the D grid
 ! -------------------------------------------------
@@ -5295,7 +5328,7 @@ subroutine dump_n_splash_
           allocate( UAtmpR4(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
           allocate( VAtmpR4(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
           ! get background A-grid winds 
-          call getAllWinds (vars%u,vars%v,UR=ana_u,VR=ana_v,rotate=.true.)
+          call getAllWinds (vars%u,vars%v,UR=ana_u,VR=ana_v)
           ! transform background A-grid winds to lat-lon
           call regridder_manager%make_regridder(ESMFGRID, ANAGrid, REGRID_METHOD_BILINEAR, RC=STATUS)
           VERIFY_(STATUS)
@@ -6255,7 +6288,7 @@ end subroutine RUN
     endif
 
     if (doEnergetics) then
-      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr, rotate=.true.)
+      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
       call Energetics (ur,vr,thv,vars%pe,dp,vars%pkz,phisxy,kenrg0,penrg0,tenrg0)
     endif
 
@@ -6288,7 +6321,7 @@ end subroutine RUN
 
 ! Get Cubed-Sphere Wind Exports
 ! -----------------------------
-    call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr, rotate=.true.)
+    call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
     call FILLOUT3 (export, 'U_DGRID', vars%u  , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'V_DGRID', vars%v  , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'U_CGRID', uc      , rc=status); VERIFY_(STATUS)
