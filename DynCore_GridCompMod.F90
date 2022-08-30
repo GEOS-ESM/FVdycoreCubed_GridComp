@@ -8644,23 +8644,31 @@ end subroutine freeTracers
      real(REAL4)  :: R8_TO_R4(LBOUND(dbl_var,1):UBOUND(dbl_var,1),&
                               LBOUND(dbl_var,2):UBOUND(dbl_var,2))
      integer :: i, j
-        do j=LBOUND(dbl_var,2),UBOUND(dbl_var,2)
-           do i=LBOUND(dbl_var,1),UBOUND(dbl_var,1)
-              R8_TO_R4(i,j) = SIGN(MIN(1.e15,MAX(1.e-15,ABS(dbl_var(i,j)))),dbl_var(i,j))
-           enddo
+
+     real(REAL8), parameter :: eps = 1.e-15_REAL8
+     real(REAL8), parameter :: big = 1.e15_REAL8
+
+     do j=LBOUND(dbl_var,2),UBOUND(dbl_var,2)
+        do i=LBOUND(dbl_var,1),UBOUND(dbl_var,1)
+           R8_TO_R4(i,j) = SIGN(MIN(big,MAX(eps,ABS(dbl_var(i,j)))),dbl_var(i,j))
         enddo
+     enddo
   end function
 
-  function R4_TO_R8(dbl_var)
-     real(REAL4), intent(IN) :: dbl_var(:,:)
-     real(REAL8)  :: R4_TO_R8(LBOUND(dbl_var,1):UBOUND(dbl_var,1),&
-                              LBOUND(dbl_var,2):UBOUND(dbl_var,2))
+  function R4_TO_R8(sngl_var)
+     real(REAL4), intent(IN) :: sngl_var(:,:)
+     real(REAL8)  :: R4_TO_R8(LBOUND(sngl_var,1):UBOUND(sngl_var,1),&
+                              LBOUND(sngl_var,2):UBOUND(sngl_var,2))
      integer :: i, j
-        do j=LBOUND(dbl_var,2),UBOUND(dbl_var,2)
-           do i=LBOUND(dbl_var,1),UBOUND(dbl_var,1)
-              R4_TO_R8(i,j) = SIGN(MIN(1.e15,MAX(1.e-15,ABS(dbl_var(i,j)))),dbl_var(i,j))
-           enddo
+
+     real(REAL4), parameter :: eps = 1.e-15_REAL4
+     real(REAL4), parameter :: big = 1.e15_REAL4
+
+     do j=LBOUND(sngl_var,2),UBOUND(sngl_var,2)
+        do i=LBOUND(sngl_var,1),UBOUND(sngl_var,1)
+           R4_TO_R8(i,j) = SIGN(MIN(big,MAX(eps,ABS(sngl_var(i,j)))),sngl_var(i,j))
         enddo
+     enddo
   end function
 
 end module FVdycoreCubed_GridComp
