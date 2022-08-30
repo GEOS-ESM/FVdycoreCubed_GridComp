@@ -789,9 +789,9 @@ echo "Done!"
 echo "-----"
 echo ""
 echo "NOTE: fv3.j by default will run StandAlone_FV3_Dycore.x from the installation directory:"
-echo "      $GEOSBIN
+echo "      $GEOSBIN"
 echo ""
-echo ""     However, if you copy an executable into the experiment directory, the script will"
+echo "      However, if you copy an executable into the experiment directory, the script will"
 echo "      run that executable instead."
 
 #######################################################################
