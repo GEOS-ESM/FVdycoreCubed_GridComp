@@ -1,3 +1,4 @@
+#!/bin/tcsh -f
 
 #######################################################################
 #                            Define Colors
@@ -682,20 +683,6 @@ r $EXPDIR/SETENV.commands
 d
 }
 
-/@GPUSTART/ {
-t success1
-: success1
-r $EXPDIR/GPUSTART.commands
-d
-}
-
-/@GPUEND/ {
-t success2
-: success2
-r $EXPDIR/GPUEND.commands
-d
-}
-
 s?@EXPID?$EXPID?g
 s?@RUN_N?$RUN_N?g
 s?@RUN_T?$RUN_T?g
@@ -824,18 +811,6 @@ TRAP:
    /bin/rm $FILES_TO_PROCESS $OLDEXPFILES $NEWEXPFILES $COPYSCRIPT $SEDFILE
    exit 1
 
-CONTACTMATT:
-cat <<EOF
-
-It appears your environment is not set correctly to
-run with the GPUs. If you wish to build and run the
-model using GPUs, please contact Matt Thompson at:
-
-            matthew.thompson@nasa.gov
-
-EOF
-exit 1
-
 SETCOLOR:
 echo
 echo "\033[1;4mGCM Setup Utility${RESET}"
@@ -878,7 +853,6 @@ fv3_setup, a setup script for the GEOS-5 FV3 Standalone
    Usage: $0:t [optional flag]
 
    -c --color      Set the colors for $0:t
-   -g --gpu        Run the model using the GPUs
    -h --help       Show usage
 
    If invoked alone, the script runs as normal.
