@@ -1,4 +1,3 @@
-#!/bin/tcsh -f
 
 #######################################################################
 #                            Define Colors
@@ -52,12 +51,14 @@ if (! -x ${BINDIR}/StandAlone_FV3_Dycore.x) then
    exit 1
 endif
 
+# Set TMPDIR to /tmp due to issues with heredocs in Singularity sandboxes
+# -----------------------------------------------------------------------
+
+setenv TMPDIR /tmp
+
 #######################################################################
 #                   Test for Command Line Flags
 #######################################################################
-
-# Set default behavior of switches
-set LINKX = FALSE
 
 while ( $#argv > 0 )
    set arg = $argv[1]
@@ -67,11 +68,6 @@ while ( $#argv > 0 )
       case -[Cc]:
       case --[Cc][Oo][Ll][Oo][Rr]:
          goto SETCOLOR
-
-      # Symlink StandAlone_FV3_Dycore.x
-      case --link:
-         set LINKX = TRUE
-         breaksw
 
       # Here any string not above will trigger USAGE
       case -[Hh]:
@@ -591,16 +587,6 @@ if( -e $HOME/.GROUProot ) /bin/rm $HOME/.GROUProot
 echo $GROUP > $HOME/.GROUProot
 
 #######################################################################
-#      Copy Model Executable and RC Files to Experiment Directory
-#######################################################################
-
-if ( $LINKX == "TRUE" ) then
-  if ( -e $GEOSBIN/StandAlone_FV3_Dycore.x ) ln -s $GEOSBIN/StandAlone_FV3_Dycore.x $EXPDIR
-else
-  if ( -e $GEOSBIN/StandAlone_FV3_Dycore.x ) cp -v $GEOSBIN/StandAlone_FV3_Dycore.x $EXPDIR
-endif
-
-#######################################################################
 #               Set Recommended MPI Stack Settings
 #######################################################################
 
@@ -814,6 +800,12 @@ chmod   +x $EXPDIR/fv3.j
 
 echo "Done!"
 echo "-----"
+echo ""
+echo "NOTE: fv3.j by default will run StandAlone_FV3_Dycore.x from the installation directory:"
+echo "      $GEOSBIN
+echo ""
+echo ""     However, if you copy an executable into the experiment directory, the script will"
+echo "      run that executable instead."
 
 #######################################################################
 #                              Clean-Up

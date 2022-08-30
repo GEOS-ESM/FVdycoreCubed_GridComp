@@ -142,13 +142,12 @@ module list
 @SETENVS
 
          setenv EXETAG "$TAG"
-         setenv FV3EXE 'R4'
+         setenv FV3EXE '@FV_PRECISION@'
          setenv EXPID   "c${AGCM_IM}_L${AGCM_LM}_T${N_TRACERS}_${NX}x${NY}_${N_OMP}threads"
          setenv EXPDSC  "c${AGCM_IM}_L${AGCM_LM}_T${N_TRACERS}_${NX}x${NY}_${N_OMP}threads"
          setenv EXPDIR  @EXPDIR
          setenv SCRDIR  $EXPDIR/scratch_${EXPID}_${EXETAG}-${FV3EXE}
 if ($NH) setenv SCRDIR  ${SCRDIR}_NH.$$
-         setenv EXE     $EXPDIR/StandAlone_FV3_Dycore.x
 
 #######################################################################
 #                 Create Experiment Scratch-Directory
@@ -157,7 +156,19 @@ if ($NH) setenv SCRDIR  ${SCRDIR}_NH.$$
 if (! -e $SCRDIR            ) mkdir -p $SCRDIR
 cd $SCRDIR
 /bin/rm -rf *
-/bin/cp $EXE StandAlone_FV3_Dycore.x
+
+#######################################################################
+#     Detect if StandAlone_FV3_Dycore.x is in the current directory
+#######################################################################
+
+if (-x $EXPDIR/StandAlone_FV3_Dycore.x) then
+   set FOUND_EXE_IN_EXPDIR = 1
+   setenv EXE $EXPDIR/StandAlone_FV3_Dycore.x
+   /bin/cp $EXE $SCRDIR/StandAlone_FV3_Dycore.x
+else
+   set FOUND_EXE_IN_EXPDIR = 0
+   setenv EXE $GEOSBIN/StandAlone_FV3_Dycore.x
+endif
 
 #######################################################################
 #          Create LIVE RC Files from Templates for Current Run
@@ -350,7 +361,30 @@ else
    set IOSERVER_OPTIONS = ""
 endif
 
-$RUN_CMD $NPES ./StandAlone_FV3_Dycore.x $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
+# Settings for Singularity - EXPERIMENTAL
+# ---------------------------------------
+
+# If you are using singularity, set the path to the singularity sandbox here
+setenv SINGULARITY_SANDBOX = ""
+
+# If SINGULARITY_SANDBOX is non-empty and FOUND_EXE_IN_EXPDIR is set to 1, error out
+if( $FOUND_EXE_IN_EXPDIR == 1 && $SINGULARITY_SANDBOX != "" ) then
+   echo "ERROR: Testing has shown Singularity only works when running with"
+   echo "       the executable directly from the installation bin dirctory"
+   exit 1
+endif
+
+# Set Singularity Bind Paths. Note: These are dependent on where you are running. 
+# By default, we'll assume you are running this script from NOBACKUP
+setenv SINGULARITY_BIND_PATH = "-B ${NOBACKUP}:${NOBACKUP}"
+
+# If SINGULARITY_SANDBOX is non-empty, then run executable in singularity sandbox
+if( $SINGULARITY_SANDBOX != "" ) then
+   module load singularity
+   $RUN_CMD $NPES singularity exec $SINGULARITY_BIND_PATH $SINGULARITY_SANDBOX $EXE $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
+else
+   $RUN_CMD $NPES $EXE $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
+endif
 
 if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 
