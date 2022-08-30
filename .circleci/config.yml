@@ -4,7 +4,7 @@ version: 2.1
 baselibs_version: &baselibs_version v7.5.0
 
 orbs:
-  ci: geos-esm/circleci-tools@dev:17d32ba41a6cc01a53403c82ca88052cf9f6bfe1
+  ci: geos-esm/circleci-tools@1
 
 workflows:
   build-test:
