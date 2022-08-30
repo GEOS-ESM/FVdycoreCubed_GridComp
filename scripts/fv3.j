@@ -142,7 +142,7 @@ module list
 @SETENVS
 
          setenv EXETAG "$TAG"
-         setenv FV3EXE '@FV_PRECISION@'
+         setenv FV3EXE '@FV_PRECISION'
          setenv EXPID   "c${AGCM_IM}_L${AGCM_LM}_T${N_TRACERS}_${NX}x${NY}_${N_OMP}threads"
          setenv EXPDSC  "c${AGCM_IM}_L${AGCM_LM}_T${N_TRACERS}_${NX}x${NY}_${N_OMP}threads"
          setenv EXPDIR  @EXPDIR
@@ -365,7 +365,7 @@ endif
 # ---------------------------------------
 
 # If you are using singularity, set the path to the singularity sandbox here
-setenv SINGULARITY_SANDBOX = ""
+setenv SINGULARITY_SANDBOX ""
 
 # If SINGULARITY_SANDBOX is non-empty and FOUND_EXE_IN_EXPDIR is set to 1, error out
 if( $FOUND_EXE_IN_EXPDIR == 1 && $SINGULARITY_SANDBOX != "" ) then
@@ -374,13 +374,15 @@ if( $FOUND_EXE_IN_EXPDIR == 1 && $SINGULARITY_SANDBOX != "" ) then
    exit 1
 endif
 
-# Set Singularity Bind Paths. Note: These are dependent on where you are running. 
-# By default, we'll assume you are running this script from NOBACKUP
-setenv SINGULARITY_BIND_PATH = "-B ${NOBACKUP}:${NOBACKUP}"
-
 # If SINGULARITY_SANDBOX is non-empty, then run executable in singularity sandbox
 if( $SINGULARITY_SANDBOX != "" ) then
+   # Load the Singularity module
    module load singularity
+
+   # Set Singularity Bind Paths. Note: These are dependent on where you are running.
+   # By default, we'll assume you are running this script from NOBACKUP
+   setenv SINGULARITY_BIND_PATH = "-B ${NOBACKUP}:${NOBACKUP}"
+
    $RUN_CMD $NPES singularity exec $SINGULARITY_BIND_PATH $SINGULARITY_SANDBOX $EXE $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
 else
    $RUN_CMD $NPES $EXE $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
