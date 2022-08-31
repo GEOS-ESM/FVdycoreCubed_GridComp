@@ -370,7 +370,7 @@ setenv SINGULARITY_SANDBOX ""
 # If SINGULARITY_SANDBOX is non-empty and FOUND_EXE_IN_EXPDIR is set to 1, error out
 if( $FOUND_EXE_IN_EXPDIR == 1 && $SINGULARITY_SANDBOX != "" ) then
    echo "ERROR: Testing has shown Singularity only works when running with"
-   echo "       the executable directly from the installation bin dirctory"
+   echo "       the executable directly from the installation bin directory"
    exit 1
 endif
 
@@ -381,12 +381,15 @@ if( $SINGULARITY_SANDBOX != "" ) then
 
    # Set Singularity Bind Paths. Note: These are dependent on where you are running.
    # By default, we'll assume you are running this script from NOBACKUP
-   setenv SINGULARITY_BIND_PATH = "-B ${NOBACKUP}:${NOBACKUP}"
+   setenv SINGULARITY_BIND_PATH "-B ${NOBACKUP}:${NOBACKUP}"
 
-   $RUN_CMD $NPES singularity exec $SINGULARITY_BIND_PATH $SINGULARITY_SANDBOX $EXE $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
+   # Set a variable to encapsulate all Singularity details
+   setenv SINGULARITY_RUN "singularity exec $SINGULARITY_BIND_PATH $SINGULARITY_SANDBOX"
 else
-   $RUN_CMD $NPES $EXE $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
+   setenv SINGULARITY_RUN ""
 endif
+
+$RUN_CMD $NPES $SINGULARITY_RUN $EXE $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
 
 if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 
