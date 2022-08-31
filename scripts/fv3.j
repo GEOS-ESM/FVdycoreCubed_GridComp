@@ -158,19 +158,6 @@ cd $SCRDIR
 /bin/rm -rf *
 
 #######################################################################
-#     Detect if StandAlone_FV3_Dycore.x is in the current directory
-#######################################################################
-
-if (-x $EXPDIR/StandAlone_FV3_Dycore.x) then
-   set FOUND_EXE_IN_EXPDIR = 1
-   setenv EXE $EXPDIR/StandAlone_FV3_Dycore.x
-   /bin/cp $EXE $SCRDIR/StandAlone_FV3_Dycore.x
-else
-   set FOUND_EXE_IN_EXPDIR = 0
-   setenv EXE $GEOSBIN/StandAlone_FV3_Dycore.x
-endif
-
-#######################################################################
 #          Create LIVE RC Files from Templates for Current Run
 #######################################################################
 
@@ -347,32 +334,48 @@ endif
 #env | grep MPI
 
 #######################################################################
-#                          Run the Model
+#          Settings for Singularity - EXPERIMENTAL
 #######################################################################
-echo "  "
-#pwd
-echo "***** USING **** $EXE *********************"
 
-if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
-
-if( $USE_IOSERVER == 1) then
-   set IOSERVER_OPTIONS = "--npes_model $MODEL_NPES --nodes_output_server $IOS_NODES"
-else
-   set IOSERVER_OPTIONS = ""
-endif
-
-# Settings for Singularity - EXPERIMENTAL
-# ---------------------------------------
+# Detect if StandAlone_FV3_Dycore.x is in the current directory
+# -------------------------------------------------------------
 
 # If you are using singularity, set the path to the singularity sandbox here
 setenv SINGULARITY_SANDBOX ""
 
-# If SINGULARITY_SANDBOX is non-empty and FOUND_EXE_IN_EXPDIR is set to 1, error out
-if( $FOUND_EXE_IN_EXPDIR == 1 && $SINGULARITY_SANDBOX != "" ) then
-   echo "ERROR: Testing has shown Singularity only works when running with"
-   echo "       the executable directly from the installation bin directory"
-   exit 1
+# echo if we are running in singularity
+if( $SINGULARITY_SANDBOX != "" ) then
+   echo "We are running under Singularity"
+   echo ""
 endif
+
+# Detect if StandAlone_FV3_Dycore.x is in the experiment directory
+if (-e $EXPDIR/StandAlone_FV3_Dycore.x) then
+   echo "Found StandAlone_FV3_Dycore.x in $EXPDIR"
+
+   # If SINGULARITY_SANDBOX is non-empty and GEOSgcm.x is found in the experiment directory,
+   # force the use of GEOSgcm.x in the installation directory
+   if( $SINGULARITY_SANDBOX != "" ) then
+      echo "NOTE: Testing has shown Singularity only works when running with"
+      echo "      the GEOSgcm.x executable directly from the installation bin directory"
+      echo ""
+      echo "      So, we will *ignore* the local StandAlone_FV3_Dycore.x and "
+      echo "      instead use $GEOSBIN/StandAlone_FV3_Dycore.x"
+      echo ""
+
+      setenv FV3EXE $GEOSBIN/StandAlone_FV3_Dycore.x
+   else
+      echo "Copying $EXPDIR/StandAlone_FV3_Dycore.x to $SCRDIR"
+      /bin/cp $EXPDIR/StandAlone_FV3_Dycore.x $SCRDIR/StandAlone_FV3_Dycore.x
+
+      setenv FV3EXE $SCRDIR/StandAlone_FV3_Dycore.x
+   endif
+else
+   echo "Using StandAlone_FV3_Dycore.x from $GEOSBIN"
+
+   setenv FV3EXE $GEOSBIN/StandAlone_FV3_Dycore.x
+endif
+echo ""
 
 # If SINGULARITY_SANDBOX is non-empty, then run executable in singularity sandbox
 if( $SINGULARITY_SANDBOX != "" ) then
@@ -389,7 +392,22 @@ else
    setenv SINGULARITY_RUN ""
 endif
 
-$RUN_CMD $NPES $SINGULARITY_RUN $EXE $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
+#######################################################################
+#                          Run the Model
+#######################################################################
+echo "  "
+#pwd
+echo "***** USING **** $FV3EXE *********************"
+
+if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
+
+if( $USE_IOSERVER == 1) then
+   set IOSERVER_OPTIONS = "--npes_model $MODEL_NPES --nodes_output_server $IOS_NODES"
+else
+   set IOSERVER_OPTIONS = ""
+endif
+
+$RUN_CMD $NPES $SINGULARITY_RUN $FV3EXE $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
 
 if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 
