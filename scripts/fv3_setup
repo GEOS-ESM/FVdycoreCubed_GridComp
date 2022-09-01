@@ -2,7 +2,7 @@
 
 #######################################################################
 #                            Define Colors
-#         Note:  For No Colors, set C1 and C2 to NONE 
+#         Note:  For No Colors, set C1 and C2 to NONE
 #######################################################################
 
 set BLACK   = `tput setaf 0`
@@ -52,12 +52,14 @@ if (! -x ${BINDIR}/StandAlone_FV3_Dycore.x) then
    exit 1
 endif
 
+# Set TMPDIR to /tmp due to issues with heredocs in Singularity sandboxes
+# -----------------------------------------------------------------------
+
+setenv TMPDIR /tmp
+
 #######################################################################
 #                   Test for Command Line Flags
 #######################################################################
-
-# Set default behavior of switches
-set LINKX = FALSE
 
 while ( $#argv > 0 )
    set arg = $argv[1]
@@ -67,11 +69,6 @@ while ( $#argv > 0 )
       case -[Cc]:
       case --[Cc][Oo][Ll][Oo][Rr]:
          goto SETCOLOR
-
-      # Symlink StandAlone_FV3_Dycore.x
-      case --link:
-         set LINKX = TRUE
-         breaksw
 
       # Here any string not above will trigger USAGE
       case -[Hh]:
@@ -132,7 +129,7 @@ if( $WORD !=  $EXPDSC ) set EXPDSC = `echo ${EXPDSC}_${WORD}`
 end
 
 #######################################################################
-#          Continue to enter in experiment parameters 
+#          Continue to enter in experiment parameters
 #######################################################################
 
 HRCODE:
@@ -362,7 +359,7 @@ else if( $AGCM_IM <=  180 ) then
    set DEF_IOS_NDS = 2
 else if( $AGCM_IM <= 360 ) then
    set DT = 450
-   set FV_NX = 12 
+   set FV_NX = 12
    set NUM_READERS = 4
    set DEF_IOS_NDS = 2
 elsif( $AGCM_IM <= 500 ) then
@@ -379,7 +376,7 @@ else if( $AGCM_IM <= 720 ) then
    set DEF_IOS_NDS = 3
 else if( $AGCM_IM <= 1440 ) then
    set DT = 450
-   set FV_NX = 30 
+   set FV_NX = 30
    set NUM_READERS = 6
    set USE_SHMEM = 1
    set DEF_IOS_NDS = 4
@@ -389,7 +386,7 @@ else if( $AGCM_IM <= 1536 ) then
    set NUM_READERS = 6
    set USE_SHMEM = 1
    set DEF_IOS_NDS = 4
-else 
+else
    set DT = 45
    set FV_NX = 64
    set NUM_READERS = 6
@@ -406,6 +403,8 @@ endif
 set FV_NY = `expr $FV_NX \* 6`
 
 set AGCM_GRIDNAME   = "PE${AGCM_IM}x${AGCM_JM}-CF"
+
+set FV_PRECISION = @CFG_FV_PRECISION@
 
 #######################################################################
 #                  Architecture Specific Variables
@@ -486,7 +485,7 @@ else
 
    setenv RUN_Q "DELETE"
    setenv RUN_P "SBATCH --ntasks=${MODEL_NPES}" # PE Configuration for fv3.j
-   
+
    # By default on desktop, just ignore IOSERVER for now until testing
    set USE_IOSERVER   = 0
    set IOS_NDS        = 0
@@ -521,7 +520,7 @@ while( $check == FALSE )
   else
        setenv EXPDIR  $EXPDIR_def
   endif
-  
+
   if( "$EXPID" != `basename $EXPDIR` ) then
        echo "\!\! The ${C1}EXPERIMENT${CN} Directory MUST point to the ${C1}EXPID${CN}: ${C2}${EXPID}${CN}"
        echo " "
@@ -589,16 +588,6 @@ endif
 
 if( -e $HOME/.GROUProot ) /bin/rm $HOME/.GROUProot
 echo $GROUP > $HOME/.GROUProot
-
-#######################################################################
-#      Copy Model Executable and RC Files to Experiment Directory
-#######################################################################
-
-if ( $LINKX == "TRUE" ) then
-  if ( -e $GEOSBIN/StandAlone_FV3_Dycore.x ) ln -s $GEOSBIN/StandAlone_FV3_Dycore.x $EXPDIR
-else
-  if ( -e $GEOSBIN/StandAlone_FV3_Dycore.x ) cp -v $GEOSBIN/StandAlone_FV3_Dycore.x $EXPDIR
-endif
 
 #######################################################################
 #               Set Recommended MPI Stack Settings
@@ -696,20 +685,6 @@ r $EXPDIR/SETENV.commands
 d
 }
 
-/@GPUSTART/ {
-t success1
-: success1
-r $EXPDIR/GPUSTART.commands
-d
-}
-
-/@GPUEND/ {
-t success2
-: success2
-r $EXPDIR/GPUEND.commands
-d
-}
-
 s?@EXPID?$EXPID?g
 s?@RUN_N?$RUN_N?g
 s?@RUN_T?$RUN_T?g
@@ -736,6 +711,7 @@ s^@BOOT^YES^g
 s/@DT/$DT/g
 s/@FV_NX/$FV_NX/g
 s/@FV_NY/$FV_NY/g
+s/@FV_PRECISION/$FV_PRECISION/g
 s/@USE_SHMEM/$USE_SHMEM/g
 s/@USE_IOSERVER/$USE_IOSERVER/g
 s/@USE_NONHYDRO/$USE_NONHYDRO/g
@@ -814,6 +790,12 @@ chmod   +x $EXPDIR/fv3.j
 
 echo "Done!"
 echo "-----"
+echo ""
+echo "NOTE: fv3.j by default will run StandAlone_FV3_Dycore.x from the installation directory:"
+echo "      $GEOSBIN"
+echo ""
+echo "      However, if you copy an executable into the experiment directory, the script will"
+echo "      run that executable instead."
 
 #######################################################################
 #                              Clean-Up
@@ -831,18 +813,6 @@ TRAP:
    echo "Interrupt received, cleaning up temporary files"
    /bin/rm $FILES_TO_PROCESS $OLDEXPFILES $NEWEXPFILES $COPYSCRIPT $SEDFILE
    exit 1
-
-CONTACTMATT:
-cat <<EOF
-
-It appears your environment is not set correctly to
-run with the GPUs. If you wish to build and run the
-model using GPUs, please contact Matt Thompson at:
-
-            matthew.thompson@nasa.gov
-
-EOF
-exit 1
 
 SETCOLOR:
 echo
@@ -886,7 +856,6 @@ fv3_setup, a setup script for the GEOS-5 FV3 Standalone
    Usage: $0:t [optional flag]
 
    -c --color      Set the colors for $0:t
-   -g --gpu        Run the model using the GPUs
    -h --help       Show usage
 
    If invoked alone, the script runs as normal.
