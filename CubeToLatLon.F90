@@ -21,7 +21,7 @@ Module CubeLatLonTransformMod
   
   use ESMF
   use MAPL
-  use, intrinsic :: iso_fortran_env, only: REAL64
+  use, intrinsic :: iso_fortran_env, only: REAL64, REAL32
 
   implicit none
   private
@@ -628,8 +628,8 @@ contains
   subroutine CubeToCube(Tr, data_cs_in, data_cs_out, rc)
 
     type(T_CubeCubeTransform),    intent(in )   :: Tr
-    real,                         intent(inout) :: data_cs_in(:,:)
-    real,                         intent(inout) :: data_cs_out(:,:)
+    real(REAL32),                         intent(inout) :: data_cs_in(:,:)
+    real(REAL32),                         intent(inout) :: data_cs_out(:,:)
     integer, optional,            intent(out)   :: rc
 
 ! Locals
@@ -797,7 +797,7 @@ contains
     real(REAL64),                     intent(inout) :: data_cs(:,:)
     real(REAL64),                     intent(inout) :: data_ll(:,:)
     logical, optional,            intent(in )   :: transpose
-    real,    optional,            intent(in )   :: misval
+    real(REAL32),    optional,            intent(in )   :: misval
     integer, optional,            intent(out)   :: rc
 
 ! Locals
@@ -850,10 +850,10 @@ contains
   subroutine CubeToLatLonr4( Tr, data_cs, data_ll, transpose, misval, rc)
 
     type(T_CubeLatLonTransform),  intent(in )   :: Tr
-    real,                         intent(inout) :: data_cs(:,:)
-    real,                         intent(inout) :: data_ll(:,:)
+    real(REAL32),                         intent(inout) :: data_cs(:,:)
+    real(REAL32),                         intent(inout) :: data_ll(:,:)
     logical, optional,            intent(in )   :: transpose
-    real,    optional,            intent(in )   :: misval
+    real(REAL32),    optional,            intent(in )   :: misval
     integer, optional,            intent(out)   :: rc
 
 ! Locals
@@ -940,7 +940,7 @@ contains
     real(REAL64),                     intent(inout) :: data_ll(:,:)
     real(REAL64),                     intent(inout) :: data_cs(:,:)
     logical, optional,            intent(in )   :: transpose
-    real,    optional,            intent(in )   :: misval
+    real(REAL32),    optional,            intent(in )   :: misval
     integer, optional,            intent(out)   :: rc
 
 ! Locals
@@ -991,10 +991,10 @@ contains
   subroutine LatLonToCuber4( Tr, data_ll, data_cs, transpose, misval, rc)
 
     type(T_CubeLatLonTransform),  intent(in )   :: Tr
-    real,                         intent(inout) :: data_ll(:,:)
-    real,                         intent(inout) :: data_cs(:,:)
+    real(REAL32),                         intent(inout) :: data_ll(:,:)
+    real(REAL32),                         intent(inout) :: data_cs(:,:)
     logical, optional,            intent(in )   :: transpose
-    real,    optional,            intent(in )   :: misval
+    real(REAL32),    optional,            intent(in )   :: misval
     integer, optional,            intent(out)   :: rc
 
 ! Locals
@@ -1094,7 +1094,7 @@ contains
     real(REAL64), dimension(:,:),     intent(inout) :: latlon
     real(REAL64), dimension(:,:,:),   intent(in)    :: weight
     integer,  dimension(:,:,:),   intent(in)    :: index
-    real, optional, intent(in)    :: misval
+    real(REAL32), optional, intent(in)    :: misval
     logical,                      intent(in)    :: subset
     logical,                      intent(in)    :: transpose
 
@@ -1212,7 +1212,7 @@ contains
     real(REAL64), dimension(:,:),   intent(inout) :: latlon
     real(REAL64), dimension(:,:,:), intent(in)    :: weight
     integer,  dimension(:,:),   intent(in)    :: id1, id2, jdc
-    real, optional, intent(in)    :: misval
+    real(REAL32), optional, intent(in)    :: misval
     logical,                    intent(in)    :: transpose
 
     !------------------------------------------------------------------!
@@ -1400,8 +1400,8 @@ contains
 
   subroutine SphericalToCartesianR4(Tr, U, V, Uxyz, Transpose, SphIsLL, Rotate, RC)
     type(T_CubeLatLonTransform), intent(IN ) :: Tr
-    real,                        intent(IN ) :: U(:,:,:), V(:,:,:)
-    real,                        intent(OUT) :: Uxyz(:,:,:)
+    real(REAL32),                        intent(IN ) :: U(:,:,:), V(:,:,:)
+    real(REAL32),                        intent(OUT) :: Uxyz(:,:,:)
     logical,                     intent(IN ) :: Transpose
     logical,                     intent(IN ) :: SphIsLL
     logical,                     intent(IN ) :: Rotate
@@ -1546,8 +1546,8 @@ contains
 
   subroutine CartesianToSphericalR4(Tr, Uxyz, U, V, Transpose, SphIsLL, Rotate, RC)
     type(T_CubeLatLonTransform), intent(IN ) :: Tr
-    real,                        intent(OUT) :: U(:,:,:), V(:,:,:)
-    real,                        intent(IN ) :: Uxyz(:,:,:)
+    real(REAL32),                        intent(OUT) :: U(:,:,:), V(:,:,:)
+    real(REAL32),                        intent(IN ) :: Uxyz(:,:,:)
     logical,                     intent(IN ) :: Transpose
     logical,                     intent(IN ) :: SphIsLL
     logical,                     intent(IN ) :: Rotate
@@ -1755,8 +1755,8 @@ contains
 
   subroutine RunTileTransform(TR, PTR2d_IN, PTR2d_OUT, TRANSPOSE, RC)
     type(T_CubeLatLonTransform), target, intent(IN ) :: Tr
-    real                                     :: ptr2d_in(:,:)
-    real                                     :: ptr2d_out(:,:)
+    real(REAL32)                                     :: ptr2d_in(:,:)
+    real(REAL32)                                     :: ptr2d_out(:,:)
     logical                                  :: transpose
     integer, optional        , intent(  OUT) :: RC
     
@@ -1768,7 +1768,7 @@ contains
     type(MAPL_LocStreamXform), pointer :: XFORM
     type(MAPL_LocStream),      pointer :: LS_IN, LS_OUT
     integer                            :: NTILES_IN, NTILES_OUT
-    real, allocatable, dimension(:)    :: tile_in, tile_out
+    real(REAL32), allocatable, dimension(:)    :: tile_in, tile_out
 
     LS_IN => TR%LocStIn
     LS_OUT => TR%LocStOut
@@ -1912,14 +1912,14 @@ SUBROUTINE CToL_INTERP_B(ll_datab, cs_datab, NT_tiles, nlat, nlon, nxg, nyg)
 END SUBROUTINE CToL_INTERP_B
 
 subroutine ReStaggerWindsCube(U, V, D2A)
-  real,                      intent(INOUT) :: U(:,:,:)
-  real,                      intent(INOUT) :: V(:,:,:)
+  real(REAL32),                      intent(INOUT) :: U(:,:,:)
+  real(REAL32),                      intent(INOUT) :: V(:,:,:)
   logical,                   intent(IN   ) :: D2A
   
   integer :: im, jm, lm
   integer :: tile, l, j1, j2, status
   integer, parameter :: ntiles=6
-  real, allocatable, dimension(:,:,:) :: UAP, VAP
+  real(REAL32), allocatable, dimension(:,:,:) :: UAP, VAP
 
   IM = size(U,1)
   JM = size(V,2)/6
@@ -1964,8 +1964,8 @@ end subroutine ReStaggerWindsCube
 
   subroutine SphericalToCartesianR4C2C(Tr, U, V, Uxyz)
     type(T_CubeCubeTransform), intent(IN ) :: Tr
-    real,                      intent(IN ) :: U(:,:,:), V(:,:,:)
-    real,                      intent(OUT) :: Uxyz(:,:,:)
+    real(REAL32),                      intent(IN ) :: U(:,:,:), V(:,:,:)
+    real(REAL32),                      intent(OUT) :: Uxyz(:,:,:)
     
     integer           :: K, LM
     real(REAL64), pointer :: e1(:,:,:), e2(:,:,:) 
@@ -1986,8 +1986,8 @@ end subroutine ReStaggerWindsCube
 
   subroutine CartesianToSphericalR4C2C(Tr, Uxyz, U, V)
     type(T_CubeCubeTransform),   intent(IN ) :: Tr
-    real,                        intent(OUT) :: U(:,:,:), V(:,:,:)
-    real,                        intent(IN ) :: Uxyz(:,:,:)
+    real(REAL32),                        intent(OUT) :: U(:,:,:), V(:,:,:)
+    real(REAL32),                        intent(IN ) :: Uxyz(:,:,:)
 
     integer           :: K, LM
     real(REAL64), pointer :: e1(:,:,:), e2(:,:,:) 
@@ -2011,8 +2011,8 @@ end subroutine ReStaggerWindsCube
   end subroutine CartesianToSphericalR4C2C
 
   subroutine GhostCubeVector(u,v,d2a)
-    real,    intent(INOUT) :: u(0:,0:,:)
-    real,    intent(INOUT) :: v(0:,0:,:)
+    real(REAL32),    intent(INOUT) :: u(0:,0:,:)
+    real(REAL32),    intent(INOUT) :: v(0:,0:,:)
     logical, intent(IN   ) :: d2a ! .true. when input is on D-grid
 
     integer :: nx, ny
