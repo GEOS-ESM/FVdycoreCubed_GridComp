@@ -714,8 +714,8 @@ contains
 
 ! Pointers to geography info in the MAPL MetaComp
 
-  real,                 pointer :: LATS (:,:)
-  real,                 pointer :: LONS (:,:)
+  real(REAL4),                 pointer :: LATS (:,:)
+  real(REAL4),                 pointer :: LONS (:,:)
 
   type (ESMF_TimeInterval)     :: Time2Run
   type (ESMF_VM)               :: VM

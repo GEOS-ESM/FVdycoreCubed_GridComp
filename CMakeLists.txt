@@ -39,8 +39,11 @@ elseif (FV_PRECISION STREQUAL R4R8) # FV is R4 but FMS is R8
    set (GFDL fms_r8)
 elseif (FV_PRECISION STREQUAL R8)
    set (GFDL fms_r8)
+   string(REPLACE " " ";" tmp ${FREAL8})
+   foreach(flag ${tmp})
+     target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
+   endforeach()
 endif ()
-
 
 if (FV_PRECISION MATCHES R4)
   target_compile_definitions (${this} PRIVATE -DSINGLE_FV -DOVERLOAD_R4)
@@ -48,6 +51,7 @@ elseif (FV_PRECISION MATCHES R4R8) # FV is R4 but FMS is R8
   target_compile_definitions (${this} PRIVATE -DSINGLE_FV -DOVERLOAD_R4)
 endif ()
 
+message(STATUS "Building FV as ${FV_PRECISION}")
 
 set (CMAKE_Fortran_FLAGS_RELEASE "${GEOS_Fortran_FLAGS_VECT}")
 

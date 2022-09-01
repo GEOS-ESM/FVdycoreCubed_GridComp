@@ -73,7 +73,7 @@ contains
       integer, intent(out), optional :: rc
       
       integer :: status,dims(3),funit
-      real, allocatable :: input(:,:)
+      real(real4), allocatable :: input(:,:)
       call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
       allocate(input(dims(1),dims(2)))
       open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
