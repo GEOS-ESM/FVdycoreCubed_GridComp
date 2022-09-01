@@ -4,6 +4,8 @@ else()
    set(CFG_NONHYDROSTATIC TRUE)
 endif()
 
+set(CFG_FV_PRECISION ${FV_PRECISION})
+
 configure_file(fv3_setup fv3_setup @ONLY)
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/fv3_setup DESTINATION bin)
 
