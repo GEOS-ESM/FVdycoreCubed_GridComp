@@ -174,7 +174,7 @@ private
     real(REAL8), allocatable           :: AREA(:,:)    ! local cell area
     real(REAL8)                        :: GLOBALAREA   ! global area
 
-    integer                         :: KS              ! Number of true pressure levels (out of NPZ+1)
+    integer                            :: KS              ! Number of true pressure levels (out of NPZ+1)
     real(REAL8)                        :: PTOP            ! pressure at top (ak(1))
     real(REAL8)                        :: PINT            ! initial pressure (ak(npz+1))
     real(REAL8), dimension(:), pointer :: AK => NULL()    ! Sigma mapping
@@ -322,7 +322,6 @@ contains
   integer              :: status
   real(FVPRC) :: DT
 
-  integer   :: ks                 !  True # press. levs
   integer   :: ndt,nx,ny
 
   type (MAPL_MetaComp),          pointer :: MAPL  => NULL()
@@ -632,14 +631,6 @@ contains
   call WRITE_PARALLEL((/FV_Atm(1)%flagstruct%npx,FV_Atm(1)%flagstruct%npy,FV_Atm(1)%flagstruct%npz/)       , &
     format='("Resolution of dynamics restart     =",3I5)'  )
 
-  ks = FV_Atm(1)%ks ! ALT: this was the value when we read "old" style FV_internal restart
-                    !      if needed, we could compute, ks by count(BK==0.0)
-                    !      then FV will try to run slightly more efficient code
-                    !      So far, GEOS-5 has used ks = 0
-  _ASSERT(ks <= FV_Atm(1)%flagstruct%NPZ+1,'ks must be smaller than NPZ+1')
-  call WRITE_PARALLEL(ks                          , &
-     format='("Number of true pressure levels =", I5)'   )
-
   FV_HYDROSTATIC = FV_Atm(1)%flagstruct%hydrostatic
   DEBUG          = FV_Atm(1)%flagstruct%fv_debug
   prt_minmax     = FV_Atm(1)%flagstruct%fv_debug
@@ -726,8 +717,8 @@ contains
 
 ! Pointers to geography info in the MAPL MetaComp
 
-  real,                 pointer :: LATS (:,:)
-  real,                 pointer :: LONS (:,:)
+  real(REAL4),                 pointer :: LATS (:,:)
+  real(REAL4),                 pointer :: LONS (:,:)
 
   type (ESMF_TimeInterval)     :: Time2Run
   type (ESMF_VM)               :: VM
@@ -843,6 +834,12 @@ contains
   if(.not.associated(GRID%BK)) allocate(GRID%BK(size(bk)))
   GRID%AK     = ak
   GRID%BK     = bk
+
+  ! We set ks to be one less than the number of levels in bk that are zero.
+  ! This matches the number that would be provided by m_set_eta.
+  FV_Atm(1)%ks = count(bk == 0.0) - 1
+  _ASSERT(FV_Atm(1)%ks <= FV_Atm(1)%flagstruct%NPZ+1,'FV_Atm(1)%ks must be smaller than NPZ+1')
+  call WRITE_PARALLEL(FV_Atm(1)%ks, format='("Number of true pressure levels =", I5)'   )
 
 ! Local Copy of dimensions
 
