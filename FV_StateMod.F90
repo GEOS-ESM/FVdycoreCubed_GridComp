@@ -2276,7 +2276,14 @@ subroutine State_To_FV ( STATE )
     enddo
   endif
 
-   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%w(isc:iec,jsc:jec,:) = STATE%VARS%W
+  if ( FV_Atm(1)%flagstruct%range_warn ) then
+    call range_check('U_S2F', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                      -280., 280., bad_data)
+    call range_check('V_S2F', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                      -280., 280., bad_data)
+  endif
+
+  if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%w(isc:iec,jsc:jec,:) = STATE%VARS%W
  
 !------------
 ! Update Pressures
@@ -2378,6 +2385,13 @@ subroutine FV_To_State ( STATE )
     JEC = state%grid%je
     KM  = state%grid%npz
     NG  = state%grid%ng
+
+    if ( FV_Atm(1)%flagstruct%range_warn ) then
+      call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                        -280., 280., bad_data)
+      call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                        -280., 280., bad_data)
+    endif
 
 ! Copy updated FV data to internal state
     STATE%VARS%U(:,:,:) = FV_Atm(1)%u(isc:iec,jsc:jec,:)
