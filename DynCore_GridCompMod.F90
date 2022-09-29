@@ -993,17 +993,17 @@ contains
      VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                  &
-         SHORT_NAME = 'MX',                                       &
+         SHORT_NAME = 'MX',                                        &
          LONG_NAME  = 'pressure_weighted_accumulated_eastward_mass_flux', &
-         UNITS      = 'Pa m+2 s-1',                                &
+         UNITS      = 'Pa m+2',                                    &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
      VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                  &
-         SHORT_NAME = 'MY',                                       &
+         SHORT_NAME = 'MY',                                        &
          LONG_NAME  = 'pressure_weighted_accumulated_northward_mass_flux', &
-         UNITS      = 'Pa m+2 s-1',                                &
+         UNITS      = 'Pa m+2',                                    &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
      VERIFY_(STATUS)
@@ -1011,7 +1011,7 @@ contains
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'MFX',                                       &
          LONG_NAME  = 'pressure_weighted_accumulated_eastward_mass_flux', &
-         UNITS      = 'Pa m+2 s-1',                                &
+         UNITS      = 'Pa m+2',                                    &
          PRECISION  = ESMF_KIND_R8,                                &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
@@ -1020,7 +1020,7 @@ contains
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'MFY',                                       &
          LONG_NAME  = 'pressure_weighted_accumulated_northward_mass_flux', &
-         UNITS      = 'Pa m+2 s-1',                                &
+         UNITS      = 'Pa m+2',                                    &
          PRECISION  = ESMF_KIND_R8,                                &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
