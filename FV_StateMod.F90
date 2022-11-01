@@ -508,7 +508,7 @@ contains
    FV_Atm(1)%flagstruct%z_tracer = .true.
   ! Some default horizontal flags
    FV_Atm(1)%flagstruct%adjust_dry_mass = fix_mass
-   FV_Atm(1)%flagstruct%consv_te = 0.7
+   FV_Atm(1)%flagstruct%consv_te = 1.0
    FV_Atm(1)%flagstruct%consv_am = .false.
    FV_Atm(1)%flagstruct%fill = .true.
    FV_Atm(1)%flagstruct%dwind_2d = .false.
@@ -520,9 +520,9 @@ contains
    FV_Atm(1)%flagstruct%rf_cutoff = 0.25e2
   ! 6th order default damping options
    FV_Atm(1)%flagstruct%nord = 2
-   FV_Atm(1)%flagstruct%dddmp = 0.0
-   FV_Atm(1)%flagstruct%d4_bg = 0.16
-   FV_Atm(1)%flagstruct%d2_bg = 0.0075
+   FV_Atm(1)%flagstruct%dddmp = 0.2
+   FV_Atm(1)%flagstruct%d4_bg = 0.12
+   FV_Atm(1)%flagstruct%d2_bg = 0.0
    FV_Atm(1)%flagstruct%d_ext = 0.0
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%n_split = 0
@@ -566,7 +566,7 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75  )
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
-      FV_Atm(1)%flagstruct%fv_sg_adj = 2*DT
+      FV_Atm(1)%flagstruct%fv_sg_adj = DT
      ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%hydrostatic = .false.
       FV_Atm(1)%flagstruct%make_nh = .false.
@@ -584,7 +584,7 @@ contains
          FV_Atm(1)%flagstruct%d_con = 0.
       else
       ! Non-Monotonic advection 
-         FV_Atm(1)%flagstruct%hord_mt =  6
+         FV_Atm(1)%flagstruct%hord_mt =  5
          FV_Atm(1)%flagstruct%hord_vt =  6
          FV_Atm(1)%flagstruct%hord_tm =  6
          FV_Atm(1)%flagstruct%hord_dp = -6
@@ -595,22 +595,22 @@ contains
      ! continue to adjust vorticity damping with
      ! increasing resolution
          if (FV_Atm(1)%flagstruct%npx >= 180) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.02
+           FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
          if (FV_Atm(1)%flagstruct%npx >= 360) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.03
+           FV_Atm(1)%flagstruct%vtdm4 = 0.02
          endif
          if (FV_Atm(1)%flagstruct%npx >= 720) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.04
+           FV_Atm(1)%flagstruct%vtdm4 = 0.03
          endif
          if (FV_Atm(1)%flagstruct%npx >= 1440) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.05
+           FV_Atm(1)%flagstruct%vtdm4 = 0.04
          endif
          if (FV_Atm(1)%flagstruct%npx >= 2880) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.06
          endif
          if (FV_Atm(1)%flagstruct%npx >= 5760) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.07
+           FV_Atm(1)%flagstruct%vtdm4 = 0.08
          endif
       endif
       if (index(FV3_CONFIG,"MERRA-2") > 0) then
