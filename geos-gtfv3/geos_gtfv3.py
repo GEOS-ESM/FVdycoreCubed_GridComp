@@ -28,8 +28,9 @@ def geos_gtfv3(
     BACKEND = 'dace:gpu'
 
     rank = comm.Get_rank()
+    RANK_PRINT = 0
 
-    if rank == 0:
+    if rank == RANK_PRINT:
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--in top level geos-gtfv3, backend:', BACKEND, flush=True)
 
@@ -49,9 +50,9 @@ def geos_gtfv3(
     # write_sum_of_vars(comm, state_in)
     # write_shape_or_value(comm, state_in)
 
-    if rank == 0:
+    if rank == RANK_PRINT:
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
-              '--created input data', flush=True)
+              '--fortran->numpy, transpose, sp->dp, swap axes', flush=True)
 
     # Setup dycore object
     # This block gets executed only at the first time step
@@ -61,7 +62,7 @@ def geos_gtfv3(
         GTFV3_DYCORE = GeosDycoreWrapper(namelist, bdt, comm, BACKEND)
     assert GTFV3_DYCORE is not None, 'GTFV3_DYCORE is None'
 
-    if rank == 0:
+    if rank == RANK_PRINT:
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--initialized dycore', flush=True)
 
@@ -74,6 +75,10 @@ def geos_gtfv3(
         state_in['ua'], state_in['va'], state_in['uc'], state_in['vc'],
         state_in['mfxd'], state_in['mfyd'], state_in['cxd'], state_in['cyd'], state_in['diss_estd'])
 
+    if rank == RANK_PRINT:
+        print('P:', datetime.now().isoformat(timespec='milliseconds'),
+              '--ran dycore', flush=True)
+
     # Convert NumPy arrays back to Fortran
     numpy_state_to_fortran(
         state_out,
@@ -84,6 +89,6 @@ def geos_gtfv3(
         ua, va, uc, vc,
         mfx, mfy, cx, cy, diss_est)
 
-    if rank == 0:
+    if rank == RANK_PRINT:
        print('P:', datetime.now().isoformat(timespec='milliseconds'),
-             '--converted NumPy arrays to Fortran', flush=True)
+             '--numpy->fortran, transpose, dp->sp, swap axes', flush=True)
