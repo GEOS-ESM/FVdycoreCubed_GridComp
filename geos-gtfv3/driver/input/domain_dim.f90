@@ -19,9 +19,7 @@ contains
     class(DomainDim_T), intent(in) :: self
 
     ! Start
-    print *, 'npx: ', self%npx
-    print *, 'npy: ', self%npy
-    print *, 'npz: ', self%npz
+    print *, 'npx/npy/npz: ', self%npx, self%npy, self%npz
 
   end subroutine wr1te
 

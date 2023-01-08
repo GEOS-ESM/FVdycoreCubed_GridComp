@@ -20,15 +20,8 @@ contains
     class(GridBounds_T), intent(in) :: self
 
     ! Start
-    print *, 'is: ', self%is
-    print *, 'ie: ', self%ie
-    print *, 'js: ', self%js
-    print *, 'je: ', self%je
-
-    print *, 'isd: ', self%isd
-    print *, 'ied: ', self%ied
-    print *, 'jsd: ', self%jsd
-    print *, 'jed: ', self%jed
+    print *, 'is/ie/js/je: ', self%is, self%ie, self%js, self%je
+    print *, 'isd/ied/jsd/jed: ', self%isd, self%ied, self%jsd, self%jed
 
   end subroutine wr1te
   
