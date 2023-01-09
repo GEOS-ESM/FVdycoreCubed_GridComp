@@ -256,6 +256,19 @@ private
 
 contains
 
+  subroutine get_date_time_isoformat(dt_iso)
+    ! Arguments
+    character(len=23), intent(out) :: dt_iso
+    ! Locals
+    character(len=8) :: date
+    character(len=10) :: time
+    character(len=*), parameter :: fmt = '(a4,a1,a2,a1,a2,a1,a2,a1,a2,a1,a6)'
+
+    call date_and_time(date=date, time=time)
+    write(dt_iso, fmt) date(1:4), '-', date(5:6), '-', date(7:8), 'T', time(1:2), ':', time(3:4), ':', time(5:10)
+
+  end subroutine get_date_time_isoformat
+
 !-----------------------------------------------------------------------
 !
 ! !INTERFACE:
@@ -1165,6 +1178,7 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
   integer :: comm, rank, mpierr
   logical :: halting_mode(5)
   real :: start, finish
+  character(len=23) :: dt_iso
 
 ! Begin
 
@@ -1727,6 +1741,8 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     ! to the Python function and resume trapping
     call ieee_get_halting_mode(ieee_all, halting_mode)
     call ieee_set_halting_mode(ieee_all, .false.)
+    call get_date_time_isoformat(dt_iso)
+    if (rank == 0) write(*, '(a2,1x,a23,a)') 'F:', dt_iso, ' --calling fortran interface'
     call cpu_time(start)
     call geos_gtfv3_interface_f( &
          comm, &
@@ -1746,6 +1762,8 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          ! input/output
          FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
     call cpu_time(finish)
+    call get_date_time_isoformat(dt_iso)
+    if (rank == 0) write(*, '(a2,1x,a23,a)') 'F:', dt_iso, ' --back in fortran'
     call ieee_set_halting_mode(ieee_all, halting_mode)
     print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
 
