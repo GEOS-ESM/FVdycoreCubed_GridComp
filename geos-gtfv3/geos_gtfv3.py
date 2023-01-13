@@ -19,6 +19,8 @@ def geos_gtfv3(
         ak, bk,
         mfx, mfy, cx, cy, diss_est):
 
+    assert nq_tot == 7, f'Expected 7, received: {nq_tot}'
+
     BACKEND = 'gtcuda'
 
     rank = comm.Get_rank()
@@ -81,7 +83,7 @@ def geos_gtfv3(
 
     # Convert NumPy arrays back to Fortran
     numpy_output_data_to_fortran(
-        state_out,
+        state_out, nq_tot,
         u, v, w, delz,
         pt, delp, q,
         ps, pe, pk, peln, pkz,

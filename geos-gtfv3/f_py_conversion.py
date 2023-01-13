@@ -22,6 +22,11 @@ def fort_to_numpy(fptr, dim):
 
 
 
+# Create a class FortranPythonConversion with state consisting of
+# is/ie/js/je, isd/ied/jsd/jed, nq_tot etc
+
+
+
 def fortran_state_to_numpy(
         npx, npy, npz,
         is_, ie, js, je, isd, ied, jsd, jed,
@@ -96,7 +101,7 @@ def fortran_state_to_numpy(
 
 
 def numpy_output_data_to_fortran(
-        output_data,
+        output_data, nq_tot,
         u_ptr, v_ptr, w_ptr, delz_ptr,
         pt_ptr, delp_ptr, q_ptr,
         ps_ptr, pe_ptr, pk_ptr, peln_ptr, pkz_ptr,
@@ -119,7 +124,7 @@ def numpy_output_data_to_fortran(
     delp_out_f = output_data['delp'].astype(np.float32).flatten(order='F')
     ffi.memmove(delp_ptr, delp_out_f, 4*delp_out_f.size)
     # q needs special handling
-    q = np.empty(list(output_data['qvapor'].shape)+[9])
+    q = np.empty(list(output_data['qvapor'].shape)+[nq_tot])
     q[:,:,:,0] = output_data['qvapor']
     q[:,:,:,1] = output_data['qliquid']
     q[:,:,:,2] = output_data['qice']

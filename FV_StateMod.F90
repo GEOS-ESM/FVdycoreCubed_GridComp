@@ -1730,11 +1730,11 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
          FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
          FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
          isd, ied, jsd, jed, &
-         myDT, FV_Atm(1)%ncnst, FV_Atm(1)%ng, FV_Atm(1)%ptop, FV_Atm(1)%ks, &
+         myDT, 7, FV_Atm(1)%ng, FV_Atm(1)%ptop, FV_Atm(1)%ks, &
          FV_Atm(1)%layout(1), FV_Atm(1)%layout(2), adiabatic, &
          ! input/output
          FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-         FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
+         FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,1:7), &
          FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
          FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
          FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
