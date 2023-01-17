@@ -1,11 +1,8 @@
 import f90nml
 from datetime import datetime
 
-from f_py_conversion import fortran_state_to_numpy
-from f_py_conversion import numpy_state_to_fortran
-
+from f_py_conversion import FortranPythonConversion
 from pace.fv3core.initialization.geos_wrapper import GeosDycoreWrapper
-
 from geos_gtfv3_debug import write_shape_or_value
 
 #-GLOBAL-variables-start-
@@ -25,7 +22,7 @@ def geos_gtfv3(
         ak, bk,
         mfx, mfy, cx, cy, diss_est):
 
-    BACKEND = 'dace:gpu'
+    BACKEND = 'gt:gpu'
 
     rank = comm.Get_rank()
     RANK_PRINT = 0
@@ -34,13 +31,16 @@ def geos_gtfv3(
         print('P:', datetime.now().isoformat(timespec='milliseconds'),
               '--in top level geos-gtfv3, backend:', BACKEND, flush=True)
 
-    # Convert Fortran arrays to NumPy
-    state_in = fortran_state_to_numpy(
+    # For Fortran<->NumPy conversion
+    f_py = FortranPythonConversion(
         npx, npy, npz,
-        is_, ie, js, je, isd, ied, jsd, jed,
-        bdt, nq_tot, ptop, ks,
-        ak, bk,
-        # input/output arrays
+        is_, ie, js, je,
+        isd, ied, jsd, jed,
+        nq_tot)
+
+    # Convert Fortran arrays to NumPy
+    state_in = f_py.fortran_to_numpy(
+        # input
         u, v, w, delz,
         pt, delp, q,
         ps, pe, pk, peln, pkz,
@@ -80,8 +80,10 @@ def geos_gtfv3(
               '--ran dycore', flush=True)
 
     # Convert NumPy arrays back to Fortran
-    numpy_state_to_fortran(
+    f_py.numpy_to_fortran(
+        # input
         state_out,
+        # output
         u, v, w, delz,
         pt, delp, q,
         ps, pe, pk, peln, pkz,
