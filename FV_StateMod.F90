@@ -516,7 +516,11 @@ contains
    FV_Atm(1)%flagstruct%ke_bg = 0.0
   ! Rayleigh Damping
    FV_Atm(1)%flagstruct%RF_fast = .false.
-   FV_Atm(1)%flagstruct%tau = 2.5
+   if (FV_Atm(1)%flagstruct%npz == 72) then
+     FV_Atm(1)%flagstruct%tau = 0.0
+   else
+     FV_Atm(1)%flagstruct%tau = 2.5
+   endif
    FV_Atm(1)%flagstruct%rf_cutoff = 0.25e2
   ! 6th order default damping options
    FV_Atm(1)%flagstruct%nord = 2

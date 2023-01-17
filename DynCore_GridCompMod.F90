@@ -1363,6 +1363,14 @@ contains
     VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                                        &
+       SHORT_NAME         = 'TROPK_BLENDED',                                             &
+       LONG_NAME          = 'tropopause_index_based_on_blended_estimate',             &
+       UNITS              = 'unitless',                                                  &
+       DIMS               = MAPL_DimsHorzOnly,                                           &
+       VLOCATION          = MAPL_VLocationNone,                                RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                                        &
        SHORT_NAME         = 'TROPT',                                                     &
        LONG_NAME          = 'tropopause_temperature_using_blended_TROPP_estimate',       &
        UNITS              = 'K',                                                         &
@@ -2765,7 +2773,7 @@ subroutine Run(gc, import, export, clock, rc)
     integer  :: NKE, NPHI
     integer  :: NUMVARS
     integer  :: ifirstxy, ilastxy, jfirstxy, jlastxy
-    integer  :: K, L, n
+    integer  :: kend, i, j, K, L, n
     integer  :: im_replay,jm_replay
     logical, parameter :: convt = .false. ! Until this is run with full physics
     logical  :: is_shutoff, is_ringing
@@ -2927,7 +2935,7 @@ subroutine Run(gc, import, export, clock, rc)
     logical                             :: adjustTracers
     type(ESMF_Alarm)                    :: predictorAlarm
     type(ESMF_Grid)                     :: bgrid
-    integer                             :: j,pos
+    integer                             :: pos
     integer                             :: nqt
     logical                             :: tend
     logical                             :: exclude
@@ -4309,6 +4317,8 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2D)) doTropvars=.true.
       call MAPL_GetPointer(export,temp2D,'TROPP_BLENDED',rc=status); VERIFY_(STATUS)
       if(associated(temp2D)) doTropvars=.true.
+      call MAPL_GetPointer(export,temp2D,'TROPK_BLENDED',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doTropvars=.true.
       call MAPL_GetPointer(export,temp2D,'TROPT',rc=status); VERIFY_(STATUS)
       if(associated(temp2D)) doTropvars=.true.
       call MAPL_GetPointer(export,temp2D,'TROPQ',rc=status); VERIFY_(STATUS)
@@ -4327,6 +4337,28 @@ subroutine Run(gc, import, export, clock, rc)
                           real(qv                 ,kind=4),         &
                           real(epvxyz*(p00**kappa),kind=4),         &
                           tropp1,tropp2,tropp3,tropt,tropq          )
+
+         ! get blended index
+         call MAPL_GetPointer(export,temp2D,'TROPK_BLENDED',rc=status); VERIFY_(STATUS)
+         if( associated(temp2D) ) then
+            kend = km
+            do j=jfirstxy,jlastxy
+               do i=ifirstxy,ilastxy
+                  if (tropp3(i,j) .NE. MAPL_UNDEF) then
+                      kend = 1
+                      do while (vars%pe(i,j,kend).LE.tropp3(i,j))
+                        kend = kend+1
+                      enddo
+                  else
+                      kend = 1
+                      do while (vars%pe(i,j,kend).LE.40000.0)
+                        kend = kend+1
+                      enddo
+                  endif
+                  temp2D(i-ifirstxy+1,j-jfirstxy+1) = kend
+               enddo
+            enddo
+         endif
 
          call MAPL_GetPointer(export,temp2D,'TROPP_THERMAL',rc=status)
          VERIFY_(STATUS)
