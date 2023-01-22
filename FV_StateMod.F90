@@ -1378,7 +1378,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        if (TRIM(state%vars%tracer(n)%tname) == 'QLLS') then
          if (qliq /= -1) then ! QLIQ
            QLIQ_FILLED = .TRUE.
-          ! nn increment already handled in QLCN
+          ! nn increment already handled in QLLS
            if (state%vars%tracer(n)%is_r4) then
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
            else
@@ -1878,38 +1878,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   nn = 0
   if (.not. ADIABATIC) then
 
-     ! Redistribute CN/LS liq, ice and cld condensate based on advected CN/LS species
-     if (FV_Atm(1)%flagstruct%nwat >= 3) then
-      do k=1,npz
-         do j=jsc,jec
-            do i=isc,iec
-              ! LIQUID
-               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qlcn)) / MAX(FV_Atm(1)%q(i,j,k,qliq),1.e-5))
-               FV_Atm(1)%q(i,j,k,qlcn) = MAX(0.0,FV_Atm(1)%q(i,j,k,qliq)*FQC)
-              ! ICE
-               FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,qicn)) / MAX(FV_Atm(1)%q(i,j,k,qice),1.e-8))
-               FV_Atm(1)%q(i,j,k,qicn) = MAX(0.0,FV_Atm(1)%q(i,j,k,qice)*FQC)
-              ! CLOUD
-               if (qcld > 0) then
-                  FQC = MIN(1.0, MAX(0.0,FV_Atm(1)%q(i,j,k,clcn)) / MAX(FV_Atm(1)%q(i,j,k,qcld),1.e-8))
-                  FV_Atm(1)%q(i,j,k,clcn) = MIN(1.0,MAX(0.0,FV_Atm(1)%q(i,j,k,qcld)*FQC))
-               endif
-            enddo
-         enddo
-      enddo
-      if (FV_Atm(1)%flagstruct%nwat == 3) then
-        nn = nn+2
-        QLIQ_FILLED = .TRUE.
-        QICE_FILLED = .TRUE.
-      endif
-      if (FV_Atm(1)%flagstruct%nwat >= 6) then
-        nn = nn+3
-        QLIQ_FILLED = .TRUE.
-        QICE_FILLED = .TRUE.
-        QCLD_FILLED = .TRUE.
-      endif
-     endif
-
      do n=1,STATE%GRID%NQ
 
        if ((sphu /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'Q')) then
@@ -1921,87 +1889,139 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
           endif
        endif
-       if ((qlcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLCN')) then
-          QLCN_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
+    ! QLIQ
+       if (qliq /= -1) then
+         if ((qlcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLCN')) then
+            QLCN_FILLED = .TRUE.
+            nn = nn+1
+            if (state%vars%tracer(n)%is_r4) then
+               state%vars%tracer(n)%content_r4(:,:,:) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq), &
+                                                            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn))
+            else
+                  state%vars%tracer(n)%content(:,:,:) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq), &
+                                                            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn))
+            endif
+         endif
+         if ((qlcn /= -1) .and. (qliq /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLLS')) then
+            QLLS_FILLED = .TRUE.
+            nn = nn+1
+            if (state%vars%tracer(n)%is_r4) then
+               state%vars%tracer(n)%content_r4(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq)-&
+                                                                FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn))
+            else
+                  state%vars%tracer(n)%content(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq)-&
+                                                                FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn))
+            endif
+         endif
+       else
+         if ((qlcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLCN')) then
+            QLCN_FILLED = .TRUE.
+            nn = nn+1
+            if (state%vars%tracer(n)%is_r4) then
+               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
+            else
+                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
+            endif
+         endif
+         if ((qlls /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLLS')) then
+            QLLS_FILLED = .TRUE.
+            nn = nn+1
+            if (state%vars%tracer(n)%is_r4) then
+               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
+            else
+                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
+            endif
           endif
        endif
-       if ((qlls /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLLS')) then
-          QLLS_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
-          endif
-       elseif ((qlcn /= -1) .and. (qliq /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLLS')) then
-          QLLS_FILLED = .TRUE.
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq)-&
-                                                              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)) 
-          else
-                state%vars%tracer(n)%content(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq)-&
-                                                              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn))
-          endif
+    ! QICE
+       if (qice /= -1) then
+         if ((qicn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QICN')) then
+            QICN_FILLED = .TRUE.
+            nn = nn+1
+            if (state%vars%tracer(n)%is_r4) then
+               state%vars%tracer(n)%content_r4(:,:,:) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice), &
+                                                            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn))
+            else
+                  state%vars%tracer(n)%content(:,:,:) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice), &
+                                                            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn))
+            endif
+         endif
+         if ((qicn /= -1) .and. (qice /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QILS')) then
+            QILS_FILLED = .TRUE.
+            nn = nn+1
+            if (state%vars%tracer(n)%is_r4) then
+               state%vars%tracer(n)%content_r4(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice)-&
+                                                                FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn))
+            else
+                  state%vars%tracer(n)%content(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice)-&
+                                                                FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn))
+            endif
+         endif
+       else
+         if ((qicn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QICN')) then
+            QICN_FILLED = .TRUE.
+            nn = nn+1
+            if (state%vars%tracer(n)%is_r4) then
+               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
+            else
+                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
+            endif
+         endif
+         if ((qils /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QILS')) then
+            QILS_FILLED = .TRUE.
+            nn = nn+1
+            if (state%vars%tracer(n)%is_r4) then
+               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
+            else
+                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
+            endif
+         endif
        endif
-       if ((qicn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QICN')) then
-          QICN_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
-          endif
+    ! QCLD
+       if (qcld /= -1) then
+         if ((clcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLCN')) then
+            CLCN_FILLED = .TRUE.
+            nn = nn+1
+            if (state%vars%tracer(n)%is_r4) then
+               state%vars%tracer(n)%content_r4(:,:,:) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld), &
+                                                            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn))
+            else
+                  state%vars%tracer(n)%content(:,:,:) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld), &
+                                                            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn))
+            endif
+         endif
+         if ((clcn /= -1) .and. (qcld /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLLS')) then
+            CLLS_FILLED = .TRUE.
+            nn = nn+1
+            if (state%vars%tracer(n)%is_r4) then
+               state%vars%tracer(n)%content_r4(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld)-&
+                                                                FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn))
+            else
+                  state%vars%tracer(n)%content(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld)-&
+                                                                FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn))
+            endif
+         endif
+       else
+         if ((clcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLCN')) then
+            CLCN_FILLED = .TRUE.
+            nn = nn+1
+            if (state%vars%tracer(n)%is_r4) then
+               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
+            else
+                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
+            endif
+         endif
+         if ((clls /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLLS')) then
+            CLLS_FILLED = .TRUE.
+            nn = nn+1
+            if (state%vars%tracer(n)%is_r4) then
+               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
+            else
+                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
+            endif
+         endif
        endif
-       if ((qils /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QILS')) then
-          QILS_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
-          endif
-       elseif ((qicn /= -1) .and. (qice /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QILS')) then
-          QILS_FILLED = .TRUE.
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice)-&
-                                                              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn))
-          else
-                state%vars%tracer(n)%content(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice)-&
-                                                              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn))
-          endif
-       endif
-       if ((clcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLCN')) then
-          CLCN_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
-          endif
-       endif
-       if ((clls /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLLS')) then
-          CLLS_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
-          endif
-       elseif ((clcn /= -1) .and. (qcld /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLLS')) then
-          CLLS_FILLED = .TRUE.
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld)-&
-                                                                      FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)))
-          else
-                state%vars%tracer(n)%content(:,:,:) = MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld)-&
-                                                                      FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)))
-          endif
-       endif
+    ! RAIN
        if ((rain /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QRAIN')) then
           RAIN_FILLED = .TRUE.
           nn = nn+1
@@ -2011,6 +2031,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain)
           endif
        endif
+    ! SNOW
        if ((snow /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QSNOW')) then
           SNOW_FILLED = .TRUE.
           nn = nn+1
@@ -2020,6 +2041,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow)
           endif
        endif
+     ! GRPL
        if ((grpl /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL')) then
           GRPL_FILLED = .TRUE.
           nn = nn+1
@@ -2035,24 +2057,24 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
    ! Verify
     select case (FV_Atm(1)%flagstruct%nwat)
     case (6:7)
+       _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
+       _ASSERT(RAIN_FILLED, 'RAIN Not Filled Out')
+       _ASSERT(SNOW_FILLED, 'SNOW Not Filled Out')
        _ASSERT(GRPL_FILLED, 'GRPL Not Filled Out')
-       _ASSERT(QCLD_FILLED, 'QCLD Not Filled Out')
        _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
        _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
        _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
        _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
        _ASSERT(CLCN_FILLED, 'CLCN Not Filled Out')
        _ASSERT(CLLS_FILLED, 'CLLS Not Filled Out')
-       _ASSERT(nn+3 == 13, 'Expecting 13 water species Out') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
+       _ASSERT(nn == 10, 'Expecting 10 water species Out') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL
      case (3)
        _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
-       _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled Out')
-       _ASSERT(QICE_FILLED, 'QICE Not Filled Out')
        _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
        _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
        _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
        _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
-       _ASSERT(nn+2 == 7, 'Expecting 7 water species Out') ! Q, QLCN, QLLS, QICN, QILS, QLIQ, QICE
+       _ASSERT(nn == 5, 'Expecting 5 water species Out') ! Q, QLCN, QLLS, QICN, QILS
     case (1)
       _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
       _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
