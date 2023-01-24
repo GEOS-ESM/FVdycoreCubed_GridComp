@@ -6887,7 +6887,8 @@ end subroutine RunAddIncs
     call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='Q', RC=rc )
     if (DYN_COLDSTART .and. overwrite_Q .and. (.not. ADIABATIC)) then
       ! USE Q computed by FV3
-       call getQ(Q(:,:,:,1), 'Q')
+!ALT       call getQ(Q(:,:,:,1), 'Q')
+       Q(:,:,:,1) = qqq%content_r4
        overwrite_Q=.false.
        call WRITE_PARALLEL("Using QV from FV3 Initial Conditions")
        fac = 1.0

@@ -384,7 +384,8 @@ contains
 
          write(fname1, "('topo_DYN_ave_',a,'x',a,'.data')") trim(imc), trim(jmc)
          if (.not. file_exist(fname1)) then
-            call mpp_error(FATAL,'get_geos_cubed_ic: cannot find topo_DYN_ave file')
+            call mpp_error(FATAL,'get_geos_cubed_ic: cannot find ' //trim(fname1))
+!@            call mpp_error(FATAL,'get_geos_cubed_ic: cannot find topo_DYN_ave file')
          endif
          call print_memuse_stats('get_geos_cubed_ic: '//TRIM(fname1)//' being read')
          offset = 4
