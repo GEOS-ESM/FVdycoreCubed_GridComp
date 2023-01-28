@@ -17,6 +17,7 @@ class FortranPythonConversion:
         self._npx, self._npy, self._npz = npx, npy, npz
         self._is, self._ie, self._js, self._je = is_, ie, js, je
         self._isd, self._ied, self._jsd, self._jed = isd, ied, jsd, jed
+        assert num_tracers == 7, f'Expected 7 tracers, received: {num_tracers}'
         self._num_tracers = num_tracers
 
         self._ffi = cffi.FFI()
