@@ -1,3 +1,5 @@
+import time
+
 # Conditional cupy import for non-GPU machines
 try:
     import cupy as cp
@@ -21,15 +23,20 @@ class CUDAProfiler:
 
     def __init__(self, label: str) -> None:
         self.label = label
+        self._start_time = 0
 
     def __enter__(self):
         if cp is not None:
             cp.cuda.runtime.deviceSynchronize()
             cp.cuda.nvtx.RangePush(self.label)
+        self._start_time = time.perf_counter()
 
     def __exit__(self, _type, _val, _traceback):
         if cp is not None:
+            cp.cuda.runtime.deviceSynchronize()
             cp.cuda.nvtx.RangePop()
+        t = time.perf_counter() - self._start_time
+        print(f"{self.label} CPU time: {t}s")
 
     @classmethod
     def sync_device():

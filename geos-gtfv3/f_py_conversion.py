@@ -1,6 +1,8 @@
 import cffi
 import numpy as np
 from math import prod
+from cuda_profiler import CUDAProfiler
+from pace.dsl.typing import Float
 
 
 class FortranPythonConversion:
@@ -36,22 +38,33 @@ class FortranPythonConversion:
             "int": np.int32,
         }
 
-    def _fort_to_numpy(self, fptr, dim):
+    def _fortran_to_numpy_trf(self, fptr, dim):
         """
         Input: Fortran data pointed to by fptr and of shape dim = (i, j, k)
         Output: C-ordered double precision NumPy data of shape (i, j, k)
         """
         ftype = self._ffi.getctype(self._ffi.typeof(fptr).item)
         assert ftype in self._TYPEMAP
-        return (
-            np.frombuffer(
-                self._ffi.buffer(fptr, prod(dim) * self._ffi.sizeof(ftype)),
-                self._TYPEMAP[ftype],
+        if Float == self._TYPEMAP[ftype]:
+            numpy_arr = (
+                np.frombuffer(
+                    self._ffi.buffer(fptr, prod(dim) * self._ffi.sizeof(ftype)),
+                    self._TYPEMAP[ftype],
+                )
+                .reshape(tuple(reversed(dim)))
+                .transpose()
             )
-            .reshape(tuple(reversed(dim)))
-            .transpose()
-            .astype(np.float64)
-        )
+        else:
+            numpy_arr = (
+                np.frombuffer(
+                    self._ffi.buffer(fptr, prod(dim) * self._ffi.sizeof(ftype)),
+                    self._TYPEMAP[ftype],
+                )
+                .reshape(tuple(reversed(dim)))
+                .transpose()
+                .astype(Float)
+            )
+        return numpy_arr
 
     def fortran_to_numpy(
         self,
@@ -86,7 +99,6 @@ class FortranPythonConversion:
         Input: Pointers to Fortran arrays *_ptr
         Output: dict where dict[key] is a NumPy array
         """
-
         # Shorthands
         is_, ie, js, je = self._is, self._ie, self._js, self._je
         isd, ied, jsd, jed = self._isd, self._ied, self._jsd, self._jed
@@ -94,50 +106,102 @@ class FortranPythonConversion:
 
         # q/pe/peln require special handling
         # pe/peln need to be have their axes swapped - (i, k, j) -> (i, j, k)
-        q = self._fort_to_numpy(q_ptr, (ied - isd + 1, jed - jsd + 1, npz, num_tracers))
+        q = self._fortran_to_numpy_trf(
+            q_ptr, (ied - isd + 1, jed - jsd + 1, npz, num_tracers)
+        )
         pe = np.swapaxes(
-            self._fort_to_numpy(
+            self._fortran_to_numpy_trf(
                 pe_ptr, (ie + 1 - (is_ - 1) + 1, npz + 1, je + 1 - (js - 1) + 1)
             ),
             1,
             2,
         )
         peln = np.swapaxes(
-            self._fort_to_numpy(peln_ptr, (ie - is_ + 1, npz + 1, je - js + 1)), 1, 2
+            self._fortran_to_numpy_trf(peln_ptr, (ie - is_ + 1, npz + 1, je - js + 1)),
+            1,
+            2,
         )
 
         numpy_state = {
-            "u": self._fort_to_numpy(u_ptr, (ied - isd + 1, jed + 1 - jsd + 1, npz)),
-            "v": self._fort_to_numpy(v_ptr, (ied + 1 - isd + 1, jed - jsd + 1, npz)),
-            "w": self._fort_to_numpy(w_ptr, (ied - isd + 1, jed - jsd + 1, npz)),
-            "delz": self._fort_to_numpy(delz_ptr, (ied - isd + 1, jed - jsd + 1, npz)),
-            "pt": self._fort_to_numpy(pt_ptr, (ied - isd + 1, jed - jsd + 1, npz)),
-            "delp": self._fort_to_numpy(delp_ptr, (ied - isd + 1, jed - jsd + 1, npz)),
+            "u": self._fortran_to_numpy_trf(
+                u_ptr, (ied - isd + 1, jed + 1 - jsd + 1, npz)
+            ),
+            "v": self._fortran_to_numpy_trf(
+                v_ptr, (ied + 1 - isd + 1, jed - jsd + 1, npz)
+            ),
+            "w": self._fortran_to_numpy_trf(w_ptr, (ied - isd + 1, jed - jsd + 1, npz)),
+            "delz": self._fortran_to_numpy_trf(
+                delz_ptr, (ied - isd + 1, jed - jsd + 1, npz)
+            ),
+            "pt": self._fortran_to_numpy_trf(
+                pt_ptr, (ied - isd + 1, jed - jsd + 1, npz)
+            ),
+            "delp": self._fortran_to_numpy_trf(
+                delp_ptr, (ied - isd + 1, jed - jsd + 1, npz)
+            ),
             "q": q,
-            "ps": self._fort_to_numpy(ps_ptr, (ied - isd + 1, jed - jsd + 1)),
+            "ps": self._fortran_to_numpy_trf(ps_ptr, (ied - isd + 1, jed - jsd + 1)),
             "pe": pe,
-            "pk": self._fort_to_numpy(pk_ptr, (ie - is_ + 1, je - js + 1, npz + 1)),
-            "pkz": self._fort_to_numpy(pkz_ptr, (ie - is_ + 1, je - js + 1, npz)),
+            "pk": self._fortran_to_numpy_trf(
+                pk_ptr, (ie - is_ + 1, je - js + 1, npz + 1)
+            ),
+            "pkz": self._fortran_to_numpy_trf(
+                pkz_ptr, (ie - is_ + 1, je - js + 1, npz)
+            ),
             "peln": peln,
-            "phis": self._fort_to_numpy(phis_ptr, (ied - isd + 1, jed - jsd + 1)),
-            "q_con": self._fort_to_numpy(
+            "phis": self._fortran_to_numpy_trf(
+                phis_ptr, (ied - isd + 1, jed - jsd + 1)
+            ),
+            "q_con": self._fortran_to_numpy_trf(
                 q_con_ptr, (ied - isd + 1, jed - jsd + 1, npz)
             ),
-            "omga": self._fort_to_numpy(omga_ptr, (ied - isd + 1, jed - jsd + 1, npz)),
-            "ua": self._fort_to_numpy(ua_ptr, (ied - isd + 1, jed - jsd + 1, npz)),
-            "va": self._fort_to_numpy(va_ptr, (ied - isd + 1, jed - jsd + 1, npz)),
-            "uc": self._fort_to_numpy(uc_ptr, (ied + 1 - isd + 1, jed - jsd + 1, npz)),
-            "vc": self._fort_to_numpy(va_ptr, (ied - isd + 1, jed + 1 - jsd + 1, npz)),
-            "mfxd": self._fort_to_numpy(mfxd_ptr, (ie + 1 - is_ + 1, je - js + 1, npz)),
-            "mfyd": self._fort_to_numpy(mfyd_ptr, (ie - is_ + 1, je + 1 - js + 1, npz)),
-            "cxd": self._fort_to_numpy(cxd_ptr, (ie + 1 - is_ + 1, jed - jsd + 1, npz)),
-            "cyd": self._fort_to_numpy(cyd_ptr, (ied - isd + 1, je + 1 - js + 1, npz)),
-            "diss_estd": self._fort_to_numpy(
+            "omga": self._fortran_to_numpy_trf(
+                omga_ptr, (ied - isd + 1, jed - jsd + 1, npz)
+            ),
+            "ua": self._fortran_to_numpy_trf(
+                ua_ptr, (ied - isd + 1, jed - jsd + 1, npz)
+            ),
+            "va": self._fortran_to_numpy_trf(
+                va_ptr, (ied - isd + 1, jed - jsd + 1, npz)
+            ),
+            "uc": self._fortran_to_numpy_trf(
+                uc_ptr, (ied + 1 - isd + 1, jed - jsd + 1, npz)
+            ),
+            "vc": self._fortran_to_numpy_trf(
+                va_ptr, (ied - isd + 1, jed + 1 - jsd + 1, npz)
+            ),
+            "mfxd": self._fortran_to_numpy_trf(
+                mfxd_ptr, (ie + 1 - is_ + 1, je - js + 1, npz)
+            ),
+            "mfyd": self._fortran_to_numpy_trf(
+                mfyd_ptr, (ie - is_ + 1, je + 1 - js + 1, npz)
+            ),
+            "cxd": self._fortran_to_numpy_trf(
+                cxd_ptr, (ie + 1 - is_ + 1, jed - jsd + 1, npz)
+            ),
+            "cyd": self._fortran_to_numpy_trf(
+                cyd_ptr, (ied - isd + 1, je + 1 - js + 1, npz)
+            ),
+            "diss_estd": self._fortran_to_numpy_trf(
                 diss_estd_ptr, (ied - isd + 1, jed - jsd + 1, npz)
             ),
         }
 
         return numpy_state  # output
+
+    def _numpy_to_fortran_trf(self, numpy_array, fptr, ptr_offset=0):
+        """
+        Input: Fortran data pointed to by fptr and of shape dim = (i, j, k)
+        Output: C-ordered double precision NumPy data of shape (i, j, k)
+        """
+        ftype = self._ffi.getctype(self._ffi.typeof(fptr).item)
+        assert ftype in self._TYPEMAP
+        if Float == self._TYPEMAP[ftype]:
+            out_f = numpy_array.flatten(order="F")
+            self._ffi.memmove(fptr + ptr_offset, out_f, 4 * out_f.size)
+        else:
+            out_f = numpy_array.astype(self._TYPEMAP[ftype]).flatten(order="F")
+            self._ffi.memmove(fptr + ptr_offset, out_f, 4 * out_f.size)
 
     def numpy_to_fortran(
         self,
@@ -173,73 +237,103 @@ class FortranPythonConversion:
         dp->sp, transpose, swap axes, numpy -> fortran
         """
 
-        # u/v/w/delz
-        u_out_f = numpy_state["u"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(u_ptr, u_out_f, 4 * u_out_f.size)
-        v_out_f = numpy_state["v"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(v_ptr, v_out_f, 4 * v_out_f.size)
-        w_out_f = numpy_state["w"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(w_ptr, w_out_f, 4 * w_out_f.size)
-        delz_out_f = numpy_state["delz"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(delz_ptr, delz_out_f, 4 * delz_out_f.size)
+        with CUDAProfiler("u/v/w/delz"):
+            # u/v/w/delz
+            self._numpy_to_fortran_trf(numpy_state["u"], u_ptr)
+            self._numpy_to_fortran_trf(numpy_state["v"], v_ptr)
+            self._numpy_to_fortran_trf(numpy_state["w"], w_ptr)
+            self._numpy_to_fortran_trf(numpy_state["delz"], delz_ptr)
 
-        # pt/delp/q
-        pt_out_f = numpy_state["pt"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(pt_ptr, pt_out_f, 4 * pt_out_f.size)
-        delp_out_f = numpy_state["delp"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(delp_ptr, delp_out_f, 4 * delp_out_f.size)
-        # q needs special handling
-        q = np.empty(list(numpy_state["qvapor"].shape) + [self._num_tracers])
-        q[:, :, :, 0] = numpy_state["qvapor"]
-        q[:, :, :, 1] = numpy_state["qliquid"]
-        q[:, :, :, 2] = numpy_state["qice"]
-        q[:, :, :, 3] = numpy_state["qrain"]
-        q[:, :, :, 4] = numpy_state["qsnow"]
-        q[:, :, :, 5] = numpy_state["qgraupel"]
-        q[:, :, :, 6] = numpy_state["qcld"]
-        q_out_f = q.astype(np.float32).flatten(order="F")
-        self._ffi.memmove(q_ptr, q_out_f, 4 * q_out_f.size)
+        with CUDAProfiler("pt/delp/q"):
+            # pt/delp/q
+            self._numpy_to_fortran_trf(numpy_state["pt"], pt_ptr)
+            self._numpy_to_fortran_trf(numpy_state["delp"], delp_ptr)
 
-        # ps/pe/pk/peln/pkz
-        ps_out_f = numpy_state["ps"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(ps_ptr, ps_out_f, 4 * ps_out_f.size)
-        pe_out_tmp = np.swapaxes(numpy_state["pe"], 1, 2)  # (i, j, k) -> (i, k, j)
-        pe_out_f = pe_out_tmp.astype(np.float32).flatten(order="F")
-        self._ffi.memmove(pe_ptr, pe_out_f, 4 * pe_out_f.size)
-        pk_out_f = numpy_state["pk"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(pk_ptr, pk_out_f, 4 * pk_out_f.size)
-        peln_out_tmp = np.swapaxes(numpy_state["peln"], 1, 2)  # (i, j, k) -> (i, k, j)
-        peln_out_f = peln_out_tmp.astype(np.float32).flatten(order="F")
-        self._ffi.memmove(peln_ptr, peln_out_f, 4 * peln_out_f.size)
-        pkz_out_f = numpy_state["pkz"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(pkz_ptr, pkz_out_f, 4 * pkz_out_f.size)
+        with CUDAProfiler("q"):
+            # Dev Note: you should be able to unroll the below code in ptr + offset
+            # since we are using Fortran layout (column-first)
+            # q needs special handling
+            # self.q = np.empty(list(numpy_state["qvapor"].shape) + [self._num_tracers])
+            # self.q[:, :, :, 0] = numpy_state["qvapor"]
+            # self.q[:, :, :, 1] = numpy_state["qliquid"]
+            # self.q[:, :, :, 2] = numpy_state["qice"]
+            # self.q[:, :, :, 3] = numpy_state["qrain"]
+            # self.q[:, :, :, 4] = numpy_state["qsnow"]
+            # self.q[:, :, :, 5] = numpy_state["qgraupel"]
+            # self.q[:, :, :, 6] = numpy_state["qcld"]
+            # self._numpy_to_fortran_trf(self.q, q_ptr)
 
-        # phis/q_con/omga
-        phis_out_f = numpy_state["phis"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(phis_ptr, phis_out_f, 4 * phis_out_f.size)
-        q_con_out_f = numpy_state["q_con"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(q_con_ptr, q_con_out_f, 4 * q_con_out_f.size)
-        omga_out_f = numpy_state["omga"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(omga_ptr, omga_out_f, 4 * omga_out_f.size)
+            self._numpy_to_fortran_trf(numpy_state["qvapor"], q_ptr)
+            offset = numpy_state["qvapor"].size
+            self._numpy_to_fortran_trf(
+                numpy_state["qliquid"],
+                q_ptr,
+                ptr_offset=offset,
+            )
+            offset += numpy_state["qliquid"].size
+            self._numpy_to_fortran_trf(
+                numpy_state["qice"],
+                q_ptr,
+                ptr_offset=offset,
+            )
+            offset += numpy_state["qice"].size
+            self._numpy_to_fortran_trf(
+                numpy_state["qrain"],
+                q_ptr,
+                ptr_offset=offset,
+            )
+            offset += numpy_state["qrain"].size
+            self._numpy_to_fortran_trf(
+                numpy_state["qsnow"],
+                q_ptr,
+                ptr_offset=offset,
+            )
+            offset += numpy_state["qsnow"].size
+            self._numpy_to_fortran_trf(
+                numpy_state["qgraupel"],
+                q_ptr,
+                ptr_offset=offset,
+            )
+            offset += numpy_state["qgraupel"].size
+            self._numpy_to_fortran_trf(
+                numpy_state["qcld"],
+                q_ptr,
+                ptr_offset=offset,
+            )
 
-        # ua/va/uc/vc
-        ua_out_f = numpy_state["ua"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(ua_ptr, ua_out_f, 4 * ua_out_f.size)
-        va_out_f = numpy_state["va"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(va_ptr, va_out_f, 4 * va_out_f.size)
-        uc_out_f = numpy_state["uc"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(uc_ptr, uc_out_f, 4 * uc_out_f.size)
-        vc_out_f = numpy_state["vc"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(vc_ptr, vc_out_f, 4 * vc_out_f.size)
+        with CUDAProfiler("ps/pe/pk/peln/pkz"):
+            # ps/pe/pk/peln/pkz
+            self._numpy_to_fortran_trf(numpy_state["ps"], ps_ptr)
+            self._numpy_to_fortran_trf(numpy_state["pk"], pk_ptr)
+            self._numpy_to_fortran_trf(numpy_state["pkz"], pkz_ptr)
+            #   pe
+            pe_out_tmp = np.swapaxes(numpy_state["pe"], 1, 2)  # (i, j, k) -> (i, k, j)
+            pe_out_f = pe_out_tmp.astype(np.float32).flatten(order="F")
+            self._ffi.memmove(pe_ptr, pe_out_f, 4 * pe_out_f.size)
+            #   peln
+            peln_out_tmp = np.swapaxes(
+                numpy_state["peln"], 1, 2
+            )  # (i, j, k) -> (i, k, j)
+            peln_out_f = peln_out_tmp.astype(np.float32).flatten(order="F")
+            self._ffi.memmove(peln_ptr, peln_out_f, 4 * peln_out_f.size)
 
-        # mfx/mfy/cx/cy/diss_est
-        mfxd_out_f = numpy_state["mfxd"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(mfxd_ptr, mfxd_out_f, 4 * mfxd_out_f.size)
-        mfyd_out_f = numpy_state["mfyd"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(mfyd_ptr, mfyd_out_f, 4 * mfyd_out_f.size)
-        cxd_out_f = numpy_state["cxd"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(cxd_ptr, cxd_out_f, 4 * cxd_out_f.size)
-        cyd_out_f = numpy_state["cyd"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(cyd_ptr, cyd_out_f, 4 * cyd_out_f.size)
-        diss_estd_out_f = numpy_state["diss_estd"].astype(np.float32).flatten(order="F")
-        self._ffi.memmove(diss_estd_ptr, diss_estd_out_f, 4 * diss_estd_out_f.size)
+        with CUDAProfiler("phis/q_con/omga"):
+            # phis/q_con/omga
+            self._numpy_to_fortran_trf(numpy_state["phis"], phis_ptr)
+            self._numpy_to_fortran_trf(numpy_state["q_con"], q_con_ptr)
+            self._numpy_to_fortran_trf(numpy_state["omga"], omga_ptr)
+
+        with CUDAProfiler("ua/va/uc/vc"):
+            # ua/va/uc/vc
+            self._numpy_to_fortran_trf(numpy_state["ua"], ua_ptr)
+            self._numpy_to_fortran_trf(numpy_state["va"], va_ptr)
+            self._numpy_to_fortran_trf(numpy_state["uc"], uc_ptr)
+            self._numpy_to_fortran_trf(numpy_state["vc"], vc_ptr)
+
+        with CUDAProfiler("mfx/mfy/cx/cy/diss_est"):
+            # mfx/mfy/cx/cy/diss_est
+            self._numpy_to_fortran_trf(numpy_state["mfxd"], mfxd_ptr)
+            self._numpy_to_fortran_trf(numpy_state["mfyd"], mfyd_ptr)
+            self._numpy_to_fortran_trf(numpy_state["cxd"], cxd_ptr)
+            self._numpy_to_fortran_trf(numpy_state["cyd"], cyd_ptr)
+            self._numpy_to_fortran_trf(numpy_state["diss_estd"], diss_estd_ptr)

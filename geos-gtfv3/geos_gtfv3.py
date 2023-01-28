@@ -1,4 +1,3 @@
-from typing import TYPE_CHECKING
 import f90nml
 from datetime import datetime
 from f_py_conversion import FortranPythonConversion
@@ -30,7 +29,7 @@ class GEOSGTFV3:
         self.namelist = f90nml.read(namelist_path)
         self.rank = comm.Get_rank()
         self.backend = backend
-        self.dycore = GeosDycoreWrapper(self.namelist, bdt, comm, self.backend)
+        self.dycore = GeosDycoreWrapper(self.namelist, comm, self.backend)
         # For Fortran<->NumPy conversion
         self.f_py = FortranPythonConversion(
             npx,
