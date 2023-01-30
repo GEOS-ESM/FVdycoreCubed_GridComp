@@ -464,7 +464,8 @@ contains
   ! Number of water species for FV3 determined later
   ! when reading the tracer bundle in fv_first_run 
    FV_Atm(1)%flagstruct%nwat = 0
-   FV_Atm(1)%flagstruct%do_sat_adj = .true. ! only valid when nwat >= 6
+  ! Trigger to enable autoconversion/cloud processes on the fv_mapz step
+   FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
   ! Veritical resolution dependencies
    FV_Atm(1)%flagstruct%external_eta = .true.
    if (FV_Atm(1)%flagstruct%npz >= 70) then
