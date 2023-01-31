@@ -12,7 +12,7 @@ program main
 
   include 'mpif.h'
 
-  integer, parameter :: NITER = 2, NTILES = 6
+  integer, parameter :: NITER = 2, NTILES = 6, NUM_TRACERS = 7
 
   integer :: rank, size, mpierr
   character(len=256) :: input_file
@@ -58,13 +58,13 @@ program main
           dim%npx, dim%npy, dim%npz, NTILES, &
           bd%is, bd%ie, bd%js, bd%je, &
           bd%isd, bd%ied, bd%jsd, bd%jed, &
-          scalars%dt, scalars%nq_tot, scalars%ng, scalars%ptop, scalars%ks, &
+          scalars%dt, NUM_TRACERS, scalars%ng, scalars%ptop, scalars%ks, &
           scalars%layout_1, scalars%layout_2, &
           scalars%adiabatic, &
 
           ! Input/Output
           arr%u, arr%v, arr%w, arr%delz, &
-          arr%pt, arr%delp, arr%q, &
+          arr%pt, arr%delp, arr%q(:,:,:,1:NUM_TRACERS), &
           arr%ps, arr%pe, arr%pk, arr%peln, arr%pkz, &
           arr%phis, arr%q_con, arr%omga, &
           arr%ua, arr%va, arr%uc, arr%vc, &
