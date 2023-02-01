@@ -85,6 +85,11 @@ set (srcs
   GEOS_FV3_Utilities.F90
   geos-gtfv3/geos_gtfv3_interface.f90
   geos-gtfv3/geos_gtfv3_interface.c
+  geos-gtfv3/driver/input/domain_dim.f90
+  geos-gtfv3/driver/input/grid_bounds.f90
+  geos-gtfv3/driver/input/input_arrays.f90
+  geos-gtfv3/driver/input/input_scalars.f90
+  geos-gtfv3/driver/FV_State_Utilities.f90
   )
 
 if (ESMA_USE_GFE_NAMESPACE)
@@ -132,6 +137,12 @@ add_definitions (-DSPMD -DMAPL_MODE)
 foreach(flag ${tmp})
    target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
 endforeach()
+
+ecbuild_add_executable (
+  TARGET dycore_driver.x
+  SOURCES geos-gtfv3/driver/main.f90
+  LIBS ${this})
+set_target_properties (dycore_driver.x PROPERTIES LINK_FLAGS "${OpenMP_Fortran_FLAGS}")
 
 ecbuild_add_executable (
   TARGET StandAlone_FV3_Dycore.x
