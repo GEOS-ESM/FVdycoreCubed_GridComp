@@ -172,4 +172,9 @@ ecbuild_add_executable (
    SOURCES interp_restarts_bin.F90
    LIBS ${this} OpenMP::OpenMP_Fortran)
 
+ecbuild_add_executable (
+   TARGET fv3-driver
+   SOURCES fv3_driver.F90 FV_State_Utilities.F90
+   LIBS ${this})
+
 add_subdirectory(scripts)
