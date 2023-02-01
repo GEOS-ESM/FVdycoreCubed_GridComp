@@ -520,9 +520,9 @@ contains
    if (FV_Atm(1)%flagstruct%npz == 72) then
      FV_Atm(1)%flagstruct%tau = 0.0
    else
-     FV_Atm(1)%flagstruct%tau = 2.5
+     FV_Atm(1)%flagstruct%tau = 2.0
    endif
-   FV_Atm(1)%flagstruct%rf_cutoff = 0.25e2
+   FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
   ! 6th order default damping options
    FV_Atm(1)%flagstruct%nord = 2
    FV_Atm(1)%flagstruct%dddmp = 0.2
