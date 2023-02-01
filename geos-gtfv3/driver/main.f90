@@ -44,12 +44,15 @@
     integer :: ctr
     character(len=23) :: dt_iso
     real :: start, finish
+    logical :: run_fn = .false.
+    logical :: run_gt = .false
     
     ! Start
     call MPI_Init(mpierr)
     call MPI_Comm_size(MPI_COMM_WORLD, size, mpierr)
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, mpierr)
-    call fms_init(MPI_COMM_WORLD)
+    run_gt = size.eq.1.or.size.eq.6
+    run_fn = size.eq.6.or.size.eq.72
     
     ! Read input data
     write(input_file, '(a23, i1, a4)') 'input-data/scalar_data.', rank, '.bin'
@@ -62,13 +65,16 @@
     fn_arr = InputArrays_T(input_file, bd, dim, scalars%nq_tot)
     
     ! Init Fn FV3
-    call fv_init1(FV_Atm, scalars%dt, grids_on_this_pe, p_split) !ksplit
-    FV_Atm(1)%flagstruct%npx    = dim%npx
-    FV_Atm(1)%flagstruct%npy    = dim%npy
-    FV_Atm(1)%flagstruct%npz    = dim%npz
-    call set_resolution_dependent_geos_defaults(fix_mass, scalars%dt, FV_Atm)
-    call fv_init2(FV_Atm, scalars%dt, grids_on_this_pe, p_split)
-    
+    if (run_fn) then
+      call fms_init(MPI_COMM_WORLD)
+      call fv_init1(FV_Atm, scalars%dt, grids_on_this_pe, p_split) !ksplit
+      FV_Atm(1)%flagstruct%npx    = dim%npx
+      FV_Atm(1)%flagstruct%npy    = dim%npy
+      FV_Atm(1)%flagstruct%npz    = dim%npz
+      call set_resolution_dependent_geos_defaults(fix_mass, scalars%dt, FV_Atm)
+      call fv_init2(FV_Atm, scalars%dt, grids_on_this_pe, p_split)
+    endif
+      
     kappa  = MAPL_KAPPA
     cp     = MAPL_CP
     zvir   = MAPL_RVAP/MAPL_RGAS - 1.   ! RWV/RAIR-1
@@ -86,7 +92,7 @@
 
     do ctr = 1, NITER
         ! Run GT
-        if (size.eq.1.or.size.eq.6) then
+        if (run_gt) then
  
           ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
           ! disable trapping of floating point exceptions temporarily, call the interface
@@ -123,7 +129,7 @@
 
         endif
     
-        if (size.eq.6.or.size.eq.72) then
+        if (run_fn) then
           call cpu_time(start)
           call fv_dynamics( &
               dim%npx, dim%npy, dim%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng,   &
