@@ -45,7 +45,7 @@
     character(len=23) :: dt_iso
     real :: start, finish
     logical :: run_fn = .false.
-    logical :: run_gt = .false
+    logical :: run_gt = .false.
     
     ! Start
     call MPI_Init(mpierr)
@@ -55,12 +55,20 @@
     run_fn = size.eq.6.or.size.eq.72
     
     ! Read input data
-    write(input_file, '(a23, i1, a4)') 'input-data/scalar_data.', rank, '.bin'
+    if (size.eq.72) then
+      write(input_file, '(a26, i0.2, a4)') 'input-data-72/scalar_data.', rank, '.bin'
+    else
+      write(input_file, '(a23, i1, a4)') 'input-data/scalar_data.', rank, '.bin'
+    endif
     scalars = InputScalars_T(input_file)
     call scalars%wr1te()
     bd = scalars%get_grid_bounds()
     dim = scalars%get_domain_dimensions()
-    write(input_file, '(a22, i1, a4)') 'input-data/array_data.', rank, '.bin'
+    if (size.eq.72) then
+      write(input_file, '(a25, i0.2, a4)') 'input-data-72/array_data.', rank, '.bin'
+    else
+      write(input_file, '(a22, i1, a4)') 'input-data/array_data.', rank, '.bin'
+    endif
     gt_arr = InputArrays_T(input_file, bd, dim, scalars%nq_tot)
     fn_arr = InputArrays_T(input_file, bd, dim, scalars%nq_tot)
     
