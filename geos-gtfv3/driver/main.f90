@@ -108,6 +108,7 @@
           call ieee_get_halting_mode(ieee_all, halting_mode)
           call ieee_set_halting_mode(ieee_all, .false.)
 
+          call MPI_BARRIER( MPI_COMM_WORLD, mpierr)
           call cpu_time(start)
           call geos_gtfv3_interface_f( &
               MPI_COMM_WORLD, &
@@ -138,6 +139,7 @@
         endif
     
         if (run_fn) then
+          call MPI_BARRIER( MPI_COMM_WORLD, mpierr)
           call cpu_time(start)
           call fv_dynamics( &
               dim%npx, dim%npy, dim%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng,   &
