@@ -173,8 +173,14 @@ ecbuild_add_executable (
    LIBS ${this} OpenMP::OpenMP_Fortran)
 
 ecbuild_add_executable (
-   TARGET fv3-driver
-   SOURCES fv3_driver.F90 FV_State_Utilities.F90
+   TARGET fv3_driver.x
+   SOURCES
+   FV_State_Utilities.F90
+   geos-gtfv3/driver/input/domain_dim.f90
+   geos-gtfv3/driver/input/grid_bounds.f90
+   geos-gtfv3/driver/input/input_scalars.f90
+   geos-gtfv3/driver/input/input_arrays.f90
+   geos-gtfv3/driver/fv3_driver.F90
    LIBS ${this})
 
 add_subdirectory(scripts)
