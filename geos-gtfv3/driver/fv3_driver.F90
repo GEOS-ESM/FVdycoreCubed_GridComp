@@ -95,14 +95,15 @@ program main
          ! Input
          FV_Atm(1)%flagstruct%hydrostatic, &
          ! Input/Output
-         arr%pt, arr%delp, arr%q(:, :, :, 1:NUM_TRACERS), & ! in/out
-         arr%ps, arr%pe, arr%pk, arr%peln, arr%pkz, & ! in/out
-         arr%phis, arr%q_con, arr%omga, & ! in/out
-         arr%ua, arr%va, arr%uc, arr%vc, & ! in/out
+         arr%pt, arr%delp, arr%q(:, :, :, 1:NUM_TRACERS), &
+         arr%ps, arr%pe, arr%pk, arr%peln, arr%pkz, &
+         arr%phis, arr%q_con, arr%omga, &
+         arr%ua, arr%va, arr%uc, arr%vc, &
          ! Input
          arr%ak, arr%bk, &
          ! Input/Output
          arr%mfx, arr%mfy, arr%cx, arr%cy, &
+         ! Input
          FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, &
          FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
          FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, &
