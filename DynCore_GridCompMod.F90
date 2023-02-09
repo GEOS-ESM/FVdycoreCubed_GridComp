@@ -6968,21 +6968,21 @@ end subroutine RunAddIncs
     endif
     if (nwat >= 6) then
     ! Grab RAIN from imports
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='RAIN', RC=rc )
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QRAIN', RC=rc )
     if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
        if (size(Q(:,:,:,4))==size(qqq%content_r4)) Q(:,:,:,4) = qqq%content_r4
     elseif (associated(qqq%content)) then
        if (size(Q(:,:,:,4))==size(qqq%content)) Q(:,:,:,4) = qqq%content
     endif
     ! Grab SNOW from imports
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='SNOW', RC=rc )
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QSNOW', RC=rc )
     if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
        if (size(Q(:,:,:,5))==size(qqq%content_r4)) Q(:,:,:,5) = qqq%content_r4
     elseif (associated(qqq%content)) then
        if (size(Q(:,:,:,5))==size(qqq%content)) Q(:,:,:,5) = qqq%content
     endif
     ! Grab GRAUPEL from imports
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='GRAUPEL', RC=rc )
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QGRAUPEL', RC=rc )
     if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
        if (size(Q(:,:,:,6))==size(qqq%content_r4)) Q(:,:,:,6) = qqq%content_r4
     elseif (associated(qqq%content)) then
