@@ -48,10 +48,10 @@ program gtfv3_driver
      write(*, '(a2,1x,a23,a18)') 'F:', dt_iso, ' --calling fortran interface'
  end if
 
- ! if (irank == 0) print*, 'irank, sum(u), sum(v), sum(w), sum(delz)'
- ! call MPI_Barrier(MPI_COMM_WORLD, mpierr)
- ! print *, irank, sum(arr%u), sum (arr%v), sum(arr%w), sum(arr%delz)
- ! call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+ if (irank == 0) print*, 'irank, sum(u), sum(v), sum(w), sum(delz)'
+ call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+ print *, irank, sum(arr%u), sum (arr%v), sum(arr%w), sum(arr%delz)
+ call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
  ! Run gtFV3
  do ctr = 1, NITER
