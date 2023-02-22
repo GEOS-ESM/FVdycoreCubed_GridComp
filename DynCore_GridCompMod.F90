@@ -35,6 +35,10 @@
                            DynRun          => FV_Run,                &
                            DynFinalize     => FV_Finalize,           &
                            getAllWinds     => fv_getAllWinds,        &
+#if defined(__GFORTRAN__)
+                           getVorticity    => fv_getVorticity,       &
+                           getDivergence   => fv_getDivergence,      &
+#endif
                            fillMassFluxes  => fv_fillMassFluxes,     &
                            computeMassFluxes => fv_computeMassFluxes,&
                            getVerticalMassFlux => fv_getVerticalMassFlux,&
@@ -87,11 +91,11 @@
 !     \item {\tt PE}:   Edge pressures
 !     \item {\tt Q}:    Tracers
 !     \item {\tt PKZ}:  Consistent mean for p$^\kappa$
-!     \item {\tt DZ}:   Height thickness (Non-Hydrostatic)  
+!     \item {\tt DZ}:   Height thickness (Non-Hydrostatic)
 !   \end{itemize}
 !
-!  as well as a GRID (to be mentioned later) 
-!  and same additional run-specific variables 
+!  as well as a GRID (to be mentioned later)
+!  and same additional run-specific variables
 !
 ! Note: {\tt PT} is not updated if the flag {\tt CONVT} is true.
 !
@@ -99,7 +103,7 @@
 !
 ! \paragraph*{Import State}
 !
-! The import state consists of the tendencies of the 
+! The import state consists of the tendencies of the
 ! control variables plus the surface geopotential heights:
 !
 !   \begin{itemize}
@@ -148,24 +152,24 @@
 !
 !   The current version supports only a 1D latitude-based
 !   decomposition of the domain (with OMP task-parallelism
-!   in the vertical, resulting in reasonable scalability 
-!   on large PE configurations).  In the near future it will 
+!   in the vertical, resulting in reasonable scalability
+!   on large PE configurations).  In the near future it will
 !   support a 2D domain decomposition, in which import and
 !   export state are decomposed in longitude and latitude,
-!   while the internal state (for the most part) is 
-!   decomposed in latitude and level.  When needed, 
+!   while the internal state (for the most part) is
+!   decomposed in latitude and level.  When needed,
 !   the data is redistributed (``transposed'') internally.
 !
 !   There are two fundamental ESMF grids in use;
 !   \begin{itemize}
 !     \item {GRIDXY}: longitude-latitude ESMF grid (public)
 !     \item {GRIDYZ}: A latitude-level cross-sectional
-!                     decomposition (private to this module) 
+!                     decomposition (private to this module)
 !   \end{itemize}
 !
-!   PILGRIM will be used for communication until ESMF has 
-!   sufficient functionality and performance to take over 
-!   the task.  The use of pilgrim requires a call to 
+!   PILGRIM will be used for communication until ESMF has
+!   sufficient functionality and performance to take over
+!   the task.  The use of pilgrim requires a call to
 !   {\tt INIT\_SPMD} to set SPMD parameters, decompositions,
 !   etc.
 !
@@ -206,7 +210,7 @@
 !
 ! !REVISION HISTORY:
 !
-! 11Jul2003  Sawyer    From Trayanov/da Silva EVAC 
+! 11Jul2003  Sawyer    From Trayanov/da Silva EVAC
 ! 23Jul2003  Sawyer    First informal tiptoe-through
 ! 29Jul2003  Sawyer    Modifications based on comments from 23Jul2003
 ! 28Aug2003  Sawyer    First check-in; Internal state to D-grid
@@ -252,8 +256,8 @@
 ! -------------------------------------
     integer, parameter         :: nlevs=5
     integer, parameter         :: ntracers=11
-    integer                    :: nlev, ntracer                    
-    integer                    :: plevs(nlevs)          
+    integer                    :: nlev, ntracer
+    integer                    :: plevs(nlevs)
     character(len=ESMF_MAXSTR) :: myTracer
     data plevs /850,700,600,500,300/
 
@@ -288,7 +292,7 @@ contains
 
 ! !DESCRIPTION:  SetServices registers Initialize, Run, and Finalize
 !   methods for FV. Two stages of the FV run method are registered. The
-!   first one does the dynamics calculations, and the second adds 
+!   first one does the dynamics calculations, and the second adds
 !   increments from external sources that appear in the Import state.
 !   SetServices also creates a private internal state in which FV
 !   keeps invariant or auxilliary state variables, as well as pointers to
@@ -297,14 +301,14 @@ contains
 !
 !  The component uses all three states (Import, Export
 !  and Internal), in addition to a Private (non-ESMF) Internal state. All
-!  three are managed by MAPL. 
+!  three are managed by MAPL.
 !
 !  The Private Internal state contains invariant
-!  quantities defined by an FV specific routine, as well as pointers 
-!  to the true state variables, kept in the MAPL Internal state. 
+!  quantities defined by an FV specific routine, as well as pointers
+!  to the true state variables, kept in the MAPL Internal state.
 !  The MAPL Internal is kept at FV's real*8 precision.
 !
-!  The Import State conatins tendencies to be added in the second 
+!  The Import State conatins tendencies to be added in the second
 !  run stage, the geopotential at the lower boundary, and a bundle
 !  of Friendly tracers to be advected. The Import and Export states
 !  are both at the default precision.
@@ -319,15 +323,15 @@ contains
 
    type(ESMF_GridComp), intent(inout) :: gc     ! gridded component
    integer, intent(out), optional     :: rc     ! return code
-    
+
 
 ! !DESCRIPTION: Set services (register) for the FVCAM Dynamical Core
 !               Grid Component.
-!         
-!EOP         
+!
+!EOP
 !----------------------------------------------------------------------
-  
-   type (DynState), pointer :: dyn_internal_state 
+
+   type (DynState), pointer :: dyn_internal_state
     type (DYN_wrap)                  :: wrap
 
     integer                          :: FV3_STANDALONE
@@ -361,7 +365,7 @@ contains
     allocate( dyn_internal_state, stat=status )
     VERIFY_(STATUS)
     wrap%dyn_state => dyn_internal_state
- 
+
 ! Save pointer to the wrapped internal state in the GC
 ! ----------------------------------------------------
 
@@ -1135,11 +1139,11 @@ contains
      VERIFY_(STATUS)
 
      call MAPL_AddExportSpec(GC,                             &
-        SHORT_NAME = 'DWDT_RAY',                                  &     
+        SHORT_NAME = 'DWDT_RAY',                                  &
         LONG_NAME  = 'vertical_velocity_tendency_due_to_Rayleigh_friction',        &
         UNITS      = 'm/s/s',                                  &
-        DIMS       = MAPL_DimsHorzVert,                           & 
-        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )     
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
      VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                       &
@@ -1678,7 +1682,7 @@ contains
      do ntracer=1,ntracers
         do nlev=1,nlevs
            write(myTracer, "('Q',i5.5,'_',i3.3)") ntracer-1, plevs(nlev)
-           call MAPL_AddExportSpec ( gc,                             &     
+           call MAPL_AddExportSpec ( gc,                             &
                 SHORT_NAME = TRIM(myTracer),                              &
                 LONG_NAME  = TRIM(myTracer),                             &
                 UNITS      = '1',                                         &
@@ -1694,7 +1698,7 @@ contains
              DIMS       = MAPL_DimsHorzVert,                      &
              VLOCATION  = MAPL_VLocationCenter,               RC=STATUS  )
         VERIFY_(STATUS)
-     enddo         
+     enddo
 #endif
 
     call MAPL_AddExportSpec ( gc,                                  &
@@ -1794,14 +1798,14 @@ contains
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
      VERIFY_(STATUS)
 
-    call MAPL_AddExportSpec ( gc,                             &     
+    call MAPL_AddExportSpec ( gc,                             &
          SHORT_NAME = 'U700',                                      &
          LONG_NAME  = 'eastward_wind_at_700_hPa',                  &
          UNITS      = 'm s-1',                                     &
          DIMS       = MAPL_DimsHorzOnly,                           &
          FIELD_TYPE = MAPL_VectorField,                            &
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
-     VERIFY_(STATUS)         
+     VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                             &
          SHORT_NAME = 'U500',                                      &
@@ -2100,7 +2104,7 @@ contains
     call MAPL_AddExportSpec ( gc,                             &
          SHORT_NAME = 'W200',                                      &
          LONG_NAME  = 'w_at_200_hPa',                              &
-         UNITS      = 'm s-1',                                     & 
+         UNITS      = 'm s-1',                                     &
          DIMS       = MAPL_DimsHorzOnly,                           &
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
      VERIFY_(STATUS)
@@ -2108,7 +2112,7 @@ contains
     call MAPL_AddExportSpec ( gc,                             &
          SHORT_NAME = 'W10',                                       &
          LONG_NAME  = 'w_at_10_hPa',                               &
-         UNITS      = 'm s-1',                                     & 
+         UNITS      = 'm s-1',                                     &
          DIMS       = MAPL_DimsHorzOnly,                           &
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
      VERIFY_(STATUS)
@@ -2186,7 +2190,7 @@ contains
          UNITS      = 'radians',                                   &
          DIMS       = MAPL_DimsHorzOnly,                           &
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
-     VERIFY_(STATUS)      
+     VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'DYNTIMER',                            &
@@ -2246,7 +2250,7 @@ contains
 
 ! !INTERNAL STATE:
 
-!ALT: technically the first 2 records of "old" style FV restart have 
+!ALT: technically the first 2 records of "old" style FV restart have
 !     6 ints: YYYY MM DD H M S
 !     5 ints: I,J,K, KS (num true pressure levels), NQ (num tracers) headers
 
@@ -2346,8 +2350,8 @@ contains
     VERIFY_(STATUS)
     call MAPL_TimerAdd(GC,    name="RUN2"          ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="-DYN_INIT"     ,RC=STATUS)       
-    VERIFY_(STATUS)          
+    call MAPL_TimerAdd(GC,    name="-DYN_INIT"     ,RC=STATUS)
+    VERIFY_(STATUS)
     call MAPL_TimerAdd(GC,    name="--FMS_INIT"    ,RC=STATUS)
     VERIFY_(STATUS)
     call MAPL_TimerAdd(GC,    name="--FV_INIT"     ,RC=STATUS)
@@ -2398,7 +2402,7 @@ contains
     call ESMF_ConfigGetAttribute ( CF, FV3_STANDALONE, Label="FV3_STANDALONE:", default=0, RC=STATUS)
     VERIFY_(STATUS)
     if (FV3_STANDALONE /=0) then
-        call MAPL_GridCreate(GC, rc=status) 
+        call MAPL_GridCreate(GC, rc=status)
         VERIFY_(STATUS)
         call MAPL_AddExportSpec( gc,                              &
             SHORT_NAME = 'TRADVEX',                                    &
@@ -2427,11 +2431,11 @@ contains
 
 ! !ARGUMENTS:
 
-  type(ESMF_GridComp), intent(inout) :: gc       ! composite gridded component 
+  type(ESMF_GridComp), intent(inout) :: gc       ! composite gridded component
   type(ESMF_State),    intent(inout) :: import   ! import state
   type(ESMF_State),    intent(inout) :: export   ! export state
   type(ESMF_Clock),    intent(inout) :: clock    ! the clock
-  
+
   integer, intent(out), OPTIONAL     :: rc       ! Error code:
                                                  ! = 0 all is well
                                                  ! otherwise, error
@@ -2440,7 +2444,7 @@ contains
   type (DYN_wrap)                    :: wrap
   type (DynState),  pointer  :: STATE
 
-  type (MAPL_MetaComp),      pointer :: mapl 
+  type (MAPL_MetaComp),      pointer :: mapl
 
   character (len=ESMF_MAXSTR)        :: layout_file
 
@@ -2468,7 +2472,7 @@ contains
   type (ESMF_TimeInterval)           :: Intv
   type (ESMF_Alarm)                  :: Alarm
   integer                            :: ColdRestart=0
-  
+
   integer                            :: status
   character(len=ESMF_MAXSTR)         :: IAm
   character(len=ESMF_MAXSTR)         :: COMP_NAME
@@ -2477,7 +2481,7 @@ contains
   type (DynGrid),  pointer           :: DycoreGrid
 
   real, pointer                      :: temp2d(:,:)
-  
+
   integer                            :: ifirst
   integer                            :: ilast
   integer                            :: jfirst
@@ -2530,7 +2534,7 @@ contains
 !EOR
     VERIFY_(STATUS)
 
-! Check for ColdStart from the configuration 
+! Check for ColdStart from the configuration
 !--------------------------------------
     call MAPL_GetResource ( MAPL, ColdRestart, 'COLDSTART:', default=0, rc=status )
     VERIFY_(STATUS)
@@ -2636,7 +2640,7 @@ contains
     call ESMF_StateGet(EXPORT, 'PREF', FIELD, RC=STATUS)
     VERIFY_(STATUS)
     call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, RC=STATUS)
-    VERIFY_(STATUS)      
+    VERIFY_(STATUS)
 
     call ESMF_StateGet(EXPORT, 'PLE', FIELD, RC=STATUS)
     VERIFY_(STATUS)
@@ -2707,7 +2711,7 @@ contains
 
     RETURN_(ESMF_SUCCESS)
   end subroutine Initialize
-  
+
 
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2719,10 +2723,10 @@ contains
 ! !IROUTINE: Run
 
 ! !DESCRIPTION: This is the first Run stage of FV. It is the container
-!    for the dycore calculations. Subroutines from the core are 
+!    for the dycore calculations. Subroutines from the core are
 !    invoked to do most of the work. A second run method, descibed below,
-!    adds the import tendencies from external sources to the FV 
-!    variables. 
+!    adds the import tendencies from external sources to the FV
+!    variables.
 !
 !    In addition to computing and adding all dynamical contributions
 !    to the FV variables (i.e., winds, pressures, and temperatures),
@@ -2741,12 +2745,12 @@ subroutine Run(gc, import, export, clock, rc)
   type (ESMF_State),   intent(inout) :: import
   type (ESMF_State),   intent(inout) :: export
   type (ESMF_Clock),   intent(inout) :: clock
-  integer, intent(out), optional     :: rc 
+  integer, intent(out), optional     :: rc
 
 !EOP
 
 ! !Local Variables:
-  
+
     integer                                          :: status
     type (ESMF_FieldBundle)                          :: bundle
     type (ESMF_FieldBundle)                          :: ANA_Bundle
@@ -2761,13 +2765,13 @@ subroutine Run(gc, import, export, clock, rc)
     class (AbstractRegridder), pointer :: L2C
     class (AbstractRegridder), pointer :: C2L
 
-    type (MAPL_MetaComp), pointer :: mapl 
+    type (MAPL_MetaComp), pointer :: mapl
 
     type (DYN_wrap) :: wrap
     type (DynState), pointer :: STATE
     type (DynGrid),  pointer :: GRID
     type (DynVars),  pointer :: VARS
-    
+
     integer  :: NQ
     integer  :: IM, JM, KM
     integer  :: NKE, NPHI
@@ -2946,10 +2950,10 @@ subroutine Run(gc, import, export, clock, rc)
     character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
     integer, parameter                  :: XLIST_MAX = 60
     logical                             :: isPresent
-   
+
     logical                             :: doEnergetics
     logical                             :: doTropvars
- 
+
   Iam = "Run"
   call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
   VERIFY_(STATUS)
@@ -2997,7 +3001,7 @@ subroutine Run(gc, import, export, clock, rc)
   jm       = grid%npy
   km       = grid%npz
 
-  is_ringing = ESMF_AlarmIsRinging( STATE%ALARMS(TIME_TO_RUN),rc=status); VERIFY_(status) 
+  is_ringing = ESMF_AlarmIsRinging( STATE%ALARMS(TIME_TO_RUN),rc=status); VERIFY_(status)
   if (.not. is_ringing) return
 
 ! Allocate Arrays
@@ -3176,7 +3180,7 @@ subroutine Run(gc, import, export, clock, rc)
                         call move_alloc(from=biggerlist, to=xlist)
                      end if
                      xlist(n) = TRIM(fieldname)
-               end if  
+               end if
                !loop over exclude_list
                exclude = .false.
                do j = 1, n
@@ -3267,12 +3271,12 @@ subroutine Run(gc, import, export, clock, rc)
 !---------------------------------------------------
 
          call ESMF_ClockGetAlarm(Clock,'INTERMITTENT',Alarm,rc=Status)
-         VERIFY_(status) 
+         VERIFY_(status)
          call ESMF_ClockGet(Clock, CurrTime=currentTIME, rc=status)
          VERIFY_(status)
 
          is_ringing = ESMF_AlarmIsRinging( Alarm,rc=status )
-         VERIFY_(status) 
+         VERIFY_(status)
 
          RefTime = currentTime
 
@@ -3287,7 +3291,7 @@ subroutine Run(gc, import, export, clock, rc)
             VERIFY_(status)
             call MAPL_GetResource ( MAPL,ReplayType,'REPLAY_TYPE:', Default="FULL", RC=STATUS )
             VERIFY_(status)
-   
+
             call MAPL_GetResource ( MAPL, im_replay, Label="REPLAY_IM:", RC=status )
             VERIFY_(STATUS)
             call MAPL_GetResource ( MAPL, jm_replay, Label="REPLAY_JM:", RC=status )
@@ -3365,7 +3369,7 @@ subroutine Run(gc, import, export, clock, rc)
 ! soon dump_n_splash will go; we'll have instead:
 !    call get_inc_on_anagrid_ - this will convert the internal state to
 !      ana-grid, diff with what's in file and produce what incremental_
-!      normally works from - a knob will tell incremental_ where fields 
+!      normally works from - a knob will tell incremental_ where fields
 !      are in memory or need reading from file.
 !    call incremental_
 !    call state_remap_
@@ -3473,7 +3477,7 @@ subroutine Run(gc, import, export, clock, rc)
       do N = 1,size(names)
            if( trim(names(N)).eq.'QLCN' .or. &
                trim(names(N)).eq.'QLLS' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      QL = QL + state%vars%tracer(N)%content_r4
                  else
                      QL = QL + state%vars%tracer(N)%content
@@ -3481,7 +3485,7 @@ subroutine Run(gc, import, export, clock, rc)
            endif
            if( trim(names(N)).eq.'QICN' .or. &
                trim(names(N)).eq.'QILS' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      QI = QI + state%vars%tracer(N)%content_r4
                  else
                      QI = QI + state%vars%tracer(N)%content
@@ -3591,7 +3595,7 @@ subroutine Run(gc, import, export, clock, rc)
              if( trim(names(N)).eq.'QLCN' .or. &
                  trim(names(N)).eq.'QLLS' ) then
                  do k=1,km
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      dqldtanaint1 = dqldtanaint1 + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                  else
                      dqldtanaint1 = dqldtanaint1 + state%vars%tracer(N)%content   (:,:,k)*delp(:,:,k)
@@ -3616,7 +3620,7 @@ subroutine Run(gc, import, export, clock, rc)
              if( trim(names(N)).eq.'QICN' .or. &
                  trim(names(N)).eq.'QILS' ) then
                  do k=1,km
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      dqidtanaint1 = dqidtanaint1 + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                  else
                      dqidtanaint1 = dqidtanaint1 + state%vars%tracer(N)%content   (:,:,k)*delp(:,:,k)
@@ -3904,7 +3908,7 @@ subroutine Run(gc, import, export, clock, rc)
              if( trim(names(N)).eq.'QLCN' .or. &
                  trim(names(N)).eq.'QLLS' ) then
                  do k=1,km
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      dqldtanaint2 = dqldtanaint2 + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                  else
                      dqldtanaint2 = dqldtanaint2 + state%vars%tracer(N)%content   (:,:,k)*delp(:,:,k)
@@ -3927,7 +3931,7 @@ subroutine Run(gc, import, export, clock, rc)
              if( trim(names(N)).eq.'QICN' .or. &
                  trim(names(N)).eq.'QILS' ) then
                  do k=1,km
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      dqidtanaint2 = dqidtanaint2 + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                  else
                      dqidtanaint2 = dqidtanaint2 + state%vars%tracer(N)%content   (:,:,k)*delp(:,:,k)
@@ -4067,8 +4071,8 @@ subroutine Run(gc, import, export, clock, rc)
           dqidt = 0.0
           do k = 1,size(names)
              if( trim(names(k)).eq.'QICN' .or. &
-                 trim(names(k)).eq.'QILS' ) then    
-                 if( state%vars%tracer(k)%is_r4 ) then 
+                 trim(names(k)).eq.'QILS' ) then
+                 if( state%vars%tracer(k)%is_r4 ) then
                      if (size(dqidt)==size(state%vars%tracer(k)%content_r4)) &
                               dqidt = dqidt - state%vars%tracer(k)%content_r4
                  else
@@ -4085,7 +4089,7 @@ subroutine Run(gc, import, export, clock, rc)
              pos = index(names(k),'::')
              if(pos > 0) then
                if( (names(k)(pos+2:))=='OX' ) then
-                 if( state%vars%tracer(k)%is_r4 ) then 
+                 if( state%vars%tracer(k)%is_r4 ) then
                      if (size(doxdt)==size(state%vars%tracer(k)%content_r4)) &
                               doxdt = doxdt - state%vars%tracer(k)%content_r4
                  else
@@ -4117,7 +4121,7 @@ subroutine Run(gc, import, export, clock, rc)
           do N = 1,size(names)
              if( trim(names(N)).eq.'QLCN' .or. &
                  trim(names(N)).eq.'QLLS' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      do k=1,km
                      temp2d = temp2d - state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                      enddo
@@ -4137,7 +4141,7 @@ subroutine Run(gc, import, export, clock, rc)
           do N = 1,size(names)
              if( trim(names(N)).eq.'QICN' .or. &
                  trim(names(N)).eq.'QILS' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      do k=1,km
                      temp2d = temp2d - state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                      enddo
@@ -4158,7 +4162,7 @@ subroutine Run(gc, import, export, clock, rc)
              pos = index(names(N),'::')
              if(pos > 0) then
                if( (names(N)(pos+2:))=='OX' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      do k=1,km
                      temp2d = temp2d - state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                      enddo
@@ -4202,9 +4206,9 @@ subroutine Run(gc, import, export, clock, rc)
 !-------------------------------------------------------
       pe0=vars%pe
       call FILLOUT3r8 (export, 'PLE0', pe0, rc=status); VERIFY_(STATUS)
-   
+
       call MAPL_TimerOff(MAPL,"-DYN_PROLOGUE")
- 
+
 !-------------------------------------------------------
 
       call MAPL_TimerOn(MAPL,"-DYN_CORE")
@@ -4226,7 +4230,7 @@ subroutine Run(gc, import, export, clock, rc)
     if(associated(temp2d)) temp2d = 0 !WMP need to get from MAPL gid
 
 !#define DEBUG_WINDS
-#if defined(DEBUG_WINDS)         
+#if defined(DEBUG_WINDS)
   call Write_Profile(grid, vars%u, 'U-after-DynRun')
   call Write_Profile(grid, vars%v, 'V-after-DynRun')
 #endif
@@ -4298,7 +4302,16 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Get all wind derivatives
 ! ------------------------
+#if defined(__GFORTRAN__)
+      ! Note there is a bug with GNU 12.1 and getting vort and divg via
+      ! getAllWinds. The reason is unknown as the getAllWinds code is
+      ! valid Fortran. Until this can be fixed, we use a less-efficient
+      ! workaround
+      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
+      call getVorticity(vars%u, vars%v, vort)
+#else
       call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr, vort=vort, divg=divg)
+#endif
 
 ! Compute absolute vorticity on the D grid
 ! -------------------------------------------------
@@ -4480,7 +4493,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export, temp3D, 'PV', rc=status)
       VERIFY_(STATUS)
       if(associated(temp3d)) temp3d = epvxyz/vars%pt
- 
+
       call MAPL_GetPointer(export, temp3D, 'S', rc=status)
       VERIFY_(STATUS)
       if(associated(temp3d)) temp3d = tempxy*cp
@@ -4524,7 +4537,7 @@ subroutine Run(gc, import, export, clock, rc)
           do N = 1,size(names)
              if( trim(names(N)).eq.'QLCN' .or. &
                  trim(names(N)).eq.'QLLS' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      dqldt = dqldt + state%vars%tracer(N)%content_r4
                  else
                      dqldt = dqldt + state%vars%tracer(N)%content
@@ -4538,7 +4551,7 @@ subroutine Run(gc, import, export, clock, rc)
           do N = 1,size(names)
              if( trim(names(N)).eq.'QICN' .or. &
                  trim(names(N)).eq.'QILS' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      dqidt = dqidt + state%vars%tracer(N)%content_r4
                  else
                      dqidt = dqidt + state%vars%tracer(N)%content
@@ -4553,7 +4566,7 @@ subroutine Run(gc, import, export, clock, rc)
              pos = index(names(N),'::')
              if(pos > 0) then
                if( (names(N)(pos+2:))=='OX' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      doxdt = doxdt + state%vars%tracer(N)%content_r4
                  else
                      doxdt = doxdt + state%vars%tracer(N)%content
@@ -4602,7 +4615,7 @@ subroutine Run(gc, import, export, clock, rc)
           do N = 1,size(names)
              if( trim(names(N)).eq.'QICN' .or. &
                  trim(names(N)).eq.'QILS' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      do k=1,km
                      temp2d = temp2d + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                      enddo
@@ -4623,7 +4636,7 @@ subroutine Run(gc, import, export, clock, rc)
              pos = index(names(N),'::')
              if(pos > 0) then
                if( (names(N)(pos+2:))=='OX' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then 
+                 if( state%vars%tracer(N)%is_r4 ) then
                      do k=1,km
                      temp2d = temp2d + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                      enddo
@@ -4760,7 +4773,7 @@ subroutine Run(gc, import, export, clock, rc)
              if( trim(names(n)).eq.'QLCN' .or. &
                  trim(names(n)).eq.'QLLS' ) then
                  do k=1,km
-                 if( state%vars%tracer(n)%is_r4 ) then 
+                 if( state%vars%tracer(n)%is_r4 ) then
                       temp2d = temp2d + ur(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                  else
                       temp2d = temp2d + ur(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
@@ -4779,7 +4792,7 @@ subroutine Run(gc, import, export, clock, rc)
              if( trim(names(n)).eq.'QLCN' .or. &
                  trim(names(n)).eq.'QLLS' ) then
                  do k=1,km
-                 if( state%vars%tracer(n)%is_r4 ) then 
+                 if( state%vars%tracer(n)%is_r4 ) then
                       temp2d = temp2d + vr(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                  else
                       temp2d = temp2d + vr(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
@@ -4800,7 +4813,7 @@ subroutine Run(gc, import, export, clock, rc)
              if( trim(names(n)).eq.'QICN' .or. &
                  trim(names(n)).eq.'QILS' ) then
                  do k=1,km
-                 if( state%vars%tracer(n)%is_r4 ) then 
+                 if( state%vars%tracer(n)%is_r4 ) then
                       temp2d = temp2d + ur(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                  else
                       temp2d = temp2d + ur(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
@@ -4819,7 +4832,7 @@ subroutine Run(gc, import, export, clock, rc)
              if( trim(names(n)).eq.'QICN' .or. &
                  trim(names(n)).eq.'QILS' ) then
                  do k=1,km
-                 if( state%vars%tracer(n)%is_r4 ) then 
+                 if( state%vars%tracer(n)%is_r4 ) then
                       temp2d = temp2d + vr(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                  else
                       temp2d = temp2d + vr(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
@@ -4975,6 +4988,10 @@ subroutine Run(gc, import, export, clock, rc)
 
       zle = log(vars%pe)
 
+#if defined(__GFORTRAN__)
+      call getDivergence(uc, vc, divg)
+#endif
+
       call MAPL_GetPointer(export,temp3d,'DIVG',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp3d)) temp3d = divg
@@ -5009,10 +5026,14 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Vorticity Exports
 
+#if defined(__GFORTRAN__)
+      call getVorticity(vars%u, vars%v, vort)
+#endif
+
       call MAPL_GetPointer(export,temp3d,'VORT',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp3d)) temp3d = vort
-  
+
       call MAPL_GetPointer(export,temp2d,'VORT200',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
@@ -5026,7 +5047,7 @@ subroutine Run(gc, import, export, clock, rc)
          call VertInterp(temp2d,dble(vort),zle,log(50000.)  ,  status)
          VERIFY_(STATUS)
       end if
- 
+
       call MAPL_GetPointer(export,temp2d,'VORT700',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
@@ -5115,9 +5136,9 @@ subroutine Run(gc, import, export, clock, rc)
       endif
 
      end if   ! SW_DYNAMICS
-      
+
       call MAPL_TimerOff(MAPL,"-DYN_EPILOGUE")
- 
+
 ! De-Allocate Arrays
 ! ------------------
 
@@ -5241,7 +5262,7 @@ subroutine check_replay_time_(lring)
                                     startTime = currentTime, &
                                                 rc = STATUS  ); VERIFY_(STATUS)
 
-      RefTime = RefTime - RefTGap 
+      RefTime = RefTime - RefTGap
   endif
 
 ! check if it's time to replay
@@ -5255,7 +5276,7 @@ subroutine check_replay_time_(lring)
 ! In this case, increment RefTime to proper time
 ! ----------------------------------------------
   if (REPLAY_REF_TGAP>0) then
-      RefTime = currentTime + RefTGap 
+      RefTime = currentTime + RefTGap
   endif
 
 end subroutine check_replay_time_
@@ -5360,7 +5381,7 @@ subroutine dump_n_splash_
           allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
           allocate( UAtmpR4(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
           allocate( VAtmpR4(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-          ! get background A-grid winds 
+          ! get background A-grid winds
           call getAllWinds (vars%u,vars%v,UR=ana_u,VR=ana_v)
           ! transform background A-grid winds to lat-lon
           call regridder_manager%make_regridder(ESMFGRID, ANAGrid, REGRID_METHOD_BILINEAR, RC=STATUS)
@@ -5498,7 +5519,7 @@ subroutine dump_n_splash_
 !      Ozone needs to be adjusted to OX
 !      --------------------------------
        call WRITE_PARALLEL('Replaying '//trim(o3name))
-    
+
        call MAPL_Get(MAPL, LONS=LONS, LATS=LATS, ORBIT=ORBIT, RC=STATUS )
        VERIFY_(STATUS)
 
@@ -5511,7 +5532,7 @@ subroutine dump_n_splash_
        pl = ( vars%pe(:,:,2:) + vars%pe(:,:,:km) ) * 0.5
 
        do L=1,km
-          if( ooo%is_r4 ) then 
+          if( ooo%is_r4 ) then
              where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
                   ooo%content_r4(:,:,L) = max(0.,cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6)
           else
@@ -5748,7 +5769,7 @@ subroutine incremental_
 !      Ozone needs to be adjusted to OX
 !      --------------------------------
        call WRITE_PARALLEL('Replaying increment of '//trim(o3name))
-    
+
        call MAPL_Get(MAPL, LONS=LONS, LATS=LATS, ORBIT=ORBIT, RC=STATUS )
        VERIFY_(STATUS)
 
@@ -5764,7 +5785,7 @@ subroutine incremental_
           where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
                 dqox(:,:,L) = cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6
        enddo
-   
+
        deallocate( ZTH, SLR )
        deallocate(cubeTEMP3D)
     endif
@@ -5799,7 +5820,7 @@ subroutine incremental_
        call l2c%regrid(TEMP3D, cubeTEMP3D, RC=STATUS )
        VERIFY_(STATUS)
        call WRITE_PARALLEL('Replaying increment of '//trim(tname))
-       ! have an incremental change to virtual temperature; 
+       ! have an incremental change to virtual temperature;
        ! want an incremental change to dry potential temperature
        ! calculate first incremental change to t-dry (save in dth for now)
        if( qqq%is_r4 ) then
@@ -5818,7 +5839,7 @@ subroutine incremental_
   vars%u   = vars%u   + sclinc * du(grid%is:grid%ie,grid%js:grid%je,1:km)
   vars%v   = vars%v   + sclinc * dv(grid%is:grid%ie,grid%js:grid%je,1:km)
       pkxy =     pkxy + sclinc * dpkxy
-  vars%pkz = vars%pkz + sclinc * dpkz 
+  vars%pkz = vars%pkz + sclinc * dpkz
   vars%pe  = vars%pe  + sclinc * dpe
   vars%pt  = vars%pt  + sclinc * dth
   if( qqq%is_r4 ) then  ! protection for negative qv is slightly inconsistent w/ update of temperature
@@ -6095,7 +6116,7 @@ end subroutine RUN
             VERIFY_(STATUS)
 
             state%vars%tracer(n)%content => PTR_R8
-            if (fieldname == QFieldName) then 
+            if (fieldname == QFieldName) then
                qqq%is_r4   = .false.
                qqq%content => state%vars%tracer(n)%content
             end if
@@ -6115,10 +6136,10 @@ end subroutine RUN
 
 ! !IROUTINE: RunAddIncs
 
-! !DESCRIPTION: This is the second registered stage of FV. 
-!    It calls an Fv supplied routine to add external contributions 
+! !DESCRIPTION: This is the second registered stage of FV.
+!    It calls an Fv supplied routine to add external contributions
 !    to FV's state variables. It does not touch the Friendly tracers.
-!    It also computes additional diagnostics and updates the 
+!    It also computes additional diagnostics and updates the
 !    FV internal state to reflect the added tendencies.
 !
 !
@@ -6132,23 +6153,23 @@ end subroutine RUN
     type (ESMF_State),   intent(inout) :: import
     type (ESMF_State),   intent(inout) :: export
     type (ESMF_Clock),   intent(in)    :: clock
-    integer, intent(out), optional     :: rc 
+    integer, intent(out), optional     :: rc
 
 !EOP
 
 ! !Local Variables:
-  
+
     integer                                          :: status
     character(len=ESMF_MAXSTR) :: IAm
 
-    type (MAPL_MetaComp), pointer :: genstate 
+    type (MAPL_MetaComp), pointer :: genstate
 
     type (DYN_wrap) :: wrap
     type (DynState), pointer :: STATE
     type (DynGrid),  pointer :: GRID
     type (DynVars),  pointer :: VARS
     type (DynTracers)                 :: qqq     ! Specific Humidity
-    
+
     real(r8), allocatable :: penrg (:,:)   ! Vertically Integrated Cp*T
     real(r8), allocatable :: kenrg (:,:)   ! Vertically Integrated K
     real(r8), allocatable :: tenrg (:,:)   ! PHIS*(Psurf-Ptop)
@@ -6198,7 +6219,7 @@ end subroutine RUN
     real(kind=4), allocatable :: dthdtphyint1(:,:)
     real(kind=4), allocatable :: dthdtphyint2(:,:)
 
-    logical :: doEnergetics 
+    logical :: doEnergetics
 
     integer i,j,k
 
@@ -6361,13 +6382,13 @@ end subroutine RUN
     call FILLOUT3 (export, 'V_CGRID', vc      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'U_AGRID', ua      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'V_AGRID', va      , rc=status); VERIFY_(STATUS)
- 
+
 ! Compute Energetics After Diabatic Forcing
 ! -----------------------------------------
 
     thv = vars%pt*(1.0+eps*qv)
 
-#if defined(DEBUG_VPT)         
+#if defined(DEBUG_VPT)
   call Write_Profile(grid, thv, 'VPT')
 #endif
 
@@ -6401,7 +6422,7 @@ end subroutine RUN
 
     tempxy = vars%pt * vars%pkz   ! Dry Temperature
 
-#if defined(DEBUG_T)         
+#if defined(DEBUG_T)
   call Write_Profile(grid, tempxy, 'T')
 #endif
 
@@ -6459,14 +6480,14 @@ end subroutine RUN
 
 ! Fill Single Level Variables
 ! ---------------------------
- 
+
     call MAPL_GetPointer(export,temp2d,'U200',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
        call VertInterp(temp2d,ur,pke,log(20000.)  ,  status)
        VERIFY_(STATUS)
     end if
- 
+
     call MAPL_GetPointer(export,temp2d,'U250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
@@ -6672,7 +6693,7 @@ end subroutine RUN
     do k=1,km+1
     zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
     enddo
-    
+
     call MAPL_GetPointer(export,temp2d,'U50M',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
@@ -6753,10 +6774,10 @@ end subroutine RUN
           enddo
        enddo
 
-!#define DEBUG_SLP           
-#if defined(DEBUG_SLP)         
-       call Write_Profile(grid, slp/100.0, 'SLP') 
-#endif                       
+!#define DEBUG_SLP
+#if defined(DEBUG_SLP)
+       call Write_Profile(grid, slp/100.0, 'SLP')
+#endif
 
        if(associated(temp2d)) temp2d = slp
        if(associated(ztemp1)) where( ztemp1.eq.MAPL_UNDEF ) ztemp1 = H1000
@@ -6818,7 +6839,7 @@ end subroutine RunAddIncs
    use fms_mod, only: set_domain, nullify_domain
    use fv_diagnostics_mod, only: prt_maxmin
    use time_manager_mod,   only: time_type
-   use fv_update_phys_mod, only: fv_update_phys 
+   use fv_update_phys_mod, only: fv_update_phys
 !
 ! !INPUT PARAMETERS:
 
@@ -7134,14 +7155,14 @@ end subroutine RunAddIncs
 
           ! Update T
           STATE%VARS%PT =  STATE%VARS%PT                         *DPOLD
-          STATE%VARS%PT = (STATE%VARS%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW 
+          STATE%VARS%PT = (STATE%VARS%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW
 
           ! update DZ with new T
           STATE%VARS%DZ = STATE%VARS%DZ * STATE%VARS%PT
        else
           ! Update T
           STATE%VARS%PT =  STATE%VARS%PT                         *DPOLD
-          STATE%VARS%PT = (STATE%VARS%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW 
+          STATE%VARS%PT = (STATE%VARS%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW
        endif
 
        ! Update PKZ from hydrostatic pressures
@@ -7155,7 +7176,7 @@ end subroutine RunAddIncs
 
        !if (DYN_DEBUG) then
        !call prt_maxmin('AI PT2', STATE%VARS%PT ,  is, ie, js, je, 0, km, 1.d00, MAPL_AM_I_ROOT())
-       !endif                  
+       !endif
 
        DEALLOCATE (DPNEW)
        DEALLOCATE (DPOLD)
@@ -7305,7 +7326,7 @@ end subroutine RunAddIncs
 ! !IROUTINE: Finalize
 
 ! !DESCRIPTION: Writes restarts and cleans-up through MAPL\_GenericFinalize and
-!   deallocates memory from the Private Internal state. 
+!   deallocates memory from the Private Internal state.
 !
 ! !INTERFACE:
 
@@ -7318,18 +7339,18 @@ subroutine Finalize(gc, import, export, clock, rc)
     type (ESMF_State),    intent(inout) :: export
     type (ESMF_Clock),    intent(inout) :: clock
     integer, optional,    intent(  out) :: rc
- 
+
 !EOP
 
 ! Local variables
     type (DYN_wrap) :: wrap
     type (DynState), pointer  :: STATE
- 
+
     character(len=ESMF_MAXSTR)        :: IAm
     character(len=ESMF_MAXSTR)        :: COMP_NAME
     integer                           :: status
 
-    type (MAPL_MetaComp),     pointer :: MAPL 
+    type (MAPL_MetaComp),     pointer :: MAPL
     type (ESMF_Config)                :: cf
 
 
@@ -7354,11 +7375,11 @@ subroutine Finalize(gc, import, export, clock, rc)
 
     call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, status)
     VERIFY_(STATUS)
-  
+
     state => wrap%dyn_state
- 
+
     call DynFinalize( STATE )
- 
+
 ! Call Generic Finalize
 !----------------------
 
@@ -7369,7 +7390,7 @@ subroutine Finalize(gc, import, export, clock, rc)
     VERIFY_(STATUS)
 
   RETURN_(ESMF_SUCCESS)
- 
+
   contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -7378,10 +7399,10 @@ subroutine Finalize(gc, import, export, clock, rc)
   integer(kind=8), intent(INOUT) :: TIMES(:,:)
   real(r8),        intent(IN   ) :: DAYS
   TIMES = 0
- 
+
   return
  end subroutine PRINT_TIMES
- 
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 end subroutine FINALIZE
@@ -7409,7 +7430,7 @@ end subroutine FINALIZE
       real(r8), parameter :: p_offset = 15000.
       real(r8), parameter :: gg       = gamma/MAPL_GRAV
 
-      real(r8), parameter :: factor   = MAPL_grav / ( MAPL_Rgas * gamma ) 
+      real(r8), parameter :: factor   = MAPL_grav / ( MAPL_Rgas * gamma )
       real(r8), parameter :: yfactor  = MAPL_Rgas * gg
 
       integer k_bot, k, k1, k2
@@ -7531,7 +7552,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
     character(len=ESMF_MAXSTR)        :: COMP_NAME
     integer                           :: status
 
-    type (MAPL_MetaComp),     pointer :: MAPL 
+    type (MAPL_MetaComp),     pointer :: MAPL
     type (ESMF_State)                 :: INTERNAL
 
     real(REAL8), pointer                 :: AK(:), BK(:)
@@ -7574,7 +7595,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
     real(r4), pointer                :: TRACER(:,:,:)
     real(REAL8), allocatable            :: Q5(:,:,:)
     real(REAL8), allocatable            :: Q6(:,:,:)
-    type (ESMF_Grid)                 :: esmfGRID 
+    type (ESMF_Grid)                 :: esmfGRID
     type (ESMF_FieldBundle)          :: TRADV_BUNDLE
     character(len=ESMF_MAXSTR)       :: FIELDNAME
     character(len=ESMF_MAXSTR)       :: STRING
@@ -7598,7 +7619,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
     state => wrap%dyn_state
     grid  => state%grid   ! direct handle to grid
 
-!BOR    
+!BOR
 ! !RESOURCE_ITEM: K :: Value of isothermal temperature on coldstart
     call MAPL_GetResource ( MAPL, T0, 'T0:', default=273., RC=STATUS )
     VERIFY_(STATUS)
@@ -7782,7 +7803,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
               !     print*, i, j, T_PERTURB
               !     PT(i,j,k) = PT(i,j,k) + T_PERTURB
               !  endif
-              !endif 
+              !endif
             enddo
          enddo
       enddo
@@ -8138,7 +8159,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
                       0.95943169315531E+04,  0.73965459465018E+04,  0.50700062290314E+04,  0.26071531411601E+04, &
                       0.00000000000000E+00 /
 
-      data b20_0178 / 0.00000000000000E+00,  0.27599078219223E-01,  0.56815203138214E-01,  0.87743118501982E-01, & 
+      data b20_0178 / 0.00000000000000E+00,  0.27599078219223E-01,  0.56815203138214E-01,  0.87743118501982E-01, &
                       0.12048311914891E+00,  0.15514137625266E+00,  0.19183028162025E+00,  0.23066881216269E+00, &
                       0.27178291572025E+00,  0.31530591949337E+00,  0.36137896240390E+00,  0.41015145278854E+00, &
                       0.46178155290889E+00,  0.51643669184922E+00,  0.57429410846515E+00,  0.63554142614418E+00, &
@@ -8225,7 +8246,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
           0.975078, 0.980072, 0.984542, 0.988500, 0.991984, 0.995003, 0.997630, 1.000000/
 
       SELECT CASE(km)
-  
+
       CASE(20)
 
           do k=1,km+1
@@ -8257,7 +8278,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
              endif
           enddo
 126   continue
- 
+
       CASE(40)
 !--------------------------------------------------
 ! Pure sigma-coordinate with uniform spacing in "z"
@@ -8449,19 +8470,19 @@ subroutine addTracer_r4(state, bundle, var, grid, fieldname)
   type(DynTracers), pointer        :: t(:)
 
   character(len=ESMF_MAXSTR)       :: IAm='FV:addTracer_r4'
-         
+
   type (ESMF_Field)                :: field
   real(r4),              pointer   :: ptr(:,:,:)
-         
+
       call ESMF_GridGet (GRID,  distGrid=distgrid,       RC=STATUS)
       VERIFY_(STATUS)
 
       call ESMF_FieldBundleGet(BUNDLE, fieldCount=NQ, RC=STATUS)
       VERIFY_(STATUS)
 
-      NQ = NQ + 1 
-               
-      field = ESMF_FieldCreate(GRID, var, datacopyflag=ESMF_DATACOPY_VALUE, name=fieldname, RC=STATUS ) 
+      NQ = NQ + 1
+
+      field = ESMF_FieldCreate(GRID, var, datacopyflag=ESMF_DATACOPY_VALUE, name=fieldname, RC=STATUS )
       VERIFY_(STATUS)
       call ESMF_AttributeSet(field,name='VLOCATION',value=MAPL_VLocationCenter,rc=status)
       VERIFY_(STATUS)
@@ -8514,19 +8535,19 @@ end subroutine freeTracers
     real(r8) :: arr_global(grid%npx,grid%ntiles*grid%npy)
     real(r8) :: rng(3)
     real(r8) :: GSUM
-    
+
     real(kind=ESMF_KIND_R8)     :: locArr(grid%is:grid%ie,grid%js:grid%je)
     real(kind=ESMF_KIND_R8)     :: glbArr(grid%npx,grid%ntiles*grid%npy)
-    
+
     istrt = grid%is
     iend  = grid%ie
     jstrt = grid%js
-    jend  = grid%je 
+    jend  = grid%je
     im    = grid%npx
-    jm    = grid%npy*grid%ntiles      
-    
+    jm    = grid%npy*grid%ntiles
+
    !call write_parallel('GlobalSUm')
-    locArr(:,:) = arr(:,:)       
+    locArr(:,:) = arr(:,:)
     call ArrayGather(locArr, glbArr, grid%grid)
     arr_global(:,:) = glbArr
 
@@ -8557,19 +8578,19 @@ end subroutine freeTracers
     real(r4) :: arr_global(grid%npx,grid%ntiles*grid%npy)
     real(r4) :: rng(3)
     real(r4) :: GSUM
-    
+
     real(kind=ESMF_KIND_R4)     :: locArr(grid%is:grid%ie,grid%js:grid%je)
     real(kind=ESMF_KIND_R4)     :: glbArr(grid%npx,grid%ntiles*grid%npy)
-    
+
     istrt = grid%is
     iend  = grid%ie
     jstrt = grid%js
-    jend  = grid%je 
+    jend  = grid%je
     im    = grid%npx
-    jm    = grid%npy*grid%ntiles      
+    jm    = grid%npy*grid%ntiles
 
   ! call write_parallel('GlobalSUm')
-    locArr(:,:) = arr(:,:)     
+    locArr(:,:) = arr(:,:)
     call ArrayGather(locArr, glbArr, grid%grid)
     arr_global(:,:) = glbArr
 
@@ -8652,22 +8673,22 @@ end subroutine freeTracers
     real(r4) :: rng(3,grid%npz)
     real(r8) :: gsum_p
     real(r4) :: GSUM
-    
+
     real(kind=ESMF_KIND_R8)     :: locArr(grid%is:grid%ie,grid%js:grid%je)
     real(kind=ESMF_KIND_R8)     :: glbArr(grid%npx,grid%ntiles*grid%npy)
-      
+
     istrt = grid%is
     iend  = grid%ie
     jstrt = grid%js
-    jend  = grid%je 
+    jend  = grid%je
     kstrt = 1
     kend  = grid%npz
     im    = grid%npx
-    jm    = grid%npy*grid%ntiles      
+    jm    = grid%npy*grid%ntiles
     km    = grid%npz
-    
+
     do k=kstrt,kend
-       locArr(:,:) = arr(:,:,k)       
+       locArr(:,:) = arr(:,:,k)
        call ArrayGather(locArr, glbArr, grid%grid)
        arr_global(:,:,k) = glbArr
     enddo
