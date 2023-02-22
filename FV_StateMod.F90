@@ -501,7 +501,11 @@ contains
    FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
    FV_Atm(1)%flagstruct%d2_bg_k2 = 0.02
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
-   FV_Atm(1)%flagstruct%gmao_remap = 0   ! Do not use GMAO schemes
+   if (FV_Atm(1)%flagstruct%npz == 72) then
+     FV_Atm(1)%flagstruct%gmao_remap = 0   ! GFDL Schemes
+   else
+     FV_Atm(1)%flagstruct%gmao_remap = 3   ! GMAO Cubic
+   endif
    FV_Atm(1)%flagstruct%kord_tm =  9
    FV_Atm(1)%flagstruct%kord_mt =  9
    FV_Atm(1)%flagstruct%kord_wz =  9
