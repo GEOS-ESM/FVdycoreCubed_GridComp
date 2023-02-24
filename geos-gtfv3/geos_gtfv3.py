@@ -1,9 +1,16 @@
 import f90nml
 from datetime import datetime
 from f_py_conversion import FortranPythonConversion
-from pace.fv3core.initialization.geos_wrapper import GeosDycoreWrapper
+from pace.fv3core.initialization.geos_wrapper import GeosDycoreWrapper, MemorySpace
 from cuda_profiler import CUDAProfiler
 from mpi4py import MPI
+from pace.util._optional_imports import cupy as cp
+import numpy as np
+from pace.dsl.gt4py_utils import is_gpu_backend
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import cffi
 
 
 class GEOSGTFV3:
@@ -12,25 +19,30 @@ class GEOSGTFV3:
         namelist_path: str,
         bdt: float,
         comm: MPI.Intercomm,
-        npx,
-        npy,
-        npz,
-        is_,
-        ie,
-        js,
-        je,
-        isd,
-        ied,
-        jsd,
-        jed,
-        nq_tot,
+        npx: int,
+        npy: int,
+        npz: int,
+        is_: int,
+        ie: int,
+        js: int,
+        je: int,
+        isd: int,
+        ied: int,
+        jsd: int,
+        jed: int,
+        nq_tot: int,
         backend: str = "dace:gpu",
     ) -> None:
         self.namelist = f90nml.read(namelist_path)
         self.rank = comm.Get_rank()
         self.backend = backend
-        self.dycore = GeosDycoreWrapper(self.namelist, bdt, comm, self.backend)
         # For Fortran<->NumPy conversion
+        if is_gpu_backend(self.backend):
+            numpy_module = cp
+            fortran_mem_space = MemorySpace.DEVICE
+        else:
+            numpy_module = np
+            fortran_mem_space = MemorySpace.HOST
         self.f_py = FortranPythonConversion(
             npx,
             npy,
@@ -44,6 +56,11 @@ class GEOSGTFV3:
             jsd,
             jed,
             nq_tot,
+            numpy_module,
+        )
+        # Setup Pace's dynamical core
+        self.dycore = GeosDycoreWrapper(
+            self.namelist, bdt, comm, self.backend, fortran_mem_space
         )
 
     def __call__(
@@ -54,32 +71,32 @@ class GEOSGTFV3:
         layout_1,
         layout_2,
         adiabatic,
-        u,
-        v,
-        w,
-        delz,
-        pt,
-        delp,
-        q,
-        ps,
-        pe,
-        pk,
-        peln,
-        pkz,
-        phis,
-        q_con,
-        omga,
-        ua,
-        va,
-        uc,
-        vc,
-        ak,
-        bk,
-        mfx,
-        mfy,
-        cx,
-        cy,
-        diss_est,
+        u: "cffi.FFI.CData",
+        v: "cffi.FFI.CData",
+        w: "cffi.FFI.CData",
+        delz: "cffi.FFI.CData",
+        pt: "cffi.FFI.CData",
+        delp: "cffi.FFI.CData",
+        q: "cffi.FFI.CData",
+        ps: "cffi.FFI.CData",
+        pe: "cffi.FFI.CData",
+        pk: "cffi.FFI.CData",
+        peln: "cffi.FFI.CData",
+        pkz: "cffi.FFI.CData",
+        phis: "cffi.FFI.CData",
+        q_con: "cffi.FFI.CData",
+        omga: "cffi.FFI.CData",
+        ua: "cffi.FFI.CData",
+        va: "cffi.FFI.CData",
+        uc: "cffi.FFI.CData",
+        vc: "cffi.FFI.CData",
+        ak: "cffi.FFI.CData",
+        bk: "cffi.FFI.CData",
+        mfx: "cffi.FFI.CData",
+        mfy: "cffi.FFI.CData",
+        cx: "cffi.FFI.CData",
+        cy: "cffi.FFI.CData",
+        diss_est: "cffi.FFI.CData",
     ):
         RANK_PRINT = 0
 
@@ -96,7 +113,7 @@ class GEOSGTFV3:
         with CUDAProfiler("fortran->py"):
 
             # Convert Fortran arrays to NumPy
-            state_in = self.f_py.fortran_to_numpy(
+            state_in = self.f_py.fortran_to_python(
                 # input
                 u,
                 v,
@@ -181,7 +198,7 @@ class GEOSGTFV3:
 
         # Convert NumPy arrays back to Fortran
         with CUDAProfiler("Py -> Fortran"):
-            self.f_py.numpy_to_fortran(
+            self.f_py.python_to_fortran(
                 # input
                 state_out,
                 # output
@@ -227,19 +244,19 @@ GEOS_DYCORE = None
 
 
 def geos_gtfv3(
-    comm,
-    npx,
-    npy,
-    npz,
-    ntiles,
-    is_,
-    ie,
-    js,
-    je,
-    isd,
-    ied,
-    jsd,
-    jed,
+    comm: MPI.Intercomm,
+    npx: int,
+    npy: int,
+    npz: int,
+    ntiles: int,
+    is_: int,
+    ie: int,
+    js: int,
+    je: int,
+    isd: int,
+    ied: int,
+    jsd: int,
+    jed: int,
     bdt,
     nq_tot,
     ng,
@@ -248,32 +265,32 @@ def geos_gtfv3(
     layout_1,
     layout_2,
     adiabatic,
-    u,
-    v,
-    w,
-    delz,
-    pt,
-    delp,
-    q,
-    ps,
-    pe,
-    pk,
-    peln,
-    pkz,
-    phis,
-    q_con,
-    omga,
-    ua,
-    va,
-    uc,
-    vc,
-    ak,
-    bk,
-    mfx,
-    mfy,
-    cx,
-    cy,
-    diss_est,
+    u: "cffi.FFI.CData",
+    v: "cffi.FFI.CData",
+    w: "cffi.FFI.CData",
+    delz: "cffi.FFI.CData",
+    pt: "cffi.FFI.CData",
+    delp: "cffi.FFI.CData",
+    q: "cffi.FFI.CData",
+    ps: "cffi.FFI.CData",
+    pe: "cffi.FFI.CData",
+    pk: "cffi.FFI.CData",
+    peln: "cffi.FFI.CData",
+    pkz: "cffi.FFI.CData",
+    phis: "cffi.FFI.CData",
+    q_con: "cffi.FFI.CData",
+    omga: "cffi.FFI.CData",
+    ua: "cffi.FFI.CData",
+    va: "cffi.FFI.CData",
+    uc: "cffi.FFI.CData",
+    vc: "cffi.FFI.CData",
+    ak: "cffi.FFI.CData",
+    bk: "cffi.FFI.CData",
+    mfx: "cffi.FFI.CData",
+    mfy: "cffi.FFI.CData",
+    cx: "cffi.FFI.CData",
+    cy: "cffi.FFI.CData",
+    diss_est: "cffi.FFI.CData",
 ):
     BACKEND = "dace:gpu"
     NAMELIST_PATH = "input.nml"
