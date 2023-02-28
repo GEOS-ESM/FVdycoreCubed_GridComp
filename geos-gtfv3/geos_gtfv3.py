@@ -1,8 +1,7 @@
 import f90nml
-from datetime import datetime
 from f_py_conversion import FortranPythonConversion
 from pace.fv3core.initialization.geos_wrapper import GeosDycoreWrapper, MemorySpace
-from cuda_profiler import CUDAProfiler
+from cuda_profiler import CUDAProfiler, TimedCUDAProfiler
 from mpi4py import MPI
 from pace.util._optional_imports import cupy as cp
 import numpy as np
@@ -63,6 +62,14 @@ class GEOSGTFV3:
             self.namelist, bdt, comm, self.backend, fortran_mem_space
         )
 
+        self._timings = {}
+
+    def finalize(self):
+        import json
+
+        with open("gtfv3_timings.json", "w") as f:
+            json.dump(self._timings, f, indent=4)
+
     def __call__(
         self,
         ng,
@@ -98,20 +105,8 @@ class GEOSGTFV3:
         cy: "cffi.FFI.CData",
         diss_est: "cffi.FFI.CData",
     ):
-        RANK_PRINT = 0
-
-        if self.rank == RANK_PRINT:
-            print(
-                "P:",
-                datetime.now().isoformat(timespec="milliseconds"),
-                "--in top level geos-gtfv3, backend:",
-                self.backend,
-                flush=True,
-            )
-
         CUDAProfiler.start_cuda_profiler()
-        with CUDAProfiler("fortran->py"):
-
+        with TimedCUDAProfiler("Fortran -> Python", self._timings):
             # Convert Fortran arrays to NumPy
             state_in = self.f_py.fortran_to_python(
                 # input
@@ -140,28 +135,11 @@ class GEOSGTFV3:
                 cy,
                 diss_est,
             )
-            # write_sum_of_vars(comm, state_in)
-            # write_shape_or_value(comm, state_in)
-
-        if self.rank == RANK_PRINT:
-            print(
-                "P:",
-                datetime.now().isoformat(timespec="milliseconds"),
-                "--fortran->numpy, transpose, sp->dp, swap axes",
-                flush=True,
-            )
-
-        if self.rank == RANK_PRINT:
-            print(
-                "P:",
-                datetime.now().isoformat(timespec="milliseconds"),
-                "--initialized dycore",
-                flush=True,
-            )
 
         # Run gtFV3
-        with CUDAProfiler("Py dycore runtime"):
-            state_out = self.dycore(
+        with TimedCUDAProfiler("Numerics", self._timings):
+            state_out, self._timings = self.dycore(
+                self._timings,
                 state_in["u"],
                 state_in["v"],
                 state_in["w"],
@@ -188,16 +166,8 @@ class GEOSGTFV3:
                 state_in["diss_estd"],
             )
 
-        if self.rank == RANK_PRINT:
-            print(
-                "P:",
-                datetime.now().isoformat(timespec="milliseconds"),
-                "--ran dycore",
-                flush=True,
-            )
-
         # Convert NumPy arrays back to Fortran
-        with CUDAProfiler("Py -> Fortran"):
+        with TimedCUDAProfiler("Python -> Fortran", self._timings):
             self.f_py.python_to_fortran(
                 # input
                 state_out,
@@ -226,14 +196,6 @@ class GEOSGTFV3:
                 cx,
                 cy,
                 diss_est,
-            )
-
-        if self.rank == RANK_PRINT:
-            print(
-                "P:",
-                datetime.now().isoformat(timespec="milliseconds"),
-                "--numpy->fortran, transpose, dp->sp, swap axes",
-                flush=True,
             )
 
 
@@ -349,3 +311,8 @@ def geos_gtfv3(
         cy,
         diss_est,
     )
+
+
+def geos_gtfv3_finalize():
+    if GEOS_DYCORE is not None:
+        GEOS_DYCORE.finalize()

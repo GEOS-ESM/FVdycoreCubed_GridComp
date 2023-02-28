@@ -6,7 +6,7 @@ program gtfv3_driver
   use domain_dim_mod, only: DomainDim_T
   use input_scalars_mod, only: InputScalars_T
   use input_arrays_mod, only: InputArrays_T
-  use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
+  use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f, geos_gtfv3_interface_finalize_f
 
   implicit none
 
@@ -25,6 +25,7 @@ program gtfv3_driver
   integer :: ctr
   character(len=23) :: dt_iso
   real :: start, finish
+  real, dimension(NITER) :: timings
 
   ! Start
   call MPI_Init(mpierr)
@@ -78,8 +79,12 @@ program gtfv3_driver
          ! Input/Output
          arr%mfx, arr%mfy, arr%cx, arr%cy, arr%diss_est)
     call cpu_time(finish)
-    print *, ctr, '- time taken on rank ', irank, ': ', finish-start
+    timings(ctr) = finish-start
  end do
+
+ call geos_gtfv3_interface_finalize_f()
+
+ print *, ctr, '- timings on rank', irank, ': ', timings
 
  if (irank == 0) print*, 'rank, sum(u), sum(v), sum(w), sum(delz)'
  call MPI_Barrier(MPI_COMM_WORLD, mpierr)

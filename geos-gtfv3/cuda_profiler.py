@@ -1,4 +1,5 @@
 import time
+from typing import Dict, List
 
 # Conditional cupy import for non-GPU machines
 try:
@@ -23,20 +24,16 @@ class CUDAProfiler:
 
     def __init__(self, label: str) -> None:
         self.label = label
-        self._start_time = 0
 
     def __enter__(self):
         if cp is not None:
             cp.cuda.runtime.deviceSynchronize()
             cp.cuda.nvtx.RangePush(self.label)
-        self._start_time = time.perf_counter()
 
     def __exit__(self, _type, _val, _traceback):
         if cp is not None:
             cp.cuda.runtime.deviceSynchronize()
             cp.cuda.nvtx.RangePop()
-        t = time.perf_counter() - self._start_time
-        print(f"{self.label} CPU time: {t}s")
 
     @classmethod
     def sync_device():
@@ -57,3 +54,22 @@ class CUDAProfiler:
     def mark_cuda_profiler(cls, message: str):
         if GPU_AVAILABLE:
             cp.cuda.nvtx.Mark(message)
+
+
+class TimedCUDAProfiler(CUDAProfiler):
+    def __init__(self, label: str, timings: Dict[str, List[float]]) -> None:
+        super().__init__(label)
+        self._start_time = 0
+        self._timings = timings
+
+    def __enter__(self):
+        super().__enter__()
+        self._start_time = time.perf_counter()
+
+    def __exit__(self, _type, _val, _traceback):
+        super().__exit__(_type, _val, _traceback)
+        t = time.perf_counter() - self._start_time
+        if self.label not in self._timings:
+            self._timings[self.label] = [t]
+        else:
+            self._timings[self.label].append(t)

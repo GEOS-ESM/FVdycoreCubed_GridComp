@@ -32,7 +32,7 @@ class FortranPythonConversion:
         num_tracers: int,
         numpy_module: ModuleType,
     ):
-        # Python module is given by the caller leaving
+        # Python numpy-like module is given by the caller leaving
         # optional control of upload/download in the case
         # of GPU/CPU system
         self._target_np = numpy_module
@@ -60,6 +60,11 @@ class FortranPythonConversion:
             "int": np.int32,
         }
 
+    def _device_sync(self):
+        """Synchronize the working CUDA streams"""
+        self._stream_A.synchronize()
+        self._stream_B.synchronize()
+
     def _fortran_to_numpy(
         self,
         fptr: "cffi.FFI.CData",
@@ -75,11 +80,6 @@ class FortranPythonConversion:
             self._ffi.buffer(fptr, prod(dim) * self._ffi.sizeof(ftype)),
             self._TYPEMAP[ftype],
         )
-
-    def _device_sync(self):
-        """Synchronize the working CUDA streams"""
-        self._stream_A.synchronize()
-        self._stream_B.synchronize()
 
     def _upload_and_transform(
         self,
