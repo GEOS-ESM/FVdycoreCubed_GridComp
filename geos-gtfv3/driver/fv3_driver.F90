@@ -97,7 +97,7 @@ program main
          ! Input/Output
          arr%pt, arr%delp, arr%q(:, :, :, 1:NUM_TRACERS), &
          arr%ps, arr%pe, arr%pk, arr%peln, arr%pkz, &
-         arr%phis, arr%q_con, arr%omga, &
+         arr%phis, arr%varflt, arr%q_con, arr%omga, &
          arr%ua, arr%va, arr%uc, arr%vc, &
          ! Input
          arr%ak, arr%bk, &
@@ -109,7 +109,7 @@ program main
          FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, &
          FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
          ! Input/Output
-         arr%diss_est, &
+         arr%diss_est, arr%u_dt, arr%v_dt, arr%w_dt, arr%t_dt, &
          ! Input
          time_total)
     call cpu_time(finish)
