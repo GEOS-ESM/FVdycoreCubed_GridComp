@@ -504,7 +504,7 @@ contains
    if (FV_Atm(1)%flagstruct%npz == 72) then
      FV_Atm(1)%flagstruct%gmao_remap = 0   ! GFDL Schemes
    else
-     FV_Atm(1)%flagstruct%gmao_remap = 3   ! GMAO Cubic
+     FV_Atm(1)%flagstruct%gmao_remap = 0   ! (0 for GFDL Schemes) (3 for GMAO Cubic)
    endif
    FV_Atm(1)%flagstruct%kord_tm =  9
    FV_Atm(1)%flagstruct%kord_mt =  9
