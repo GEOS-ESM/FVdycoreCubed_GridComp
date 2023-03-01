@@ -1824,6 +1824,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     w_dt(:,:,:) = 0.0
 
     if (run_gtfv3 == 0) then
+       call cpu_time(start)
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
             FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
