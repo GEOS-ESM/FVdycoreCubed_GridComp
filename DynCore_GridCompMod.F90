@@ -1068,6 +1068,24 @@ contains
      VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                       &
+         SHORT_NAME = 'DUDTPHY',                                        &
+         LONG_NAME  = 'tendency_of_eastward_wind_due_to_physics',       &
+         UNITS      = 'm/s/s',                                      &
+         DIMS       = MAPL_DimsHorzVert,                                &
+         FIELD_TYPE = MAPL_VectorField,                                 &
+         VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                       &
+         SHORT_NAME = 'DVDTPHY',                                        &
+         LONG_NAME  = 'tendency_of_northward_wind_due_to_physics',      &
+         UNITS      = 'm/s/s',                                      &
+         DIMS       = MAPL_DimsHorzVert,                                &
+         FIELD_TYPE = MAPL_VectorField,                                 &
+         VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                       &
          SHORT_NAME = 'DUDTANA',                                        &
          LONG_NAME  = 'tendency_of_eastward_wind_due_to_analysis',      &
          UNITS      = 'm/s/s',                                      &
@@ -2810,8 +2828,6 @@ subroutine Run(gc, import, export, clock, rc)
     real(r8), allocatable :: trsum1(:)     ! Global Sum of Tracers before Add_Incs
     real(r8), allocatable :: trsum2(:)     ! Global Sum of Tracers after  Add_Incs
 
-    real(kind=4), pointer ::      dudtana(:,:,:)
-    real(kind=4), pointer ::      dvdtana(:,:,:)
     real(kind=4), pointer ::      dtdtana(:,:,:)
     real(kind=4), pointer ::     ddpdtana(:,:,:)
     real(kind=4), pointer ::       qctmp (:,:,:)
@@ -3504,15 +3520,11 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! DUDTANA
 ! -------
-      call MAPL_GetPointer ( export, dudtana, 'DUDTANA', rc=status )
-      VERIFY_(STATUS)
-      if( associated(dudtana) ) dudtana = ua
+!     Note: Calculation of DUDTANA moved to ADD_INCS to account for AtoD & DtoA transformations
 
 ! DVDTANA
 ! -------
-      call MAPL_GetPointer ( export, dvdtana, 'DVDTANA', rc=status )
-      VERIFY_(STATUS)
-      if( associated(dvdtana) ) dvdtana = va
+!     Note: Calculation of DVDTANA moved to ADD_INCS to account for AtoD & DtoA transformations
 
 ! DTDTANA
 ! -------
@@ -3635,7 +3647,7 @@ subroutine Run(gc, import, export, clock, rc)
       ! -----------------------
       delpold = delp                            ! Old Pressure Thickness
 
-      call ADD_INCS ( STATE,IMPORT,DT,IS_WEIGHTED=IS_WEIGHTED )
+      call ADD_INCS ( STATE,IMPORT,EXPORT,DT,'ANA ADD_INCS',IS_WEIGHTED=IS_WEIGHTED )
 
       if (DYN_DEBUG) call DEBUG_FV_STATE('ANA ADD_INCS',STATE)
 
@@ -3799,21 +3811,11 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! DUDTANA
 ! -------
-      call MAPL_GetPointer ( export, dudtana, 'DUDTANA', rc=status )
-      VERIFY_(STATUS)
-      if( associated(dudtana) ) then
-                     dummy   =  ua
-                     dudtana = (dummy-dudtana)/dt
-      endif
+!     Note: Calculation of DUDTANA moved to ADD_INCS to account for AtoD & DtoA transformations
 
 ! DVDTANA
 ! -------
-      call MAPL_GetPointer ( export, dvdtana, 'DVDTANA', rc=status )
-      VERIFY_(STATUS)
-      if( associated(dvdtana) ) then
-                     dummy   =  va
-                     dvdtana = (dummy-dvdtana)/dt
-      endif
+!     Note: Calculation of DVDTANA moved to ADD_INCS to account for AtoD & DtoA transformations
 
 ! DTDTANA
 ! -------
@@ -6279,7 +6281,7 @@ end subroutine RUN
 
 ! Add Diabatic Forcing to State Variables
 ! ---------------------------------------
-    call ADD_INCS ( STATE,IMPORT,DT )
+    call ADD_INCS ( STATE,IMPORT,EXPORT,DT,'PHYSICS ADD_INCS' )
 
     if (DYN_DEBUG) call DEBUG_FV_STATE('PHYSICS ADD_INCS',STATE)
 
@@ -6751,7 +6753,7 @@ end subroutine RUN
 end subroutine RunAddIncs
 
 !-----------------------------------------------------------------------
-  subroutine ADD_INCS ( STATE,IMPORT,DT,IS_WEIGHTED,RC )
+  subroutine ADD_INCS ( STATE,IMPORT,EXPORT,DT,STRING,IS_WEIGHTED,RC )
 
    use fms_mod, only: set_domain, nullify_domain
    use fv_diagnostics_mod, only: prt_maxmin
@@ -6762,7 +6764,9 @@ end subroutine RunAddIncs
 
    type(DynState), pointer                :: STATE
    type(ESMF_State),       intent(INOUT)  :: IMPORT
+   type(ESMF_State),       intent(INOUT)  :: EXPORT
    real(FVPRC),            intent(IN   )  :: DT
+   character(len=*),       intent(IN   )  :: STRING
    integer,  optional,     intent(OUT  )  :: RC
    logical,  optional,     intent(IN   )  :: is_weighted
 
@@ -6781,6 +6785,7 @@ end subroutine RunAddIncs
     real(r4), allocatable :: fvQOLD(:,:,:), QTEND(:,:,:)
     real(r8), allocatable :: DPNEW(:,:,:),DPOLD(:,:,:)
 
+    real(REAL8), allocatable ::      ua(:,:,:),      va(:,:,:)
     real(REAL8), allocatable :: tend_ua(:,:,:), tend_va(:,:,:)
     real(REAL8), allocatable :: tend_un(:,:,:), tend_vn(:,:,:)
 
@@ -6957,6 +6962,8 @@ end subroutine RunAddIncs
        ! ****        while IMPORT Tendencies are on the A-Grid             ****
        ! **********************************************************************
 
+       ALLOCATE(      ua(is:ie  ,js:je  ,km) )
+       ALLOCATE(      va(is:ie  ,js:je  ,km) )
        ALLOCATE( tend_ua(is:ie  ,js:je  ,km) )
        ALLOCATE( tend_va(is:ie  ,js:je  ,km) )
        ALLOCATE( tend_un(is:ie  ,js:je+1,km) )
@@ -6981,12 +6988,55 @@ end subroutine RunAddIncs
        ! Put the wind tendencies on the Native Dynamics grid
        ! ---------------------------------------------------
        call Agrid_To_Native( tend_ua, tend_va, tend_un, tend_vn )
+         call getAgridWinds( STATE%VARS%U, STATE%VARS%V, ua, va, rotate=.true.)
+
+         if( trim(STRING) == 'ANA ADD_INCS' ) then
+             call ESMFL_StateGetPointerToData ( EXPORT,TEND,'DUDTANA',RC=STATUS )
+             VERIFY_(STATUS)
+             if( associated(TEND) ) tend = ua(is:ie,js:je,1:km)
+             call ESMFL_StateGetPointerToData ( EXPORT,TEND,'DVDTANA',RC=STATUS )
+             VERIFY_(STATUS)
+             if( associated(TEND) ) tend = va(is:ie,js:je,1:km)
+         endif
+
+         if( trim(STRING) == 'PHYSICS ADD_INCS' ) then
+             call ESMFL_StateGetPointerToData ( EXPORT,TEND,'DUDTPHY',RC=STATUS )
+             VERIFY_(STATUS)
+             if( associated(TEND) ) tend = ua(is:ie,js:je,1:km)
+             call ESMFL_StateGetPointerToData ( EXPORT,TEND,'DVDTPHY',RC=STATUS )
+             VERIFY_(STATUS)
+             if( associated(TEND) ) tend = va(is:ie,js:je,1:km)
+         endif
 
        ! Add the wind tendencies to the control variables
        ! ------------------------------------------------
        STATE%VARS%U = STATE%VARS%U + DT*TEND_UN(is:ie,js:je,1:km)
        STATE%VARS%V = STATE%VARS%V + DT*TEND_VN(is:ie,js:je,1:km)
 
+       ! Put the wind tendencies back on A-Grid (for consistency with wind output)
+       ! -------------------------------------------------------------------------
+         call getAgridWinds( STATE%VARS%U, STATE%VARS%V, ua, va, rotate=.true.)
+
+         if( trim(STRING) == 'ANA ADD_INCS' ) then
+             call ESMFL_StateGetPointerToData ( EXPORT,TEND,'DUDTANA',RC=STATUS )
+             VERIFY_(STATUS)
+             if( associated(TEND) ) tend = ( ua(is:ie,js:je,1:km)-tend )/DT
+             call ESMFL_StateGetPointerToData ( EXPORT,TEND,'DVDTANA',RC=STATUS )
+             VERIFY_(STATUS)
+             if( associated(TEND) ) tend = ( va(is:ie,js:je,1:km)-tend )/DT
+         endif
+
+         if( trim(STRING) == 'PHYSICS ADD_INCS' ) then
+             call ESMFL_StateGetPointerToData ( EXPORT,TEND,'DUDTPHY',RC=STATUS )
+             VERIFY_(STATUS)
+             if( associated(TEND) ) tend = ( ua(is:ie,js:je,1:km)-tend )/DT
+             call ESMFL_StateGetPointerToData ( EXPORT,TEND,'DVDTPHY',RC=STATUS )
+             VERIFY_(STATUS)
+             if( associated(TEND) ) tend = ( va(is:ie,js:je,1:km)-tend )/DT
+         endif
+
+       DEALLOCATE(      ua )
+       DEALLOCATE(      va )
        DEALLOCATE( tend_ua )
        DEALLOCATE( tend_va )
        DEALLOCATE( tend_un )
