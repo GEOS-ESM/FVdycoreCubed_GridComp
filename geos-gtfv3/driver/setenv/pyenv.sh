@@ -27,4 +27,5 @@ else
     echo "-=: Virtual env sourced. :=-"
 fi
 
-PYTHONPATH=$PYTHONPATH:$GTFV3_DIR/../geos-gtfv3/
+export PYTHONPATH=$PYTHONPATH:$GTFV3_DIR/../geos-gtfv3/
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GTFV3_DIR/../geos-gtfv3/driver/build/
