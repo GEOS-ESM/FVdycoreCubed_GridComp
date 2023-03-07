@@ -74,10 +74,10 @@ program main
  !     write(*, '(a2,1x,a23,a18)') 'F:', dt_iso, ' --calling fortran interface'
  ! end if
 
- ! if (irank == 0) print*, 'irank, sum(u), sum(v), sum(w), sum(delz)'
- ! call MPI_Barrier(MPI_COMM_WORLD, mpierr)
- ! print *, irank, sum(arr%u), sum (arr%v), sum(arr%w), sum(arr%delz)
- ! call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+ if (irank == 0) print*, 'irank, sum(u), sum(v), sum(w), sum(delz)'
+ call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+ print *, irank, sum(arr%u), sum (arr%v), sum(arr%w), sum(arr%delz)
+ call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
  ! Run FV3
  zvir = MAPL_RVAP/MAPL_RGAS - 1
@@ -116,6 +116,11 @@ program main
     print *, irank, ', fv_dynamics: time taken = ', finish - start, 's'
  end do
  
+ if (irank == 0) print*, 'irank, sum(u), sum(v), sum(w), sum(delz)'
+ call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+ print *, irank, sum(arr%u), sum (arr%v), sum(arr%w), sum(arr%delz)
+ call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
  call fv_end(FV_Atm, grids_on_this_pe, .false.)
  call MPI_Finalize(mpierr)
 
