@@ -505,7 +505,7 @@ subroutine AppGridCreate (META, esmfgrid, RC)
    FMT = '(A,' // trim(FMTIM) //',A,' // trim(FMTJM) // ',A)'
    write(tmpname,trim(FMT)) 'PE',IM_WORLD,'x',JM_WORLD,'-CF'
    ! !RESOURCE_ITEM: none :: Optional grid name
-   call MAPL_GetResource( META, GRIDNAME, 'AGCM_GRIDNAME:', default=trim(tmpname), rc = status )
+   call MAPL_GetResource( META, GRIDNAME, 'AGCM.GRIDNAME:', default=trim(tmpname), rc = status )
    VERIFY_(STATUS)
 
    esmfgrid = AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, STATUS)

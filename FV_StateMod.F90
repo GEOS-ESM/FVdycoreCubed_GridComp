@@ -367,6 +367,8 @@ contains
       VERIFY_(STATUS)
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'AGCM_LM:', default= 72, RC=STATUS )
       VERIFY_(STATUS)
+      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%stretch_fac, 'AGCM.STRETCH_FACTOR:', default=1.0, RC=STATUS )
+      VERIFY_(STATUS)
 ! FV likes npx;npy in terms of cell vertices
       if (FV_Atm(1)%flagstruct%npy == 6*FV_Atm(1)%flagstruct%npx) then
          FV_Atm(1)%flagstruct%ntiles = 6
@@ -544,35 +546,51 @@ contains
    if (FV_Atm(1)%flagstruct%ntiles == 6) then
      ! Cubed-sphere grid resolution and DT dependence 
      !              based on ideal remapping DT
-      if (FV_Atm(1)%flagstruct%npx >= 12) then
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 12) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 24) then
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 24) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 48) then
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0  )
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 90) then
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 180) then
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 360) then
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 720) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 112.5   )
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 75.0    )
+          else
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 112.5   )
+          endif
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 1440) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0   )
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 37.5    )
+          else
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 75.0    )
+          endif
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 2880) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5   )
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 18.75   )
+          else
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 37.5    )
+          endif
       endif
-      if (FV_Atm(1)%flagstruct%npx >= 5760) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75  )
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 9.375   )
+          else
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 18.75   )
+          endif
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       FV_Atm(1)%flagstruct%fv_sg_adj = DT
@@ -603,22 +621,22 @@ contains
          FV_Atm(1)%flagstruct%vtdm4 = 0.01
      ! continue to adjust vorticity damping with
      ! increasing resolution
-         if (FV_Atm(1)%flagstruct%npx >= 180) then
+         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
-         if (FV_Atm(1)%flagstruct%npx >= 360) then
+         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.02
          endif
-         if (FV_Atm(1)%flagstruct%npx >= 720) then
+         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.03
          endif
-         if (FV_Atm(1)%flagstruct%npx >= 1440) then
+         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.04
          endif
-         if (FV_Atm(1)%flagstruct%npx >= 2880) then
+         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.06
          endif
-         if (FV_Atm(1)%flagstruct%npx >= 5760) then
+         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.08
          endif
       endif
@@ -673,6 +691,8 @@ contains
 
   call WRITE_PARALLEL((/FV_Atm(1)%flagstruct%npx,FV_Atm(1)%flagstruct%npy,FV_Atm(1)%flagstruct%npz/)       , &
     format='("Resolution of dynamics restart     =",3I5)'  )
+  call WRITE_PARALLEL((/FV_Atm(1)%flagstruct%stretch_fac/)       , &
+    format='("                 stretch_fac       =",F10.4)'  )
 
   FV_HYDROSTATIC = FV_Atm(1)%flagstruct%hydrostatic
   DEBUG          = FV_Atm(1)%flagstruct%fv_debug
