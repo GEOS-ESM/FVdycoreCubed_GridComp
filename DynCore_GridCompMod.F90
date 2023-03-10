@@ -34,14 +34,15 @@
                            DynInit         => FV_InitState,          &
                            DynRun          => FV_Run,                &
                            DynFinalize     => FV_Finalize,           &
-                           getAgridWinds   => INTERP_DGRID_TO_AGRID, &
+                           getAllWinds     => fv_getAllWinds,        &
+#if defined(__GFORTRAN__)
+                           getVorticity    => fv_getVorticity,       &
+                           getDivergence   => fv_getDivergence,      &
+#endif
                            fillMassFluxes  => fv_fillMassFluxes,     &
                            computeMassFluxes => fv_computeMassFluxes,&
                            getVerticalMassFlux => fv_getVerticalMassFlux,&
                            getOmega        => fv_getOmega,           &
-                           getPK           => fv_getPK,              &
-                           getVorticity    => fv_getVorticity,       &
-                           getDivergence   => fv_getdivergence,      &
                            getEPV          => fv_getEPV,             &
                            getPKZ          => fv_getPKZ,             &
                            getDELZ         => fv_getDELZ,            &
@@ -480,6 +481,16 @@ contains
          DIMS       = MAPL_DimsHorzOnly,                           &
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
     VERIFY_(STATUS)
+
+     call MAPL_AddImportSpec(GC,                             &
+        SHORT_NAME         = 'VARFLT',                            &
+        LONG_NAME          = 'variance_of_filtered_topography',   &
+        UNITS              = 'm+2',                               &
+        DIMS               = MAPL_DimsHorzOnly,                   &
+        VLOCATION          = MAPL_VLocationNone,                  &
+        RESTART    = MAPL_RestartSkip,                            &
+                                                       RC=STATUS  )
+     VERIFY_(STATUS)
 
     call MAPL_AddImportSpec( gc,                              &
         SHORT_NAME = 'TRADV',                                        &
@@ -1068,6 +1079,74 @@ contains
      VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                       &
+         SHORT_NAME = 'DUDTSUBZ',                                        &
+         LONG_NAME  = 'tendency_of_eastward_wind_due_to_subgrid_dz',      &
+         UNITS      = 'm/s/s',                                      &
+         DIMS       = MAPL_DimsHorzVert,                                &
+         FIELD_TYPE = MAPL_VectorField,                                 &
+         VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                       &
+         SHORT_NAME = 'DVDTSUBZ',                                        &
+         LONG_NAME  = 'tendency_of_northward_wind_due_to_subgrid_dz',     &
+         UNITS      = 'm/s/s',                                      &
+         DIMS       = MAPL_DimsHorzVert,                                &
+         FIELD_TYPE = MAPL_VectorField,                                 &
+         VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                       &
+         SHORT_NAME = 'DTDTSUBZ',                                        &
+         LONG_NAME  = 'tendency_of_air_temperature_due_to_subgrid_dz',    &
+         UNITS      = 'K s-1',                                        &
+         DIMS       = MAPL_DimsHorzVert,                                &
+         VLOCATION  = MAPL_VLocationCenter,                RC=STATUS    )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                       &
+         SHORT_NAME = 'DWDTSUBZ',                                        &
+         LONG_NAME  = 'tendency_of_vertical_velocity_due_to_subgrid_dz',     &
+         UNITS      = 'm/s/s',                                      &
+         DIMS       = MAPL_DimsHorzVert,                                &
+         VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DTDT_RAY',                                  &
+        LONG_NAME  = 'air_temperature_tendency_due_to_Rayleigh_friction',        &
+        UNITS      = 'K s-1',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DUDT_RAY',                                  &
+        LONG_NAME  = 'tendency_of_eastward_wind_due_to_Rayleigh_friction',       &
+        UNITS      = 'm s-2',                                     &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        FIELD_TYPE = MAPL_VectorField,                                 &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DVDT_RAY',                                  &
+        LONG_NAME  = 'tendency_of_northward_wind_due_to_Rayleigh_friction',      &
+        UNITS      = 'm s-2',                                     &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        FIELD_TYPE = MAPL_VectorField,                                 &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DWDT_RAY',                                  &
+        LONG_NAME  = 'vertical_velocity_tendency_due_to_Rayleigh_friction',        &
+        UNITS      = 'm/s/s',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                       &
          SHORT_NAME = 'DUDTANA',                                        &
          LONG_NAME  = 'tendency_of_eastward_wind_due_to_analysis',      &
          UNITS      = 'm/s/s',                                      &
@@ -1283,6 +1362,14 @@ contains
        SHORT_NAME         = 'TROPP_BLENDED',                                             &
        LONG_NAME          = 'tropopause_pressure_based_on_blended_estimate',             &
        UNITS              = 'Pa',                                                        &
+       DIMS               = MAPL_DimsHorzOnly,                                           &
+       VLOCATION          = MAPL_VLocationNone,                                RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                                        &
+       SHORT_NAME         = 'TROPK_BLENDED',                                             &
+       LONG_NAME          = 'tropopause_index_based_on_blended_estimate',             &
+       UNITS              = 'unitless',                                                  &
        DIMS               = MAPL_DimsHorzOnly,                                           &
        VLOCATION          = MAPL_VLocationNone,                                RC=STATUS )
     VERIFY_(STATUS)
@@ -1591,6 +1678,7 @@ contains
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
      VERIFY_(STATUS)
 
+#ifdef SKIP_TRACERS
      do ntracer=1,ntracers
         do nlev=1,nlevs
            write(myTracer, "('Q',i5.5,'_',i3.3)") ntracer-1, plevs(nlev)
@@ -1611,6 +1699,7 @@ contains
              VLOCATION  = MAPL_VLocationCenter,               RC=STATUS  )
         VERIFY_(STATUS)
      enddo
+#endif
 
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'UH25',                                      &
@@ -2255,25 +2344,31 @@ contains
 ! Set the Profiling timers
 ! ------------------------
 
-    call MAPL_TimerAdd(GC,    name="INITIALIZE"  ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="INITIALIZE"    ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="RUN"         ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="RUN"           ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="RUN2"        ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="RUN2"          ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="-DYN_INIT"    ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="-DYN_INIT"     ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="--FMS_INIT"  ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="--FMS_INIT"    ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="--FV_INIT"  ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="--FV_INIT"     ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="-DYN_CORE"   ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="-DYN_ANA"      ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="--FV_DYNAMICS",RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="-DYN_PROLOGUE" ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="--MASS_FIX"  ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="-DYN_CORE"     ,RC=STATUS)
     VERIFY_(STATUS)
-    call MAPL_TimerAdd(GC,    name="FINALIZE"    ,RC=STATUS)
+    call MAPL_TimerAdd(GC,    name="-DYN_EPILOGUE" ,RC=STATUS)
+    VERIFY_(STATUS)
+    call MAPL_TimerAdd(GC,    name="--FV_DYNAMICS" ,RC=STATUS)
+    VERIFY_(STATUS)
+    call MAPL_TimerAdd(GC,    name="--MASS_FIX"    ,RC=STATUS)
+    VERIFY_(STATUS)
+    call MAPL_TimerAdd(GC,    name="FINALIZE"      ,RC=STATUS)
     VERIFY_(STATUS)
 
 ! Register services for this component
@@ -2296,8 +2391,7 @@ contains
     VERIFY_(STATUS)
     call MAPL_GetResource ( MAPL, LAYOUT_FILE, 'LAYOUT:', default='fvcore_layout.rc', rc=status )
     VERIFY_(STATUS)
-    call DynSetup(GC, LAYOUT_FILE, RC=STATUS)
-    VERIFY_(STATUS)
+    call DynSetup(GC, LAYOUT_FILE)
 
 ! Register prototype of cubed sphere grid and associated regridders
 !------------------------------------------------------------------
@@ -2365,8 +2459,8 @@ contains
   real(r8), pointer                  ::  pt(:,:,:)
   real(r8), pointer                  ::  pk(:,:,:)
 
-  real(r8), allocatable              ::  ua(:,:,:)
-  real(r8), allocatable              ::  va(:,:,:)
+  real(r8), allocatable              ::  ur(:,:,:)
+  real(r8), allocatable              ::  vr(:,:,:)
 
   real(r4), pointer                  :: ple(:,:,:)
   real(r4), pointer                  ::   u(:,:,:)
@@ -2385,7 +2479,8 @@ contains
 
   type (ESMF_State)                  :: INTERNAL
   type (DynGrid),  pointer           :: DycoreGrid
-  real(r4), pointer                      :: temp2d(:,:)
+
+  real, pointer                      :: temp2d(:,:)
 
   integer                            :: ifirst
   integer                            :: ilast
@@ -2455,7 +2550,7 @@ contains
     VERIFY_(STATUS)
 
     call MAPL_TimerOn(MAPL,"-DYN_INIT")
-    call DynInit ( STATE, CLOCK, INTERNAL, IMPORT, GC, RC=status)
+    call DynInit ( STATE, CLOCK, INTERNAL, IMPORT, GC, status)
     VERIFY_(STATUS)
     call MAPL_TimerOff(MAPL,"-DYN_INIT")
 
@@ -2506,18 +2601,18 @@ contains
     jlast  = state%grid%je
     km     = state%grid%npz
 
-    allocate( UA(ifirst:ilast,jfirst:jlast,km) )
-    allocate( VA(ifirst:ilast,jfirst:jlast,km) )
+    allocate( UR(ifirst:ilast,jfirst:jlast,km) )
+    allocate( VR(ifirst:ilast,jfirst:jlast,km) )
 
-    call getAgridWinds( UD, VD, UA, VA, rotate=.true.)
+    call getAllWinds( UD, VD, UR=UR, VR=VR)
 
-      U = UA
-      V = VA
+      U = UR
+      V = VR
       T = PT*PK
     PLE = PE
 
-    deallocate( UA )
-    deallocate( VA )
+    deallocate( UR )
+    deallocate( VR )
 
 ! Fill Grid-Cell Area Delta-X/Y
 ! -----------------------------
@@ -2682,14 +2777,15 @@ subroutine Run(gc, import, export, clock, rc)
     integer  :: NKE, NPHI
     integer  :: NUMVARS
     integer  :: ifirstxy, ilastxy, jfirstxy, jlastxy
-    integer  :: K, L, n
+    integer  :: kend, i, j, K, L, n
     integer  :: im_replay,jm_replay
     logical, parameter :: convt = .false. ! Until this is run with full physics
-    logical  :: is_ringing
+    logical  :: is_shutoff, is_ringing
 
     real(r8),     pointer :: phisxy(:,:)
     real(kind=4), pointer ::   phis(:,:)
 
+    real(r8), allocatable ::    plk(:,:,:) ! pl**kappa
     real(r8), allocatable ::   pkxy(:,:,:) ! pe**kappa
     real(r8), allocatable ::    pe0(:,:,:) ! edge-level pressure before dynamics
     real(r8), allocatable ::    pe1(:,:,:) ! edge-level pressure after dynamics
@@ -2701,6 +2797,8 @@ subroutine Run(gc, import, export, clock, rc)
     real(r8), allocatable ::     vc(:,:,:) ! temporary array
     real(r8), allocatable ::    uc0(:,:,:) ! temporary array
     real(r8), allocatable ::    vc0(:,:,:) ! temporary array
+    real(r8), allocatable ::     ur(:,:,:) ! temporary array
+    real(r8), allocatable ::     vr(:,:,:) ! temporary array
     real(r8), allocatable ::     qv(:,:,:) ! temporary array
     real(r8), allocatable ::     ql(:,:,:) ! temporary array
     real(r8), allocatable ::     qi(:,:,:) ! temporary array
@@ -2715,11 +2813,11 @@ subroutine Run(gc, import, export, clock, rc)
     real(r8), allocatable ::  qrold(:,:,:) ! temporary array
     real(r8), allocatable ::  qsold(:,:,:) ! temporary array
     real(r8), allocatable ::  qgold(:,:,:) ! temporary array
+    real(r8), allocatable ::delpold(:,:,:) ! temporary array
     real(r8), allocatable ::     ox(:,:,:) ! temporary array
     real(r8), allocatable ::     zl(:,:,:) ! temporary array
     real(r8), allocatable ::    zle(:,:,:) ! temporary array
     real(r8), allocatable ::   delp(:,:,:) ! temporary array
-    real(r8), allocatable ::delpold(:,:,:) ! temporary array
     real(r8), allocatable ::   dudt(:,:,:) ! temporary array
     real(r8), allocatable ::   dvdt(:,:,:) ! temporary array
     real(r8), allocatable ::   dtdt(:,:,:) ! temporary array
@@ -2728,17 +2826,12 @@ subroutine Run(gc, import, export, clock, rc)
     real(r8), allocatable ::  ddpdt(:,:,:) ! temporary array
     real(r8), allocatable ::  dpedt(:,:,:) ! temporary array
     real(FVPRC), allocatable :: tmp3d (:,:,:) ! temporary array
+    real(FVPRC), allocatable ::  vort (:,:,:) ! temporary array
+    real(FVPRC), allocatable ::  divg (:,:,:) ! temporary array
     real(r8), allocatable ::     dmdt(:,:) ! temporary array
-    real(r8), allocatable ::   tmp2d (:,:) ! temporary array
-    real(r8), allocatable ::    gze(:,:,:) ! temporary array
 
-    real(r8), allocatable, target :: ke    (:,:,:) ! Kinetic    Energy
-    real(r8), allocatable, target :: cpt   (:,:,:) ! Internal   Energy
-    real(r8), allocatable, target :: phi   (:,:,:) ! Potential  Energy
     real(r8), allocatable :: qsum1 (:,:)   ! Vertically Integrated Variable
     real(r4), allocatable :: qsum2 (:,:)   ! Vertically Integrated Variable
-
-    real(r8), allocatable :: phi00 (:,:)   ! Vertically Integrated phi
 
     real(r8), allocatable :: penrg (:,:)   ! Vertically Integrated Cp*T
     real(r8), allocatable :: kenrg (:,:)   ! Vertically Integrated K
@@ -2750,32 +2843,6 @@ subroutine Run(gc, import, export, clock, rc)
     real(r8), allocatable :: pedyn (:,:)
     real(r8), allocatable :: tedyn (:,:)
 
-#ifdef ENERGETICS
-    real(r8), allocatable :: penrga (:,:)  ! Vertically Integrated Cp*T
-    real(r8), allocatable :: kenrga (:,:)  ! Vertically Integrated K
-    real(r8), allocatable :: tenrga (:,:)  ! PHIS*(Psurf-Ptop)
-    real(r8), allocatable :: penrgb (:,:)  ! Vertically Integrated Cp*T
-    real(r8), allocatable :: kenrgb (:,:)  ! Vertically Integrated K
-    real(r8), allocatable :: tenrgb (:,:)  ! PHIS*(Psurf-Ptop)
-    real(r8), allocatable :: kehot  (:,:)  ! Vertically Integrated K due to higher-order-terms
-    real(r8), allocatable :: kedp   (:,:)  ! Vertically Integrated K due to pressure change
-    real(r8), allocatable :: keadv  (:,:)  ! Vertically Integrated K due to advection
-    real(r8), allocatable :: kepg   (:,:)  ! Vertically Integrated K due to pressure gradient
-    real(r8), allocatable :: kegen  (:,:)
-    real(r8), allocatable :: kecdcor(:,:)
-    real(r8), allocatable :: pecdcor(:,:)
-    real(r8), allocatable :: tecdcor(:,:)
-    real(r8), allocatable :: keremap(:,:)
-    real(r8), allocatable :: peremap(:,:)
-    real(r8), allocatable :: teremap(:,:)
-    real(r8), allocatable :: convke (:,:)
-    real(r8), allocatable :: convcpt(:,:)
-    real(r8), allocatable :: convphi(:,:)
-    real(r8), allocatable :: convthv(:,:)
-#endif
-
-    real(r8),     allocatable :: dthdtremap  (:,:)   ! Vertically Integrated THV tendency due to vertical remapping
-    real(r8),     allocatable :: dthdtconsv  (:,:)   ! Vertically Integrated THV tendency due to TE conservation
     real(kind=4), allocatable :: dqvdtanaint1(:,:)
     real(kind=4), allocatable :: dqvdtanaint2(:,:)
     real(kind=4), allocatable :: dqldtanaint1(:,:)
@@ -2787,17 +2854,13 @@ subroutine Run(gc, import, export, clock, rc)
     real(kind=4), allocatable :: dthdtanaint1(:,:)
     real(kind=4), allocatable :: dthdtanaint2(:,:)
 
-    real(kind=4), allocatable :: dummy (:,:,:) ! Dummy 3-D  Variable
     real(kind=4), allocatable :: tropp1(:,:)   ! Tropopause Pressure
     real(kind=4), allocatable :: tropp2(:,:)   ! Tropopause Pressure
     real(kind=4), allocatable :: tropp3(:,:)   ! Tropopause Pressure
     real(kind=4), allocatable :: tropt (:,:)   ! Tropopause Temperature
     real(kind=4), allocatable :: tropq (:,:)   ! Tropopause Specific Humidity
 
-    real(r8), allocatable :: pelnxz(:,:,:) ! log pressure (pe) at layer edges
     real(r8), allocatable :: omaxyz(:,:,:) ! vertical pressure velocity (pa/sec)
-    real(r8), allocatable :: cptxyz(:,:,:) ! Cp*Tv
-    real(r8), allocatable :: thvxyz(:,:,:) ! Thetav
     real(r8), allocatable :: epvxyz(:,:,:) ! ertel's potential vorticity
 
     real(r8), allocatable :: cxxyz(:,:,:)  ! Accumulated eastward courant numbers
@@ -2873,11 +2936,10 @@ subroutine Run(gc, import, export, clock, rc)
     integer nx_ana, ny_ana
 
     logical, save                       :: firstime=.true.
-    integer, save                       :: nq_saved = 0
     logical                             :: adjustTracers
     type(ESMF_Alarm)                    :: predictorAlarm
     type(ESMF_Grid)                     :: bgrid
-    integer                             :: j,pos
+    integer                             :: pos
     integer                             :: nqt
     logical                             :: tend
     logical                             :: exclude
@@ -2888,6 +2950,9 @@ subroutine Run(gc, import, export, clock, rc)
     character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
     integer, parameter                  :: XLIST_MAX = 60
     logical                             :: isPresent
+
+    logical                             :: doEnergetics
+    logical                             :: doTropvars
 
   Iam = "Run"
   call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
@@ -2939,12 +3004,9 @@ subroutine Run(gc, import, export, clock, rc)
   is_ringing = ESMF_AlarmIsRinging( STATE%ALARMS(TIME_TO_RUN),rc=status); VERIFY_(status)
   if (.not. is_ringing) return
 
-
 ! Allocate Arrays
 ! ---------------
-      ALLOCATE(  dummy(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(   delp(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(delpold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(   dudt(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(   dvdt(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(   dtdt(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
@@ -2962,32 +3024,35 @@ subroutine Run(gc, import, export, clock, rc)
       ALLOCATE(     vc(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(    uc0(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(    vc0(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+      ALLOCATE(     ur(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+      ALLOCATE(     vr(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(     qv(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(     ql(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(     qi(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(     qr(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(     qs(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(     qg(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(  qdnew(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(  qdold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(  qvold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(  qlold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(  qiold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(  qrold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(  qsold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(  qgold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
       ALLOCATE(     ox(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-
-      ALLOCATE(     ke(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(    cpt(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(    phi(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(    gze(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
 
       ALLOCATE(  qsum1(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
       ALLOCATE(  qsum2(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
 
       ALLOCATE(   dmdt(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
-      ALLOCATE(  phi00(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
+
+      doEnergetics=.false.
+      call MAPL_GetPointer(export,temp2D,'KEANA',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doEnergetics=.true.
+      call MAPL_GetPointer(export,temp2D,'PEANA',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doEnergetics=.true.
+      call MAPL_GetPointer(export,temp2D,'TEANA',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doEnergetics=.true.
+      call MAPL_GetPointer(export,temp2D,'KEDYN',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doEnergetics=.true.
+      call MAPL_GetPointer(export,temp2D,'PEDYN',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doEnergetics=.true.
+      call MAPL_GetPointer(export,temp2D,'TEDYN',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doEnergetics=.true.
+      if (doEnergetics) then
       ALLOCATE(  kedyn(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
       ALLOCATE(  pedyn(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
       ALLOCATE(  tedyn(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
@@ -2997,61 +3062,19 @@ subroutine Run(gc, import, export, clock, rc)
       ALLOCATE( kenrg0(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
       ALLOCATE( penrg0(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
       ALLOCATE( tenrg0(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
+      endif
 
-#ifdef ENERGETICS
-      ALLOCATE( kenrga (ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( penrga (ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( tenrga (ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( kenrgb (ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( penrgb (ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( tenrgb (ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( kepg   (ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( keadv  (ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( kedp   (ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( kehot  (ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( kegen  (ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( kecdcor(ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( pecdcor(ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( tecdcor(ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( keremap(ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( peremap(ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( teremap(ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( convke (ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( convcpt(ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( convphi(ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-      ALLOCATE( convthv(ifirstxy:ilastxy,jfirstxy:jlastxy)   )
-#endif
-
-      ALLOCATE( tropp1      (ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( tropp2      (ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( tropp3      (ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( tropt       (ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( tropq       (ifirstxy:ilastxy,jfirstxy:jlastxy) )
+      ALLOCATE(   vort(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+      ALLOCATE(   divg(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
 
       ALLOCATE(  tmp3d(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE( dqvdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( dqvdtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( dqldtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( dqldtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( dqidtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( dqidtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( doxdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( doxdtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( dthdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( dthdtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( dthdtremap  (ifirstxy:ilastxy,jfirstxy:jlastxy) )
-      ALLOCATE( dthdtconsv  (ifirstxy:ilastxy,jfirstxy:jlastxy) )
 
-      ALLOCATE( pelnxz   (ifirstxy:ilastxy,km+1,jfirstxy:jlastxy) )
-
-      ALLOCATE(  tmp2d   (ifirstxy:ilastxy,jfirstxy:jlastxy     ) )
       ALLOCATE( phisxy   (ifirstxy:ilastxy,jfirstxy:jlastxy     ) )
+      ALLOCATE(    plk   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE(   pkxy   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
       ALLOCATE(     zl   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE(    zle   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
       ALLOCATE( omaxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
-      ALLOCATE( cptxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
-      ALLOCATE( thvxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE( epvxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE(  cxxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE(  cyxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
@@ -3215,19 +3238,6 @@ subroutine Run(gc, import, export, clock, rc)
 !---------------------------------------------------------------------
       call PULL_Q ( STATE, IMPORT, qqq, NXQ, RC=rc )
 
-! Report total number and names of advected tracers
-!--------------------------------------------------
-      if (STATE%GRID%NQ > 0) then
-        if (STATE%GRID%NQ /= NQ_SAVED) then
-           NQ_SAVED = STATE%GRID%NQ
-           write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", STATE%GRID%NQ, " tracers:"
-           call WRITE_PARALLEL( trim(STRING)   )
-           do k=1,STATE%GRID%NQ
-              call WRITE_PARALLEL( trim(STATE%VARS%TRACER(k)%TNAME) )
-           end do
-        end if
-      endif
-
 !-----------------------------
 ! end of fewer_tracers-section
 !-----------------------------
@@ -3241,6 +3251,14 @@ subroutine Run(gc, import, export, clock, rc)
          end if
       end do
 
+! WMP Begin REPLAY/ANA section
+      call MAPL_TimerOn(MAPL,"-DYN_ANA")
+      call ESMF_ClockGetAlarm(Clock,'ReplayShutOff',Alarm,rc=Status)
+      VERIFY_(status)
+      is_shutoff = ESMF_AlarmIsRinging( Alarm,rc=Status)
+      VERIFY_(status)
+
+      if (.not. is_shutoff) then
 ! If requested, do Intermittent Replay
 !-------------------------------------
 
@@ -3426,6 +3444,16 @@ subroutine Run(gc, import, export, clock, rc)
 ! Diagnostics Before Analysis Increments are Added
 !-------------------------------------------------
 
+      ALLOCATE(delpold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+      ALLOCATE(  qdnew(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+      ALLOCATE(  qdold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+      ALLOCATE(  qvold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+      ALLOCATE(  qlold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+      ALLOCATE(  qiold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+      ALLOCATE(  qrold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+      ALLOCATE(  qsold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+      ALLOCATE(  qgold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+
       call MAPL_GetPointer ( IMPORT, dqvana, 'DQVANA', RC=STATUS )   ! Get QV Increment from Analysis
       VERIFY_(STATUS)
       call MAPL_GetPointer ( IMPORT, dqlana, 'DQLANA', RC=STATUS )   ! Get QL Increment from Analysis
@@ -3494,25 +3522,26 @@ subroutine Run(gc, import, export, clock, rc)
 
 !! Get A-grid winds
 !! ----------------
-      call getAgridWinds(vars%u, vars%v, ua, va, rotate=.true.)
+      call getAllWinds(vars%u, vars%v, UR=ur, VR=vr)
 
       delp   = vars%pe(:,:,2:)  -vars%pe(:,:,:km)   ! Pressure Thickness
       dmdt   = vars%pe(:,:,km+1)-vars%pe(:,:,1)     ! Psurf-Ptop
       tempxy = vars%pt * (1.0+eps*(qv-dqvana))       ! Compute THV Before Analysis Update
 
-      call Energetics (ua,va,tempxy,vars%pe,delp,vars%pkz,phisxy,kenrg,penrg,tenrg)
+      if (doEnergetics) &
+      call Energetics (ur,vr,tempxy,vars%pe,delp,vars%pkz,phisxy,kenrg,penrg,tenrg)
 
 ! DUDTANA
 ! -------
       call MAPL_GetPointer ( export, dudtana, 'DUDTANA', rc=status )
       VERIFY_(STATUS)
-      if( associated(dudtana) ) dudtana = ua
+      if( associated(dudtana) ) dudtana = ur
 
 ! DVDTANA
 ! -------
       call MAPL_GetPointer ( export, dvdtana, 'DVDTANA', rc=status )
       VERIFY_(STATUS)
-      if( associated(dvdtana) ) dvdtana = va
+      if( associated(dvdtana) ) dvdtana = vr
 
 ! DTDTANA
 ! -------
@@ -3532,6 +3561,8 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if( associated(temp2D) ) then
           tempxy       = vars%pt*(1+eps*(qv-dqvana))   ! Set tempxy = TH*QVold (Before Analysis Update)
+          ALLOCATE( dthdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+          ALLOCATE( dthdtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
           dthdtanaint1 = 0.0
           do k=1,km
           dthdtanaint1 = dthdtanaint1 + tempxy(:,:,k)*delp(:,:,k)
@@ -3543,6 +3574,8 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer ( export, temp2D, 'DQVDTANAINT', rc=status )
       VERIFY_(STATUS)
       if( associated(temp2D) ) then
+          ALLOCATE( dqvdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+          ALLOCATE( dqvdtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
           tempxy       = qv-dqvana   ! Set tempxy = QVold (Before Analysis Update)
           dqvdtanaint1 = 0.0
           do k=1,km
@@ -3555,6 +3588,8 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer ( export, temp2D, 'DQLDTANAINT', rc=status )
       VERIFY_(STATUS)
       if( associated(temp2D) ) then
+          ALLOCATE( dqldtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+          ALLOCATE( dqldtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
           dqldtanaint1 = 0.0
           do N = 1,size(names)
              if( trim(names(N)).eq.'QLCN' .or. &
@@ -3578,6 +3613,8 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer ( export, temp2D, 'DQIDTANAINT', rc=status )
       VERIFY_(STATUS)
       if( associated(temp2D) ) then
+          ALLOCATE( dqidtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+          ALLOCATE( dqidtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
           dqidtanaint1 = 0.0
           do N = 1,size(names)
              if( trim(names(N)).eq.'QICN' .or. &
@@ -3601,6 +3638,8 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer ( export, temp2D, 'DOXDTANAINT', rc=status )
       VERIFY_(STATUS)
       if( associated(temp2D) ) then
+          ALLOCATE( doxdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+          ALLOCATE( doxdtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
           tempxy       = OX-doxana   ! Set tempxy = OXold (Before Analysis Update)
           doxdtanaint1 = 0.0
           do k=1,km
@@ -3611,7 +3650,7 @@ subroutine Run(gc, import, export, clock, rc)
 ! Add Diabatic Forcing from Analysis to State Variables
 ! -----------------------------------------------------
 
-      if (vars%nwat == 6) then
+      if (vars%nwat >= 6) then
         QDOLD = 1.0 - (QVOLD+QLOLD+QIOLD+QROLD+QSOLD+QGOLD)
         QDNEW = 1.0 - (QV   +QL   +QI   +QR   +QS   +QG   )
       else
@@ -3793,7 +3832,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if( associated(temp2D) ) temp2D = ( (vars%pe(:,:,km+1)-vars%pe(:,:,1)) - dmdt )/(grav*dt)
 
-      call getAgridWinds(vars%u, vars%v, ua, va, rotate=.true.)
+      call getAllWinds(vars%u, vars%v, UC=uc0, VC=vc0, UR=ur, VR=vr)
 
       dmdt = vars%pe(:,:,km+1)-vars%pe(:,:,1)     ! Psurf-Ptop
 
@@ -3802,8 +3841,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer ( export, dudtana, 'DUDTANA', rc=status )
       VERIFY_(STATUS)
       if( associated(dudtana) ) then
-                     dummy   =  ua
-                     dudtana = (dummy-dudtana)/dt
+                     dudtana = (ur-dudtana)/dt
       endif
 
 ! DVDTANA
@@ -3811,8 +3849,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer ( export, dvdtana, 'DVDTANA', rc=status )
       VERIFY_(STATUS)
       if( associated(dvdtana) ) then
-                     dummy   =  va
-                     dvdtana = (dummy-dvdtana)/dt
+                     dvdtana = (vr-dvdtana)/dt
       endif
 
 ! DTDTANA
@@ -3820,8 +3857,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer ( export, dtdtana, 'DTDTANA', rc=status )
       VERIFY_(STATUS)
       if( associated(dtdtana) ) then
-                     dummy   =  vars%pt*vars%pkz
-                     dtdtana = (dummy-dtdtana)/dt
+                     dtdtana = ((vars%pt*vars%pkz)-dtdtana)/dt
       endif
 
 ! DDELPDTANA
@@ -3829,8 +3865,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer ( export, ddpdtana, 'DDELPDTANA', rc=status )
       VERIFY_(STATUS)
       if( associated(ddpdtana) ) then
-                     dummy    =  delp
-                     ddpdtana = (dummy-ddpdtana)/dt
+                     ddpdtana = (delp-ddpdtana)/dt
       endif
 
 ! DTHVDTANAINT
@@ -3844,6 +3879,8 @@ subroutine Run(gc, import, export, clock, rc)
           dthdtanaint2 = dthdtanaint2 + tempxy(:,:,k)*delp(:,:,k)
           enddo
           temp2D       = (dthdtanaint2-dthdtanaint1) * MAPL_P00**MAPL_KAPPA / (MAPL_GRAV*DT)
+          DEALLOCATE( dthdtanaint1 )
+          DEALLOCATE( dthdtanaint2 )
       endif
 
 ! DQVDTANAINT
@@ -3857,6 +3894,8 @@ subroutine Run(gc, import, export, clock, rc)
           dqvdtanaint2 = dqvdtanaint2 + tempxy(:,:,k)*delp(:,:,k)
           enddo
           temp2D       = (dqvdtanaint2-dqvdtanaint1) / (MAPL_GRAV*DT)
+          DEALLOCATE( dqvdtanaint1 )
+          DEALLOCATE( dqvdtanaint2 )
       endif
 
 ! DQLDTANAINT
@@ -3878,6 +3917,8 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
           temp2D = (dqldtanaint2-dqldtanaint1) / (MAPL_GRAV*DT)
+          DEALLOCATE( dqldtanaint1 )
+          DEALLOCATE( dqldtanaint2 )
       endif
 
 ! DQIDTANAINT
@@ -3899,6 +3940,8 @@ subroutine Run(gc, import, export, clock, rc)
              endif
           enddo
           temp2D = (dqidtanaint2-dqidtanaint1) / (MAPL_GRAV*DT)
+          DEALLOCATE( dqidtanaint1 )
+          DEALLOCATE( dqidtanaint2 )
       endif
 
 ! DOXDTANAINT
@@ -3912,8 +3955,68 @@ subroutine Run(gc, import, export, clock, rc)
           doxdtanaint2 = doxdtanaint2 + tempxy(:,:,k)*delp(:,:,k)
           enddo
           temp2D = (doxdtanaint2-doxdtanaint1) * (MAPL_O3MW/MAPL_AIRMW) / (MAPL_GRAV*DT)
+          DEALLOCATE( doxdtanaint1 )
+          DEALLOCATE( doxdtanaint2 )
       endif
 
+      DEALLOCATE( delpold)
+      DEALLOCATE( qdnew  )
+      DEALLOCATE( qdold  )
+      DEALLOCATE( qvold  )
+      DEALLOCATE( qlold  )
+      DEALLOCATE( qiold  )
+      DEALLOCATE( qrold  )
+      DEALLOCATE( qsold  )
+      DEALLOCATE( qgold  )
+
+! WMP End ANA section
+      else ! REPLAY/ANA is_shutoff
+
+      ox = 0.0
+      qv = 0.0
+      if (.not. ADIABATIC) then
+       do k=1,size(names)
+         pos = index(names(k),'::')
+         if(pos > 0) then
+           if( (names(k)(pos+2:))=='OX' ) then
+             if ( (ooo%is_r4) .and. associated(ooo%content_r4) ) then
+                if (size(ox)==size(ooo%content_r4)) then
+                   ox = ooo%content_r4
+                endif
+             elseif (associated(ooo%content)) then
+                if (size(ox)==size(ooo%content)) then
+                   ox = ooo%content
+                endif
+             endif
+           endif
+         endif
+         if( trim(names(k))=='Q'  ) then
+             if ( (qqq%is_r4) .and. associated(qqq%content_r4) ) then
+                if (size(qv)==size(qqq%content_r4)) then
+                   qv = qqq%content_r4
+                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
+                endif
+             elseif (associated(qqq%content)) then
+                if (size(qv)==size(qqq%content)) then
+                   qv = qqq%content
+                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
+                endif
+             endif
+         endif
+       enddo
+      endif
+      call getAllWinds(vars%u, vars%v, UC=uc0, VC=vc0, UR=ur, VR=vr)
+      delp   = vars%pe(:,:,2:)  -vars%pe(:,:,:km)   ! Pressure Thickness
+      dmdt   = vars%pe(:,:,km+1)-vars%pe(:,:,1)     ! Psurf-Ptop
+      tempxy = vars%pt * (1.0+eps*qv)
+      if (doEnergetics) &
+      call Energetics (ur,vr,tempxy,vars%pe,delp,vars%pkz,phisxy,kenrg,penrg,tenrg)
+
+      endif
+      call MAPL_TimerOff(MAPL,"-DYN_ANA")
+
+
+      call MAPL_TimerOn(MAPL,"-DYN_PROLOGUE")
 ! Create FV Thermodynamic Variables
 !----------------------------------
 
@@ -3924,16 +4027,16 @@ subroutine Run(gc, import, export, clock, rc)
 
       dpedt  = vars%pe      ! Edge Pressure      Tendency
       ddpdt  =    delp      ! Pressure Thickness Tendency
-      dudt   =     ua       ! U-Wind on A-Grid   Tendency
-      dvdt   =     va       ! V-Wind on A-Grid   Tendency
+      dudt   =     ur       ! U-Wind on A-Grid   Tendency
+      dvdt   =     vr       ! V-Wind on A-Grid   Tendency
       dtdt   = tempxy       ! Dry Temperature    Tendency
       dqdt   =     qv       ! Specific Humidity  Tendency
       dthdt  = vars%pt*(1.0+eps*qv)*delp
 
       call FILLOUT3 (export,  'QV_DYN_IN',      qv, rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export,   'T_DYN_IN',  tempxy, rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export,   'U_DYN_IN',      ua, rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export,   'V_DYN_IN',      va, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export,   'U_DYN_IN',      ur, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export,   'V_DYN_IN',      vr, rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PLE_DYN_IN', vars%pe, rc=status); VERIFY_(STATUS)
 
 ! Initialize 3-D Tracer Dynamics Tendencies
@@ -4079,46 +4182,14 @@ subroutine Run(gc, import, export, clock, rc)
 
     tempxy = vars%pt * (1.0+eps*qv)       ! Compute THV After Analysis Update
 
-    call Energetics (ua,va,tempxy,vars%pe,delp,vars%pkz,phisxy, kenrg0,penrg0,tenrg0,ke=ke,cpt=cpt,gze=gze)
-
+    if (doEnergetics) then
+    call Energetics (ur,vr,tempxy,vars%pe,delp,vars%pkz,phisxy, kenrg0,penrg0,tenrg0)
     kenrg = (kenrg0-kenrg)/DT
     penrg = (penrg0-penrg)/DT
     tenrg = (tenrg0-tenrg)/DT
-
     call FILLOUT2 (export, 'KEANA', kenrg, rc=status); VERIFY_(STATUS)
     call FILLOUT2 (export, 'PEANA', penrg, rc=status); VERIFY_(STATUS)
     call FILLOUT2 (export, 'TEANA', tenrg, rc=status); VERIFY_(STATUS)
-
-! Add Passive Tracers for KE, CPT, and PHI
-! ----------------------------------------
-    nq = STATE%GRID%NQ
-    if (NXQ /= 0) then
-      NKE  = nq-1
-      NPHI = nq
-      phi00 = 0.0
-      do k=1,km
-       phi(:,:,k) = ( gze(:,:,k+1)*vars%pe(:,:,k+1)-gze(:,:,k)*vars%pe(:,:,k) )/delp(:,:,k) + (1+kappa)*cpt(:,:,k)
-      phi00 = phi00 + phi(:,:,k)*delp(:,:,k)
-      enddo
-      phi00 = phi00 / grav
-      state%vars%tracer(NKE )%content => KE
-      state%vars%tracer(NPHI)%content => PHI
-      state%vars%tracer(NKE )%is_r4 = .false.
-      state%vars%tracer(NPHI)%is_r4 = .false.
-
-          deallocate( NAMES )
-            allocate( NAMES(NQ),STAT=STATUS )
-          VERIFY_(STATUS)
-          NAMES(1:NQ-NXQ) = NAMES0
-          NAMES(NQ-1) = 'KE'
-          NAMES(NQ  ) = 'PHI'
-          deallocate( NAMES0 )
-            allocate( NAMES0(NQ),STAT=STATUS )
-          VERIFY_(STATUS)
-          NAMES0 = NAMES
-    else
-      NKE  = -1
-      NPHI = -1
     endif
 
 ! Call Wrapper (DynRun) for FVDycore
@@ -4131,21 +4202,24 @@ subroutine Run(gc, import, export, clock, rc)
       LCONSV = CONSV.eq.1
       LFILL  =  FILL.eq.1
 
-! Fill c-grid winds and pressures before dynamics export
+! Fill pressures before dynamics export
 !-------------------------------------------------------
-      call getAgridWinds(vars%u, vars%v, ua, va, uc0, vc0)
       pe0=vars%pe
       call FILLOUT3r8 (export, 'PLE0', pe0, rc=status); VERIFY_(STATUS)
+
+      call MAPL_TimerOff(MAPL,"-DYN_PROLOGUE")
+
 !-------------------------------------------------------
 
       call MAPL_TimerOn(MAPL,"-DYN_CORE")
       t1 = MPI_Wtime(status)
-      call DynRun (STATE, CLOCK, GC, RC=STATUS)
+      call DynRun (STATE, EXPORT, CLOCK, GC, RC=STATUS)
       VERIFY_(STATUS)
       t2 = MPI_Wtime(status)
       dyn_run_timer = t2-t1
       call MAPL_TimerOff(MAPL,"-DYN_CORE")
 
+      call MAPL_TimerOn(MAPL,"-DYN_EPILOGUE")
 ! Computational diagnostics
 ! --------------------------
     call MAPL_GetPointer(export,temp2d,'DYNTIMER',rc=status)
@@ -4160,7 +4234,8 @@ subroutine Run(gc, import, export, clock, rc)
   call Write_Profile(grid, vars%u, 'U-after-DynRun')
   call Write_Profile(grid, vars%v, 'V-after-DynRun')
 #endif
-      call getPK ( pkxy )
+      plk  = exp( kappa * log( 0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1)) ) )
+      pkxy = exp( kappa * log( vars%pe ) )
 
 !----------------------------------------------------------------------------
 
@@ -4174,7 +4249,7 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) temp2d =  vars%pe(:,:,km+1)/GRAV
 
-      call getAgridWinds(vars%u, vars%v, ua, va, uc, vc)
+      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
       call FILLOUT3 (export, 'U_DGRID', vars%u  , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'V_DGRID', vars%v  , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'U_CGRID', uc      , rc=status); VERIFY_(STATUS)
@@ -4182,9 +4257,8 @@ subroutine Run(gc, import, export, clock, rc)
       call FILLOUT3 (export, 'U_AGRID', ua      , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'V_AGRID', va      , rc=status); VERIFY_(STATUS)
 
-      call getAgridWinds(vars%u, vars%v, ua, va, rotate=.true.)
-      call FILLOUT3 (export, 'U'      , ua      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'V'      , va      , rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'U'      , ur      , rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'V'      , vr      , rc=status); VERIFY_(STATUS)
 
     else               ! .not. SW_DYNAMICS
 
@@ -4217,7 +4291,6 @@ subroutine Run(gc, import, export, clock, rc)
       end if
 
 ! Compute Dry Theta and T with Unified Poles
-! ------------------------------------------
 
       tempxy  = vars%pt * vars%pkz
 
@@ -4227,10 +4300,22 @@ subroutine Run(gc, import, export, clock, rc)
       delp = ( vars%pe(:,:,2:) - vars%pe(:,:,:km) )
       pl   = ( vars%pe(:,:,2:) + vars%pe(:,:,:km) ) * 0.5
 
+! Get all wind derivatives
+! ------------------------
+#if defined(__GFORTRAN__)
+      ! Note there is a bug with GNU 12.1 and getting vort and divg via
+      ! getAllWinds. The reason is unknown as the getAllWinds code is
+      ! valid Fortran. Until this can be fixed, we use a less-efficient
+      ! workaround
+      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
+      call getVorticity(vars%u, vars%v, vort)
+#else
+      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr, vort=vort, divg=divg)
+#endif
+
 ! Compute absolute vorticity on the D grid
 ! -------------------------------------------------
-      call getVorticity(vars%u, vars%v, tmp3d)
-      call getEPV(vars%pt,tmp3d,ua,va,epvxyz)
+      call getEPV(vars%pt,vort,ua,va,epvxyz)
       call MAPL_GetPointer(export, temp3D, 'EPV', rc=status)
       VERIFY_(STATUS)
       if(associated(temp3d)) temp3d = epvxyz*(p00**kappa)
@@ -4238,6 +4323,26 @@ subroutine Run(gc, import, export, clock, rc)
 ! Compute Tropopause Pressure, Temperature, and Moisture
 ! ------------------------------------------------------
 
+      doTropvars=.false.
+      call MAPL_GetPointer(export,temp2D,'TROPP_THERMAL',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doTropvars=.true.
+      call MAPL_GetPointer(export,temp2D,'TROPP_EPV',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doTropvars=.true.
+      call MAPL_GetPointer(export,temp2D,'TROPP_BLENDED',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doTropvars=.true.
+      call MAPL_GetPointer(export,temp2D,'TROPK_BLENDED',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doTropvars=.true.
+      call MAPL_GetPointer(export,temp2D,'TROPT',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doTropvars=.true.
+      call MAPL_GetPointer(export,temp2D,'TROPQ',rc=status); VERIFY_(STATUS)
+      if(associated(temp2D)) doTropvars=.true.
+
+      if (doTropvars) then
+         ALLOCATE( tropp1 (ifirstxy:ilastxy,jfirstxy:jlastxy) )
+         ALLOCATE( tropp2 (ifirstxy:ilastxy,jfirstxy:jlastxy) )
+         ALLOCATE( tropp3 (ifirstxy:ilastxy,jfirstxy:jlastxy) )
+         ALLOCATE( tropt  (ifirstxy:ilastxy,jfirstxy:jlastxy) )
+         ALLOCATE( tropq  (ifirstxy:ilastxy,jfirstxy:jlastxy) )
          call tropovars ( ilastxy-ifirstxy+1,jlastxy-jfirstxy+1,km, &
                           real(vars%pe            ,kind=4),         &
                           real(pl                 ,kind=4),         &
@@ -4246,29 +4351,57 @@ subroutine Run(gc, import, export, clock, rc)
                           real(epvxyz*(p00**kappa),kind=4),         &
                           tropp1,tropp2,tropp3,tropt,tropq          )
 
-      call MAPL_GetPointer(export,temp2D,'TROPP_THERMAL',rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2D)) temp2D = tropp1
+         ! get blended index
+         call MAPL_GetPointer(export,temp2D,'TROPK_BLENDED',rc=status); VERIFY_(STATUS)
+         if( associated(temp2D) ) then
+            kend = km
+            do j=jfirstxy,jlastxy
+               do i=ifirstxy,ilastxy
+                  if (tropp3(i,j) .NE. MAPL_UNDEF) then
+                      kend = 1
+                      do while (vars%pe(i,j,kend).LE.tropp3(i,j))
+                        kend = kend+1
+                      enddo
+                  else
+                      kend = 1
+                      do while (vars%pe(i,j,kend).LE.40000.0)
+                        kend = kend+1
+                      enddo
+                  endif
+                  temp2D(i-ifirstxy+1,j-jfirstxy+1) = kend
+               enddo
+            enddo
+         endif
 
-      call MAPL_GetPointer(export,temp2D,'TROPP_EPV',rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2D)) temp2D = tropp2
+         call MAPL_GetPointer(export,temp2D,'TROPP_THERMAL',rc=status)
+         VERIFY_(STATUS)
+         if(associated(temp2D)) temp2D = tropp1
 
-      call MAPL_GetPointer(export,temp2D,'TROPP_BLENDED',rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2D)) temp2D = tropp3
+         call MAPL_GetPointer(export,temp2D,'TROPP_EPV',rc=status)
+         VERIFY_(STATUS)
+         if(associated(temp2D)) temp2D = tropp2
 
-      call MAPL_GetPointer(export,temp2D,'TROPT',rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2D)) temp2D = tropt
+         call MAPL_GetPointer(export,temp2D,'TROPP_BLENDED',rc=status)
+         VERIFY_(STATUS)
+         if(associated(temp2D)) temp2D = tropp3
 
-      call MAPL_GetPointer(export,temp2D,'TROPQ',rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2D)) temp2D = tropq
+         call MAPL_GetPointer(export,temp2D,'TROPT',rc=status)
+         VERIFY_(STATUS)
+         if(associated(temp2D)) temp2D = tropt
+
+         call MAPL_GetPointer(export,temp2D,'TROPQ',rc=status)
+         VERIFY_(STATUS)
+         if(associated(temp2D)) temp2D = tropq
+
+         DEALLOCATE( tropp1 )
+         DEALLOCATE( tropp2 )
+         DEALLOCATE( tropp3 )
+         DEALLOCATE( tropt  )
+         DEALLOCATE( tropq  )
+      endif
 
 ! Get Cubed-Sphere Wind Exports
 ! -----------------------------
-      call getAgridWinds(vars%u, vars%v, ua, va, uc, vc)
       call FILLOUT3 (export, 'U_DGRID', vars%u  , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'V_DGRID', vars%v  , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'U_CGRID', uc      , rc=status); VERIFY_(STATUS)
@@ -4276,18 +4409,14 @@ subroutine Run(gc, import, export, clock, rc)
       call FILLOUT3 (export, 'U_AGRID', ua      , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'V_AGRID', va      , rc=status); VERIFY_(STATUS)
 
-! Compute A-Grid Winds
-! --------------------
-      call getAgridWinds(vars%u, vars%v, ua, va, rotate=.true.)
-
 ! Compute Diagnostic Dynamics Tendencies
 !  (Note: initial values of d(m,u,v,T,q)/dt are progs m,u,v,T,q)
 ! --------------------------------------------------------------
 
       dmdt = ( vars%pe(:,:,km+1)-vars%pe(:,:,1) - dmdt )/(grav*dt)
 
-      dudt = (    ua-dudt )/dt
-      dvdt = (    va-dvdt )/dt
+      dudt = (    ur-dudt )/dt
+      dvdt = (    vr-dvdt )/dt
       dtdt = (  tempxy-dtdt )/dt
       dqdt = (      qv-dqdt )/dt
 
@@ -4310,22 +4439,8 @@ subroutine Run(gc, import, export, clock, rc)
       ! Compute time-centered C-Grid Courant Numbers and Mass Fluxes on Cubed Orientation
         uc0 = 0.5*(uc +uc0)
         vc0 = 0.5*(vc +vc0)
-        gze = 0.5*(pe1+pe0)
-
-       ! truncate precision to R4 and back to R8
-       !do k=1,km
-       !  dummy(:,:,1)=R8_TO_R4(  uc0(:,:,k))
-       !    uc0(:,:,k)=R4_TO_R8(dummy(:,:,1))
-       !  dummy(:,:,1)=R8_TO_R4(  vc0(:,:,k))
-       !    vc0(:,:,k)=R4_TO_R8(dummy(:,:,1))
-       !enddo
-       !do k=1,km+1
-       !  dummy(:,:,1)=R8_TO_R4(  gze(:,:,k))
-       !    gze(:,:,k)=R4_TO_R8(dummy(:,:,1))
-       !enddo
-       ! truncate precision to R4 and back to R8
-
-        call computeMassFluxes(uc0, vc0, gze, mfxxyz, mfyxyz, cxxyz, cyxyz, dt)
+        pe0 = 0.5*(pe1+pe0)
+        call computeMassFluxes(uc0, vc0, pe0, mfxxyz, mfyxyz, cxxyz, cyxyz, dt)
         call FILLOUT3r8 (export, 'CX'  , cxxyz  , rc=status); VERIFY_(STATUS)
         call FILLOUT3r8 (export, 'CY'  , cyxyz  , rc=status); VERIFY_(STATUS)
         call FILLOUT3r8 (export, 'MFX' , mfxxyz , rc=status); VERIFY_(STATUS)
@@ -4348,18 +4463,19 @@ subroutine Run(gc, import, export, clock, rc)
       call getVerticalMassFlux(mfxxyz, mfyxyz, mfzxyz, dt)
       call FILLOUT3r8 (export, 'MFZ' , mfzxyz , rc=status); VERIFY_(STATUS)
 
-      call FILLOUT3 (export, 'U'      , ua      , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'V'      , va      , rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'U'      , ur      , rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'V'      , vr      , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'T'      , tempxy  , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'Q'      , qv      , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PL'     , pl      , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PLE'    , vars%pe , rc=status); VERIFY_(STATUS)
-      call FILLOUT3 (export, 'PLK'    , vars%pkz, rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'PLK'    , plk     , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PKE'    , pkxy    , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PT'     , vars%pt , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'PE'     , vars%pe , rc=status); VERIFY_(STATUS)
 
 
+#ifdef SKIP_TRACERS
       do ntracer=1,ntracers
          write(myTracer, "('Q',i5.5)") ntracer-1
          call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
@@ -4372,6 +4488,7 @@ subroutine Run(gc, import, export, clock, rc)
             endif
          endif
       enddo
+#endif
 
       call MAPL_GetPointer(export, temp3D, 'PV', rc=status)
       VERIFY_(STATUS)
@@ -4550,7 +4667,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          temp2d = 0.0
          do k=1,km
-            temp2d = temp2d + ua(:,:,k)*tempxy(:,:,k)*delp(:,:,k)
+            temp2d = temp2d + ur(:,:,k)*tempxy(:,:,k)*delp(:,:,k)
          enddo
          temp2d = temp2d*(cp/grav)
       end if
@@ -4560,7 +4677,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          temp2d = 0.0
          do k=1,km
-            temp2d = temp2d + va(:,:,k)*tempxy(:,:,k)*delp(:,:,k)
+            temp2d = temp2d + vr(:,:,k)*tempxy(:,:,k)*delp(:,:,k)
          enddo
          temp2d = temp2d*(cp/grav)
       end if
@@ -4574,23 +4691,21 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp3d)) temp3d = tempxy
 
-      call Energetics (ua,va,tempxy,vars%pe,delp,vars%pkz,phisxy,kenrg,penrg,tenrg)
-
+      if (doEnergetics) then
+      call Energetics (ur,vr,tempxy,vars%pe,delp,vars%pkz,phisxy,kenrg,penrg,tenrg)
       kedyn   = (kenrg -kenrg0)/DT
       pedyn   = (penrg -penrg0)/DT
       tedyn   = (tenrg -tenrg0)/DT
-
       call MAPL_GetPointer(export,temp2d,'KEDYN',rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) temp2d = kedyn
-
       call MAPL_GetPointer(export,temp2d,'PEDYN',rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) temp2d = pedyn
-
       call MAPL_GetPointer(export,temp2d,'TEDYN',rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) temp2d = tedyn
+      endif
 
 ! Compute/Get Omega
 ! --------------------------
@@ -4607,13 +4722,13 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,tempv,'VKE',rc=status); VERIFY_(STATUS)
 
       if(associated(tempu) .or. associated(tempv)) then
-         ke = 0.5*(ua**2 + va**2)
+         tmp3d = 0.5*(ur**2 + vr**2)
       end if
 
       if(associated(tempu)) then
          tempu = 0.0
          do k=1,km
-            tempu = tempu + ua(:,:,k)*ke(:,:,k)*delp(:,:,k)
+            tempu = tempu + ur(:,:,k)*tmp3d(:,:,k)*delp(:,:,k)
          enddo
          tempu = tempu / grav
       end if
@@ -4621,7 +4736,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(tempv)) then
          tempv = 0.0
          do k=1,km
-            tempv = tempv + va(:,:,k)*ke(:,:,k)*delp(:,:,k)
+            tempv = tempv + vr(:,:,k)*tmp3d(:,:,k)*delp(:,:,k)
          enddo
          tempv = tempv / grav
       end if
@@ -4633,7 +4748,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          temp2d = 0.0
          do k=1,km
-            temp2d = temp2d + ua(:,:,k)*QV(:,:,k)*delp(:,:,k)
+            temp2d = temp2d + ur(:,:,k)*QV(:,:,k)*delp(:,:,k)
          enddo
          temp2d = temp2d / grav
       end if
@@ -4643,7 +4758,7 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) then
          temp2d = 0.0
          do k=1,km
-            temp2d = temp2d + va(:,:,k)*QV(:,:,k)*delp(:,:,k)
+            temp2d = temp2d + vr(:,:,k)*QV(:,:,k)*delp(:,:,k)
          enddo
          temp2d = temp2d / grav
       end if
@@ -4659,9 +4774,9 @@ subroutine Run(gc, import, export, clock, rc)
                  trim(names(n)).eq.'QLLS' ) then
                  do k=1,km
                  if( state%vars%tracer(n)%is_r4 ) then
-                      temp2d = temp2d + ua(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
+                      temp2d = temp2d + ur(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                  else
-                      temp2d = temp2d + ua(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
+                      temp2d = temp2d + ur(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
                  endif
                  enddo
              endif
@@ -4678,9 +4793,9 @@ subroutine Run(gc, import, export, clock, rc)
                  trim(names(n)).eq.'QLLS' ) then
                  do k=1,km
                  if( state%vars%tracer(n)%is_r4 ) then
-                      temp2d = temp2d + va(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
+                      temp2d = temp2d + vr(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                  else
-                      temp2d = temp2d + va(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
+                      temp2d = temp2d + vr(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
                  endif
                  enddo
              endif
@@ -4699,9 +4814,9 @@ subroutine Run(gc, import, export, clock, rc)
                  trim(names(n)).eq.'QILS' ) then
                  do k=1,km
                  if( state%vars%tracer(n)%is_r4 ) then
-                      temp2d = temp2d + ua(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
+                      temp2d = temp2d + ur(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                  else
-                      temp2d = temp2d + ua(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
+                      temp2d = temp2d + ur(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
                  endif
                  enddo
              endif
@@ -4718,9 +4833,9 @@ subroutine Run(gc, import, export, clock, rc)
                  trim(names(n)).eq.'QILS' ) then
                  do k=1,km
                  if( state%vars%tracer(n)%is_r4 ) then
-                      temp2d = temp2d + va(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
+                      temp2d = temp2d + vr(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                  else
-                      temp2d = temp2d + va(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
+                      temp2d = temp2d + vr(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
                  endif
                  enddo
              endif
@@ -4758,14 +4873,14 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(tempu)) then
          tempu = 0.0
          do k=1,km
-            tempu = tempu + ua(:,:,k)*zl(:,:,k)*delp(:,:,k)
+            tempu = tempu + ur(:,:,k)*zl(:,:,k)*delp(:,:,k)
          enddo
       end if
 
       if(associated(tempv)) then
          tempv = 0.0
          do k=1,km
-            tempv = tempv + va(:,:,k)*zl(:,:,k)*delp(:,:,k)
+            tempv = tempv + vr(:,:,k)*zl(:,:,k)*delp(:,:,k)
          enddo
       end if
 
@@ -4793,14 +4908,14 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'US',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,ua,-zle,-HGT_SURFACE, status)
+         call VertInterp(temp2d,ur,-zle,-HGT_SURFACE, status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'VS'   ,rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,va,-zle,-HGT_SURFACE, status)
+         call VertInterp(temp2d,vr,-zle,-HGT_SURFACE, status)
          VERIFY_(STATUS)
       end if
 
@@ -4822,7 +4937,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'SPEED',rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,sqrt(ua**2 + va**2),-zle,-HGT_SURFACE, status)
+         call VertInterp(temp2d,sqrt(ur**2 + vr**2),-zle,-HGT_SURFACE, status)
          VERIFY_(STATUS)
       end if
     else
@@ -4838,11 +4953,11 @@ subroutine Run(gc, import, export, clock, rc)
 
       call MAPL_GetPointer(export,temp2d,'US',  rc=status)
       VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d =       ua(:,:,km)
+      if(associated(temp2d)) temp2d =       ur(:,:,km)
 
       call MAPL_GetPointer(export,temp2d,'VS'   ,rc=status)
       VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d =       va(:,:,km)
+      if(associated(temp2d)) temp2d =       vr(:,:,km)
 
       call MAPL_GetPointer(export,temp2d,'TA'   ,rc=status)
       VERIFY_(STATUS)
@@ -4857,7 +4972,7 @@ subroutine Run(gc, import, export, clock, rc)
 
       call MAPL_GetPointer(export,temp2d,'SPEED',rc=status)
       VERIFY_(STATUS)
-      if(associated(temp2d)) temp2d = sqrt( ua(:,:,km)**2 + va(:,:,km)**2 )
+      if(associated(temp2d)) temp2d = sqrt( ur(:,:,km)**2 + vr(:,:,km)**2 )
    endif
 
 ! Updraft Helicty Export
@@ -4873,73 +4988,77 @@ subroutine Run(gc, import, export, clock, rc)
 
       zle = log(vars%pe)
 
-      call getDivergence(uc, vc, tmp3d)
+#if defined(__GFORTRAN__)
+      call getDivergence(uc, vc, divg)
+#endif
 
       call MAPL_GetPointer(export,temp3d,'DIVG',  rc=status)
       VERIFY_(STATUS)
-      if(associated(temp3d)) temp3d = tmp3d
+      if(associated(temp3d)) temp3d = divg
 
       call MAPL_GetPointer(export,temp2d,'DIVG200',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(tmp3d),zle,log(20000.)  ,  status)
+         call VertInterp(temp2d,dble(divg),zle,log(20000.)  ,  status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'DIVG500',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(tmp3d),zle,log(50000.)  ,  status)
+         call VertInterp(temp2d,dble(divg),zle,log(50000.)  ,  status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'DIVG700',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(tmp3d),zle,log(70000.)  ,  status)
+         call VertInterp(temp2d,dble(divg),zle,log(70000.)  ,  status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'DIVG850',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(tmp3d),zle,log(85000.)  ,  status)
+         call VertInterp(temp2d,dble(divg),zle,log(85000.)  ,  status)
          VERIFY_(STATUS)
        end if
 
 ! Vorticity Exports
 
-      call getVorticity(vars%u, vars%v, tmp3d)
+#if defined(__GFORTRAN__)
+      call getVorticity(vars%u, vars%v, vort)
+#endif
 
       call MAPL_GetPointer(export,temp3d,'VORT',  rc=status)
       VERIFY_(STATUS)
-      if(associated(temp3d)) temp3d = tmp3d
+      if(associated(temp3d)) temp3d = vort
 
       call MAPL_GetPointer(export,temp2d,'VORT200',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(tmp3d),zle,log(20000.)  ,  status)
+         call VertInterp(temp2d,dble(vort),zle,log(20000.)  ,  status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'VORT500',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(tmp3d),zle,log(50000.)  ,  status)
+         call VertInterp(temp2d,dble(vort),zle,log(50000.)  ,  status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'VORT700',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(tmp3d),zle,log(70000.)  ,  status)
+         call VertInterp(temp2d,dble(vort),zle,log(70000.)  ,  status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'VORT850',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(tmp3d),zle,log(85000.)  ,  status)
+         call VertInterp(temp2d,dble(vort),zle,log(85000.)  ,  status)
          VERIFY_(STATUS)
        end if
 
@@ -5018,30 +5137,12 @@ subroutine Run(gc, import, export, clock, rc)
 
      end if   ! SW_DYNAMICS
 
+      call MAPL_TimerOff(MAPL,"-DYN_EPILOGUE")
 
 ! De-Allocate Arrays
 ! ------------------
 
-      DEALLOCATE( dummy        )
-      DEALLOCATE( dqvdtanaint1 )
-      DEALLOCATE( dqvdtanaint2 )
-      DEALLOCATE( dqldtanaint1 )
-      DEALLOCATE( dqldtanaint2 )
-      DEALLOCATE( dqidtanaint1 )
-      DEALLOCATE( dqidtanaint2 )
-      DEALLOCATE( doxdtanaint1 )
-      DEALLOCATE( doxdtanaint2 )
-      DEALLOCATE( dthdtanaint1 )
-      DEALLOCATE( dthdtanaint2 )
-      DEALLOCATE( dthdtremap   )
-      DEALLOCATE( dthdtconsv   )
-
-      DEALLOCATE( TROPP1 )
-      DEALLOCATE( TROPP2 )
-      DEALLOCATE( TROPP3 )
-      DEALLOCATE( TROPT  )
-      DEALLOCATE( TROPQ  )
-
+      if (doEnergetics) then
       DEALLOCATE( KEDYN  )
       DEALLOCATE( PEDYN  )
       DEALLOCATE( TEDYN  )
@@ -5051,47 +5152,19 @@ subroutine Run(gc, import, export, clock, rc)
       DEALLOCATE( KENRG0 )
       DEALLOCATE( PENRG0 )
       DEALLOCATE( TENRG0 )
+      endif
 
-#ifdef ENERGETICS
-      DEALLOCATE( KEPG   )
-      DEALLOCATE( KEADV  )
-      DEALLOCATE( KEDP   )
-      DEALLOCATE( KEHOT  )
-      DEALLOCATE( KEGEN  )
-      DEALLOCATE( KECDCOR)
-      DEALLOCATE( PECDCOR)
-      DEALLOCATE( TECDCOR)
-      DEALLOCATE( KEREMAP)
-      DEALLOCATE( PEREMAP)
-      DEALLOCATE( TEREMAP)
-      DEALLOCATE( CONVKE )
-      DEALLOCATE( CONVCPT)
-      DEALLOCATE( CONVPHI)
-      DEALLOCATE( CONVTHV)
-      DEALLOCATE( KENRGA )
-      DEALLOCATE( PENRGA )
-      DEALLOCATE( TENRGA )
-      DEALLOCATE( KENRGB )
-      DEALLOCATE( PENRGB )
-      DEALLOCATE( TENRGB )
-#endif
-
-      DEALLOCATE( ke    )
-      DEALLOCATE( cpt   )
-      DEALLOCATE( phi   )
-      DEALLOCATE( gze   )
       DEALLOCATE( qsum1 )
       DEALLOCATE( qsum2 )
 
-      DEALLOCATE( ZL     )
-      DEALLOCATE( ZLE    )
-      DEALLOCATE( PKXY   )
+      DEALLOCATE( zl     )
+      DEALLOCATE( zle    )
+      DEALLOCATE( plk    )
+      DEALLOCATE( pkxy   )
+      DEALLOCATE( vort   )
+      DEALLOCATE( divg   )
       DEALLOCATE( tmp3d  )
-      DEALLOCATE( tmp2d  )
-      DEALLOCATE( pelnxz )
       DEALLOCATE( omaxyz )
-      DEALLOCATE( cptxyz )
-      DEALLOCATE( thvxyz )
       DEALLOCATE( epvxyz )
       DEALLOCATE(  cxxyz )
       DEALLOCATE(  cyxyz )
@@ -5108,23 +5181,16 @@ subroutine Run(gc, import, export, clock, rc)
       DEALLOCATE( vc     )
       DEALLOCATE( uc0    )
       DEALLOCATE( vc0    )
+      DEALLOCATE( ur     )
+      DEALLOCATE( vr     )
       DEALLOCATE( qv     )
       DEALLOCATE( ql     )
       DEALLOCATE( qi     )
       DEALLOCATE( qr     )
       DEALLOCATE( qs     )
       DEALLOCATE( qg     )
-      DEALLOCATE( qdnew  )
-      DEALLOCATE( qdold  )
-      DEALLOCATE( qvold  )
-      DEALLOCATE( qlold  )
-      DEALLOCATE( qiold  )
-      DEALLOCATE( qrold  )
-      DEALLOCATE( qsold  )
-      DEALLOCATE( qgold  )
       DEALLOCATE( ox     )
       DEALLOCATE( delp   )
-      DEALLOCATE( delpold)
       DEALLOCATE( dmdt   )
       DEALLOCATE( dudt   )
       DEALLOCATE( dvdt   )
@@ -5136,7 +5202,6 @@ subroutine Run(gc, import, export, clock, rc)
       DEALLOCATE( phisxy )
       if (allocated(names)) DEALLOCATE( names  )
       if (allocated(names0)) DEALLOCATE( names0  )
-      DEALLOCATE( phi00  )
 
       call freeTracers(state)
 
@@ -5317,7 +5382,7 @@ subroutine dump_n_splash_
           allocate( UAtmpR4(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
           allocate( VAtmpR4(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
           ! get background A-grid winds
-          call getAgridWinds (vars%u,vars%v,ana_u,ana_v,rotate=.true.)
+          call getAllWinds (vars%u,vars%v,UR=ana_u,VR=ana_v)
           ! transform background A-grid winds to lat-lon
           call regridder_manager%make_regridder(ESMFGRID, ANAGrid, REGRID_METHOD_BILINEAR, RC=STATUS)
           VERIFY_(STATUS)
@@ -6118,15 +6183,16 @@ end subroutine RUN
     real(r8), allocatable ::  H1000(:,:)
     real(r8), allocatable ::  H850 (:,:)
     real(r8), allocatable ::  H500 (:,:)
-    real(r8), allocatable ::  tmp2d(:,:)
     real(r8), allocatable ::  tmp3d(:,:,:)
+    real(r8), allocatable ::    plk(:,:,:)
     real(r8), allocatable ::    pke(:,:,:)
-    real(r8), allocatable ::   pkxy(:,:,:) ! pe**kappa
     real(r8), allocatable ::     pl(:,:,:)
     real(r8), allocatable ::     ua(:,:,:)
     real(r8), allocatable ::     va(:,:,:)
     real(r8), allocatable ::     uc(:,:,:)
     real(r8), allocatable ::     vc(:,:,:)
+    real(r8), allocatable ::     ur(:,:,:)
+    real(r8), allocatable ::     vr(:,:,:)
     real(r8), allocatable ::     qv(:,:,:)
     real(r8), allocatable ::     dp(:,:,:)
     real(r8), allocatable ::    thv(:,:,:)
@@ -6152,6 +6218,8 @@ end subroutine RUN
 
     real(kind=4), allocatable :: dthdtphyint1(:,:)
     real(kind=4), allocatable :: dthdtphyint2(:,:)
+
+    logical :: doEnergetics
 
     integer i,j,k
 
@@ -6197,15 +6265,25 @@ end subroutine RUN
     ALLOCATE( dthdtphyint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
     ALLOCATE( dthdtphyint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
 
+    doEnergetics=.false.
+    call MAPL_GetPointer(export,temp2D,'KE'   ,rc=status); VERIFY_(STATUS)
+    if(associated(temp2D)) doEnergetics=.true.
+    call MAPL_GetPointer(export,temp2D,'KEPHY',rc=status); VERIFY_(STATUS)
+    if(associated(temp2D)) doEnergetics=.true.
+    call MAPL_GetPointer(export,temp2D,'PEPHY',rc=status); VERIFY_(STATUS)
+    if(associated(temp2D)) doEnergetics=.true.
+    call MAPL_GetPointer(export,temp2D,'TEPHY',rc=status); VERIFY_(STATUS)
+    if(associated(temp2D)) doEnergetics=.true.
+    if (doEnergetics) then
     ALLOCATE(  kenrg(ifirstxy:ilastxy,jfirstxy:jlastxy) )
     ALLOCATE(  penrg(ifirstxy:ilastxy,jfirstxy:jlastxy) )
     ALLOCATE(  tenrg(ifirstxy:ilastxy,jfirstxy:jlastxy) )
     ALLOCATE( kenrg0(ifirstxy:ilastxy,jfirstxy:jlastxy) )
     ALLOCATE( penrg0(ifirstxy:ilastxy,jfirstxy:jlastxy) )
     ALLOCATE( tenrg0(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+    endif
 
     ALLOCATE(  tmp3d(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-    ALLOCATE(  tmp2d(ifirstxy:ilastxy,jfirstxy:jlastxy) )
     ALLOCATE( phisxy(ifirstxy:ilastxy,jfirstxy:jlastxy) )
     ALLOCATE(  logps(ifirstxy:ilastxy,jfirstxy:jlastxy) )
 
@@ -6213,6 +6291,8 @@ end subroutine RUN
     ALLOCATE(     va(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
     ALLOCATE(     uc(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
     ALLOCATE(     vc(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+    ALLOCATE(     ur(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+    ALLOCATE(     vr(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
     ALLOCATE(     qv(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
     ALLOCATE(     pl(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
     ALLOCATE(  logpl(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
@@ -6220,6 +6300,7 @@ end subroutine RUN
     ALLOCATE(    thv(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
     ALLOCATE( tempxy(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
 
+    ALLOCATE(    plk(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
     ALLOCATE(    pke(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
     ALLOCATE(  logpe(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
     ALLOCATE(    zle(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
@@ -6234,10 +6315,6 @@ end subroutine RUN
 ! --------------------------
 
     dp = ( vars%pe(:,:,2:) - vars%pe (:,:,:km) )
-
-! Get A-grid winds
-! ----------------
-  call getAgridWinds(vars%u, vars%v, ua, va, rotate=.true.)
 
 ! Load Specific Humidity
 ! ----------------------
@@ -6264,7 +6341,10 @@ end subroutine RUN
        thv = vars%pt
     endif
 
-    call Energetics (ua,va,thv,vars%pe,dp,vars%pkz,phisxy,kenrg0,penrg0,tenrg0)
+    if (doEnergetics) then
+      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
+      call Energetics (ur,vr,thv,vars%pe,dp,vars%pkz,phisxy,kenrg0,penrg0,tenrg0)
+    endif
 
 ! DTHVDTPHYINT
 ! ------------
@@ -6295,17 +6375,13 @@ end subroutine RUN
 
 ! Get Cubed-Sphere Wind Exports
 ! -----------------------------
-    call getAgridWinds(vars%u, vars%v, ua, va, uc, vc)
+    call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
     call FILLOUT3 (export, 'U_DGRID', vars%u  , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'V_DGRID', vars%v  , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'U_CGRID', uc      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'V_CGRID', vc      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'U_AGRID', ua      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'V_AGRID', va      , rc=status); VERIFY_(STATUS)
-
-! Create A-Grid Winds
-! -------------------
-    call getAgridWinds(vars%u, vars%v, ua, va, rotate=.true.)
 
 ! Compute Energetics After Diabatic Forcing
 ! -----------------------------------------
@@ -6316,19 +6392,18 @@ end subroutine RUN
   call Write_Profile(grid, thv, 'VPT')
 #endif
 
-    call Energetics (ua,va,thv,vars%pe,dp,vars%pkz,phisxy,kenrg,penrg,tenrg)
-
-    call MAPL_GetPointer(export,temp2d,'KE',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = kenrg
-
-    kenrg = (kenrg-kenrg0)/DT
-    penrg = (penrg-penrg0)/DT
-    tenrg = (tenrg-tenrg0)/DT
-
-    call FILLOUT2 (export, 'KEPHY', kenrg, rc=status); VERIFY_(STATUS)
-    call FILLOUT2 (export, 'PEPHY', penrg, rc=status); VERIFY_(STATUS)
-    call FILLOUT2 (export, 'TEPHY', tenrg, rc=status); VERIFY_(STATUS)
+    if (doEnergetics) then
+      call Energetics (ur,vr,thv,vars%pe,dp,vars%pkz,phisxy,kenrg,penrg,tenrg)
+      call MAPL_GetPointer(export,temp2d,'KE',  rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp2d)) temp2d = kenrg
+      kenrg = (kenrg-kenrg0)/DT
+      penrg = (penrg-penrg0)/DT
+      tenrg = (tenrg-tenrg0)/DT
+      call FILLOUT2 (export, 'KEPHY', kenrg, rc=status); VERIFY_(STATUS)
+      call FILLOUT2 (export, 'PEPHY', penrg, rc=status); VERIFY_(STATUS)
+      call FILLOUT2 (export, 'TEPHY', tenrg, rc=status); VERIFY_(STATUS)
+    endif
 
 ! DTHVDTPHYINT
 ! ------------
@@ -6342,7 +6417,8 @@ end subroutine RUN
           temp2D       = (dthdtphyint2-dthdtphyint1) * MAPL_P00**MAPL_KAPPA / (MAPL_GRAV*DT)
       endif
 
-    call getPK ( pke )
+    plk = exp( kappa * log( 0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1)) ) )
+    pke = exp( kappa * log( vars%pe ) )
 
     tempxy = vars%pt * vars%pkz   ! Dry Temperature
 
@@ -6351,13 +6427,13 @@ end subroutine RUN
 #endif
 
     call FILLOUT3 (export, 'DELP'   , dp      , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'U'      , ua      , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'V'      , va      , rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'U'      , ur      , rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'V'      , vr      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'T'      , tempxy  , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'Q'      , qv      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'PL'     , pl      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'PLE'    , vars%pe , rc=status); VERIFY_(STATUS)
-    call FILLOUT3 (export, 'PLK'    , vars%pkz, rc=status); VERIFY_(STATUS)
+    call FILLOUT3 (export, 'PLK'    , plk     , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'PKE'    , pke     , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'THV'    , thv     , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'PT'     , vars%pt , rc=status); VERIFY_(STATUS)
@@ -6367,6 +6443,7 @@ end subroutine RUN
     VERIFY_(STATUS)
     if(associated(temp3d)) temp3d = (tempxy)*(p00/(0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1))))**kappa
 
+#ifdef SKIP_TRACERS
       do ntracer=1,ntracers
          write(myTracer, "('Q',i5.5)") ntracer-1
          call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
@@ -6379,6 +6456,7 @@ end subroutine RUN
             endif
          endif
       enddo
+#endif
 
 ! Compute Edge Heights
 ! --------------------
@@ -6406,70 +6484,70 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'U200',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ua,pke,log(20000.)  ,  status)
+       call VertInterp(temp2d,ur,pke,log(20000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'U250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ua,pke,log(25000.)  ,  status)
+       call VertInterp(temp2d,ur,pke,log(25000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'U500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ua,pke,log(50000.)  ,  status)
+       call VertInterp(temp2d,ur,pke,log(50000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'U700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ua,pke,log(70000.)  ,  status)
+       call VertInterp(temp2d,ur,pke,log(70000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'U850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ua,pke,log(85000.)  ,  status)
+       call VertInterp(temp2d,ur,pke,log(85000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V200',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,va,pke,log(20000.)  ,  status)
+       call VertInterp(temp2d,vr,pke,log(20000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,va,pke,log(25000.)  ,  status)
+       call VertInterp(temp2d,vr,pke,log(25000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,va,pke,log(50000.)  ,  status)
+       call VertInterp(temp2d,vr,pke,log(50000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,va,pke,log(70000.)  ,  status)
+       call VertInterp(temp2d,vr,pke,log(70000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,va,pke,log(85000.)  ,  status)
+       call VertInterp(temp2d,vr,pke,log(85000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
@@ -6596,11 +6674,11 @@ end subroutine RUN
 ! ---------------------------------------
     call MAPL_GetPointer(export,temp2d,'UTOP', rc=status)
     VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = ua(:,:,1)
+    if(associated(temp2d)) temp2d = ur(:,:,1)
 
     call MAPL_GetPointer(export,temp2d,'VTOP', rc=status)
     VERIFY_(STATUS)
-    if(associated(temp2d)) temp2d = va(:,:,1)
+    if(associated(temp2d)) temp2d = vr(:,:,1)
 
     call MAPL_GetPointer(export,temp2d,'TTOP', rc=status)
     VERIFY_(STATUS)
@@ -6619,14 +6697,14 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'U50M',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ua,-zle,-50., status)
+       call VertInterp(temp2d,ur,-zle,-50., status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V50M',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,va,-zle,-50., status)
+       call VertInterp(temp2d,vr,-zle,-50., status)
        VERIFY_(STATUS)
     end if
 
@@ -6654,7 +6732,7 @@ end subroutine RUN
     if(associated(temp2d)) then
        temp2d = 0.0
        do k=1,km
-       temp2d = temp2d + ua(:,:,k)*dp(:,:,k)
+       temp2d = temp2d + ur(:,:,k)*dp(:,:,k)
        enddo
        temp2d = temp2d / (vars%pe(:,:,km+1)-vars%pe(:,:,1))
     endif
@@ -6711,13 +6789,15 @@ end subroutine RUN
 ! Deallocate Memory
 ! -----------------
 
+    if (doEnergetics) then
     DEALLOCATE(  kenrg )
     DEALLOCATE(  penrg )
     DEALLOCATE(  tenrg )
     DEALLOCATE( kenrg0 )
     DEALLOCATE( penrg0 )
     DEALLOCATE( tenrg0 )
-    DEALLOCATE(  tmp2d )
+    endif
+
     DEALLOCATE(  tmp3d )
 
     DEALLOCATE( phisxy )
@@ -6726,12 +6806,15 @@ end subroutine RUN
     DEALLOCATE(     va )
     DEALLOCATE(     uc )
     DEALLOCATE(     vc )
+    DEALLOCATE(     ur )
+    DEALLOCATE(     vr )
     DEALLOCATE(     qv )
     DEALLOCATE(     pl )
     DEALLOCATE(     dp )
     DEALLOCATE( tempxy )
 
     DEALLOCATE(    thv )
+    DEALLOCATE(    plk )
     DEALLOCATE(    pke )
     DEALLOCATE(  logpl )
     DEALLOCATE(  logpe )
@@ -6823,9 +6906,9 @@ end subroutine RunAddIncs
 ! **********************************************************************
 
    ! Determine how many water species we have
-    nwat = 0
+    nwat = state%vars%nwat
     nwat_tracers = 0
-    if (.not. ADIABATIC) then
+    if ((nwat==0) .AND. (.not. ADIABATIC)) then
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'Q'       ) nwat_tracers = nwat_tracers + 1
          if (TRIM(state%vars%tracer(n)%tname) == 'QLCN'    ) nwat_tracers = nwat_tracers + 1
@@ -6846,6 +6929,9 @@ end subroutine RunAddIncs
           if (nwat_tracers >= 5) nwat = 3 ! STATE has QV, QLIQ, QICE
           if (nwat_tracers == 8) nwat = 6 ! STATE has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
        endif
+    endif
+    if (.not. ADIABATIC) then
+       _ASSERT(nwat >= 1, 'expecting water species (nwat) to match')
     endif
     if (nwat >= 1) then
     ALLOCATE(   Q(is:ie,js:je,1:km,nwat) )
@@ -6903,21 +6989,21 @@ end subroutine RunAddIncs
     endif
     if (nwat >= 6) then
     ! Grab RAIN from imports
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='RAIN', RC=rc )
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QRAIN', RC=rc )
     if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
        if (size(Q(:,:,:,4))==size(qqq%content_r4)) Q(:,:,:,4) = qqq%content_r4
     elseif (associated(qqq%content)) then
        if (size(Q(:,:,:,4))==size(qqq%content)) Q(:,:,:,4) = qqq%content
     endif
     ! Grab SNOW from imports
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='SNOW', RC=rc )
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QSNOW', RC=rc )
     if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
        if (size(Q(:,:,:,5))==size(qqq%content_r4)) Q(:,:,:,5) = qqq%content_r4
     elseif (associated(qqq%content)) then
        if (size(Q(:,:,:,5))==size(qqq%content)) Q(:,:,:,5) = qqq%content
     endif
     ! Grab GRAUPEL from imports
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='GRAUPEL', RC=rc )
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QGRAUPEL', RC=rc )
     if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
        if (size(Q(:,:,:,6))==size(qqq%content_r4)) Q(:,:,:,6) = qqq%content_r4
     elseif (associated(qqq%content)) then
@@ -6939,7 +7025,7 @@ end subroutine RunAddIncs
         rainwat = -1
         snowwat = -1
         graupel = -1
-    case(6)
+    case(6:7)
         sphum   = 1
         liq_wat = 2
         ice_wat = 3
@@ -7045,7 +7131,7 @@ end subroutine RunAddIncs
        !endif
 
        select case (nwat)
-       case (6)
+       case (6:7)
            CVM = (1.-( Q(:,:,:,  sphum)+Q(:,:,:,liq_wat)+Q(:,:,:,rainwat)+Q(:,:,:,ice_wat)+&
                        Q(:,:,:,snowwat)+Q(:,:,:,graupel) )               )*c_air + &
                       (Q(:,:,:,  sphum)                                  )*c_vap + &
@@ -7082,7 +7168,8 @@ end subroutine RunAddIncs
        ! Update PKZ from hydrostatic pressures
        !  This isn't entirely necessary, FV3 overwrites this in fv_dynamics
        !  but we have to get back to PT here
-       call getPKZ(STATE%VARS%PKZ,STATE%VARS%PT,Q,STATE%VARS%PE,STATE%VARS%DZ,HYDROSTATIC)
+  !!   call getPKZ(STATE%VARS%PKZ,STATE%VARS%PT,Q,STATE%VARS%PE,STATE%VARS%DZ,HYDROSTATIC)
+       call getPKZ(STATE%VARS%PKZ,STATE%VARS%PE)
 
        ! Make T back into PT
        STATE%VARS%PT = STATE%VARS%PT/STATE%VARS%PKZ
