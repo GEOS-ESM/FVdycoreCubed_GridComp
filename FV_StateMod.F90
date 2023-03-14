@@ -522,11 +522,16 @@ contains
    FV_Atm(1)%flagstruct%delt_max = 0.002
    FV_Atm(1)%flagstruct%ke_bg = 0.0
   ! Rayleigh Damping
-   FV_Atm(1)%flagstruct%RF_fast = .false.
-   if (FV_Atm(1)%flagstruct%npz == 72) then
-     FV_Atm(1)%flagstruct%tau = 0.0
+   if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+     FV_Atm(1)%flagstruct%RF_fast = .true.
+     FV_Atm(1)%flagstruct%tau = 1.0
    else
-     FV_Atm(1)%flagstruct%tau = 2.0
+     FV_Atm(1)%flagstruct%RF_fast = .false.
+     if (FV_Atm(1)%flagstruct%npz == 72) then
+       FV_Atm(1)%flagstruct%tau = 0.0
+     else
+       FV_Atm(1)%flagstruct%tau = 2.0
+     endif
    endif
    FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
   ! 6th order default damping options
@@ -565,32 +570,20 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 75.0    )
-          else
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 112.5   )
-          endif
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 120.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 37.5    )
-          else
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 75.0    )
-          endif
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )  
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )  
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 18.75   )
-          else
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 37.5    )
-          endif
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )  
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )  
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 9.375   )
-          else
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 18.75   )
-          endif
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)  
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )  
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       FV_Atm(1)%flagstruct%fv_sg_adj = DT
