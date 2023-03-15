@@ -500,8 +500,8 @@ contains
    endif
    FV_Atm(1)%flagstruct%n_sponge = 0
 !!!FV_Atm(1)%flagstruct%n_zfilter = FV_Atm(1)%flagstruct%npz
-   FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
-   FV_Atm(1)%flagstruct%d2_bg_k2 = 0.02
+   FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
+   FV_Atm(1)%flagstruct%d2_bg_k2 = 0.15
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
    if (FV_Atm(1)%flagstruct%npz == 72) then
      FV_Atm(1)%flagstruct%gmao_remap = 0   ! GFDL Schemes
@@ -515,7 +515,6 @@ contains
    FV_Atm(1)%flagstruct%z_tracer = .true.
   ! Some default horizontal flags
    FV_Atm(1)%flagstruct%adjust_dry_mass = fix_mass
-   FV_Atm(1)%flagstruct%consv_te = 1.0
    FV_Atm(1)%flagstruct%consv_am = .false.
    FV_Atm(1)%flagstruct%fill = .true.
    FV_Atm(1)%flagstruct%dwind_2d = .false.
@@ -524,7 +523,15 @@ contains
   ! Rayleigh Damping
    if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
      FV_Atm(1)%flagstruct%RF_fast = .true.
-     FV_Atm(1)%flagstruct%tau = 1.0
+     FV_Atm(1)%flagstruct%tau = 1.25
+     FV_Atm(1)%flagstruct%rf_cutoff = 0.50e2
+    ! 6th order default damping options
+     FV_Atm(1)%flagstruct%nord = 3
+     FV_Atm(1)%flagstruct%dddmp = 0.2
+     FV_Atm(1)%flagstruct%d4_bg = 0.14
+     FV_Atm(1)%flagstruct%d2_bg = 0.0
+     FV_Atm(1)%flagstruct%d_ext = 0.0
+     FV_Atm(1)%flagstruct%consv_te = 1.0
    else
      FV_Atm(1)%flagstruct%RF_fast = .false.
      if (FV_Atm(1)%flagstruct%npz == 72) then
@@ -532,14 +539,15 @@ contains
      else
        FV_Atm(1)%flagstruct%tau = 2.0
      endif
+     FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
+    ! 6th order default damping options
+     FV_Atm(1)%flagstruct%nord = 2
+     FV_Atm(1)%flagstruct%dddmp = 0.2
+     FV_Atm(1)%flagstruct%d4_bg = 0.12
+     FV_Atm(1)%flagstruct%d2_bg = 0.0
+     FV_Atm(1)%flagstruct%d_ext = 0.0
+     FV_Atm(1)%flagstruct%consv_te = 1.0
    endif
-   FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
-  ! 6th order default damping options
-   FV_Atm(1)%flagstruct%nord = 2
-   FV_Atm(1)%flagstruct%dddmp = 0.2
-   FV_Atm(1)%flagstruct%d4_bg = 0.12
-   FV_Atm(1)%flagstruct%d2_bg = 0.0
-   FV_Atm(1)%flagstruct%d_ext = 0.0
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%n_split = 0
    FV_Atm(1)%flagstruct%k_split = 1
@@ -587,7 +595,8 @@ contains
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       FV_Atm(1)%flagstruct%fv_sg_adj = DT
-     ! Monotonic Hydrostatic defaults
+      if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) FV_Atm(1)%flagstruct%fv_sg_adj = DT*1.5
+      ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%hydrostatic = .false.
       FV_Atm(1)%flagstruct%make_nh = .false.
      ! This is the best/fastest option for tracers
