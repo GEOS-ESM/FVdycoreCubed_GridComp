@@ -500,8 +500,6 @@ contains
    endif
    FV_Atm(1)%flagstruct%n_sponge = 0
 !!!FV_Atm(1)%flagstruct%n_zfilter = FV_Atm(1)%flagstruct%npz
-   FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
-   FV_Atm(1)%flagstruct%d2_bg_k2 = 0.15
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
    if (FV_Atm(1)%flagstruct%npz == 72) then
      FV_Atm(1)%flagstruct%gmao_remap = 0   ! GFDL Schemes
@@ -520,7 +518,7 @@ contains
    FV_Atm(1)%flagstruct%dwind_2d = .false.
    FV_Atm(1)%flagstruct%delt_max = 0.002
    FV_Atm(1)%flagstruct%ke_bg = 0.0
-  ! Rayleigh Damping
+  ! Rayleigh & Divergence Damping
    if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
      FV_Atm(1)%flagstruct%RF_fast = .true.
      FV_Atm(1)%flagstruct%tau = 1.25
@@ -531,6 +529,8 @@ contains
      FV_Atm(1)%flagstruct%d4_bg = 0.14
      FV_Atm(1)%flagstruct%d2_bg = 0.0
      FV_Atm(1)%flagstruct%d_ext = 0.0
+     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
+     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.15
      FV_Atm(1)%flagstruct%consv_te = 1.0
    else
      FV_Atm(1)%flagstruct%RF_fast = .false.
@@ -546,6 +546,8 @@ contains
      FV_Atm(1)%flagstruct%d4_bg = 0.12
      FV_Atm(1)%flagstruct%d2_bg = 0.0
      FV_Atm(1)%flagstruct%d_ext = 0.0
+     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
+     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.02
      FV_Atm(1)%flagstruct%consv_te = 1.0
    endif
   ! Some default time-splitting options
