@@ -507,8 +507,6 @@ contains
    endif
    FV_Atm(1)%flagstruct%n_sponge = 0
 !!!FV_Atm(1)%flagstruct%n_zfilter = FV_Atm(1)%flagstruct%npz
-   FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
-   FV_Atm(1)%flagstruct%d2_bg_k2 = 0.02
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
    if (FV_Atm(1)%flagstruct%npz == 72) then
      FV_Atm(1)%flagstruct%gmao_remap = 0   ! GFDL Schemes
@@ -522,26 +520,43 @@ contains
    FV_Atm(1)%flagstruct%z_tracer = .true.
   ! Some default horizontal flags
    FV_Atm(1)%flagstruct%adjust_dry_mass = fix_mass
-   FV_Atm(1)%flagstruct%consv_te = 1.0
    FV_Atm(1)%flagstruct%consv_am = .false.
    FV_Atm(1)%flagstruct%fill = .true.
    FV_Atm(1)%flagstruct%dwind_2d = .false.
    FV_Atm(1)%flagstruct%delt_max = 0.002
    FV_Atm(1)%flagstruct%ke_bg = 0.0
-  ! Rayleigh Damping
-   FV_Atm(1)%flagstruct%RF_fast = .false.
-   if (FV_Atm(1)%flagstruct%npz == 72) then
-     FV_Atm(1)%flagstruct%tau = 0.0
+  ! Rayleigh & Divergence Damping
+   if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+     FV_Atm(1)%flagstruct%RF_fast = .true.
+     FV_Atm(1)%flagstruct%tau = 1.25
+     FV_Atm(1)%flagstruct%rf_cutoff = 0.50e2
+    ! 6th order default damping options
+     FV_Atm(1)%flagstruct%nord = 3
+     FV_Atm(1)%flagstruct%dddmp = 0.2
+     FV_Atm(1)%flagstruct%d4_bg = 0.14
+     FV_Atm(1)%flagstruct%d2_bg = 0.0
+     FV_Atm(1)%flagstruct%d_ext = 0.0
+     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
+     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.15
+     FV_Atm(1)%flagstruct%consv_te = 1.0
    else
-     FV_Atm(1)%flagstruct%tau = 2.0
+     FV_Atm(1)%flagstruct%RF_fast = .false.
+     if (FV_Atm(1)%flagstruct%npz == 72) then
+       FV_Atm(1)%flagstruct%tau = 0.0
+     else
+       FV_Atm(1)%flagstruct%tau = 2.0
+     endif
+     FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
+    ! 6th order default damping options
+     FV_Atm(1)%flagstruct%nord = 2
+     FV_Atm(1)%flagstruct%dddmp = 0.2
+     FV_Atm(1)%flagstruct%d4_bg = 0.12
+     FV_Atm(1)%flagstruct%d2_bg = 0.0
+     FV_Atm(1)%flagstruct%d_ext = 0.0
+     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
+     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.02
+     FV_Atm(1)%flagstruct%consv_te = 1.0
    endif
-   FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
-  ! 6th order default damping options
-   FV_Atm(1)%flagstruct%nord = 2
-   FV_Atm(1)%flagstruct%dddmp = 0.2
-   FV_Atm(1)%flagstruct%d4_bg = 0.12
-   FV_Atm(1)%flagstruct%d2_bg = 0.0
-   FV_Atm(1)%flagstruct%d_ext = 0.0
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%n_split = 0
    FV_Atm(1)%flagstruct%k_split = 1
@@ -572,36 +587,25 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 75.0    )
-          else
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 112.5   )
-          endif
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 120.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 37.5    )
-          else
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 75.0    )
-          endif
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )  
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )  
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 18.75   )
-          else
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 37.5    )
-          endif
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )  
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )  
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 9.375   )
-          else
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 18.75   )
-          endif
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)  
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )  
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       FV_Atm(1)%flagstruct%fv_sg_adj = DT
-     ! Monotonic Hydrostatic defaults
+      if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) FV_Atm(1)%flagstruct%fv_sg_adj = DT*1.5
+      ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%hydrostatic = .false.
       FV_Atm(1)%flagstruct%make_nh = .false.
      ! This is the best/fastest option for tracers
