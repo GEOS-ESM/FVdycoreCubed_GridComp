@@ -2480,7 +2480,7 @@ contains
   type (ESMF_State)                  :: INTERNAL
   type (DynGrid),  pointer           :: DycoreGrid
 
-  real, pointer                      :: temp2d(:,:)
+  real(r4), pointer                      :: temp2d(:,:)
 
   integer                            :: ifirst
   integer                            :: ilast
