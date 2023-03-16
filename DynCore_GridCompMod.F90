@@ -2480,7 +2480,7 @@ contains
   type (ESMF_State)                  :: INTERNAL
   type (DynGrid),  pointer           :: DycoreGrid
 
-  real, pointer                      :: temp2d(:,:)
+  real(r4), pointer                      :: temp2d(:,:)
 
   integer                            :: ifirst
   integer                            :: ilast
@@ -2954,6 +2954,8 @@ subroutine Run(gc, import, export, clock, rc)
     logical                             :: doEnergetics
     logical                             :: doTropvars
 
+    integer :: FV3_STANDALONE
+
   Iam = "Run"
   call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
   VERIFY_(STATUS)
@@ -3252,11 +3254,19 @@ subroutine Run(gc, import, export, clock, rc)
       end do
 
 ! WMP Begin REPLAY/ANA section
-      call MAPL_TimerOn(MAPL,"-DYN_ANA")
-      call ESMF_ClockGetAlarm(Clock,'ReplayShutOff',Alarm,rc=Status)
-      VERIFY_(status)
-      is_shutoff = ESMF_AlarmIsRinging( Alarm,rc=Status)
-      VERIFY_(status)
+!-----------------------------
+
+      call ESMF_ConfigGetAttribute ( CF, FV3_STANDALONE, Label="FV3_STANDALONE:", default=0, RC=STATUS)
+      VERIFY_(STATUS)
+      if (FV3_STANDALONE == 0) then
+         call MAPL_TimerOn(MAPL,"-DYN_ANA")
+         call ESMF_ClockGetAlarm(Clock,'ReplayShutOff',Alarm,rc=Status)
+         VERIFY_(status)
+         is_shutoff = ESMF_AlarmIsRinging( Alarm,rc=Status)
+         VERIFY_(status)
+      else
+         is_shutoff = .true.
+      end if
 
       if (.not. is_shutoff) then
 ! If requested, do Intermittent Replay
@@ -4013,7 +4023,9 @@ subroutine Run(gc, import, export, clock, rc)
       call Energetics (ur,vr,tempxy,vars%pe,delp,vars%pkz,phisxy,kenrg,penrg,tenrg)
 
       endif
-      call MAPL_TimerOff(MAPL,"-DYN_ANA")
+      if (FV3_STANDALONE == 0) then
+         call MAPL_TimerOff(MAPL,"-DYN_ANA")
+      endif
 
 
       call MAPL_TimerOn(MAPL,"-DYN_PROLOGUE")

@@ -218,7 +218,7 @@ private
     real(REAL8)                             :: hlv      ! latent heat of evaporation
     real(FVPRC)                             :: zvir     ! RWV/RAIR-1
 
-  real, pointer :: phis(:,:), varflt(:,:)
+  real(kind=4), pointer :: phis(:,:), varflt(:,:)
 
   logical :: fv_first_run = .true.
 
