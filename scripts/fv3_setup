@@ -156,7 +156,7 @@ endif
 
 ASKHYDRO:
 
-set DEFAULT_NON_HYDROSTATIC = @CFG_NONHYDROSTATIC@
+set DEFAULT_NON_HYDROSTATIC = FALSE
 echo "Do you wish to run ${C1}NON-HYDROSTATIC${CN} dynamics? (Default: ${C2}${DEFAULT_NON_HYDROSTATIC}${CN})"
 
 set   DO_NONHYDRO  = $<
@@ -362,7 +362,7 @@ else if( $AGCM_IM <= 360 ) then
    set FV_NX = 12
    set NUM_READERS = 4
    set DEF_IOS_NDS = 2
-elsif( $AGCM_IM <= 500 ) then
+else if( $AGCM_IM <= 500 ) then
    set DT = 450
    set FV_NX = 12
    set NUM_READERS = 4
