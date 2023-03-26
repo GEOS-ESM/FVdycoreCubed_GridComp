@@ -1699,11 +1699,43 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'UH25',                                      &
-         LONG_NAME  = 'updraft_helicity_2_to_5_km_mean',           &
+         LONG_NAME  = 'updraft_helicity_2_to_5_km',           &
          UNITS      = 'm+2 s-2',                                   &
          DIMS       = MAPL_DimsHorzOnly,                           &
          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
-     VERIFY_(STATUS)
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+         SHORT_NAME = 'UH03',                                      &
+         LONG_NAME  = 'updraft_helicity_0_to_3_km',           &
+         UNITS      = 'm+2 s-2',                                   &
+         DIMS       = MAPL_DimsHorzOnly,                           &
+         VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+         SHORT_NAME = 'SRH01',                                      &
+         LONG_NAME  = 'storm_relative_helicity_0_to_1_km',           &
+         UNITS      = 'm+2 s-2',                                   &
+         DIMS       = MAPL_DimsHorzOnly,                           &
+         VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+         SHORT_NAME = 'SRH03',                                      &
+         LONG_NAME  = 'storm_relative_helicity_0_to_3_km',           &
+         UNITS      = 'm+2 s-2',                                   &
+         DIMS       = MAPL_DimsHorzOnly,                           &
+         VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+         SHORT_NAME = 'SRH25',                                      &
+         LONG_NAME  = 'storm_relative_helicity_2_to_5_km',           &
+         UNITS      = 'm+2 s-2',                                   &
+         DIMS       = MAPL_DimsHorzOnly,                           &
+         VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
+    VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'VORT',                                      &
@@ -2477,7 +2509,7 @@ contains
   type (DynGrid),  pointer           :: DycoreGrid
 
   real, pointer                      :: temp2d(:,:)
-  
+ 
   integer                            :: ifirst
   integer                            :: ilast
   integer                            :: jfirst
@@ -2892,6 +2924,12 @@ subroutine Run(gc, import, export, clock, rc)
     real(kind=4), pointer ::       tempv (:,:)
     real(kind=4), allocatable ::   cubetemp3d(:,:,:)
     real(kind=4), allocatable ::   cubevtmp3d(:,:,:)
+
+    real(kind=4), pointer :: uh25(:,:)
+    real(kind=4), pointer :: uh03(:,:)
+    real(kind=4), pointer :: srh01(:,:)
+    real(kind=4), pointer :: srh03(:,:)
+    real(kind=4), pointer :: srh25(:,:)
 
     real(r8),     allocatable ::   uatmp(:,:,:)
     real(r8),     allocatable ::   vatmp(:,:,:)
@@ -4962,13 +5000,16 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) temp2d = sqrt( ur(:,:,km)**2 + vr(:,:,km)**2 )
    endif
 
-! Updraft Helicty Export
+! Updraft Helicty Exports
 
-      call MAPL_GetPointer(export,temp2d,'UH25',  rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) then
-         call fv_getUpdraftHelicity(temp2d)
-         VERIFY_(STATUS)
+      call MAPL_GetPointer(export,  uh25, 'UH25',  rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export,  uh03, 'UH03',  rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, srh01,'SRH01',  rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, srh03,'SRH03',  rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, srh25,'SRH25',  rc=status); VERIFY_(STATUS)
+      if( associated( uh25) .or. associated( uh03) .or. &
+          associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
+          call fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
       endif
 
 ! Divergence Exports

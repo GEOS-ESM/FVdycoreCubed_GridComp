@@ -34,7 +34,7 @@ module FV_StateMod
    use gfdl_lin_cloud_microphys_mod, only: gfdl_cloud_microphys_init
 
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check, &
-                                 get_vorticity, updraft_helicity
+                                 get_vorticity, updraft_helicity, bunkers_vector, helicity_relative_CAPS
 
 implicit none
 private
@@ -3832,33 +3832,95 @@ subroutine fv_getDivergence(uc, vc, divg)
     enddo
 end subroutine fv_getDivergence
 
-subroutine fv_getUpdraftHelicity(uh25)
+subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
    use constants_mod, only: fms_grav=>grav
 ! made this REAL4
-   real(REAL4), intent(OUT) :: uh25(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+   real(REAL4), intent(OUT) ::  uh25(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+   real(REAL4), intent(OUT) ::  uh03(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+   real(REAL4), intent(OUT) :: srh01(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+   real(REAL4), intent(OUT) :: srh03(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+   real(REAL4), intent(OUT) :: srh25(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
 
 ! made an intermediate output of FVPRC
-   real(FVPRC) :: uh25_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+   real(FVPRC) :: uh_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
    integer :: sphum=1
    real(FVPRC) :: vort(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,FV_Atm(1)%npz)
-   ! introduced these two variables for the literals
    real(FVPRC) :: z_bot, z_top
+   real(FVPRC), allocatable :: ustm(:,:), vstm(:,:)
 
-   call get_vorticity(FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, &
-                      FV_Atm(1)%bd%isd, FV_Atm(1)%bd%ied, FV_Atm(1)%bd%jsd, FV_Atm(1)%bd%jed, &
-                      FV_Atm(1)%npz, FV_Atm(1)%u, FV_Atm(1)%v, vort, &
+   integer :: isc, iec, jsc, jec, ng, npz
+   integer :: isd, ied, jsd, jed
+
+   isc = FV_Atm(1)%bd%isc
+   iec = FV_Atm(1)%bd%iec
+   jsc = FV_Atm(1)%bd%jsc
+   jec = FV_Atm(1)%bd%jec
+
+   isd = FV_Atm(1)%bd%isd
+   ied = FV_Atm(1)%bd%ied
+   jsd = FV_Atm(1)%bd%jsd
+   jed = FV_Atm(1)%bd%jed
+
+   ng = FV_Atm(1)%ng
+   npz = FV_Atm(1)%npz
+
+   call get_vorticity(isc, iec, jsc, jec, isd, ied, jsd, jed, npz, &
+                      FV_Atm(1)%u, FV_Atm(1)%v, vort, &
                       FV_Atm(1)%gridstruct%dx, FV_Atm(1)%gridstruct%dy, FV_Atm(1)%gridstruct%rarea)
 
-! call this with uh25_tmp which is of FVPRC
+! call this with uh_tmp which is of FVPRC
    z_bot = 2.e3
    z_top = 5.e3
-   call updraft_helicity(FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, FV_Atm(1)%ng, FV_Atm(1)%npz, &
-                     zvir, sphum, uh25_tmp, &
-                     FV_Atm(1)%w, vort, FV_Atm(1)%delz, FV_Atm(1)%q,   &
-                     FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
-
+   call updraft_helicity(isc, iec, jsc, jec, ng, npz, &
+                         zvir, sphum, uh_tmp, &
+                         FV_Atm(1)%w, vort, FV_Atm(1)%delz, FV_Atm(1)%q,   &
+                         FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
 ! cast back to r4
-   uh25 = uh25_tmp
+   uh25 = uh_tmp
+
+! call this with uh_tmp which is of FVPRC
+   z_bot = 0.e3
+   z_top = 3.e3
+   call updraft_helicity(isc, iec, jsc, jec, ng, npz, &
+                         zvir, sphum, uh_tmp, &
+                         FV_Atm(1)%w, vort, FV_Atm(1)%delz, FV_Atm(1)%q,   &
+                         FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
+! cast back to r4 
+   uh03 = uh_tmp
+
+! Storm relative helicities
+   allocate(ustm(isc:iec,jsc:jec), vstm(isc:iec,jsc:jec))
+
+   call bunkers_vector(isc, iec, jsc, jec, ng, npz, zvir, sphum, ustm, vstm, &
+                   FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
+                   FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav)
+
+   z_bot = 0.e3
+   z_top = 1.e3
+   call helicity_relative_CAPS(isc, iec, jsc, jec, ng, npz, zvir, sphum, uh_tmp, ustm, vstm, &
+                   FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
+                   FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
+! cast back to r4 
+   srh01 = uh_tmp                                 
+
+   z_bot = 0.e3
+   z_top = 3.e3
+   call helicity_relative_CAPS(isc, iec, jsc, jec, ng, npz, zvir, sphum, uh_tmp, ustm, vstm, &
+                   FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
+                   FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
+! cast back to r4
+   srh03 = uh_tmp
+
+   z_bot = 2.e3
+   z_top = 5.e3
+   call helicity_relative_CAPS(isc, iec, jsc, jec, ng, npz, zvir, sphum, uh_tmp, ustm, vstm, &
+                   FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
+                   FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
+! cast back to r4
+   srh25 = uh_tmp
+
+   deallocate(ustm, vstm)
+
 end subroutine fv_getUpdraftHelicity
 
 subroutine fv_getEPV(pt, vort, ua, va, epv)
