@@ -591,16 +591,16 @@ contains
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 120.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )  
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )  
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )  
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )  
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)  
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )  
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       FV_Atm(1)%flagstruct%fv_sg_adj = DT
@@ -3842,11 +3842,11 @@ end subroutine fv_getDivergence
 subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
    use constants_mod, only: fms_grav=>grav
 ! made this REAL4
-   real(REAL4), pointer, optional, intent(OUT) ::  uh25(:,:)
-   real(REAL4), pointer, optional, intent(OUT) ::  uh03(:,:)
-   real(REAL4), pointer, optional, intent(OUT) :: srh01(:,:)
-   real(REAL4), pointer, optional, intent(OUT) :: srh03(:,:)
-   real(REAL4), pointer, optional, intent(OUT) :: srh25(:,:)
+   real(REAL4), optional, intent(OUT) ::  uh25(:,:)
+   real(REAL4), optional, intent(OUT) ::  uh03(:,:)
+   real(REAL4), optional, intent(OUT) :: srh01(:,:)
+   real(REAL4), optional, intent(OUT) :: srh03(:,:)
+   real(REAL4), optional, intent(OUT) :: srh25(:,:)
 
 ! made an intermediate output of FVPRC
    real(FVPRC) :: uh_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
@@ -3875,7 +3875,7 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
                       FV_Atm(1)%u, FV_Atm(1)%v, vort, &
                       FV_Atm(1)%gridstruct%dx, FV_Atm(1)%gridstruct%dy, FV_Atm(1)%gridstruct%rarea)
 
-   if (associated(uh25)) then
+   if (present(uh25)) then
    z_bot = 2.e3
    z_top = 5.e3
    call updraft_helicity(isc, iec, jsc, jec, ng, npz, &
@@ -3885,7 +3885,7 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
    uh25 = uh_tmp
    endif
 
-   if (associated(uh03)) then
+   if (present(uh03)) then
    z_bot = 0.e3
    z_top = 3.e3
    call updraft_helicity(isc, iec, jsc, jec, ng, npz, &
@@ -3897,23 +3897,23 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
 
    ! Storm relative helicities
 
-   if (associated(srh01) .or. associated(srh03) .or. associated(srh25)) then
+   if (present(srh01) .or. present(srh03) .or. present(srh25)) then
      allocate(ustm(isc:iec,jsc:jec), vstm(isc:iec,jsc:jec))
      call bunkers_vector(isc, iec, jsc, jec, ng, npz, zvir, sphum, ustm, vstm, &
                      FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                      FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav)
    endif
 
-   if (associated(srh01)) then
+   if (present(srh01)) then
    z_bot = 0.e3
    z_top = 1.e3
    call helicity_relative_CAPS(isc, iec, jsc, jec, ng, npz, zvir, sphum, uh_tmp, ustm, vstm, &
                    FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                    FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
-   srh01 = uh_tmp                                 
+   srh01 = uh_tmp
    endif
 
-   if (associated(srh03)) then
+   if (present(srh03)) then
    z_bot = 0.e3
    z_top = 3.e3
    call helicity_relative_CAPS(isc, iec, jsc, jec, ng, npz, zvir, sphum, uh_tmp, ustm, vstm, &
@@ -3922,7 +3922,7 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
    srh03 = uh_tmp
    endif
 
-   if (associated(srh25)) then
+   if (present(srh25)) then
    z_bot = 2.e3
    z_top = 5.e3
    call helicity_relative_CAPS(isc, iec, jsc, jec, ng, npz, zvir, sphum, uh_tmp, ustm, vstm, &
@@ -3931,7 +3931,7 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
    srh25 = uh_tmp
    endif
 
-   if (associated(srh01) .or. associated(srh03) .or. associated(srh25)) then
+   if (present(srh01) .or. present(srh03) .or. present(srh25)) then
      deallocate(ustm, vstm)
    endif
 
