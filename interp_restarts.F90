@@ -449,6 +449,9 @@ program interp_restarts
          imc = npx-1
          jmc = imc*6
          call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon ','lat ','lev ','edge'/),(/imc,jmc,npz,npz+1/),rc=status)
+         if (allocated(schmidt_parameters)) then
+             call add_stretch_params(OutCfg(1),schmidt_parameters)
+         end if     
 
          ! if dz and w were not in the original file add them
          ! they need to be in there for the restart
@@ -539,6 +542,9 @@ program interp_restarts
          allocate(InCfg(1),OutCfg(1))
          InCfg(1)=InFmt%read(rc=status)
          call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev'/),(/imc,jmc,npz/),rc=status)
+         if (allocated(schmidt_parameters)) then
+             call add_stretch_params(OutCfg(1),schmidt_parameters)
+         end if     
          if (AmWriter) then
             call OutFmt%create_par(fname1,comm=arrdes%writers_comm,info=info,rc=status)
             call OutFmt%write(OutCfg(1),rc=status)
@@ -593,25 +599,26 @@ program interp_restarts
             allocate(InCfg(1),OutCfg(1))
             InCfg(1)=InFmt%read(rc=status)
 
-
-            if (rst_files(ifile)%has_edge .eqv. .false. &
-            .and. rst_files(ifile)%has_center .eqv. .false. &
-            .and. rst_files(ifile)%ungrid_size == -1) then
+            if ((rst_files(ifile)%has_edge .eqv. .false.) &
+            .and. (rst_files(ifile)%has_center .eqv. .false.) &
+            .and. (rst_files(ifile)%ungrid_size == -1)) then
                 call MAPL_IOChangeRes(InCfg(1),OutCfg(1),['lon','lat'],[imc,jmc],rc=status)
-            else if (rst_files(ifile)%has_edge .eqv. .false. &
-            .and. rst_files(ifile)%has_center .eqv. .true. &
-            .and. rst_files(ifile)%ungrid_size == -1) then
+            else if ((rst_files(ifile)%has_edge .eqv. .false.) &
+            .and. (rst_files(ifile)%has_center .eqv. .true.) &
+            .and. (rst_files(ifile)%ungrid_size == -1)) then
                call MAPL_IOChangeRes(InCfg(1),OutCfg(1),['lon','lat','lev'],[imc,jmc,npz],rc=status)
-            else if (rst_files(ifile)%has_edge .eqv. .true. &
-            .and. rst_files(ifile)%has_center .eqv. .true. &
-            .and. rst_files(ifile)%ungrid_size == -1) then
+            else if ((rst_files(ifile)%has_edge .eqv. .true.) &
+            .and. (rst_files(ifile)%has_center .eqv. .true.) &
+            .and. (rst_files(ifile)%ungrid_size == -1)) then
                call MAPL_IOChangeRes(InCfg(1),OutCfg(1),['lon ','lat ','lev ','edge'],[imc,jmc,npz,npz+1],rc=status)
-            else if (rst_files(ifile)%has_edge .eqv. .false. &
-            .and. rst_files(ifile)%has_center .eqv. .true. &
-            .and. rst_files(ifile)%ungrid_size > 0) then
+            else if ((rst_files(ifile)%has_edge .eqv. .false.) &
+            .and. (rst_files(ifile)%has_center .eqv. .true.) &
+            .and. (rst_files(ifile)%ungrid_size > 0)) then
                call MAPL_IOChangeRes(InCfg(1),OutCfg(1),[character(len=12):: 'lon ','lat ','lev ','unknown_dim1'],[imc,jmc,npz,rst_files(ifile)%ungrid_size],rc=status)
             end if
-     
+            if (allocated(schmidt_parameters)) then
+                call add_stretch_params(OutCfg(1),schmidt_parameters)
+            end if     
 
             call OutFmt%create_par(fname1,comm=arrdes%writers_comm,info=info,rc=status)
             call OutFmt%write(OutCfg(1),rc=status)
@@ -620,7 +627,7 @@ program interp_restarts
          end if
          do iq=1,size(rst_files(ifile)%vars)
             vname = trim(rst_files(ifile)%vars(iq)%name)
-            if (is_master()) print*, 'Writing : ', TRIM(fname1), ' ', iq
+            if (is_master()) print*, 'Writing : ', TRIM(vname), ' ', iq
             nlev = rst_files(ifile)%vars(iq)%nlev
             allocate(r4_local(is:ie,js:je,nlev))
             if (rst_files(ifile)%vars(iq)%rank ==2) then
@@ -671,5 +678,15 @@ contains
 
       return
    end subroutine rs_count
+
+   subroutine add_stretch_params(meta,stretch_parameters)
+      type(FileMetadata), intent(inout) :: meta
+      real, intent(in) :: stretch_parameters(3)
+
+      call meta%add_attribute('TARGET_LON',stretch_parameters(1))
+      call meta%add_attribute('TARGET_LAT',stretch_parameters(2))
+      call meta%add_attribute('STRETCH_FACTOR',stretch_parameters(3))
+
+   end subroutine add_stretch_params
 
 end program interp_restarts
