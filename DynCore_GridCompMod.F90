@@ -1319,6 +1319,30 @@ contains
     VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                  &
+       SHORT_NAME         = 'WSPD_10M',                               &
+       LONG_NAME          = 'wind_speed_at_10m',                  &
+       UNITS              = 'm s-1',                               &
+       DIMS               = MAPL_DimsHorzOnly,                     &
+       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+       SHORT_NAME         = 'VVEL_UP_100_1000',                    &
+       LONG_NAME          = 'max_vertical_velocity_up_between_100_1000_hPa', &
+       UNITS              = 'm s-1',                               &
+       DIMS               = MAPL_DimsHorzOnly,                     &
+       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+       SHORT_NAME         = 'VVEL_DN_100_1000',                    &
+       LONG_NAME          = 'max_vertical_velocity_down_between_100_1000_hPa', &
+       UNITS              = 'm s-1',                               &
+       DIMS               = MAPL_DimsHorzOnly,                     &
+       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'DZ',                                  &
        LONG_NAME          = 'surface_layer_height',                &
        UNITS              = 'm',                                   &
@@ -5024,6 +5048,47 @@ subroutine Run(gc, import, export, clock, rc)
       VERIFY_(STATUS)
       if(associated(temp2d)) temp2d = sqrt( ur(:,:,km)**2 + vr(:,:,km)**2 )
    endif
+
+
+   call MAPL_GetPointer(export,temp2d,'WSPD_10M',rc=status)        
+   VERIFY_(STATUS)
+   if(associated(temp2d)) then
+       call VertInterp(temp2d,sqrt(ur**2 + vr**2),-zle,-10.0, status)
+       VERIFY_(STATUS)
+   end if
+
+   if (.not. HYDROSTATIC) then
+   call MAPL_GetPointer(export,temp2d,'VVEL_UP_100_1000',rc=status)
+   VERIFY_(STATUS)
+   if(associated(temp2d)) then
+       temp2d = vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,km)
+       do k=km-1,1,-1
+          do j=jfirstxy,jlastxy
+             do i=ifirstxy,ilastxy
+                if ( (vars%w(i,j,k) > temp2d(i-ifirstxy+1,j-jfirstxy+1)) .and. &
+                     (vars%pe(i,j,k) >= 10000.0) ) then
+                   temp2d(i-ifirstxy+1,j-jfirstxy+1) = vars%w(i,j,k)
+                endif
+             enddo
+          enddo
+       enddo
+   end if
+   call MAPL_GetPointer(export,temp2d,'VVEL_DN_100_1000',rc=status)
+   VERIFY_(STATUS)
+   if(associated(temp2d)) then
+       temp2d = vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,km)
+       do k=km-1,1,-1
+          do j=jfirstxy,jlastxy
+             do i=ifirstxy,ilastxy
+                if ( (vars%w(i,j,k) < temp2d(i-ifirstxy+1,j-jfirstxy+1)) .and. &
+                     (vars%pe(i,j,k) >= 10000.0) ) then
+                   temp2d(i-ifirstxy+1,j-jfirstxy+1) = vars%w(i,j,k)
+                endif
+             enddo
+          enddo
+       enddo 
+   end if
+   end if
 
 ! Updraft Helicty Exports
 
