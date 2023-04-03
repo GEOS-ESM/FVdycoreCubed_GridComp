@@ -5036,7 +5036,7 @@ subroutine Run(gc, import, export, clock, rc)
       if (.not. HYDROSTATIC) then
          if( associated( uh25) .or. associated( uh03) .or. &
             associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
-            call fv_getUpdraftHelicity(uh25=uh25, uh03=uh03, srh01=srh01, srh03=srh03, srh25=srh25)
+            call fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
          endif
       endif
 
