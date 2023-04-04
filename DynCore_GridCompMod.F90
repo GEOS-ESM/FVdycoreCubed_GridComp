@@ -5092,16 +5092,16 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Updraft Helicty Exports
 
-      call MAPL_GetPointer(export,  uh25, 'UH25',  rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export,  uh03, 'UH03',  rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export, srh01,'SRH01',  rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export, srh03,'SRH03',  rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export, srh25,'SRH25',  rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export,  uh25, 'UH25', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export,  uh03, 'UH03', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, srh01,'SRH01', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, srh03,'SRH03', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, srh25,'SRH25', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
       ! Per WMP, this calculation is not useful if running hydrostatic
       if (.not. HYDROSTATIC) then
          if( associated( uh25) .or. associated( uh03) .or. &
-            associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
-            call fv_getUpdraftHelicity(uh25=uh25, uh03=uh03, srh01=srh01, srh03=srh03, srh25=srh25)
+             associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
+            call fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
          endif
       endif
 

@@ -473,8 +473,6 @@ contains
   ! Number of water species for FV3 determined later
   ! when reading the tracer bundle in fv_first_run
    FV_Atm(1)%flagstruct%nwat = 0
-  ! Trigger to enable autoconversion/cloud processes on the fv_mapz step
-   FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
   ! Veritical resolution dependencies
    FV_Atm(1)%flagstruct%external_eta = .true.
    if (FV_Atm(1)%flagstruct%npz >= 70) then
@@ -487,36 +485,22 @@ contains
    endif
    if (FV_Atm(1)%flagstruct%npz >= 90) then
      FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 25 ! ~10mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 126) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~10mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 132) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 39 ! ~50mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 136) then
      FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 48 ! ~50mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 180) then
      FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 76 ! ~50mb
    endif
-   FV_Atm(1)%flagstruct%n_sponge = 0
-!!!FV_Atm(1)%flagstruct%n_zfilter = FV_Atm(1)%flagstruct%npz
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
    if (FV_Atm(1)%flagstruct%npz == 72) then
      FV_Atm(1)%flagstruct%gmao_remap = 0   ! GFDL Schemes
    else
      FV_Atm(1)%flagstruct%gmao_remap = 0   ! (0 for GFDL Schemes) (3 for GMAO Cubic)
    endif
-   FV_Atm(1)%flagstruct%kord_tm =  9
-   FV_Atm(1)%flagstruct%kord_mt =  9
-   FV_Atm(1)%flagstruct%kord_wz =  9
-   FV_Atm(1)%flagstruct%kord_tr =  9
    FV_Atm(1)%flagstruct%z_tracer = .true.
   ! Some default horizontal flags
    FV_Atm(1)%flagstruct%adjust_dry_mass = fix_mass
@@ -527,19 +511,7 @@ contains
    FV_Atm(1)%flagstruct%ke_bg = 0.0
   ! Rayleigh & Divergence Damping
    if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
-     FV_Atm(1)%flagstruct%RF_fast = .true.
-     FV_Atm(1)%flagstruct%tau = 1.25
-     FV_Atm(1)%flagstruct%rf_cutoff = 0.50e2
-    ! 6th order default damping options
-     FV_Atm(1)%flagstruct%nord = 3
-     FV_Atm(1)%flagstruct%dddmp = 0.2
-     FV_Atm(1)%flagstruct%d4_bg = 0.14
-     FV_Atm(1)%flagstruct%d2_bg = 0.0
-     FV_Atm(1)%flagstruct%d_ext = 0.0
-     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
-     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.15
-     FV_Atm(1)%flagstruct%consv_te = 1.0
-   else
+     FV_Atm(1)%flagstruct%n_sponge = 0
      FV_Atm(1)%flagstruct%RF_fast = .false.
      if (FV_Atm(1)%flagstruct%npz == 72) then
        FV_Atm(1)%flagstruct%tau = 0.0
@@ -547,6 +519,10 @@ contains
        FV_Atm(1)%flagstruct%tau = 2.0
      endif
      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
+     FV_Atm(1)%flagstruct%kord_tm =  9
+     FV_Atm(1)%flagstruct%kord_mt =  9
+     FV_Atm(1)%flagstruct%kord_wz =  9
+     FV_Atm(1)%flagstruct%kord_tr =  9
     ! 6th order default damping options
      FV_Atm(1)%flagstruct%nord = 2
      FV_Atm(1)%flagstruct%dddmp = 0.2
@@ -556,6 +532,36 @@ contains
      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.02
      FV_Atm(1)%flagstruct%consv_te = 1.0
+     FV_Atm(1)%flagstruct%p_fac = 0.05
+     FV_Atm(1)%flagstruct%fv_sg_adj = DT
+    ! Trigger to enable autoconversion/cloud processes on the fv_mapz step
+     FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
+   else
+     FV_Atm(1)%flagstruct%n_sponge = 0
+     FV_Atm(1)%flagstruct%RF_fast = .false.
+     if (FV_Atm(1)%flagstruct%npz == 72) then
+       FV_Atm(1)%flagstruct%tau = 0.0
+     else
+       FV_Atm(1)%flagstruct%tau = 2.0
+     endif
+     FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
+     FV_Atm(1)%flagstruct%kord_tm =  9
+     FV_Atm(1)%flagstruct%kord_mt =  9
+     FV_Atm(1)%flagstruct%kord_wz =  9
+     FV_Atm(1)%flagstruct%kord_tr =  9
+    ! 6th order default damping options
+     FV_Atm(1)%flagstruct%nord = 2
+     FV_Atm(1)%flagstruct%dddmp = 0.2
+     FV_Atm(1)%flagstruct%d4_bg = 0.12
+     FV_Atm(1)%flagstruct%d2_bg = 0.0
+     FV_Atm(1)%flagstruct%d_ext = 0.0
+     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
+     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.02
+     FV_Atm(1)%flagstruct%consv_te = 1.0
+     FV_Atm(1)%flagstruct%p_fac = 0.05
+     FV_Atm(1)%flagstruct%fv_sg_adj = DT
+    ! Trigger to enable autoconversion/cloud processes on the fv_mapz step
+     FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
    endif
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%n_split = 0
@@ -563,7 +569,6 @@ contains
   ! default NonHydrostatic settings (irrelavent to Hydrostatic)
    FV_Atm(1)%flagstruct%beta = 0.0
    FV_Atm(1)%flagstruct%a_imp = 1.0
-   FV_Atm(1)%flagstruct%p_fac = 0.05
   ! Cubed-Sphere Global Resolution Specific adjustments
    if (FV_Atm(1)%flagstruct%ntiles == 6) then
      ! Cubed-sphere grid resolution and DT dependence
@@ -587,24 +592,18 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 120.0 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
-      FV_Atm(1)%flagstruct%fv_sg_adj = DT
-      if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) FV_Atm(1)%flagstruct%fv_sg_adj = DT*1.5
       ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%hydrostatic = .false.
       FV_Atm(1)%flagstruct%make_nh = .false.
@@ -632,22 +631,22 @@ contains
          FV_Atm(1)%flagstruct%vtdm4 = 0.01
      ! continue to adjust vorticity damping with
      ! increasing resolution
-         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
+         if (FV_Atm(1)%flagstruct%npx >= 180) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
-         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
+         if (FV_Atm(1)%flagstruct%npx >= 360) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.02
          endif
-         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
+         if (FV_Atm(1)%flagstruct%npx >= 720) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.03
          endif
-         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
+         if (FV_Atm(1)%flagstruct%npx >= 1440) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.04
          endif
-         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
+         if (FV_Atm(1)%flagstruct%npx >= 2880) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.06
          endif
-         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
+         if (FV_Atm(1)%flagstruct%npx >= 5760) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.08
          endif
       endif
@@ -2408,7 +2407,7 @@ subroutine State_To_FV ( STATE )
 
        if ( FV_Atm(1)%flagstruct%range_warn ) then
           call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            130., 335., bad_data)
+                            150., 333., bad_data)
        endif
 
 !------------
@@ -2473,10 +2472,10 @@ subroutine FV_To_State ( STATE )
 !-----------------------------------
 ! Fill Dry Temperature to PT
 !-----------------------------------
-      !if ( FV_Atm(1)%flagstruct%range_warn ) then
-      !   call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-      !                     130., 335., bad_data)
-      !endif
+       if ( FV_Atm(1)%flagstruct%range_warn ) then
+          call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                            150., 333., bad_data)
+       endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 
 !------------------------------
@@ -3842,11 +3841,11 @@ end subroutine fv_getDivergence
 subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
    use constants_mod, only: fms_grav=>grav
 ! made this REAL4
-   real(REAL4), optional, intent(OUT) ::  uh25(:,:)
-   real(REAL4), optional, intent(OUT) ::  uh03(:,:)
-   real(REAL4), optional, intent(OUT) :: srh01(:,:)
-   real(REAL4), optional, intent(OUT) :: srh03(:,:)
-   real(REAL4), optional, intent(OUT) :: srh25(:,:)
+   real(REAL4), intent(OUT) ::  uh25(:,:)
+   real(REAL4), intent(OUT) ::  uh03(:,:)
+   real(REAL4), intent(OUT) :: srh01(:,:)
+   real(REAL4), intent(OUT) :: srh03(:,:)
+   real(REAL4), intent(OUT) :: srh25(:,:)
 
 ! made an intermediate output of FVPRC
    real(FVPRC) :: uh_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
@@ -3875,7 +3874,6 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
                       FV_Atm(1)%u, FV_Atm(1)%v, vort, &
                       FV_Atm(1)%gridstruct%dx, FV_Atm(1)%gridstruct%dy, FV_Atm(1)%gridstruct%rarea)
 
-   if (present(uh25)) then
    z_bot = 2.e3
    z_top = 5.e3
    call updraft_helicity(isc, iec, jsc, jec, ng, npz, &
@@ -3883,9 +3881,7 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
                          FV_Atm(1)%w, vort, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                          FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
    uh25 = uh_tmp
-   endif
 
-   if (present(uh03)) then
    z_bot = 0.e3
    z_top = 3.e3
    call updraft_helicity(isc, iec, jsc, jec, ng, npz, &
@@ -3893,47 +3889,36 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
                          FV_Atm(1)%w, vort, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                          FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
    uh03 = uh_tmp
-   endif
 
    ! Storm relative helicities
 
-   if (present(srh01) .or. present(srh03) .or. present(srh25)) then
-     allocate(ustm(isc:iec,jsc:jec), vstm(isc:iec,jsc:jec))
-     call bunkers_vector(isc, iec, jsc, jec, ng, npz, zvir, sphum, ustm, vstm, &
-                     FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
-                     FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav)
-   endif
+   allocate(ustm(isc:iec,jsc:jec), vstm(isc:iec,jsc:jec))
+   call bunkers_vector(isc, iec, jsc, jec, ng, npz, zvir, sphum, ustm, vstm, &
+                  FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
+                  FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav)
 
-   if (present(srh01)) then
    z_bot = 0.e3
    z_top = 1.e3
    call helicity_relative_CAPS(isc, iec, jsc, jec, ng, npz, zvir, sphum, uh_tmp, ustm, vstm, &
                    FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                    FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
    srh01 = uh_tmp
-   endif
 
-   if (present(srh03)) then
    z_bot = 0.e3
    z_top = 3.e3
    call helicity_relative_CAPS(isc, iec, jsc, jec, ng, npz, zvir, sphum, uh_tmp, ustm, vstm, &
                    FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                    FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
    srh03 = uh_tmp
-   endif
 
-   if (present(srh25)) then
    z_bot = 2.e3
    z_top = 5.e3
    call helicity_relative_CAPS(isc, iec, jsc, jec, ng, npz, zvir, sphum, uh_tmp, ustm, vstm, &
                    FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                    FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
    srh25 = uh_tmp
-   endif
 
-   if (present(srh01) .or. present(srh03) .or. present(srh25)) then
-     deallocate(ustm, vstm)
-   endif
+   deallocate(ustm, vstm)
 
 end subroutine fv_getUpdraftHelicity
 
