@@ -283,6 +283,8 @@
   real(kind=8) :: t1, t2
   real(kind=8) :: dyn_run_timer
 
+  logical :: DO_ADD_INCS = .true.
+
 contains
 
 !----------------------------------------------------------------------
@@ -2588,6 +2590,9 @@ contains
 ! !RESOURCE_ITEM: none :: name of layout file
     call MAPL_GetResource ( MAPL, layout_file, 'LAYOUT:', default='fvcore_layout.rc', rc=status )
 !EOR
+    VERIFY_(STATUS)
+
+    call MAPL_GetResource ( MAPL, DO_ADD_INCS, 'DO_ADD_INCS:', default=DO_ADD_INCS, rc=status )
     VERIFY_(STATUS)
 
 ! Check for ColdStart from the configuration
@@ -7155,7 +7160,7 @@ end subroutine RunAddIncs
         graupel = 6
     end select
 
-    if (.not. ADIABATIC) then
+    if ( (.not. ADIABATIC) .and. (DO_ADD_INCS) ) then
 
 
        ! **********************************************************************
@@ -7301,6 +7306,7 @@ end subroutine RunAddIncs
 
        DEALLOCATE (DPNEW)
        DEALLOCATE (DPOLD)
+
     endif ! .not. Adiabatic
 
 
