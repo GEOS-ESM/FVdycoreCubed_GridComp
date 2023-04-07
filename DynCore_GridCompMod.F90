@@ -1319,6 +1319,30 @@ contains
     VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                  &
+       SHORT_NAME         = 'WSPD_10M',                               &
+       LONG_NAME          = 'wind_speed_at_10m',                  &
+       UNITS              = 'm s-1',                               &
+       DIMS               = MAPL_DimsHorzOnly,                     &
+       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+       SHORT_NAME         = 'VVEL_UP_100_1000',                    &
+       LONG_NAME          = 'max_vertical_velocity_up_between_100_1000_hPa', &
+       UNITS              = 'm s-1',                               &
+       DIMS               = MAPL_DimsHorzOnly,                     &
+       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+       SHORT_NAME         = 'VVEL_DN_100_1000',                    &
+       LONG_NAME          = 'max_vertical_velocity_down_between_100_1000_hPa', &
+       UNITS              = 'm s-1',                               &
+       DIMS               = MAPL_DimsHorzOnly,                     &
+       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'DZ',                                  &
        LONG_NAME          = 'surface_layer_height',                &
        UNITS              = 'm',                                   &
@@ -5025,17 +5049,58 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) temp2d = sqrt( ur(:,:,km)**2 + vr(:,:,km)**2 )
    endif
 
+
+   call MAPL_GetPointer(export,temp2d,'WSPD_10M',rc=status)        
+   VERIFY_(STATUS)
+   if(associated(temp2d)) then
+       call VertInterp(temp2d,sqrt(ur**2 + vr**2),-zle,-10.0, status)
+       VERIFY_(STATUS)
+   end if
+
+   if (.not. HYDROSTATIC) then
+   call MAPL_GetPointer(export,temp2d,'VVEL_UP_100_1000',rc=status)
+   VERIFY_(STATUS)
+   if(associated(temp2d)) then
+       temp2d = vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,km)
+       do k=km-1,1,-1
+          do j=jfirstxy,jlastxy
+             do i=ifirstxy,ilastxy
+                if ( (vars%w(i,j,k) > temp2d(i-ifirstxy+1,j-jfirstxy+1)) .and. &
+                     (vars%pe(i,j,k) >= 10000.0) ) then
+                   temp2d(i-ifirstxy+1,j-jfirstxy+1) = vars%w(i,j,k)
+                endif
+             enddo
+          enddo
+       enddo
+   end if
+   call MAPL_GetPointer(export,temp2d,'VVEL_DN_100_1000',rc=status)
+   VERIFY_(STATUS)
+   if(associated(temp2d)) then
+       temp2d = vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,km)
+       do k=km-1,1,-1
+          do j=jfirstxy,jlastxy
+             do i=ifirstxy,ilastxy
+                if ( (vars%w(i,j,k) < temp2d(i-ifirstxy+1,j-jfirstxy+1)) .and. &
+                     (vars%pe(i,j,k) >= 10000.0) ) then
+                   temp2d(i-ifirstxy+1,j-jfirstxy+1) = vars%w(i,j,k)
+                endif
+             enddo
+          enddo
+       enddo 
+   end if
+   end if
+
 ! Updraft Helicty Exports
 
-      call MAPL_GetPointer(export,  uh25, 'UH25',  rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export,  uh03, 'UH03',  rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export, srh01,'SRH01',  rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export, srh03,'SRH03',  rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export, srh25,'SRH25',  rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export,  uh25, 'UH25', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export,  uh03, 'UH03', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, srh01,'SRH01', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, srh03,'SRH03', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, srh25,'SRH25', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
       ! Per WMP, this calculation is not useful if running hydrostatic
       if (.not. HYDROSTATIC) then
          if( associated( uh25) .or. associated( uh03) .or. &
-            associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
+             associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
             call fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
          endif
       endif
