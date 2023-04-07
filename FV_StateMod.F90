@@ -1844,7 +1844,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
             time_total)
        call cpu_time(finish)
-       print *, rank, ', fv_dynamics: time taken = ', finish - start, 's'
+       if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
     else
        ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
        ! disable trapping of floating point exceptions temporarily, call the interface
