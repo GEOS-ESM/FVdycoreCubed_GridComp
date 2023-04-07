@@ -485,19 +485,19 @@ contains
    endif
    if (FV_Atm(1)%flagstruct%npz >= 90) then
      FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 39 ! ~50mb
+     FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 136) then
      FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 48 ! ~50mb
+     FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 180) then
      FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 76 ! ~50mb
+     FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
    if (FV_Atm(1)%flagstruct%npz == 72) then
-     FV_Atm(1)%flagstruct%gmao_remap = 0   ! GFDL Schemes
+     FV_Atm(1)%flagstruct%gmao_remap = 0   ! (0 for GFDL Schemes) (3 for GMAO Cubic)
    else
      FV_Atm(1)%flagstruct%gmao_remap = 0   ! (0 for GFDL Schemes) (3 for GMAO Cubic)
    endif
@@ -509,22 +509,24 @@ contains
    FV_Atm(1)%flagstruct%dwind_2d = .false.
    FV_Atm(1)%flagstruct%delt_max = 0.002
    FV_Atm(1)%flagstruct%ke_bg = 0.0
-  ! Rayleigh & Divergence Damping
+  ! Rayleigh, Remap & Divergence Damping
    if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
      FV_Atm(1)%flagstruct%n_sponge = 0
-     FV_Atm(1)%flagstruct%RF_fast = .false.
+     FV_Atm(1)%flagstruct%RF_fast = .true.
      if (FV_Atm(1)%flagstruct%npz == 72) then
        FV_Atm(1)%flagstruct%tau = 0.0
      else
-       FV_Atm(1)%flagstruct%tau = 2.0
+       FV_Atm(1)%flagstruct%tau = 2.5
      endif
      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
-     FV_Atm(1)%flagstruct%kord_tm =  9
-     FV_Atm(1)%flagstruct%kord_mt =  9
-     FV_Atm(1)%flagstruct%kord_wz =  9
-     FV_Atm(1)%flagstruct%kord_tr =  9
+    ! Use GMAO cubic remapping scheme
+     FV_Atm(1)%flagstruct%gmao_remap = 3   ! GMAO Cubic
+     FV_Atm(1)%flagstruct%kord_tm = 10
+     FV_Atm(1)%flagstruct%kord_mt = 10
+     FV_Atm(1)%flagstruct%kord_wz = 10
+     FV_Atm(1)%flagstruct%kord_tr = 10
     ! 6th order default damping options
-     FV_Atm(1)%flagstruct%nord = 2
+     FV_Atm(1)%flagstruct%nord = 3
      FV_Atm(1)%flagstruct%dddmp = 0.2
      FV_Atm(1)%flagstruct%d4_bg = 0.12
      FV_Atm(1)%flagstruct%d2_bg = 0.0
@@ -532,8 +534,8 @@ contains
      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.02
      FV_Atm(1)%flagstruct%consv_te = 1.0
-     FV_Atm(1)%flagstruct%p_fac = 0.05
-     FV_Atm(1)%flagstruct%fv_sg_adj = DT
+     FV_Atm(1)%flagstruct%p_fac = 0.1
+     FV_Atm(1)%flagstruct%fv_sg_adj = DT*3
     ! Trigger to enable autoconversion/cloud processes on the fv_mapz step
      FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
    else
@@ -621,10 +623,17 @@ contains
          FV_Atm(1)%flagstruct%d_con = 0.
       else
       ! Non-Monotonic advection
-         FV_Atm(1)%flagstruct%hord_mt =  5
-         FV_Atm(1)%flagstruct%hord_vt =  6
-         FV_Atm(1)%flagstruct%hord_tm =  6
-         FV_Atm(1)%flagstruct%hord_dp = -6
+         if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+           FV_Atm(1)%flagstruct%hord_mt =  6
+           FV_Atm(1)%flagstruct%hord_vt =  6
+           FV_Atm(1)%flagstruct%hord_tm =  6
+           FV_Atm(1)%flagstruct%hord_dp = -6
+         else
+           FV_Atm(1)%flagstruct%hord_mt =  5
+           FV_Atm(1)%flagstruct%hord_vt =  6
+           FV_Atm(1)%flagstruct%hord_tm =  6
+           FV_Atm(1)%flagstruct%hord_dp = -6
+         endif
        ! Must now include explicit vorticity damping
          FV_Atm(1)%flagstruct%d_con = 1.
          FV_Atm(1)%flagstruct%do_vort_damp = .true.
@@ -1199,6 +1208,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   real(REAL4), pointer     :: PTR3D(:,:,:)
 
+  real(REAL4), pointer     :: LONS(:,:), LATS(:,:) 
+  real(REAL8), pointer     :: lonptr(:,:), latptr(:,:)
+  real(REAL4), allocatable :: griddiffs(:,:)
+  type (ESMF_Grid)         :: ESMFGRID
+
 ! Splitting for Pure Advection
   real(FVPRC) :: myDT, lnp, rdg, pek, ak1
 
@@ -1303,6 +1317,53 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
       !endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
+#ifdef VERIFY_GRID
+    ! Verify Grid Coordinates
+    ! ------- ESMF ------
+     allocate ( griddiffs(isc:iec,jsc:jec) )
+     call ESMF_GridCompGet( GC, grid=ESMFGRID, RC=STATUS )
+     call ESMF_GridGetCoord(ESMFGRID,localDE=0,coordDim=1,&
+                        staggerloc=ESMF_STAGGERLOC_CENTER,&
+                            farrayPtr=lonptr,rc=status)
+     griddiffs = REAL(lonptr)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,1))
+     do j=jsc,jec
+        do i=isc,iec
+           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LONS discprepency FV3 : ESMF ', &
+                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,1)*180.0/MAPL_PI), &
+                                REAL(           lonptr(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
+        enddo
+     enddo
+     call ESMF_GridGetCoord(ESMFGRID,localDE=0,coordDim=2,&
+                        staggerloc=ESMF_STAGGERLOC_CENTER,&
+                                    farrayPtr=latptr,rc=status)
+     griddiffs = REAL(latptr)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,2))
+     do j=jsc,jec
+        do i=isc,iec
+           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LATS discprepency FV3 : ESMF ', &
+                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,2)*180.0/MAPL_PI), &
+                                REAL(           latptr(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
+        enddo
+     enddo
+    ! ------- MAPL ------
+     call MAPL_Get(MAPL, LATS=LATS, LONS=LONS, RC=STATUS)  ! These are in radians
+     griddiffs = REAL(LONS)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,1))
+     do j=jsc,jec
+        do i=isc,iec
+           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LONS discprepency FV3 : MAPL ', &
+                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,1)*180.0/MAPL_PI), &
+                                REAL(             LONS(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
+        enddo
+     enddo
+     griddiffs = REAL(LATS)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,2))
+     do j=jsc,jec
+        do i=isc,iec
+           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LATS discprepency FV3 : MAPL ', &
+                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,2)*180.0/MAPL_PI), &
+                                REAL(             LATS(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
+        enddo
+     enddo
+     deallocate ( griddiffs )
+#endif
     ! Set FV3 surface geopotential
      FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=FVPRC)
      FV_Atm(1)%varflt(isc:iec,jsc:jec) = real(varflt,kind=FVPRC)
