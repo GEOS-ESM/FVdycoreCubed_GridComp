@@ -35,10 +35,8 @@
                            DynRun          => FV_Run,                &
                            DynFinalize     => FV_Finalize,           &
                            getAllWinds     => fv_getAllWinds,        &
-#if defined(__GFORTRAN__)
                            getVorticity    => fv_getVorticity,       &
                            getDivergence   => fv_getDivergence,      &
-#endif
                            fillMassFluxes  => fv_fillMassFluxes,     &
                            computeMassFluxes => fv_computeMassFluxes,&
                            getVerticalMassFlux => fv_getVerticalMassFlux,&
@@ -4381,16 +4379,9 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Get all wind derivatives
 ! ------------------------
-#if defined(__GFORTRAN__)
-      ! Note there is a bug with GNU 12.1 and getting vort and divg via
-      ! getAllWinds. The reason is unknown as the getAllWinds code is
-      ! valid Fortran. Until this can be fixed, we use a less-efficient
-      ! workaround
       call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
       call getVorticity(vars%u, vars%v, vort)
-#else
-      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr, vort=vort, divg=divg)
-#endif
+      call getDivergence(uc, vc, divg)
 
 ! Compute absolute vorticity on the D grid
 ! -------------------------------------------------
@@ -5114,10 +5105,6 @@ subroutine Run(gc, import, export, clock, rc)
 
       zle = log(vars%pe)
 
-#if defined(__GFORTRAN__)
-      call getDivergence(uc, vc, divg)
-#endif
-
       call MAPL_GetPointer(export,temp3d,'DIVG',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp3d)) temp3d = divg
@@ -5151,10 +5138,6 @@ subroutine Run(gc, import, export, clock, rc)
        end if
 
 ! Vorticity Exports
-
-#if defined(__GFORTRAN__)
-      call getVorticity(vars%u, vars%v, vort)
-#endif
 
       call MAPL_GetPointer(export,temp3d,'VORT',  rc=status)
       VERIFY_(STATUS)
