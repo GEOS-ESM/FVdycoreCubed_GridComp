@@ -254,7 +254,7 @@ def geos_gtfv3(
     cy: "cffi.FFI.CData",
     diss_est: "cffi.FFI.CData",
 ):
-    BACKEND = "dace:gpu"
+    BACKEND = "gt:gpu"
     NAMELIST_PATH = "input.nml"
 
     global GEOS_DYCORE
