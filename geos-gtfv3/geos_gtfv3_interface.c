@@ -13,27 +13,28 @@ void geos_gtfv3_interface_c(
     int adiabatic,
 
     // input/output
-    float* u, float* v, float* w, float* delz,
-    float* pt, float* delp, float* q,
-    float* ps, float* pe, float* pk, float* peln, float* pkz,
-    float* phis, float* q_con, float* omga, float* ua, float* va, float* uc, float* vc,
+    float *u, float *v, float *w, float *delz,
+    float *pt, float *delp, float *q,
+    float *ps, float *pe, float *pk, float *peln, float *pkz,
+    float *phis, float *q_con, float *omga, float *ua, float *va, float *uc, float *vc,
 
     // input
-    const float* ak, const float* bk,
+    const float *ak, const float *bk,
 
     // input/output
-    float* mfx, float* mfy, float* cx, float* cy, float* diss_est) {
+    float *mfx, float *mfy, float *cx, float *cy, float *diss_est)
+{
 
     MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
     /* printf("MPI communicator (F): %d\n", comm_f); */
     /* printf("MPI communicator (C): %d\n", comm_c); */
 
-    time_t now = time(&now);
-    char buf[20];
-    strftime(buf, sizeof(buf), "%FT%T", localtime(&now));
-    int rank;
-    MPI_Comm_rank(comm_c, &rank);
-    if (rank == 0) printf("C: %s.xxx --calling python interface\n", buf);
+    // time_t now = time(&now);
+    // char buf[20];
+    // strftime(buf, sizeof(buf), "%FT%T", localtime(&now));
+    // int rank;
+    // MPI_Comm_rank(comm_c, &rank);
+    // if (rank == 0) printf("C: %s.xxx --calling python interface\n", buf);
 
     geos_gtfv3_interface_py(
         comm_c,
@@ -52,4 +53,9 @@ void geos_gtfv3_interface_c(
         ak, bk,
 
         mfx, mfy, cx, cy, diss_est);
+}
+
+void geos_gtfv3_interface_finalize_c()
+{
+    geos_gtfv3_interface_finalize_py();
 }
