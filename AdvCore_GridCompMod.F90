@@ -599,9 +599,6 @@ contains
                adjustTracers = .true.
             end if
          end if
-      else if (adjustTracerMode == 'NO') then
-         ! Proceed without warning
-         adjustTracers = .false.
       else
          call WRITE_PARALLEL('Invalid option, ignored')
          adjustTracers = .false.

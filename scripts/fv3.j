@@ -142,12 +142,13 @@ module list
 @SETENVS
 
          setenv EXETAG "$TAG"
-         setenv FV3EXE '@FV_PRECISION'
+         setenv FV3EXE 'R4'
          setenv EXPID   "c${AGCM_IM}_L${AGCM_LM}_T${N_TRACERS}_${NX}x${NY}_${N_OMP}threads"
          setenv EXPDSC  "c${AGCM_IM}_L${AGCM_LM}_T${N_TRACERS}_${NX}x${NY}_${N_OMP}threads"
          setenv EXPDIR  @EXPDIR
          setenv SCRDIR  $EXPDIR/scratch_${EXPID}_${EXETAG}-${FV3EXE}
 if ($NH) setenv SCRDIR  ${SCRDIR}_NH.$$
+         setenv EXE     $EXPDIR/StandAlone_FV3_Dycore.x
 
 #######################################################################
 #                 Create Experiment Scratch-Directory
@@ -156,6 +157,7 @@ if ($NH) setenv SCRDIR  ${SCRDIR}_NH.$$
 if (! -e $SCRDIR            ) mkdir -p $SCRDIR
 cd $SCRDIR
 /bin/rm -rf *
+/bin/cp $EXE StandAlone_FV3_Dycore.x
 
 #######################################################################
 #          Create LIVE RC Files from Templates for Current Run
@@ -334,70 +336,11 @@ endif
 #env | grep MPI
 
 #######################################################################
-#          Settings for Singularity - EXPERIMENTAL
-#######################################################################
-
-# Detect if StandAlone_FV3_Dycore.x is in the current directory
-# -------------------------------------------------------------
-
-# If you are using singularity, set the path to the singularity sandbox here
-setenv SINGULARITY_SANDBOX ""
-
-# echo if we are running in singularity
-if( $SINGULARITY_SANDBOX != "" ) then
-   echo "We are running under Singularity"
-   echo ""
-endif
-
-# Detect if StandAlone_FV3_Dycore.x is in the experiment directory
-if (-e $EXPDIR/StandAlone_FV3_Dycore.x) then
-   echo "Found StandAlone_FV3_Dycore.x in $EXPDIR"
-
-   # If SINGULARITY_SANDBOX is non-empty and GEOSgcm.x is found in the experiment directory,
-   # force the use of GEOSgcm.x in the installation directory
-   if( $SINGULARITY_SANDBOX != "" ) then
-      echo "NOTE: Testing has shown Singularity only works when running with"
-      echo "      the GEOSgcm.x executable directly from the installation bin directory"
-      echo ""
-      echo "      So, we will *ignore* the local StandAlone_FV3_Dycore.x and "
-      echo "      instead use $GEOSBIN/StandAlone_FV3_Dycore.x"
-      echo ""
-
-      setenv FV3EXE $GEOSBIN/StandAlone_FV3_Dycore.x
-   else
-      echo "Copying $EXPDIR/StandAlone_FV3_Dycore.x to $SCRDIR"
-      /bin/cp $EXPDIR/StandAlone_FV3_Dycore.x $SCRDIR/StandAlone_FV3_Dycore.x
-
-      setenv FV3EXE $SCRDIR/StandAlone_FV3_Dycore.x
-   endif
-else
-   echo "Using StandAlone_FV3_Dycore.x from $GEOSBIN"
-
-   setenv FV3EXE $GEOSBIN/StandAlone_FV3_Dycore.x
-endif
-echo ""
-
-# If SINGULARITY_SANDBOX is non-empty, then run executable in singularity sandbox
-if( $SINGULARITY_SANDBOX != "" ) then
-   # Load the Singularity module
-   module load singularity
-
-   # Set Singularity Bind Paths. Note: These are dependent on where you are running.
-   # By default, we'll assume you are running this script from NOBACKUP
-   setenv SINGULARITY_BIND_PATH "-B ${NOBACKUP}:${NOBACKUP}"
-
-   # Set a variable to encapsulate all Singularity details
-   setenv SINGULARITY_RUN "singularity exec $SINGULARITY_BIND_PATH $SINGULARITY_SANDBOX"
-else
-   setenv SINGULARITY_RUN ""
-endif
-
-#######################################################################
 #                          Run the Model
 #######################################################################
 echo "  "
 #pwd
-echo "***** USING **** $FV3EXE *********************"
+echo "***** USING **** $EXE *********************"
 
 if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 
@@ -407,7 +350,7 @@ else
    set IOSERVER_OPTIONS = ""
 endif
 
-$RUN_CMD $NPES $SINGULARITY_RUN $FV3EXE $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
+$RUN_CMD $NPES ./StandAlone_FV3_Dycore.x $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
 
 if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 

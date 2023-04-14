@@ -12,11 +12,11 @@ module input_arrays_mod
      real, allocatable, dimension(:,:,:) :: u, v, w, delz
      real, allocatable :: pt(:,:,:), delp(:,:,:), q(:,:,:,:)
      real, allocatable :: ps(:,:), pe(:,:,:), pk(:,:,:), peln(:,:,:), pkz(:,:,:)
-     real, allocatable :: phis(:,:), varflt(:,:), q_con(:,:,:), omga(:,:,:)
+     real, allocatable :: phis(:,:), q_con(:,:,:), omga(:,:,:)
      real, allocatable :: ua(:,:,:), va(:,:,:), uc(:,:,:), vc(:,:,:)
      real, allocatable :: ak(:), bk(:)
      real, allocatable :: mfx(:,:,:), mfy(:,:,:), cx(:,:,:), cy(:,:,:)
-     real, allocatable :: diss_est(:,:,:), u_dt(:,:,:), v_dt(:,:,:), w_dt(:,:,:), t_dt(:,:,:)
+     real, allocatable :: diss_est(:,:,:)
    contains
      procedure :: wr1te
   end type InputArrays_T
@@ -60,9 +60,8 @@ contains
     allocate(arr%pk(bd%is:bd%ie, bd%js:bd%je, npz+1), source = undef)
     allocate(arr%peln(bd%is:bd%ie, npz+1, bd%js:bd%je), source = undef)
     allocate(arr%pkz(bd%is:bd%ie, bd%js:bd%je, npz), source = undef)
-    !# phis, varflt, q_con, omga
+    !# phis, q_con, omga
     allocate(arr%phis(bd%isd:bd%ied, bd%jsd:bd%jed), source = undef)
-    allocate(arr%varflt(bd%is:bd%ie, bd%js:bd%je), source = undef)
     allocate(arr%q_con(bd%isd:bd%ied, bd%jsd:bd%jed, 1:npz), source = undef) ! ??
     allocate(arr%omga(bd%isd:bd%ied, bd%jsd:bd%jed, npz), source = undef)
     !# ua, va, uc, vc
@@ -78,12 +77,7 @@ contains
     allocate(arr%mfy(bd%is:bd%ie, bd%js:bd%je+1, npz), source = undef)
     allocate(arr%cx(bd%is:bd%ie+1, bd%jsd:bd%jed, npz), source = undef)
     allocate(arr%cy(bd%isd:bd%ied, bd%js:bd%je+1, npz), source = undef)
-    !# diss_est, u_dt, v_dt, w_dt, t_dt
     allocate(arr%diss_est(bd%isd:bd%ied, bd%jsd:bd%jed, npz), source = undef)
-    allocate(arr%u_dt(bd%is:bd%ie, bd%js:bd%je, npz), source = undef)
-    allocate(arr%v_dt(bd%is:bd%ie, bd%js:bd%je, npz), source = undef)
-    allocate(arr%w_dt(bd%is:bd%ie, bd%js:bd%je, npz), source = undef)
-    allocate(arr%t_dt(bd%is:bd%ie, bd%js:bd%je, npz), source = undef)
 
     ! Now read data
     open(newunit = file_handle, file = file_name, form = 'unformatted', status = 'old')
@@ -91,10 +85,10 @@ contains
          arr%u, arr%v, arr%w, arr%delz, &
          arr%pt, arr%delp, arr%q, &
          arr%ps, arr%pe, arr%pk, arr%peln, arr%pkz, &
-         arr%phis, arr%q_con, arr%omga, & ! no varflt yet
+         arr%phis, arr%q_con, arr%omga, &
          arr%ua, arr%va, arr%uc, arr%vc, &
          arr%ak, arr%bk, &
-         arr%mfx, arr%mfy, arr%cx, arr%cy, arr%diss_est ! no u/v/w/t_dt
+         arr%mfx, arr%mfy, arr%cx, arr%cy, arr%diss_est
     close(file_handle)
     ! print *, 'phis:', shape(arr%phis), sum(arr%phis), &
     !      arr%phis(3,1), arr%phis(4,1), arr%phis(9,1), arr%phis(14,1), arr%phis(15,1), &
@@ -114,12 +108,12 @@ contains
     print *, 'ps, pe, pk, peln, pkz: ', &
          sum(self%ps), sum(self%pe), sum(self%pk), sum(self%peln), sum(self%pkz), &
          shape(self%pe), shape(self%peln)
-    print *, 'phis, varflt, q_con, omga: ', sum(self%phis), sum(self%varflt), sum(self%q_con), sum(self%omga)
+    print *, 'phis, q_con, omga: ', sum(self%phis), sum(self%q_con), sum(self%omga)
     print *, 'q_con shape: ', shape(self%q_con)
     print *, 'ua, va, uc, vc: ', sum(self%ua), sum(self%va), sum(self%uc), sum(self%vc)
     print *, 'ak, bk: ', sum(self%ak), sum(self%bk)
     print *, 'mfx, mfy, cx, cy: ', sum(self%mfx), sum(self%mfy), sum(self%cx), sum(self%cy)
-    print *, 'diss_est, u_dt, v_dt, w_dt: ', sum(self%diss_est), sum(self%u_dt), sum(self%v_dt), sum(self%w_dt), sum(self%t_dt)
+    print *, 'diss_est: ', sum(self%diss_est)
 
   end subroutine wr1te
 

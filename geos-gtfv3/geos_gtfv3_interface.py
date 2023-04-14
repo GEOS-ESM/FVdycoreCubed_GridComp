@@ -1,21 +1,21 @@
 import cffi
 from mpi4py import MPI
 
-TMPFILEBASE = "geos_gtfv3_interface_py"
+TMPFILEBASE = 'geos_gtfv3_interface_py'
 
 ffi = cffi.FFI()
 
 # MPI_Comm can be int or void*
-if MPI._sizeof(MPI.Comm) == ffi.sizeof("int"):
-    _mpi_comm_t = "int"
+if MPI._sizeof(MPI.Comm) == ffi.sizeof('int'):
+    _mpi_comm_t = 'int'
 else:
-    _mpi_comm_t = "void*"
+    _mpi_comm_t = 'void*'
 
-source = """
+source = '''
 from {} import ffi
 from datetime import datetime
 from mpi4py import MPI
-from geos_gtfv3 import geos_gtfv3, geos_gtfv3_finalize
+from geos_gtfv3 import geos_gtfv3
 
 @ffi.def_extern()
 def geos_gtfv3_interface_py(
@@ -37,9 +37,9 @@ def geos_gtfv3_interface_py(
     comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
     comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
 
-    # if comm_py.Get_rank() == 0:
-    #     print('P:', datetime.now().isoformat(timespec='milliseconds'),
-    #           '--in cffi interface', flush=True)
+    if comm_py.Get_rank() == 0:
+        print('P:', datetime.now().isoformat(timespec='milliseconds'),
+              '--in cffi interface', flush=True)
 
     geos_gtfv3(
         comm_py,
@@ -53,16 +53,9 @@ def geos_gtfv3_interface_py(
         ua, va, uc, vc,
         ak, bk,
         mfx, mfy, cx, cy, diss_est)
+'''.format(TMPFILEBASE, _mpi_comm_t)
 
-@ffi.def_extern()
-def geos_gtfv3_interface_finalize_py():
-    geos_gtfv3_finalize()
-
-""".format(
-    TMPFILEBASE, _mpi_comm_t
-)
-
-header = """
+header = '''
 extern void geos_gtfv3_interface_py(
     {} comm_c,
     int npx, int npy, int npz, int ntiles,
@@ -78,13 +71,9 @@ extern void geos_gtfv3_interface_py(
     const float* ak, const float* bk,
     // input/output
     float* mfx, float* mfy, float* cx, float* cy, float* diss_est);
+'''.format(_mpi_comm_t)
 
-extern void geos_gtfv3_interface_finalize_py();
-""".format(
-    _mpi_comm_t
-)
-
-with open(TMPFILEBASE + ".h", "w") as f:
+with open(TMPFILEBASE+'.h', 'w') as f:
     f.write(header)
 ffi.embedding_api(header)
 
@@ -92,4 +81,4 @@ source_header = r'''#include "{}.h"'''.format(TMPFILEBASE)
 ffi.set_source(TMPFILEBASE, source_header)
 
 ffi.embedding_init_code(source)
-ffi.compile(target="lib" + TMPFILEBASE + ".so", verbose=True)
+ffi.compile(target='lib'+TMPFILEBASE+'.so', verbose=True)
