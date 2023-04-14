@@ -3,6 +3,11 @@
 #include "mpi.h"
 #include "geos_gtfv3_interface_py.h"
 
+void geos_gtfv3_interface_init_c()
+{
+    geos_gtfv3_interface_init_py();
+}
+
 void geos_gtfv3_interface_c(
     // input
     MPI_Fint comm_f,
@@ -28,12 +33,12 @@ void geos_gtfv3_interface_c(
     /* printf("MPI communicator (F): %d\n", comm_f); */
     /* printf("MPI communicator (C): %d\n", comm_c); */
 
-    time_t now = time(&now);
-    char buf[20];
-    strftime(buf, sizeof(buf), "%FT%T", localtime(&now));
-    int rank;
-    MPI_Comm_rank(comm_c, &rank);
-    if (rank == 0) printf("C: %s.xxx --calling python interface\n", buf);
+    // time_t now = time(&now);
+    // char buf[20];
+    // strftime(buf, sizeof(buf), "%FT%T", localtime(&now));
+    // int rank;
+    // MPI_Comm_rank(comm_c, &rank);
+    // if (rank == 0) printf("C: %s.xxx --calling python interface\n", buf);
 
     geos_gtfv3_interface_py(
         comm_c,
@@ -52,4 +57,9 @@ void geos_gtfv3_interface_c(
         ak, bk,
 
         mfx, mfy, cx, cy, diss_est);
+}
+
+void geos_gtfv3_interface_finalize_c()
+{
+    geos_gtfv3_interface_finalize_py();
 }

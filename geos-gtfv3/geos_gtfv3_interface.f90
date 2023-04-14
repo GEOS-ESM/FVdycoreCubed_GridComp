@@ -5,9 +5,14 @@ module geos_gtfv3_interface_mod
   implicit none
 
   private
+  public :: geos_gtfv3_interface_init_f
   public :: geos_gtfv3_interface_f
+  public :: geos_gtfv3_interface_finalize_f
 
   interface
+
+    subroutine geos_gtfv3_interface_init_f() bind(c, name='geos_gtfv3_interface_init_c')
+    end subroutine geos_gtfv3_interface_init_f
 
      subroutine geos_gtfv3_interface_f( &
           ! Input
@@ -62,6 +67,10 @@ module geos_gtfv3_interface_mod
        real(kind=c_float), dimension(*), intent(inout) :: mfx, mfy, cx, cy, diss_est
 
      end subroutine geos_gtfv3_interface_f
+
+     subroutine geos_gtfv3_interface_finalize_f() bind(c, name='geos_gtfv3_interface_finalize_c')
+       
+     end subroutine geos_gtfv3_interface_finalize_f
 
   end interface
 
