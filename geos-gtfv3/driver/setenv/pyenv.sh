@@ -1,5 +1,6 @@
 VENV_DIR="${VENV_DIR:-}"
 GTFV3_DIR="${GTFV3_DIR:-}"
+GEOS_INSTALL_DIR="${GEOS_INSTALL_DIR:-}"
 
 # Sanitize
 if [ -z "$VENV_DIR" ]; then
@@ -30,4 +31,4 @@ else
 fi
 
 export PYTHONPATH=$PYTHONPATH:$GTFV3_DIR/../geos-gtfv3/
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GTFV3_DIR/../geos-gtfv3/driver/build/
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GEOS_INSTALL_DIR/lib
