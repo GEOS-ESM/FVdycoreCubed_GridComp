@@ -11,7 +11,20 @@ module geos_gtfv3_interface_mod
 
   interface
 
-    subroutine geos_gtfv3_interface_init_f() bind(c, name='geos_gtfv3_interface_init_c')
+    subroutine geos_gtfv3_interface_init_f(comm, &
+      npx, npy, npz, ntiles, &
+      is, ie, js, je, &
+      isd, ied, jsd, jed, &
+      bdt, nq_tot) bind(c, name='geos_gtfv3_interface_init_c')
+      import c_int, c_float, c_double
+
+      implicit none
+      integer(kind=c_int), value, intent(in) :: comm
+      integer(kind=c_int), value, intent(in) :: npx, npy, npz, ntiles
+      integer(kind=c_int), value, intent(in) :: is, ie, js, je
+      integer(kind=c_int), value, intent(in) :: isd, ied, jsd, jed
+      real(kind=c_float), value, intent(in) :: bdt ! large time step
+      integer(kind=c_int), value, intent(in) :: nq_tot ! transported tracers
     end subroutine geos_gtfv3_interface_init_f
 
      subroutine geos_gtfv3_interface_f( &
@@ -69,7 +82,6 @@ module geos_gtfv3_interface_mod
      end subroutine geos_gtfv3_interface_f
 
      subroutine geos_gtfv3_interface_finalize_f() bind(c, name='geos_gtfv3_interface_finalize_c')
-       
      end subroutine geos_gtfv3_interface_finalize_f
 
   end interface

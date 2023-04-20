@@ -254,29 +254,7 @@ def geos_gtfv3(
     cy: "cffi.FFI.CData",
     diss_est: "cffi.FFI.CData",
 ):
-    BACKEND = "dace:gpu"
-    NAMELIST_PATH = "input.nml"
-
     global GEOS_DYCORE
-    if GEOS_DYCORE is None:
-        GEOS_DYCORE = GEOSGTFV3(
-            namelist_path=NAMELIST_PATH,
-            bdt=bdt,
-            comm=comm,
-            npx=npx,
-            npy=npy,
-            npz=npz,
-            is_=is_,
-            ie=ie,
-            js=js,
-            je=je,
-            isd=isd,
-            ied=ied,
-            jsd=jsd,
-            jed=jed,
-            nq_tot=nq_tot,
-            backend=BACKEND,
-        )
     GEOS_DYCORE(
         ng,
         ptop,
@@ -318,5 +296,44 @@ def geos_gtfv3_finalize():
         GEOS_DYCORE.finalize()
 
 
-def geos_gtfv3_init():
+def geos_gtfv3_init(
+    comm: MPI.Intercomm,
+    npx: int,
+    npy: int,
+    npz: int,
+    ntiles: int,
+    is_: int,
+    ie: int,
+    js: int,
+    je: int,
+    isd: int,
+    ied: int,
+    jsd: int,
+    jed: int,
+    bdt,
+    nq_tot: int,
+):
+    BACKEND = "dace:gpu"
+    NAMELIST_PATH = "input.nml"
+    global GEOS_DYCORE
+    if GEOS_DYCORE is not None:
+        raise RuntimeError("Double init")
+    GEOS_DYCORE = GEOSGTFV3(
+        namelist_path=NAMELIST_PATH,
+        bdt=bdt,
+        comm=comm,
+        npx=npx,
+        npy=npy,
+        npz=npz,
+        is_=is_,
+        ie=ie,
+        js=js,
+        je=je,
+        isd=isd,
+        ied=ied,
+        jsd=jsd,
+        jed=jed,
+        nq_tot=nq_tot,
+        backend=BACKEND,
+    )
     print("gtFV3 init")

@@ -3,9 +3,19 @@
 #include "mpi.h"
 #include "geos_gtfv3_interface_py.h"
 
-void geos_gtfv3_interface_init_c()
+void geos_gtfv3_interface_init_c(
+    MPI_Fint comm_f,
+    int npx, int npy, int npz, int ntiles,
+    int is, int ie, int js, int je,
+    int isd, int ied, int jsd, int jed,
+    float bdt, int nq_tot)
 {
-    geos_gtfv3_interface_init_py();
+    MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
+    geos_gtfv3_interface_init_py(comm_c,
+                                 npx, npy, npz, ntiles,
+                                 is, ie, js, je,
+                                 isd, ied, jsd, jed,
+                                 bdt, nq_tot);
 }
 
 void geos_gtfv3_interface_c(
@@ -18,16 +28,17 @@ void geos_gtfv3_interface_c(
     int adiabatic,
 
     // input/output
-    float* u, float* v, float* w, float* delz,
-    float* pt, float* delp, float* q,
-    float* ps, float* pe, float* pk, float* peln, float* pkz,
-    float* phis, float* q_con, float* omga, float* ua, float* va, float* uc, float* vc,
+    float *u, float *v, float *w, float *delz,
+    float *pt, float *delp, float *q,
+    float *ps, float *pe, float *pk, float *peln, float *pkz,
+    float *phis, float *q_con, float *omga, float *ua, float *va, float *uc, float *vc,
 
     // input
-    const float* ak, const float* bk,
+    const float *ak, const float *bk,
 
     // input/output
-    float* mfx, float* mfy, float* cx, float* cy, float* diss_est) {
+    float *mfx, float *mfy, float *cx, float *cy, float *diss_est)
+{
 
     MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
     /* printf("MPI communicator (F): %d\n", comm_f); */
