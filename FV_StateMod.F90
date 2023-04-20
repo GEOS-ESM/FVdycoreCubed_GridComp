@@ -36,7 +36,7 @@ module FV_StateMod
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
 
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
-   use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
+   use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f, geos_gtfv3_interface_init_f
 
 implicit none
 private
@@ -782,6 +782,10 @@ contains
   integer    :: tile_in
   integer    :: gid, masterproc
 
+  logical :: halting_mode(5)
+  integer :: comm, rank, mpierr
+  real(FVPRC) :: myDT
+
 ! BEGIN
 
 ! Retrieve the pointer to the state
@@ -1095,6 +1099,23 @@ contains
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV Initialize', RC=STATUS )
   VERIFY_(STATUS)
 
+  ! MPI communicator
+  call ESMF_VMGetCurrent(VM, rc=STATUS)
+  call ESMF_VMGet(VM, mpiCommunicator=comm)
+  call MPI_Comm_rank(comm, rank, mpierr)
+  VERIFY_(STATUS)
+
+  myDT = STATE%DT
+
+  call ieee_get_halting_mode(ieee_all, halting_mode)
+  call ieee_set_halting_mode(ieee_all, .false.)
+  call geos_gtfv3_interface_init_f(comm, &
+   FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
+   FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
+   ISD, IED, JSD, JED, &
+   myDT, 7)
+  call ieee_set_halting_mode(ieee_all, halting_mode)
+  
   RETURN_(ESMF_SUCCESS)
 
 end subroutine FV_InitState
@@ -1176,7 +1197,6 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
 
   type(ESMF_VM) :: vm
   integer :: comm, rank, mpierr
-  logical :: halting_mode(5)
   real :: start, finish
   character(len=23) :: dt_iso
 
@@ -1739,8 +1759,6 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
     ! disable trapping of floating point exceptions temporarily, call the interface
     ! to the Python function and resume trapping
-    call ieee_get_halting_mode(ieee_all, halting_mode)
-    call ieee_set_halting_mode(ieee_all, .false.)
     call get_date_time_isoformat(dt_iso)
     if (rank == 0) write(*, '(a2,1x,a23,a)') 'F:', dt_iso, ' --calling fortran interface'
     call cpu_time(start)
@@ -1764,7 +1782,6 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
     call cpu_time(finish)
     call get_date_time_isoformat(dt_iso)
     if (rank == 0) write(*, '(a2,1x,a23,a)') 'F:', dt_iso, ' --back in fortran'
-    call ieee_set_halting_mode(ieee_all, halting_mode)
     print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
 
     ! call cpu_time(start)
