@@ -1829,7 +1829,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
             FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
             kappa, cp, zvir, &
-            FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+            FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
+            FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
             FV_Atm(1)%flagstruct%hydrostatic, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
@@ -1843,7 +1844,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
             time_total)
        call cpu_time(finish)
-       print *, rank, ', fv_dynamics: time taken = ', finish - start, 's'
+       if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
     else
        ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
        ! disable trapping of floating point exceptions temporarily, call the interface
@@ -1872,22 +1873,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        call ieee_set_halting_mode(ieee_all, halting_mode)
        print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
     end if
-
-    ! block
-    !   character(len=256) :: out_file
-    !   integer :: unit
-    !   write(out_file, '(a8, i0.2, a4)') 'fv3-out.', rank, '.bin'
-    !   open(newunit=unit, file=out_file, form='unformatted', status='new')
-    !   write(unit) isd, ied, jsd, jed, FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, FV_Atm(1)%npz
-    !   write(unit) FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz
-    !   write(unit) FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,1:7)
-    !   write(unit) FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz
-    !   write(unit) FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga
-    !   write(unit) FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc
-    !   write(unit) FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy
-    !   write(unit) FV_Atm(1)%diss_est
-    !   close(unit)
-    ! end block    
 
     allocate ( udt(isc:iec,jsc:jec,npz) )
     allocate ( vdt(isc:iec,jsc:jec,npz) )
