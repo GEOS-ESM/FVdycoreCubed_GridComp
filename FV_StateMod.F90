@@ -14,6 +14,9 @@ module FV_StateMod
    use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS, &
                                 MAPL_KAPPA, MAPL_PI_R8, MAPL_ALHL, MAPL_PSDRY
 
+   use fv_mp_mod,         only: start_group_halo_update, complete_group_halo_update
+   use fv_mp_mod,         only: group_halo_update_type
+
    use fms_mod, only: fms_init, set_domain, nullify_domain
    use mpp_domains_mod, only: mpp_update_domains, CGRID_NE, DGRID_NE, mpp_get_boundary
    use mpp_parameter_mod, only: AGRID_PARAM=>AGRID, CORNER
@@ -2584,12 +2587,12 @@ subroutine FV_To_State ( STATE )
     KM  = state%grid%npz
     NG  = state%grid%ng
 
-   !if ( FV_Atm(1)%flagstruct%range_warn ) then
-   !  call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-   !                    -280., 280., bad_data)
-   !  call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-   !                    -280., 280., bad_data)
-   !endif
+    if ( FV_Atm(1)%flagstruct%range_warn ) then
+      call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                        -280., 280., bad_data)
+      call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                        -280., 280., bad_data)
+    endif
 
 ! Copy updated FV data to internal state
     STATE%VARS%U(:,:,:) = FV_Atm(1)%u(isc:iec,jsc:jec,:)
@@ -2609,10 +2612,10 @@ subroutine FV_To_State ( STATE )
 !-----------------------------------
 ! Fill Dry Temperature to PT
 !-----------------------------------
-      !if ( FV_Atm(1)%flagstruct%range_warn ) then
-      !   call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-      !                     130., 335., bad_data)
-      !endif
+       if ( FV_Atm(1)%flagstruct%range_warn ) then
+          call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                            130., 335., bad_data)
+       endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 
 !------------------------------
@@ -2740,7 +2743,7 @@ subroutine fv_getPKZ(pkz,pe)
 return
 end subroutine fv_getPKZ
 
-subroutine a2d3d(ua, va, ud, vd)
+subroutine a2d3d(ua, va, ud, vd, wind_increment_limiter)
 
 ! Move A-Grid winds/tendencies oriented on lat/lon to the D-grid cubed-sphere orientation
 
@@ -2749,19 +2752,24 @@ subroutine a2d3d(ua, va, ud, vd)
       real(REAL8)                :: va(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec  ,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec  ,FV_Atm(1)%npz) ! V-Wind
       real(REAL8), intent(inout) :: ud(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec  ,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec+1,FV_Atm(1)%npz) ! U-Wind
       real(REAL8), intent(inout) :: vd(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec  ,FV_Atm(1)%npz) ! V-Wind
+      real(REAL8), optional      :: wind_increment_limiter
 ! !Local Variables
-      integer :: is ,ie , js ,je
+      integer :: is,ie, js,je, ng
       integer :: npx, npy, npz
       integer :: i,j,k, im2,jm2
 
-      real(REAL8) :: uatemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed,FV_Atm(1)%npz)
-      real(REAL8) :: vatemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed,FV_Atm(1)%npz)
+      real :: uatemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed,FV_Atm(1)%npz)
+      real :: vatemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed,FV_Atm(1)%npz)
 
-      real(REAL8) :: v3(FV_Atm(1)%bd%isc-1:FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc-1:FV_Atm(1)%bd%jec+1,3)
-      real(REAL8) :: ue(FV_Atm(1)%bd%isc-1:FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc  :FV_Atm(1)%bd%jec+1,3)    ! 3D winds at edges
-      real(REAL8) :: ve(FV_Atm(1)%bd%isc  :FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc-1:FV_Atm(1)%bd%jec+1,3)    ! 3D winds at edges
-      real(REAL8), dimension(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec):: ut1, ut2, ut3
-      real(REAL8), dimension(FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec):: vt1, vt2, vt3
+      real :: v3(FV_Atm(1)%bd%isc-1:FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc-1:FV_Atm(1)%bd%jec+1,3)
+      real :: ue(FV_Atm(1)%bd%isc-1:FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc  :FV_Atm(1)%bd%jec+1,3)    ! 3D winds at edges
+      real :: ve(FV_Atm(1)%bd%isc  :FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc-1:FV_Atm(1)%bd%jec+1,3)    ! 3D winds at edges
+      real, dimension(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec):: ut1, ut2, ut3
+      real, dimension(FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec):: vt1, vt2, vt3
+
+      type(group_halo_update_type), save :: i_pack(2)
+
+      logical :: bad_data=.false.
 
       npx = FV_Atm(1)%npx
       npy = FV_Atm(1)%npy
@@ -2770,6 +2778,7 @@ subroutine a2d3d(ua, va, ud, vd)
       ie  = FV_Atm(1)%bd%iec
       js  = FV_Atm(1)%bd%jsc
       je  = FV_Atm(1)%bd%jec
+      ng  = FV_Atm(1)%ng
 
       im2 = (npx-1)/2
       jm2 = (npy-1)/2
@@ -2780,10 +2789,32 @@ subroutine a2d3d(ua, va, ud, vd)
     uatemp(is:ie,js:je,:) = ua
     vatemp(is:ie,js:je,:) = va
 
+    if ( fv_atm(1)%gridstruct%square_domain ) then
+       call start_group_halo_update(i_pack(1), uatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.false.)
+       call start_group_halo_update(i_pack(1), vatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.true.)
+    else
+       call start_group_halo_update(i_pack(1), uatemp, FV_Atm(1)%domain, complete=.false.)
+       call start_group_halo_update(i_pack(1), vatemp, FV_Atm(1)%domain, complete=.true.)
+    endif
+
+    if ( FV_Atm(1)%flagstruct%range_warn ) then
+       call range_check('DUDT_A2D', 86400.0*uatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
+                         -400., 400., bad_data)
+       call range_check('DVDT_A2D', 86400.0*vatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
+                         -400., 400., bad_data)
+    endif
+
+    ! Apply Tendency Limiter
+    if (present(wind_increment_limiter)) then
+    where(abs(uatemp) > wind_increment_limiter)
+        uatemp = (wind_increment_limiter/abs(uatemp)) * uatemp
+    end where
+    where(abs(vatemp) > wind_increment_limiter)
+        vatemp = (wind_increment_limiter/abs(vatemp)) * vatemp
+    end where        
+    endif
+
     if (FV_Atm(1)%flagstruct%grid_type<4) then
-   ! Cubed-Sphere
-    call mpp_update_domains(uatemp, FV_Atm(1)%domain, complete=.false.)
-    call mpp_update_domains(vatemp, FV_Atm(1)%domain, complete=.true.)
     do k=1, npz
 ! Compute 3D wind tendency on A grid
        do j=js-1,je+1
@@ -2909,9 +2940,6 @@ subroutine a2d3d(ua, va, ud, vd)
 
     enddo         ! k-loop
    else
-   ! Cartesian
-    call mpp_update_domains(uatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.false.)
-    call mpp_update_domains(vatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.true.)
     do k=1,npz
        do j=js,je+1
           do i=is,ie
