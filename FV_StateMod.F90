@@ -1112,14 +1112,16 @@ contains
 
   myDT = STATE%DT
 
-  call ieee_get_halting_mode(ieee_all, halting_mode)
-  call ieee_set_halting_mode(ieee_all, .false.)
-  call geos_gtfv3_interface_init_f(comm, &
-   FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
-   FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
-   ISD, IED, JSD, JED, &
-   myDT, 7)
-  call ieee_set_halting_mode(ieee_all, halting_mode)
+  if ( run_gtfv3 == 1 ) then
+    call ieee_get_halting_mode(ieee_all, halting_mode)
+    call ieee_set_halting_mode(ieee_all, .false.)
+    call geos_gtfv3_interface_init_f(comm, &
+     FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
+     FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
+     ISD, IED, JSD, JED, &
+     myDT, 7)
+    call ieee_set_halting_mode(ieee_all, halting_mode)
+  end if
   
   RETURN_(ESMF_SUCCESS)
 
@@ -1802,22 +1804,28 @@ subroutine FV_Run (STATE, CLOCK, GC, RC)
       print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
     end if
 
-    ! block
-    !   character(len=256) :: out_file
-    !   integer :: unit
-    !   call get_date_time_isoformat(dt_iso)
-    !   write(out_file, '(a10, a23, a1, i0.2, a4)') 'gtfv3-out-', dt_iso, '-', rank, '.bin'
-    !   open(newunit=unit, file=out_file, form='unformatted', status='new')
-    !   write(unit) isd, ied, jsd, jed, FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, FV_Atm(1)%npz
-    !   write(unit) FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz
-    !   write(unit) FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,1:7)
-    !   write(unit) FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz
-    !   write(unit) FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga
-    !   write(unit) FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc
-    !   write(unit) FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy
-    !   write(unit) FV_Atm(1)%diss_est
-    !   close(unit)
-    ! end block
+   !  block
+   !    character(len=256) :: out_file
+   !    integer :: unit
+   !    call get_date_time_isoformat(dt_iso)
+   !    if (run_gtfv3 == 0) then
+   !       write(out_file, '(a10, a23, a1, i0.2, a4)') 'fortran-out-', dt_iso, '-', rank, '.bin'
+   !    else
+   !       write(out_file, '(a10, a23, a1, i0.2, a4)') 'gtfv3-out-', dt_iso, '-', rank, '.bin'
+   !    end if
+   !    print *, 'peln i ', FV_Atm(1)%bd%isc, ':', FV_Atm(1)%bd%iec, ' j ', FV_Atm(1)%bd%jsc,':', FV_Atm(1)%bd%jec, 'k 1:', FV_Atm(1)%npz+1
+   !    open(newunit=unit, file=out_file, form='unformatted', status='new')
+   !    ! write(unit) isd, ied, jsd, jed, FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, FV_Atm(1)%npz
+   !    ! write(unit) FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz
+   !    ! write(unit) FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,1:7)
+   !    ! write(unit) FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz
+   !    ! write(unit) FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga
+   !    ! write(unit) FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc
+   !    ! write(unit) FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy
+   !    ! write(unit) FV_Atm(1)%diss_est
+   !    write(unit) FV_Atm(1)%peln
+   !    close(unit)
+   !  end block
 
     if ( FV_Atm(1)%flagstruct%fv_sg_adj > 0 ) then
          allocate ( u_dt(isd:ied,jsd:jed,npz) )
