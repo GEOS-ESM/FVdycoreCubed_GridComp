@@ -7176,7 +7176,7 @@ end subroutine RunAddIncs
        ! Put the wind tendencies on the Native Dynamics grid
        ! ---------------------------------------------------
        call Agrid_To_Native( tend_ua, tend_va, tend_un, tend_vn, &
-                             wind_increment_limiter = 400.d0/86400.d0 )
+                             wind_increment_limiter = 800.d0/86400.d0 )
 
 
        ! Add the wind tendencies to the control variables

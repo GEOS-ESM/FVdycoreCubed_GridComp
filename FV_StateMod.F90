@@ -2790,18 +2790,20 @@ subroutine a2d3d(ua, va, ud, vd, wind_increment_limiter)
     vatemp(is:ie,js:je,:) = va
 
     if ( fv_atm(1)%gridstruct%square_domain ) then
-       call start_group_halo_update(i_pack(1), uatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.false.)
-       call start_group_halo_update(i_pack(1), vatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.true.)
+     ! Cartesian
+       call mpp_update_domains(uatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.false.)
+       call mpp_update_domains(vatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.true.)
     else
-       call start_group_halo_update(i_pack(1), uatemp, FV_Atm(1)%domain, complete=.false.)
-       call start_group_halo_update(i_pack(1), vatemp, FV_Atm(1)%domain, complete=.true.)
+     ! Cubed-Sphere
+       call mpp_update_domains(uatemp, FV_Atm(1)%domain, complete=.false.)
+       call mpp_update_domains(vatemp, FV_Atm(1)%domain, complete=.true.)
     endif
 
     if ( FV_Atm(1)%flagstruct%range_warn ) then
        call range_check('DUDT_A2D', 86400.0*uatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
-                         -400., 400., bad_data)
+                         -800., 800., bad_data)
        call range_check('DVDT_A2D', 86400.0*vatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
-                         -400., 400., bad_data)
+                         -800., 800., bad_data)
     endif
 
     ! Apply Tendency Limiter
