@@ -35,9 +35,10 @@ module FV_StateMod
 
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check, &
                                  get_vorticity, updraft_helicity, bunkers_vector, helicity_relative_CAPS
-
+#ifdef RUN_GTFV3
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
    use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
+#endif
 
 implicit none
 private
@@ -257,7 +258,10 @@ private
    real(REAL8), parameter ::  D180_0                  = 180.0
    real(REAL8), parameter ::  ratmax                  =  0.81
 
+#ifdef RUN_GTFV3
    integer :: run_gtfv3 = 0
+#endif
+
 contains
 
 !-----------------------------------------------------------------------
@@ -716,8 +720,10 @@ contains
   call MAPL_MemUtilsWrite(VM, trim(Iam), RC=STATUS )
   VERIFY_(STATUS)
 
+#ifdef RUN_GTFV3
   call MAPL_GetResource(MAPL, run_gtfv3, 'RUN_GTFV3:', default=0, RC=STATUS)
   VERIFY_(STATUS)
+#endif
 
   RETURN_(ESMF_SUCCESS)
 
@@ -916,8 +922,6 @@ contains
   GRID%AK     = ak
   GRID%BK     = bk
 
-  ! We set ks to be one less than the number of levels in bk that are zero.
-  ! This matches the number that would be provided by m_set_eta.
   FV_Atm(1)%ks = count(bk == 0.0) - 1
   _ASSERT(FV_Atm(1)%ks <= FV_Atm(1)%flagstruct%NPZ+1,'ks must be smaller than NPZ+1')
   call WRITE_PARALLEL(FV_Atm(1)%ks, format='("Number of true pressure levels =", I5)'   )
@@ -1250,18 +1254,21 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   logical :: NWAT_TEST
 
+#ifdef RUN_GTFV3
   type(ESMF_VM) :: vm
   integer :: comm, rank, mpierr
   logical :: halting_mode(5)
   real :: start, finish
+#endif
 
 ! Begin
 
+#ifdef RUN_GTFV3
   ! MPI communicator
   call ESMF_VMGetCurrent(vm, rc=status)
   call ESMF_VMGet(vm, mpiCommunicator=comm)
   call MPI_Comm_rank(comm, rank, mpierr)
-
+#endif
 ! Retrieve the pointer to the state
 ! ---------------------------------
 
@@ -1858,8 +1865,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     t_dt(:,:,:) = 0.0
     w_dt(:,:,:) = 0.0
 
+#ifdef RUN_GTFV3
     if (run_gtfv3 == 0) then
        call cpu_time(start)
+#endif
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
             FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
@@ -1878,6 +1887,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
             FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
             time_total)
+#ifdef RUN_GTFV3
        call cpu_time(finish)
        if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
     else
@@ -1908,6 +1918,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        call ieee_set_halting_mode(ieee_all, halting_mode)
        print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
     end if
+#endif
 
     allocate ( udt(isc:iec,jsc:jec,npz) )
     allocate ( vdt(isc:iec,jsc:jec,npz) )
