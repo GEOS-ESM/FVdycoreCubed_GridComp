@@ -266,16 +266,16 @@ class FortranPythonConversion:
         dtype: type,
         swap_axes: Optional[Tuple[int, int]] = None,
     ) -> np.ndarray:
-        if swap_axes:
-            device_array = cp.swapaxes(
-                device_array,
-                swap_axes[0],
-                swap_axes[1],
+        with self._current_stream:
+            if swap_axes:
+                device_array = cp.swapaxes(
+                    device_array,
+                    swap_axes[0],
+                    swap_axes[1],
+                )
+            host_array = cp.asnumpy(
+                device_array.astype(dtype).flatten(order="F"),
             )
-        host_array = cp.asnumpy(
-            device_array.astype(dtype).flatten(order="F"),
-            stream=self._current_stream,
-        )
         self._current_stream = (
             self._stream_A if self._current_stream == self._stream_B else self._stream_B
         )
