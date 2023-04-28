@@ -15,7 +15,7 @@ module geos_gtfv3_interface_mod
       npx, npy, npz, ntiles, &
       is, ie, js, je, &
       isd, ied, jsd, jed, &
-      bdt, nq_tot) bind(c, name='geos_gtfv3_interface_init_c')
+      bdt, nq_tot, run_gtfv3) bind(c, name='geos_gtfv3_interface_init_c')
       import c_int, c_float, c_double
 
       implicit none
@@ -25,6 +25,7 @@ module geos_gtfv3_interface_mod
       integer(kind=c_int), value, intent(in) :: isd, ied, jsd, jed
       real(kind=c_float), value, intent(in) :: bdt ! large time step
       integer(kind=c_int), value, intent(in) :: nq_tot ! transported tracers
+      integer(kind=c_int), value, intent(in) :: run_gtfv3
     end subroutine geos_gtfv3_interface_init_f
 
      subroutine geos_gtfv3_interface_f( &

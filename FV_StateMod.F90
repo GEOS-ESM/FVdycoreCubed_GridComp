@@ -1112,16 +1112,14 @@ contains
 
   myDT = STATE%DT
 
-  if ( run_gtfv3 == 1 ) then
-    call ieee_get_halting_mode(ieee_all, halting_mode)
-    call ieee_set_halting_mode(ieee_all, .false.)
-    call geos_gtfv3_interface_init_f(comm, &
-     FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
-     FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
-     ISD, IED, JSD, JED, &
-     myDT, 7)
-    call ieee_set_halting_mode(ieee_all, halting_mode)
-  end if
+   call ieee_get_halting_mode(ieee_all, halting_mode)
+   call ieee_set_halting_mode(ieee_all, .false.)
+   call geos_gtfv3_interface_init_f(comm, &
+   FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
+   FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
+   ISD, IED, JSD, JED, &
+   myDT, 7, run_gtfv3)
+   call ieee_set_halting_mode(ieee_all, halting_mode)
   
   RETURN_(ESMF_SUCCESS)
 

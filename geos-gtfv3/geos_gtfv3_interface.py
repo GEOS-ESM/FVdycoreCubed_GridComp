@@ -21,7 +21,7 @@ from geos_gtfv3 import geos_gtfv3, geos_gtfv3_finalize, geos_gtfv3_init
 def geos_gtfv3_interface_init_py(comm_c,
     npx, npy, npz, ntiles,
     is_, ie, js, je, isd, ied, jsd, jed,
-    bdt, nq_tot):
+    bdt, nq_tot, run_gtfv3):
 
     # comm_c -> comm_py
     comm_py = MPI.Intracomm() # new comm, internal MPI_Comm handle is MPI_COMM_NULL
@@ -31,7 +31,7 @@ def geos_gtfv3_interface_init_py(comm_c,
     geos_gtfv3_init(comm_py,
         npx, npy, npz, ntiles,
         is_, ie, js, je, isd, ied, jsd, jed,
-        bdt, nq_tot)
+        bdt, nq_tot, run_gtfv3)
 
 @ffi.def_extern()
 def geos_gtfv3_interface_py(
@@ -83,7 +83,7 @@ extern void geos_gtfv3_interface_init_py(
     {} comm_c,
     int npx, int npy, int npz, int ntiles,
     int is_, int ie, int js, int je, int isd, int ied, int jsd, int jed,
-    float bdt, int nq_tot
+    float bdt, int nq_tot, int run_gtfv3
 );
 extern void geos_gtfv3_interface_py(
     {} comm_c,

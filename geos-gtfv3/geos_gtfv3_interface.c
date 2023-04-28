@@ -8,14 +8,14 @@ void geos_gtfv3_interface_init_c(
     int npx, int npy, int npz, int ntiles,
     int is, int ie, int js, int je,
     int isd, int ied, int jsd, int jed,
-    float bdt, int nq_tot)
+    float bdt, int nq_tot, int run_gtfv3)
 {
     MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
     geos_gtfv3_interface_init_py(comm_c,
                                  npx, npy, npz, ntiles,
                                  is, ie, js, je,
                                  isd, ied, jsd, jed,
-                                 bdt, nq_tot);
+                                 bdt, nq_tot, run_gtfv3);
 }
 
 void geos_gtfv3_interface_c(
