@@ -2,6 +2,32 @@ esma_set_this ()
 
 option(BUILD_GEOS_GTFV3_INTERFACE "Build GEOS-gtFV3 interface" OFF)
 
+set (srcs
+  sw.f90 jw.f90 testcases_3_4_5_6_stand_alone.f90
+  GetWeightsC2C.F90
+  GetWeights.F90
+  CubeHalo.F90
+  Cube2LatLon.F90 LatLon2Cube.F90 AppGridCreate.F90 FV_StateMod.F90
+  AdvCore_GridCompMod.F90
+  DynCore_GridCompMod.F90 CreateInterpWeights_GridCompMod.F90
+  StandAlone_DynAdvCore_GridCompMod.F90
+  CubeToLatLonRegridder.F90
+  LatLonToCubeRegridder.F90
+  CubeToCubeRegridder.F90
+  CubeToLatLon.F90
+  CubeGridPrototype.F90
+  GEOS_FV3_Utilities.F90
+  fv_regrid_c2c.F90
+  fv_regrid_c2c_bin.F90
+  fv_regridding_utils.F90
+  rs_scaleMod.F90
+  )
+if (BUILD_GEOS_GTFV3_INTERFACE)
+  list (APPEND srcs
+  geos-gtfv3/geos_gtfv3_interface.f90
+  geos-gtfv3/geos_gtfv3_interface.c)
+endif ()
+
 if (BUILD_GEOS_GTFV3_INTERFACE)
 
   message(STATUS "Building GEOS-gtFV3 interface")
@@ -76,32 +102,6 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
     LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
     )
 
-endif ()
-
-set (srcs
-  sw.f90 jw.f90 testcases_3_4_5_6_stand_alone.f90
-  GetWeightsC2C.F90
-  GetWeights.F90
-  CubeHalo.F90
-  Cube2LatLon.F90 LatLon2Cube.F90 AppGridCreate.F90 FV_StateMod.F90
-  AdvCore_GridCompMod.F90
-  DynCore_GridCompMod.F90 CreateInterpWeights_GridCompMod.F90
-  StandAlone_DynAdvCore_GridCompMod.F90
-  CubeToLatLonRegridder.F90
-  LatLonToCubeRegridder.F90
-  CubeToCubeRegridder.F90
-  CubeToLatLon.F90
-  CubeGridPrototype.F90
-  GEOS_FV3_Utilities.F90
-  fv_regrid_c2c.F90
-  fv_regrid_c2c_bin.F90
-  fv_regridding_utils.F90
-  rs_scaleMod.F90
-  )
-if (BUILD_GEOS_GTFV3_INTERFACE)
-  list (APPEND srcs
-  geos-gtfv3/geos_gtfv3_interface.f90
-  geos-gtfv3/geos_gtfv3_interface.c)
 endif ()
 
 set(dependencies MAPL GFTL_SHARED::gftl-shared GMAO_hermes GEOS_Shared esmf OpenMP::OpenMP_Fortran)
