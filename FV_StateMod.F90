@@ -36,7 +36,7 @@ module FV_StateMod
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
 
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
-   use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f, geos_gtfv3_interface_init_f
+   use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f, geos_gtfv3_interface_init_f, geos_gtfv3_interface_finalize_f
 
 implicit none
 private
@@ -2172,6 +2172,8 @@ end subroutine FV_Run
 #if defined( MAPL_MODE )
 !    call ESMF_GridDestroy  (STATE%GRID%GRID)
 #endif
+
+   call geos_gtfv3_interface_finalize_f()
 
  end subroutine FV_Finalize
 
