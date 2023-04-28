@@ -205,6 +205,7 @@ private
     integer(kind=8)                      :: RUN_TIMES(4,NUM_TIMES)
     logical                              :: DOTIME, DODYN
     real(REAL8)                          :: DT          ! Large time step
+    integer                              :: KSPLIT
     integer                              :: NSPLIT
     integer                              :: NUM_CALLS
   end type T_FVDYCORE_STATE
@@ -530,10 +531,11 @@ contains
    FV_Atm(1)%flagstruct%ke_bg = 0.0
   ! Rayleigh & Divergence Damping
    if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+     FV_Atm(1)%flagstruct%do_sat_adj = .true. ! only valid when nwat >= 6
      FV_Atm(1)%flagstruct%dz_min = 6.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
-     FV_Atm(1)%flagstruct%tau = 1.25
-     FV_Atm(1)%flagstruct%rf_cutoff = 0.50e2
+     FV_Atm(1)%flagstruct%tau = 1.5 
+     FV_Atm(1)%flagstruct%rf_cutoff = 10.e2
     ! 6th order default damping options
      FV_Atm(1)%flagstruct%nord = 3
      FV_Atm(1)%flagstruct%dddmp = 0.2
@@ -608,7 +610,6 @@ contains
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       FV_Atm(1)%flagstruct%fv_sg_adj = DT
-      if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) FV_Atm(1)%flagstruct%fv_sg_adj = DT*1.5
       ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%hydrostatic = .false.
       FV_Atm(1)%flagstruct%make_nh = .false.
@@ -861,6 +862,7 @@ contains
   GRID => STATE%GRID     ! For convenience
   STATE%DOTIME= .TRUE.
   STATE%DT        = DT
+  STATE%KSPLIT    = FV_Atm(1)%flagstruct%K_SPLIT
   STATE%NSPLIT    = FV_Atm(1)%flagstruct%N_SPLIT
   GRID%NG     = 3 ; ng = 3
   GRID%NPX    = FV_Atm(1)%flagstruct%NPX-1
@@ -1979,7 +1981,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     w_dt(:,:,:) = 0.0
     call fv_dynamics(FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng,   &
                      myDT, FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, kappa,   &
-                     cp, zvir, FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+                     cp, zvir, FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst,  &
+                     state%ksplit, state%nsplit, FV_Atm(1)%flagstruct%q_split, &
                      FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz,       &
                      FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, FV_Atm(1)%ps,       &
                      FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz,                         &
@@ -2422,7 +2425,7 @@ subroutine State_To_FV ( STATE )
     real(FVPRC) :: ebuffer(state%grid%js:state%grid%je,state%grid%npz)
     real(FVPRC) :: nbuffer(state%grid%is:state%grid%ie,state%grid%npz)
 
-    logical :: bad_data=.false.
+    logical :: bad_range=.false.
 
     integer :: rc
     character(len=ESMF_MAXSTR)          :: ERRSTR
@@ -2479,9 +2482,16 @@ subroutine State_To_FV ( STATE )
 
   if ( FV_Atm(1)%flagstruct%range_warn ) then
     call range_check('U_S2F', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                      -280., 280., bad_data)
+                      -280., 280., bad_range)
     call range_check('V_S2F', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                      -280., 280., bad_data)
+                      -280., 280., bad_range)
+    if (bad_range) then
+       STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
+       STATE%NSPLIT = NINT(FV_Atm(1)%flagstruct%n_split*1.5)
+       call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%k_split, STATE%KSPLIT ,format='("FV3 k_split adjustment: ",(I3)," to ",(I3))' )
+       call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%n_split, STATE%NSPLIT ,format='("FV3 n_split adjustment: ",(I3)," to ",(I3))' )
+       call WRITE_PARALLEL(STATE%DT/real(STATE%KSPLIT*STATE%NSPLIT)     ,format='("Adjusted Dynamics time step : ",(F10.4))')
+    endif        
   endif
 
   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%w(isc:iec,jsc:jec,:) = STATE%VARS%W
@@ -2547,7 +2557,7 @@ subroutine State_To_FV ( STATE )
 
        if ( FV_Atm(1)%flagstruct%range_warn ) then
           call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            130., 335., bad_data)
+                            130., 335., bad_range)
        endif
 
 !------------
@@ -2574,7 +2584,7 @@ subroutine FV_To_State ( STATE )
 
    type(T_FVDYCORE_STATE),      pointer   :: STATE
 
-    logical :: bad_data = .false.
+    logical :: bad_range = .false.
     integer               :: ISC,IEC, JSC,JEC, KM, NG
     integer               :: I,J,K
     character(len=ESMF_MAXSTR)          :: ERRSTR
@@ -2589,9 +2599,9 @@ subroutine FV_To_State ( STATE )
 
     if ( FV_Atm(1)%flagstruct%range_warn ) then
       call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                        -280., 280., bad_data)
+                        -280., 280., bad_range)
       call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                        -280., 280., bad_data)
+                        -280., 280., bad_range)
     endif
 
 ! Copy updated FV data to internal state
@@ -2614,7 +2624,7 @@ subroutine FV_To_State ( STATE )
 !-----------------------------------
        if ( FV_Atm(1)%flagstruct%range_warn ) then
           call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            130., 335., bad_data)
+                            130., 335., bad_range)
        endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 
@@ -2769,7 +2779,7 @@ subroutine a2d3d(ua, va, ud, vd, wind_increment_limiter)
 
       type(group_halo_update_type), save :: i_pack(2)
 
-      logical :: bad_data=.false.
+      logical :: bad_range=.false.
 
       npx = FV_Atm(1)%npx
       npy = FV_Atm(1)%npy
@@ -2799,22 +2809,22 @@ subroutine a2d3d(ua, va, ud, vd, wind_increment_limiter)
        call mpp_update_domains(vatemp, FV_Atm(1)%domain, complete=.true.)
     endif
 
-    if ( FV_Atm(1)%flagstruct%range_warn ) then
-       call range_check('DUDT_A2D', 86400.0*uatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
-                         -800., 800., bad_data)
-       call range_check('DVDT_A2D', 86400.0*vatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
-                         -800., 800., bad_data)
-    endif
+   !if ( FV_Atm(1)%flagstruct%range_warn ) then
+   !   call range_check('DUDT_A2D', 86400.0*uatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
+   !                     -1000., 1000., bad_range)
+   !   call range_check('DVDT_A2D', 86400.0*vatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
+   !                     -1000., 1000., bad_range)
+   !endif
 
-    ! Apply Tendency Limiter
-    if (present(wind_increment_limiter)) then
-    where(abs(uatemp) > wind_increment_limiter)
-        uatemp = (wind_increment_limiter/abs(uatemp)) * uatemp
-    end where
-    where(abs(vatemp) > wind_increment_limiter)
-        vatemp = (wind_increment_limiter/abs(vatemp)) * vatemp
-    end where        
-    endif
+   !! Apply Tendency Limiter
+   !if (present(wind_increment_limiter)) then
+   !where(abs(uatemp) > wind_increment_limiter)
+   !    uatemp = (wind_increment_limiter/abs(uatemp)) * uatemp
+   !end where
+   !where(abs(vatemp) > wind_increment_limiter)
+   !    vatemp = (wind_increment_limiter/abs(vatemp)) * vatemp
+   !end where        
+   !endif
 
     if (FV_Atm(1)%flagstruct%grid_type<4) then
     do k=1, npz
