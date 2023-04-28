@@ -578,19 +578,19 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 24) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 450.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
@@ -2425,7 +2425,9 @@ subroutine State_To_FV ( STATE )
     real(FVPRC) :: ebuffer(state%grid%js:state%grid%je,state%grid%npz)
     real(FVPRC) :: nbuffer(state%grid%is:state%grid%ie,state%grid%npz)
 
-    logical :: bad_range=.false.
+    logical :: bad_range_U=.false.
+    logical :: bad_range_V=.false.
+    logical :: bad_range_T=.false.
 
     integer :: rc
     character(len=ESMF_MAXSTR)          :: ERRSTR
@@ -2482,15 +2484,18 @@ subroutine State_To_FV ( STATE )
 
   if ( FV_Atm(1)%flagstruct%range_warn ) then
     call range_check('U_S2F', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                      -280., 280., bad_range)
+                      -280., 280., bad_range_U)
     call range_check('V_S2F', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                      -280., 280., bad_range)
-    if (bad_range) then
+                      -280., 280., bad_range_V)
+    if (bad_range_U .or. bad_range_V) then
        STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
        STATE%NSPLIT = NINT(FV_Atm(1)%flagstruct%n_split*1.5)
        call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%k_split, STATE%KSPLIT ,format='("FV3 k_split adjustment: ",(I3)," to ",(I3))' )
        call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%n_split, STATE%NSPLIT ,format='("FV3 n_split adjustment: ",(I3)," to ",(I3))' )
        call WRITE_PARALLEL(STATE%DT/real(STATE%KSPLIT*STATE%NSPLIT)     ,format='("Adjusted Dynamics time step : ",(F10.4))')
+    else
+       STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
+       STATE%NSPLIT = FV_Atm(1)%flagstruct%n_split
     endif        
   endif
 
@@ -2557,7 +2562,7 @@ subroutine State_To_FV ( STATE )
 
        if ( FV_Atm(1)%flagstruct%range_warn ) then
           call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            130., 335., bad_range)
+                            130., 335., bad_range_T)
        endif
 
 !------------
