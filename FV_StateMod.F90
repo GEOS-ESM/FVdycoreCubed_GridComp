@@ -55,6 +55,7 @@ private
 
   logical :: FV_OFF = .false.
   integer :: INT_FV_OFF = 0
+  logical :: ADJUST_DT = .false.
   logical :: DEBUG = .false.
   logical :: COLDSTART = .false.
   logical :: SW_DYNAMICS = .false.
@@ -417,6 +418,8 @@ contains
   call MAPL_GetResource( MAPL, AdvCore_Advection, label='AdvCore_Advection:', default=AdvCore_Advection, rc=status )
   VERIFY_(STATUS)
 
+  call MAPL_GetResource( MAPL, ADJUST_DT,       label='ADJUST_DT:'   , default=ADJUST_DT, rc=status )
+  VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, INT_fix_mass,    label='fix_mass:'    , default=INT_fix_mass, rc=status )
   VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, INT_check_mass,  label='check_mass:'  , default=INT_check_mass, rc=status )
@@ -594,26 +597,26 @@ contains
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 120.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
-      FV_Atm(1)%flagstruct%fv_sg_adj = DT
+      FV_Atm(1)%flagstruct%fv_sg_adj = min(3600.0,DT*4.0)
       ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%hydrostatic = .false.
       FV_Atm(1)%flagstruct%make_nh = .false.
@@ -2434,7 +2437,7 @@ subroutine State_To_FV ( STATE )
                       -280., 280., bad_range_U)
     call range_check('V_S2F', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
                       -280., 280., bad_range_V)
-    if (bad_range_U .or. bad_range_V) then
+    if ((bad_range_U .or. bad_range_V) .and. (ADJUST_DT)) then
        STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
        STATE%NSPLIT = MIN(2*FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT*1.25))
     else
