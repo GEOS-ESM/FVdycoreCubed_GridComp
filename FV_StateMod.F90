@@ -732,63 +732,6 @@ contains
 
 contains
 
-!-----------------------------------------------------------------------
-! BOP
-! !IROUTINE:  init_nsplit --- find proper value for nsplit if not specified
-!
-! !INTERFACE:
-  integer function INIT_NSPLIT(dtime,npx,npy)
-!
-    implicit none
-
-! !INPUT PARAMETERS:
-    real (REAL8), intent(in) :: dtime      !  time step
-    integer, intent(in)   :: npx,npy    !  Global horizontal resolution
-
-! !DESCRIPTION:
-!
-!    If nsplit=0 (module variable) then determine a good value
-!    for ns (used in fvdycore) based on resolution and the large-time-step
-!    (dtime). The user may have to set this manually if instability occurs.
-!
-! !REVISION HISTORY:
-!   00.10.19   Lin     Creation
-!   01.03.26   Sawyer  ProTeX documentation
-!   01.06.10   Sawyer  Modified for dynamics_init framework
-!   03.12.04   Sawyer  Moved here from dynamics_vars.  Now a function
-!   07.16.07   Putman  Modified for cubed-sphere
-!
-! EOP
-!-----------------------------------------------------------------------
-! !LOCAL VARIABLES:
-    real (REAL8)   umax
-    real (REAL8)   dimx
-    real (REAL8)   dim0                      ! base dimension
-    real (REAL8)   dt0                       ! base time step
-    real (REAL8)   ns0                       ! base nsplit for base dimension
-    integer     ns                        ! final value to be returned
-
-    parameter ( dim0 = 180.  )
-    parameter ( dt0  = 1800. )
-    parameter ( umax = 350.  )
-
-    ns0  = 7.
-    dimx = 4.0*npx
-    if (FV_Atm(1)%flagstruct%grid_type < 4) then
-       ns = nint ( ns0*abs(dtime)*dimx/(dt0*dim0) + 0.49 )
-       if (.not. FV_Atm(1)%flagstruct%hydrostatic) ns = ns*1.5 ! time-step needs to be shortened for NH stabilitiy
-       ns = max ( 1, ns )
-    else
-      !ns = nint ( 2.*umax*dtime/sqrt(dx_const**2 + dy_const**2) + 0.49 )
-       ns = nint ( ns0*dtime/sqrt(FV_Atm(1)%flagstruct%dx_const**2 + FV_Atm(1)%flagstruct%dy_const**2) + 0.49 )
-    endif
-
-    init_nsplit = ns/FV_Atm(1)%flagstruct%k_split
-
-    return
-  end function INIT_NSPLIT
-!---------------------------------------------------------------------
-
  end subroutine FV_Setup
 
  subroutine FV_InitState (STATE, CLOCK, INTERNAL, IMPORT, GC, RC)
