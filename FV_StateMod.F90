@@ -606,7 +606,7 @@ contains
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  20.0  )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
@@ -2493,14 +2493,13 @@ subroutine State_To_FV ( STATE )
                       -280., 280., bad_range_V)
     if (bad_range_U .or. bad_range_V) then
        STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
-       STATE%NSPLIT = NINT(FV_Atm(1)%flagstruct%n_split*1.5)
-       call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%k_split, STATE%KSPLIT ,format='("FV3 k_split adjustment: ",(I3)," to ",(I3))' )
-       call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%n_split, STATE%NSPLIT ,format='("FV3 n_split adjustment: ",(I3)," to ",(I3))' )
-       call WRITE_PARALLEL(STATE%DT/real(STATE%KSPLIT*STATE%NSPLIT)     ,format='("Adjusted Dynamics time step : ",(F10.4))')
+       STATE%NSPLIT = MIN(2*FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT*1.25))
     else
        STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
-       STATE%NSPLIT = FV_Atm(1)%flagstruct%n_split
+       STATE%NSPLIT = MAX(  FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT/1.25))
     endif        
+    if (STATE%NSPLIT /= FV_Atm(1)%flagstruct%n_split) &
+    call WRITE_PARALLEL( STATE%DT/real(STATE%KSPLIT*STATE%NSPLIT)   ,format='("Adjusted Dynamics time step : ",(F10.4))')
   endif
 
   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%w(isc:iec,jsc:jec,:) = STATE%VARS%W
