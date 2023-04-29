@@ -575,22 +575,22 @@ contains
      ! Cubed-sphere grid resolution and DT dependence
      !              based on ideal remapping DT
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 12) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 24) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0   )
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
       endif
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
+      endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 450.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
@@ -603,6 +603,10 @@ contains
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )
+      endif
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125)
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  20.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
