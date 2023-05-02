@@ -674,10 +674,10 @@ contains
            FV_Atm(1)%flagstruct%vtdm4 = 0.04
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.06
+           FV_Atm(1)%flagstruct%vtdm4 = 0.05
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.08
+           FV_Atm(1)%flagstruct%vtdm4 = 0.06
          endif
       endif
       if (index(FV3_CONFIG,"MERRA-2") > 0) then
