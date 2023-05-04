@@ -527,6 +527,7 @@ contains
    FV_Atm(1)%flagstruct%ke_bg = 0.0
   ! Rayleigh & Divergence Damping
    if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+     FV_Atm(1)%flagstruct%dz_min = 6.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
      FV_Atm(1)%flagstruct%tau = 1.25
      FV_Atm(1)%flagstruct%rf_cutoff = 0.50e2
@@ -622,10 +623,17 @@ contains
          FV_Atm(1)%flagstruct%d_con = 0.
       else
       ! Non-Monotonic advection
-         FV_Atm(1)%flagstruct%hord_mt =  5
-         FV_Atm(1)%flagstruct%hord_vt =  6
-         FV_Atm(1)%flagstruct%hord_tm =  6
-         FV_Atm(1)%flagstruct%hord_dp = -6
+         if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+           FV_Atm(1)%flagstruct%hord_mt =  6
+           FV_Atm(1)%flagstruct%hord_vt =  6
+           FV_Atm(1)%flagstruct%hord_tm =  6
+           FV_Atm(1)%flagstruct%hord_dp = -6
+         else
+           FV_Atm(1)%flagstruct%hord_mt =  5
+           FV_Atm(1)%flagstruct%hord_vt =  6
+           FV_Atm(1)%flagstruct%hord_tm =  6
+           FV_Atm(1)%flagstruct%hord_dp = -6
+         endif
        ! Must now include explicit vorticity damping
          FV_Atm(1)%flagstruct%d_con = 1.
          FV_Atm(1)%flagstruct%do_vort_damp = .true.
@@ -688,7 +696,7 @@ contains
 
 !! Force compatibility of gmao_remap and n_zfilter
     if (FV_Atm(1)%flagstruct%gmao_remap > 0) then
-              FV_Atm(1)%flagstruct%n_zfilter = 0
+        FV_Atm(1)%flagstruct%n_zfilter = 0
     endif
 
 !! Setup GFDL microphysics module
@@ -1200,6 +1208,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   real(REAL4), pointer     :: PTR3D(:,:,:)
 
+  real(REAL4), pointer     :: LONS(:,:), LATS(:,:) 
+  real(REAL8), pointer     :: lonptr(:,:), latptr(:,:)
+  real(REAL4), allocatable :: griddiffs(:,:)
+  type (ESMF_Grid)         :: ESMFGRID
+
 ! Splitting for Pure Advection
   real(FVPRC) :: myDT, lnp, rdg, pek, ak1
 
@@ -1210,10 +1223,13 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   integer :: qice = -1
   integer :: qlls = -1
   integer :: qlcn = -1
+  integer :: qlcnf= -1 
   integer :: qils = -1
   integer :: qicn = -1
+  integer :: qicnf= -1 
   integer :: clls = -1
   integer :: clcn = -1
+  integer :: clcnf= -1
   integer :: qcld = -1
   integer :: rain = -1
   integer :: snow = -1
@@ -1304,6 +1320,53 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
       !endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
+#ifdef VERIFY_GRID
+    ! Verify Grid Coordinates
+    ! ------- ESMF ------
+     allocate ( griddiffs(isc:iec,jsc:jec) )
+     call ESMF_GridCompGet( GC, grid=ESMFGRID, RC=STATUS )
+     call ESMF_GridGetCoord(ESMFGRID,localDE=0,coordDim=1,&
+                        staggerloc=ESMF_STAGGERLOC_CENTER,&
+                            farrayPtr=lonptr,rc=status)
+     griddiffs = REAL(lonptr)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,1))
+     do j=jsc,jec
+        do i=isc,iec
+           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LONS discprepency FV3 : ESMF ', &
+                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,1)*180.0/MAPL_PI), &
+                                REAL(           lonptr(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
+        enddo
+     enddo
+     call ESMF_GridGetCoord(ESMFGRID,localDE=0,coordDim=2,&
+                        staggerloc=ESMF_STAGGERLOC_CENTER,&
+                                    farrayPtr=latptr,rc=status)
+     griddiffs = REAL(latptr)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,2))
+     do j=jsc,jec
+        do i=isc,iec
+           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LATS discprepency FV3 : ESMF ', &
+                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,2)*180.0/MAPL_PI), &
+                                REAL(           latptr(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
+        enddo
+     enddo
+    ! ------- MAPL ------
+     call MAPL_Get(MAPL, LATS=LATS, LONS=LONS, RC=STATUS)  ! These are in radians
+     griddiffs = REAL(LONS)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,1))
+     do j=jsc,jec
+        do i=isc,iec
+           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LONS discprepency FV3 : MAPL ', &
+                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,1)*180.0/MAPL_PI), &
+                                REAL(             LONS(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
+        enddo
+     enddo
+     griddiffs = REAL(LATS)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,2))
+     do j=jsc,jec
+        do i=isc,iec
+           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LATS discprepency FV3 : MAPL ', &
+                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,2)*180.0/MAPL_PI), &
+                                REAL(             LATS(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
+        enddo
+     enddo
+     deallocate ( griddiffs )
+#endif
     ! Set FV3 surface geopotential
      FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=FVPRC)
      FV_Atm(1)%varflt(isc:iec,jsc:jec) = real(varflt,kind=FVPRC)
@@ -1333,17 +1396,17 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     snow = 5
     grpl = 6
     qcld = 7
-  ! Advect around split CN species for redistribution...
-    qlcn = 8
-    qicn = 9
-    clcn = 10
+  ! Advect around CN fractions of species for redistribution...
+    qlcnf = 8
+    qicnf = 9
+    clcnf = 10
    case (3)
     sphu = 1
     qliq = 2
     qice = 3
-  ! Advect around split CN species for redistribution...
-    qlcn = 4
-    qicn = 5
+  ! Advect around CN fractions of species for redistribution...
+    qlcnf = 4
+    qicnf = 5
    case (1)
     sphu = 1
   ! Advect as split CN/LS species
@@ -1410,6 +1473,16 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content(:,:,:)
            endif
          endif
+         if (qlcnf /= -1) then ! QLCN
+           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           QLCN_FILLED = .TRUE.
+           nn = nn+1
+           if (state%vars%tracer(n)%is_r4) then
+              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf) = state%vars%tracer(n)%content_r4(:,:,:)
+           else
+              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf) = state%vars%tracer(n)%content(:,:,:)
+           endif
+         endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'QLLS') then
          if (qliq /= -1) then ! QLIQ
@@ -1451,6 +1524,16 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content_r4(:,:,:)
            else
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content(:,:,:)
+           endif
+         endif
+         if (qicnf /= -1) then ! QICN
+           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           QICN_FILLED = .TRUE.
+           nn = nn+1
+           if (state%vars%tracer(n)%is_r4) then
+              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf) = state%vars%tracer(n)%content_r4(:,:,:)
+           else
+              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf) = state%vars%tracer(n)%content(:,:,:)
            endif
          endif
        endif
@@ -1527,6 +1610,16 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content(:,:,:)
            endif
          endif
+         if (clcnf /= -1) then ! CLCN
+           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           CLCN_FILLED = .TRUE.
+           nn = nn+1
+           if (state%vars%tracer(n)%is_r4) then
+             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf) = state%vars%tracer(n)%content_r4(:,:,:)
+           else
+             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf) = state%vars%tracer(n)%content(:,:,:)
+           endif
+         endif
        endif
        if (TRIM(state%vars%tracer(n)%tname) == 'CLLS') then
          if (qcld /= -1) then ! QCLD
@@ -1550,6 +1643,49 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
          endif
        endif
     enddo
+   ! make convective fractions for advection
+    if ( (qliq /= -1) .and. (qlcnf /= -1) ) then
+       do k=1,npz
+         do j=jsc,jec
+           do i=isc,iec
+             if (FV_Atm(1)%q(i,j,k,qliq) > 0.0) then
+                 FV_Atm(1)%q(i,j,k,qlcnf) = FV_Atm(1)%q(i,j,k,qlcnf) / &
+                                            FV_Atm(1)%q(i,j,k,qliq)
+             else
+                 FV_Atm(1)%q(i,j,k,qlcnf) = 0.0
+             endif
+           enddo
+         enddo
+       enddo
+    endif
+    if ( (qice /= -1) .and. (qicnf /= -1) ) then
+       do k=1,npz
+         do j=jsc,jec
+           do i=isc,iec
+             if (FV_Atm(1)%q(i,j,k,qice) > 0.0) then
+                 FV_Atm(1)%q(i,j,k,qicnf) = FV_Atm(1)%q(i,j,k,qicnf) / &
+                                            FV_Atm(1)%q(i,j,k,qice)
+             else
+                 FV_Atm(1)%q(i,j,k,qicnf) = 0.0
+             endif
+           enddo 
+         enddo 
+       enddo 
+    endif
+    if ( (qcld /= -1) .and. (clcnf /= -1) ) then
+       do k=1,npz
+         do j=jsc,jec
+           do i=isc,iec      
+             if (FV_Atm(1)%q(i,j,k,qcld) > 0.0) then   
+                 FV_Atm(1)%q(i,j,k,clcnf) = FV_Atm(1)%q(i,j,k,clcnf) / &
+                                            FV_Atm(1)%q(i,j,k,qcld)
+             else
+                 FV_Atm(1)%q(i,j,k,clcnf) = 0.0
+             endif
+           enddo 
+         enddo 
+       enddo 
+    endif
    ! Verify
     select case (FV_Atm(1)%flagstruct%nwat)
     case (6:7)
@@ -1560,16 +1696,16 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
       _ASSERT(SNOW_FILLED, 'SNOW Not Filled')
       _ASSERT(GRPL_FILLED, 'GRPL Not Filled')
       _ASSERT(QCLD_FILLED, 'QCLD Not Filled')
-      _ASSERT(QLCN_FILLED, 'QLCN Not Filled')
-      _ASSERT(QICN_FILLED, 'QICN Not Filled')
-      _ASSERT(CLCN_FILLED, 'CLCN Not Filled')
+      _ASSERT(QLCN_FILLED, 'QLCNF Not Filled')
+      _ASSERT(QICN_FILLED, 'QICNF Not Filled')
+      _ASSERT(CLCN_FILLED, 'CLCNF Not Filled')
       _ASSERT(nn == 10, 'Expecting 10 water species') ! Q, QLCN, QICN, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
     case (3)
       _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
       _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled')
       _ASSERT(QICE_FILLED, 'QICE Not Filled')
-      _ASSERT(QLCN_FILLED, 'QLCN Not Filled')
-      _ASSERT(QICN_FILLED, 'QICN Not Filled')
+      _ASSERT(QLCN_FILLED, 'QLCNF Not Filled')
+      _ASSERT(QICN_FILLED, 'QICNF Not Filled')
       _ASSERT(nn == 5, 'Expecting 5 water species') ! Q, QLCN, QICN, QLIQ, QICE
     case (1)
       _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
@@ -1927,26 +2063,26 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        endif
     ! QLIQ
        if (qliq /= -1) then
-         if ((qlcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLCN')) then
+         if ((qlcnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLCN')) then
             QLCN_FILLED = .TRUE.
             nn = nn+1
             if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq), &
-                                                            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn))
+               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * &
+                                        MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf)))
             else
-                  state%vars%tracer(n)%content(:,:,:) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq), &
-                                                            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn))
+                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * &
+                                        MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf)))
             endif
          endif
-         if ((qlcn /= -1) .and. (qliq /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLLS')) then
+         if ((qlcnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLLS')) then
             QLLS_FILLED = .TRUE.
             nn = nn+1
             if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq)-&
-                                                                FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn))
+               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * &
+                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf))))
             else
-                  state%vars%tracer(n)%content(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq)-&
-                                                                FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn))
+                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * &
+                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf))))
             endif
          endif
        else
@@ -1971,26 +2107,26 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        endif
     ! QICE
        if (qice /= -1) then
-         if ((qicn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QICN')) then
+         if ((qicnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QICN')) then
             QICN_FILLED = .TRUE.
             nn = nn+1
             if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice), &
-                                                            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn))
+               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * &
+                                        MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf)))
             else
-                  state%vars%tracer(n)%content(:,:,:) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice), &
-                                                            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn))
+                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * &
+                                        MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf)))
             endif
          endif
-         if ((qicn /= -1) .and. (qice /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QILS')) then
+         if ((qicnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QILS')) then
             QILS_FILLED = .TRUE.
             nn = nn+1
             if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice)-&
-                                                                FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn))
+               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * &
+                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf))))
             else
-                  state%vars%tracer(n)%content(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice)-&
-                                                                FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn))
+                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * &
+                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf))))
             endif
          endif
        else
@@ -2015,28 +2151,28 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        endif
     ! QCLD
        if (qcld /= -1) then
-         if ((clcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLCN')) then
+         if ((clcnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLCN')) then
             CLCN_FILLED = .TRUE.
             nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld), &
-                                                            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn))
+            if (state%vars%tracer(n)%is_r4) then      
+               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
+                                        MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf)))
             else
-                  state%vars%tracer(n)%content(:,:,:) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld), &
-                                                            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn))
+                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
+                                        MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf)))
             endif
-         endif
-         if ((clcn /= -1) .and. (qcld /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLLS')) then
+         endif    
+         if ((clcnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLLS')) then
             CLLS_FILLED = .TRUE.
             nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld)-&
-                                                                FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn))
+            if (state%vars%tracer(n)%is_r4) then     
+               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
+                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf))))       
             else
-                  state%vars%tracer(n)%content(:,:,:) = MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld)-&
-                                                                FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn))
+                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
+                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf))))
             endif
-         endif
+         endif   
        else
          if ((clcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLCN')) then
             CLCN_FILLED = .TRUE.
@@ -2408,7 +2544,7 @@ subroutine State_To_FV ( STATE )
 
        if ( FV_Atm(1)%flagstruct%range_warn ) then
           call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            150., 335., bad_data)
+                            130., 335., bad_data)
        endif
 
 !------------
@@ -2448,12 +2584,12 @@ subroutine FV_To_State ( STATE )
     KM  = state%grid%npz
     NG  = state%grid%ng
 
-    if ( FV_Atm(1)%flagstruct%range_warn ) then
-      call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                        -280., 280., bad_data)
-      call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                        -280., 280., bad_data)
-    endif
+   !if ( FV_Atm(1)%flagstruct%range_warn ) then
+   !  call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+   !                    -280., 280., bad_data)
+   !  call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+   !                    -280., 280., bad_data)
+   !endif
 
 ! Copy updated FV data to internal state
     STATE%VARS%U(:,:,:) = FV_Atm(1)%u(isc:iec,jsc:jec,:)
@@ -2473,10 +2609,10 @@ subroutine FV_To_State ( STATE )
 !-----------------------------------
 ! Fill Dry Temperature to PT
 !-----------------------------------
-       if ( FV_Atm(1)%flagstruct%range_warn ) then
-          call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            150., 335., bad_data)
-       endif
+      !if ( FV_Atm(1)%flagstruct%range_warn ) then
+      !   call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+      !                     130., 335., bad_data)
+      !endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 
 !------------------------------
@@ -3842,11 +3978,11 @@ end subroutine fv_getDivergence
 subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
    use constants_mod, only: fms_grav=>grav
 ! made this REAL4
-   real(REAL4), intent(OUT) ::  uh25(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
-   real(REAL4), intent(OUT) ::  uh03(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
-   real(REAL4), intent(OUT) :: srh01(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
-   real(REAL4), intent(OUT) :: srh03(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
-   real(REAL4), intent(OUT) :: srh25(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+   real(REAL4), intent(OUT) ::  uh25(:,:)
+   real(REAL4), intent(OUT) ::  uh03(:,:)
+   real(REAL4), intent(OUT) :: srh01(:,:)
+   real(REAL4), intent(OUT) :: srh03(:,:)
+   real(REAL4), intent(OUT) :: srh25(:,:)
 
 ! made an intermediate output of FVPRC
    real(FVPRC) :: uh_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
@@ -3893,18 +4029,18 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
 
    ! Storm relative helicities
 
-     allocate(ustm(isc:iec,jsc:jec), vstm(isc:iec,jsc:jec))
-     call bunkers_vector(isc, iec, jsc, jec, ng, npz, zvir, sphum, ustm, vstm, &
-                     FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
-                     FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav)
+   allocate(ustm(isc:iec,jsc:jec), vstm(isc:iec,jsc:jec))
+   call bunkers_vector(isc, iec, jsc, jec, ng, npz, zvir, sphum, ustm, vstm, &
+                  FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
+                  FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav)
+
 
    z_bot = 0.e3
    z_top = 1.e3
    call helicity_relative_CAPS(isc, iec, jsc, jec, ng, npz, zvir, sphum, uh_tmp, ustm, vstm, &
                    FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                    FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
-
-   srh01 = uh_tmp                                 
+   srh01 = uh_tmp
 
    z_bot = 0.e3
    z_top = 3.e3
@@ -4051,7 +4187,7 @@ end subroutine fv_getEPV
 !
 ! !INTERFACE:
 !
-subroutine fv_getAllWinds_3D_R4(u, v, ua, va, uc, vc, ur, vr, vort, divg)
+subroutine fv_getAllWinds_3D_R4(u, v, ua, va, uc, vc, ur, vr)
 
 ! !INPUT PARAMETERS:
   real(REAL4), intent(IN)  ::  u(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
@@ -4066,9 +4202,6 @@ subroutine fv_getAllWinds_3D_R4(u, v, ua, va, uc, vc, ur, vr, vort, divg)
  ! rotated winds
   real(REAL4), optional, intent(OUT) :: ur(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
   real(REAL4), optional, intent(OUT) :: vr(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
- ! vorticity/divergence
-  real(FVPRC), optional, intent(OUT) :: vort(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
-  real(FVPRC), optional, intent(OUT) :: divg(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
 !
 ! !DESCRIPTION:
 !
@@ -4136,13 +4269,6 @@ subroutine fv_getAllWinds_3D_R4(u, v, ua, va, uc, vc, ur, vr, vort, divg)
   endif
   call mpp_update_domains(utemp, vtemp, FV_Atm(1)%domain, gridtype=DGRID_NE, complete=.true.)
 
-  if (present(vort)) then
-     call get_vorticity(isc, iec, jsc, jec, &
-                        isd, ied, jsd, jed, &
-                        npz, utemp, vtemp, vort, &
-                        FV_Atm(1)%gridstruct%dx, FV_Atm(1)%gridstruct%dy, FV_Atm(1)%gridstruct%rarea)
-  endif
-
   do k=1,npz
    call d2a2c_vect(utemp(:,:,k),  vtemp(:,:,k), &
                    uatemp(:,:,k), vatemp(:,:,k), &
@@ -4154,37 +4280,6 @@ subroutine fv_getAllWinds_3D_R4(u, v, ua, va, uc, vc, ur, vr, vort, divg)
   if (present(va)) va(:,:,:) = vatemp(isc:iec,jsc:jec,:)
   if (present(uc)) uc(:,:,:) = uctemp(isc:iec,jsc:jec,:)
   if (present(vc)) vc(:,:,:) = vctemp(isc:iec,jsc:jec,:)
-
-! Calc Divergence
-  if (present(divg)) then
-    do k=1,npz
-        call compute_utvt(isd,ied, jsd,jed, uctemp(isd,jsd,k), vctemp(isd,jsd,k), ut(isd,jsd), vt(isd,jsd), 1.0)
-        do j=jsc,jec
-           do i=isc,iec+1
-              if ( ut(i,j) > 0. ) then
-                   ut(i,j) = fv_atm(1)%gridstruct%dy(i,j)*ut(i,j)*fv_atm(1)%gridstruct%sin_sg(i-1,j,3)
-              else
-                   ut(i,j) = fv_atm(1)%gridstruct%dy(i,j)*ut(i,j)*fv_atm(1)%gridstruct%sin_sg(i,j,1)
-             endif
-           enddo
-        enddo
-        do j=jsc,jec+1
-           do i=isc,iec
-              if ( vt(i,j) > 0. ) then
-                   vt(i,j) = fv_atm(1)%gridstruct%dx(i,j)*vt(i,j)*fv_atm(1)%gridstruct%sin_sg(i,j-1,4)
-              else
-                   vt(i,j) = fv_atm(1)%gridstruct%dx(i,j)*vt(i,j)*fv_atm(1)%gridstruct%sin_sg(i,j,2)
-              endif
-           enddo
-        enddo
-        do j=jsc,jec
-           do i=isc,iec
-              divg(i,j,k) = fv_atm(1)%gridstruct%rarea(i,j)*( ut(i+1,j)-ut(i,j) + &
-                                                              vt(i,j+1)-vt(i,j) )
-           enddo
-        enddo
-    enddo
-  endif
 
   if (FV_Atm(1)%flagstruct%grid_type<4 .AND. (present(ur) .or. present(vr))) then
      call cubed_to_latlon(utemp  , vtemp  , &
@@ -4207,7 +4302,7 @@ end subroutine fv_getAllWinds_3D_R4
 !
 ! !INTERFACE:
 !
-subroutine fv_getAllWinds_3D(u, v, ua, va, uc, vc, ur, vr, vort, divg)
+subroutine fv_getAllWinds_3D(u, v, ua, va, uc, vc, ur, vr)
 
 ! !INPUT PARAMETERS:
   real(REAL8), intent(IN)  ::  u(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
@@ -4222,9 +4317,6 @@ subroutine fv_getAllWinds_3D(u, v, ua, va, uc, vc, ur, vr, vort, divg)
  ! rotated winds
   real(REAL8), optional, intent(OUT) :: ur(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
   real(REAL8), optional, intent(OUT) :: vr(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
- ! vorticity/divergence
-  real(FVPRC), optional, intent(OUT) :: vort(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
-  real(FVPRC), optional, intent(OUT) :: divg(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
 !
 ! !DESCRIPTION:
 !
@@ -4292,13 +4384,6 @@ subroutine fv_getAllWinds_3D(u, v, ua, va, uc, vc, ur, vr, vort, divg)
   endif
   call mpp_update_domains(utemp, vtemp, FV_Atm(1)%domain, gridtype=DGRID_NE, complete=.true.)
 
-  if (present(vort)) then
-     call get_vorticity(isc, iec, jsc, jec, &
-                        isd, ied, jsd, jed, &
-                        npz, utemp, vtemp, vort, &
-                        FV_Atm(1)%gridstruct%dx, FV_Atm(1)%gridstruct%dy, FV_Atm(1)%gridstruct%rarea)
-  endif
-
   do k=1,npz
    call d2a2c_vect(utemp(:,:,k),  vtemp(:,:,k), &
                    uatemp(:,:,k), vatemp(:,:,k), &
@@ -4310,37 +4395,6 @@ subroutine fv_getAllWinds_3D(u, v, ua, va, uc, vc, ur, vr, vort, divg)
   if (present(va)) va(:,:,:) = vatemp(isc:iec,jsc:jec,:)
   if (present(uc)) uc(:,:,:) = uctemp(isc:iec,jsc:jec,:)
   if (present(vc)) vc(:,:,:) = vctemp(isc:iec,jsc:jec,:)
-
-! Calc Divergence
-  if (present(divg)) then
-    do k=1,npz
-        call compute_utvt(isd,ied, jsd,jed, uctemp(isd,jsd,k), vctemp(isd,jsd,k), ut(isd,jsd), vt(isd,jsd), 1.0)
-        do j=jsc,jec
-           do i=isc,iec+1
-              if ( ut(i,j) > 0. ) then
-                   ut(i,j) = fv_atm(1)%gridstruct%dy(i,j)*ut(i,j)*fv_atm(1)%gridstruct%sin_sg(i-1,j,3)
-              else
-                   ut(i,j) = fv_atm(1)%gridstruct%dy(i,j)*ut(i,j)*fv_atm(1)%gridstruct%sin_sg(i,j,1)
-             endif
-           enddo
-        enddo
-        do j=jsc,jec+1
-           do i=isc,iec
-              if ( vt(i,j) > 0. ) then
-                   vt(i,j) = fv_atm(1)%gridstruct%dx(i,j)*vt(i,j)*fv_atm(1)%gridstruct%sin_sg(i,j-1,4)
-              else
-                   vt(i,j) = fv_atm(1)%gridstruct%dx(i,j)*vt(i,j)*fv_atm(1)%gridstruct%sin_sg(i,j,2)
-              endif
-           enddo
-        enddo
-        do j=jsc,jec
-           do i=isc,iec
-              divg(i,j,k) = fv_atm(1)%gridstruct%rarea(i,j)*( ut(i+1,j)-ut(i,j) + &
-                                                              vt(i,j+1)-vt(i,j) )
-           enddo
-        enddo
-    enddo
-  endif
 
   if (FV_Atm(1)%flagstruct%grid_type<4 .AND. (present(ur) .or. present(vr))) then
      call cubed_to_latlon(utemp  , vtemp  , &
@@ -4363,7 +4417,7 @@ end subroutine fv_getAllWinds_3D
 !
 ! !INTERFACE:
 !
-subroutine fv_getAllWinds_2D(u, v, ua, va, uc, vc, ur, vr, vort, divg)
+subroutine fv_getAllWinds_2D(u, v, ua, va, uc, vc, ur, vr)
 
 !
 ! !INPUT PARAMETERS:
@@ -4378,9 +4432,6 @@ subroutine fv_getAllWinds_2D(u, v, ua, va, uc, vc, ur, vr, vort, divg)
  ! rotated winds
   real(REAL8), optional, intent(OUT)  :: ur(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
   real(REAL8), optional, intent(OUT)  :: vr(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
- ! vorticity/divergence
-  real(REAL8), optional, intent(OUT)  :: vort(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
-  real(REAL8), optional, intent(OUT)  :: divg(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
 !
 ! !DESCRIPTION:
 !
@@ -4762,6 +4813,7 @@ subroutine echo_fv3_setup()
 !   logical :: reset_eta = .false.
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%p_fac ,format='("FV3 p_fac: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%a_imp ,format='("FV3 a_imp: ",(F7.5))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%dz_min ,format='("FV3 dz_min: ",(F7.5))' )
    call WRITE_PARALLEL ( 'FV3 Splitting options:' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%n_split ,format='("FV3 n_split: ",(I3))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%m_split ,format='("FV3 m_split: ",(I3))' )
