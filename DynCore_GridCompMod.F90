@@ -5096,7 +5096,7 @@ subroutine Run(gc, import, export, clock, rc)
       ! Per WMP, this calculation is not useful if running hydrostatic
       if (.not. HYDROSTATIC) then
          if( associated( uh25) .or. associated( uh03) .or. &
-             associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
+            associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
             call fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
          endif
       endif
