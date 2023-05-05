@@ -14,6 +14,9 @@ module FV_StateMod
    use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS, &
                                 MAPL_KAPPA, MAPL_PI_R8, MAPL_ALHL, MAPL_PSDRY
 
+   use fv_mp_mod,         only: start_group_halo_update, complete_group_halo_update
+   use fv_mp_mod,         only: group_halo_update_type
+
    use fms_mod, only: fms_init, set_domain, nullify_domain
    use mpp_domains_mod, only: mpp_update_domains, CGRID_NE, DGRID_NE, mpp_get_boundary
    use mpp_parameter_mod, only: AGRID_PARAM=>AGRID, CORNER
@@ -52,6 +55,7 @@ private
 
   logical :: FV_OFF = .false.
   integer :: INT_FV_OFF = 0
+  logical :: ADJUST_DT = .false.
   logical :: DEBUG = .false.
   logical :: COLDSTART = .false.
   logical :: SW_DYNAMICS = .false.
@@ -202,6 +206,7 @@ private
     integer(kind=8)                      :: RUN_TIMES(4,NUM_TIMES)
     logical                              :: DOTIME, DODYN
     real(REAL8)                          :: DT          ! Large time step
+    integer                              :: KSPLIT
     integer                              :: NSPLIT
     integer                              :: NUM_CALLS
   end type T_FVDYCORE_STATE
@@ -413,6 +418,8 @@ contains
   call MAPL_GetResource( MAPL, AdvCore_Advection, label='AdvCore_Advection:', default=AdvCore_Advection, rc=status )
   VERIFY_(STATUS)
 
+  call MAPL_GetResource( MAPL, ADJUST_DT,       label='ADJUST_DT:'   , default=ADJUST_DT, rc=status )
+  VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, INT_fix_mass,    label='fix_mass:'    , default=INT_fix_mass, rc=status )
   VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, INT_check_mass,  label='check_mass:'  , default=INT_check_mass, rc=status )
@@ -526,21 +533,33 @@ contains
    FV_Atm(1)%flagstruct%delt_max = 0.002
    FV_Atm(1)%flagstruct%ke_bg = 0.0
   ! Rayleigh & Divergence Damping
-   if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+   if (index(FV3_CONFIG,"HWT") > 0) then
+     FV_Atm(1)%flagstruct%fv_sg_adj = min(3600.0,DT*4.0)
+     if (FV_Atm(1)%flagstruct%npz >= 90) then
+       FV_Atm(1)%flagstruct%n_zfilter = 46 ! ~100mb
+     endif
+     if (FV_Atm(1)%flagstruct%npz >= 136) then
+       FV_Atm(1)%flagstruct%n_zfilter = 60 ! ~100mb
+     endif
+     if (FV_Atm(1)%flagstruct%npz >= 180) then
+       FV_Atm(1)%flagstruct%n_zfilter = 92 ! ~100mb
+     endif
+     FV_Atm(1)%flagstruct%do_sat_adj = .true. ! only valid when nwat >= 6
      FV_Atm(1)%flagstruct%dz_min = 6.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
-     FV_Atm(1)%flagstruct%tau = 1.25
-     FV_Atm(1)%flagstruct%rf_cutoff = 0.50e2
+     FV_Atm(1)%flagstruct%tau = 2.0 
+     FV_Atm(1)%flagstruct%rf_cutoff = 10.e2
     ! 6th order default damping options
      FV_Atm(1)%flagstruct%nord = 3
-     FV_Atm(1)%flagstruct%dddmp = 0.2
-     FV_Atm(1)%flagstruct%d4_bg = 0.14
+     FV_Atm(1)%flagstruct%dddmp = 0.1
+     FV_Atm(1)%flagstruct%d4_bg = 0.12
      FV_Atm(1)%flagstruct%d2_bg = 0.0
      FV_Atm(1)%flagstruct%d_ext = 0.0
      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.15
      FV_Atm(1)%flagstruct%consv_te = 1.0
    else
+     FV_Atm(1)%flagstruct%fv_sg_adj = DT
      FV_Atm(1)%flagstruct%RF_fast = .false.
      if (FV_Atm(1)%flagstruct%npz == 72) then
        FV_Atm(1)%flagstruct%tau = 0.0
@@ -570,42 +589,44 @@ contains
      ! Cubed-sphere grid resolution and DT dependence
      !              based on ideal remapping DT
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 12) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 24) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 120.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
+      endif
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125)
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
-      FV_Atm(1)%flagstruct%fv_sg_adj = DT
-      if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) FV_Atm(1)%flagstruct%fv_sg_adj = DT*1.5
       ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%hydrostatic = .false.
       FV_Atm(1)%flagstruct%make_nh = .false.
@@ -653,10 +674,10 @@ contains
            FV_Atm(1)%flagstruct%vtdm4 = 0.04
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.06
+           FV_Atm(1)%flagstruct%vtdm4 = 0.05
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.08
+           FV_Atm(1)%flagstruct%vtdm4 = 0.06
          endif
       endif
       if (index(FV3_CONFIG,"MERRA-2") > 0) then
@@ -723,63 +744,6 @@ contains
   RETURN_(ESMF_SUCCESS)
 
 contains
-
-!-----------------------------------------------------------------------
-! BOP
-! !IROUTINE:  init_nsplit --- find proper value for nsplit if not specified
-!
-! !INTERFACE:
-  integer function INIT_NSPLIT(dtime,npx,npy)
-!
-    implicit none
-
-! !INPUT PARAMETERS:
-    real (REAL8), intent(in) :: dtime      !  time step
-    integer, intent(in)   :: npx,npy    !  Global horizontal resolution
-
-! !DESCRIPTION:
-!
-!    If nsplit=0 (module variable) then determine a good value
-!    for ns (used in fvdycore) based on resolution and the large-time-step
-!    (dtime). The user may have to set this manually if instability occurs.
-!
-! !REVISION HISTORY:
-!   00.10.19   Lin     Creation
-!   01.03.26   Sawyer  ProTeX documentation
-!   01.06.10   Sawyer  Modified for dynamics_init framework
-!   03.12.04   Sawyer  Moved here from dynamics_vars.  Now a function
-!   07.16.07   Putman  Modified for cubed-sphere
-!
-! EOP
-!-----------------------------------------------------------------------
-! !LOCAL VARIABLES:
-    real (REAL8)   umax
-    real (REAL8)   dimx
-    real (REAL8)   dim0                      ! base dimension
-    real (REAL8)   dt0                       ! base time step
-    real (REAL8)   ns0                       ! base nsplit for base dimension
-    integer     ns                        ! final value to be returned
-
-    parameter ( dim0 = 180.  )
-    parameter ( dt0  = 1800. )
-    parameter ( umax = 350.  )
-
-    ns0  = 7.
-    dimx = 4.0*npx
-    if (FV_Atm(1)%flagstruct%grid_type < 4) then
-       ns = nint ( ns0*abs(dtime)*dimx/(dt0*dim0) + 0.49 )
-       if (.not. FV_Atm(1)%flagstruct%hydrostatic) ns = ns*1.5 ! time-step needs to be shortened for NH stabilitiy
-       ns = max ( 1, ns )
-    else
-      !ns = nint ( 2.*umax*dtime/sqrt(dx_const**2 + dy_const**2) + 0.49 )
-       ns = nint ( ns0*dtime/sqrt(FV_Atm(1)%flagstruct%dx_const**2 + FV_Atm(1)%flagstruct%dy_const**2) + 0.49 )
-    endif
-
-    init_nsplit = ns/FV_Atm(1)%flagstruct%k_split
-
-    return
-  end function INIT_NSPLIT
-!---------------------------------------------------------------------
 
  end subroutine FV_Setup
 
@@ -858,6 +822,7 @@ contains
   GRID => STATE%GRID     ! For convenience
   STATE%DOTIME= .TRUE.
   STATE%DT        = DT
+  STATE%KSPLIT    = FV_Atm(1)%flagstruct%K_SPLIT
   STATE%NSPLIT    = FV_Atm(1)%flagstruct%N_SPLIT
   GRID%NG     = 3 ; ng = 3
   GRID%NPX    = FV_Atm(1)%flagstruct%NPX-1
@@ -914,6 +879,12 @@ contains
   GRID%jed    = FV_Atm(1)%bd%jed
   if(.not.associated(GRID%AK)) allocate(GRID%AK(size(ak)))
   if(.not.associated(GRID%BK)) allocate(GRID%BK(size(bk)))
+  if (FV_Atm(1)%flagstruct%npz == 137) then
+     ak(0) = 1.000000
+     ak(1) = 1.825000
+     ak(2) = 3.000000
+     ak(3) = 4.630000
+  endif
   GRID%AK     = ak
   GRID%BK     = bk
 
@@ -1036,7 +1007,7 @@ contains
 
   FV_Atm(1)%ak = ak
   FV_Atm(1)%bk = bk
-  FV_Atm(1)%ptop = FV_Atm(1)%ak(1)
+  FV_Atm(1)%ptop = ak(0)
   FV_Atm(1)%q(:,:,:,:) = 0.0 ! We Don't Have QV from the Import yet
 
   if (COLDSTART) then
@@ -1976,7 +1947,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     w_dt(:,:,:) = 0.0
     call fv_dynamics(FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng,   &
                      myDT, FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, kappa,   &
-                     cp, zvir, FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+                     cp, zvir, FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst,  &
+                     state%ksplit, state%nsplit, FV_Atm(1)%flagstruct%q_split, &
                      FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz,       &
                      FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, FV_Atm(1)%ps,       &
                      FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz,                         &
@@ -2419,7 +2391,9 @@ subroutine State_To_FV ( STATE )
     real(FVPRC) :: ebuffer(state%grid%js:state%grid%je,state%grid%npz)
     real(FVPRC) :: nbuffer(state%grid%is:state%grid%ie,state%grid%npz)
 
-    logical :: bad_data=.false.
+    logical :: bad_range_U
+    logical :: bad_range_V
+    logical :: bad_range_T
 
     integer :: rc
     character(len=ESMF_MAXSTR)          :: ERRSTR
@@ -2476,9 +2450,18 @@ subroutine State_To_FV ( STATE )
 
   if ( FV_Atm(1)%flagstruct%range_warn ) then
     call range_check('U_S2F', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                      -280., 280., bad_data)
+                      -280., 280., bad_range=bad_range_U)
     call range_check('V_S2F', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                      -280., 280., bad_data)
+                      -280., 280., bad_range=bad_range_V)
+    if ((bad_range_U .or. bad_range_V) .and. (ADJUST_DT)) then
+       STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
+       STATE%NSPLIT = MIN(2*FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT*1.25))
+    else
+       STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
+       STATE%NSPLIT = MAX(  FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT/1.25))
+    endif        
+    if (STATE%NSPLIT /= FV_Atm(1)%flagstruct%n_split) &
+    call WRITE_PARALLEL( STATE%DT/real(STATE%KSPLIT*STATE%NSPLIT)   ,format='("Adjusted Dynamics time step : ",(F10.4))')
   endif
 
   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%w(isc:iec,jsc:jec,:) = STATE%VARS%W
@@ -2544,7 +2527,7 @@ subroutine State_To_FV ( STATE )
 
        if ( FV_Atm(1)%flagstruct%range_warn ) then
           call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            130., 335., bad_data)
+                            130., 335., bad_range=bad_range_T)
        endif
 
 !------------
@@ -2571,7 +2554,7 @@ subroutine FV_To_State ( STATE )
 
    type(T_FVDYCORE_STATE),      pointer   :: STATE
 
-    logical :: bad_data = .false.
+    logical :: bad_range = .false.
     integer               :: ISC,IEC, JSC,JEC, KM, NG
     integer               :: I,J,K
     character(len=ESMF_MAXSTR)          :: ERRSTR
@@ -2586,9 +2569,9 @@ subroutine FV_To_State ( STATE )
 
    !if ( FV_Atm(1)%flagstruct%range_warn ) then
    !  call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-   !                    -280., 280., bad_data)
+   !                    -280., 280., bad_range)
    !  call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-   !                    -280., 280., bad_data)
+   !                    -280., 280., bad_range)
    !endif
 
 ! Copy updated FV data to internal state
@@ -2611,7 +2594,7 @@ subroutine FV_To_State ( STATE )
 !-----------------------------------
       !if ( FV_Atm(1)%flagstruct%range_warn ) then
       !   call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-      !                     130., 335., bad_data)
+      !                     130., 335., bad_range)
       !endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 
@@ -2740,7 +2723,7 @@ subroutine fv_getPKZ(pkz,pe)
 return
 end subroutine fv_getPKZ
 
-subroutine a2d3d(ua, va, ud, vd)
+subroutine a2d3d(ua, va, ud, vd, wind_increment_limiter)
 
 ! Move A-Grid winds/tendencies oriented on lat/lon to the D-grid cubed-sphere orientation
 
@@ -2749,19 +2732,25 @@ subroutine a2d3d(ua, va, ud, vd)
       real(REAL8)                :: va(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec  ,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec  ,FV_Atm(1)%npz) ! V-Wind
       real(REAL8), intent(inout) :: ud(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec  ,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec+1,FV_Atm(1)%npz) ! U-Wind
       real(REAL8), intent(inout) :: vd(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec  ,FV_Atm(1)%npz) ! V-Wind
+      real(REAL8), optional      :: wind_increment_limiter
 ! !Local Variables
-      integer :: is ,ie , js ,je
+      integer :: is,ie, js,je, ng
       integer :: npx, npy, npz
       integer :: i,j,k, im2,jm2
 
-      real(REAL8) :: uatemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed,FV_Atm(1)%npz)
-      real(REAL8) :: vatemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed,FV_Atm(1)%npz)
+      real :: limiter(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed,FV_Atm(1)%npz)
+      real :: uatemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed,FV_Atm(1)%npz)
+      real :: vatemp(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied,FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed,FV_Atm(1)%npz)
 
-      real(REAL8) :: v3(FV_Atm(1)%bd%isc-1:FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc-1:FV_Atm(1)%bd%jec+1,3)
-      real(REAL8) :: ue(FV_Atm(1)%bd%isc-1:FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc  :FV_Atm(1)%bd%jec+1,3)    ! 3D winds at edges
-      real(REAL8) :: ve(FV_Atm(1)%bd%isc  :FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc-1:FV_Atm(1)%bd%jec+1,3)    ! 3D winds at edges
-      real(REAL8), dimension(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec):: ut1, ut2, ut3
-      real(REAL8), dimension(FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec):: vt1, vt2, vt3
+      real :: v3(FV_Atm(1)%bd%isc-1:FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc-1:FV_Atm(1)%bd%jec+1,3)
+      real :: ue(FV_Atm(1)%bd%isc-1:FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc  :FV_Atm(1)%bd%jec+1,3)    ! 3D winds at edges
+      real :: ve(FV_Atm(1)%bd%isc  :FV_Atm(1)%bd%iec+1,FV_Atm(1)%bd%jsc-1:FV_Atm(1)%bd%jec+1,3)    ! 3D winds at edges
+      real, dimension(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec):: ut1, ut2, ut3
+      real, dimension(FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec):: vt1, vt2, vt3
+
+      type(group_halo_update_type), save :: i_pack(2)
+
+      logical :: bad_range=.false.
 
       npx = FV_Atm(1)%npx
       npy = FV_Atm(1)%npy
@@ -2770,6 +2759,7 @@ subroutine a2d3d(ua, va, ud, vd)
       ie  = FV_Atm(1)%bd%iec
       js  = FV_Atm(1)%bd%jsc
       je  = FV_Atm(1)%bd%jec
+      ng  = FV_Atm(1)%ng
 
       im2 = (npx-1)/2
       jm2 = (npy-1)/2
@@ -2780,10 +2770,34 @@ subroutine a2d3d(ua, va, ud, vd)
     uatemp(is:ie,js:je,:) = ua
     vatemp(is:ie,js:je,:) = va
 
+    if ( fv_atm(1)%gridstruct%square_domain ) then
+     ! Cartesian
+       call mpp_update_domains(uatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.false.)
+       call mpp_update_domains(vatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.true.)
+    else
+     ! Cubed-Sphere
+       call mpp_update_domains(uatemp, FV_Atm(1)%domain, complete=.false.)
+       call mpp_update_domains(vatemp, FV_Atm(1)%domain, complete=.true.)
+    endif
+
+  ! if ( FV_Atm(1)%flagstruct%range_warn ) then
+  !    call range_check('DUDT_A2D', 86400.0*uatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
+  !                      -1000., 1000., bad_range)
+  !    call range_check('DVDT_A2D', 86400.0*vatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
+  !                      -1000., 1000., bad_range)
+  ! endif
+
+  ! ! Apply Tendency Limiter
+  ! if (present(wind_increment_limiter)) then
+  ! where(abs(uatemp) > wind_increment_limiter)
+  !     uatemp = (wind_increment_limiter/abs(uatemp)) * uatemp
+  ! end where
+  ! where(abs(vatemp) > wind_increment_limiter)
+  !     vatemp = (wind_increment_limiter/abs(vatemp)) * vatemp
+  ! end where        
+  ! endif
+
     if (FV_Atm(1)%flagstruct%grid_type<4) then
-   ! Cubed-Sphere
-    call mpp_update_domains(uatemp, FV_Atm(1)%domain, complete=.false.)
-    call mpp_update_domains(vatemp, FV_Atm(1)%domain, complete=.true.)
     do k=1, npz
 ! Compute 3D wind tendency on A grid
        do j=js-1,je+1
@@ -2909,9 +2923,6 @@ subroutine a2d3d(ua, va, ud, vd)
 
     enddo         ! k-loop
    else
-   ! Cartesian
-    call mpp_update_domains(uatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.false.)
-    call mpp_update_domains(vatemp, FV_Atm(1)%domain, whalo=1, ehalo=1, shalo=1, nhalo=1, complete=.true.)
     do k=1,npz
        do j=js,je+1
           do i=is,ie

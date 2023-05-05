@@ -17,7 +17,7 @@ program interp_restarts
    use fv_grid_utils_mod, only: ptop_min
    use init_hydro_mod, only: p_var
    use constants_mod,  only: pi, omega, grav, kappa, rdgas, rvgas, cp_air
-   use fv_diagnostics_mod,only: prt_maxmin
+   use fv_diagnostics_mod,only: prt_mxm
 ! use fv_eta_mod,     only: set_eta
    use m_set_eta,     only: set_eta
    use memutils_mod, only: print_memuse_stats
@@ -478,22 +478,26 @@ program interp_restarts
 
 ! U
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' U'
+      call prt_mxm('U', FV_Atm(1)%u, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
       r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%u(is:ie,js:je,1:npz)
       call MAPL_VarWrite(OutFmt,"U",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
       VERIFY_(status)
 ! V
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' V'
+      call prt_mxm('V', FV_Atm(1)%v, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
       r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%v(is:ie,js:je,1:npz)
       call MAPL_VarWrite(OutFmt,"V",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
       VERIFY_(status)
 ! PT
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PT'
+      call prt_mxm('T', FV_Atm(1)%pt, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
 
       call MAPL_VarWrite(OutFmt,"PT",pt_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
        VERIFY_(status)
 
 ! PE
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PE'
+ !!!  call prt_mxm('PE', FV_Atm(1)%pe, is, ie, js, je, FV_Atm(1)%ng, npz+1, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
       do k=1,npz+1
          r8_local(is:ie,js:je,k) = FV_Atm(1)%pe(is:ie,k,js:je)
       enddo
@@ -501,6 +505,7 @@ program interp_restarts
       VERIFY_(status)
 ! PKZ
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PKZ'
+ !!!  call prt_mxm('PKZ', FV_Atm(1)%pkz, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
       r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%pkz(is:ie,js:je,1:npz)
       call MAPL_VarWrite(OutFmt,"PKZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
       VERIFY_(status)
@@ -508,13 +513,14 @@ program interp_restarts
       if (.not. fv_atm(1)%flagstruct%hydrostatic) then
 ! DZ
          if (is_master()) print*, 'Writing : ', TRIM(fname1), ' DZ'
+ !!!     call prt_mxm('DZ', FV_Atm(1)%delz, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
          r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%delz(is:ie,js:je,1:npz)
          call MAPL_VarWrite(OutFmt,"DZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
          VERIFY_(status)
 
 ! W
          if (is_master()) print*, 'Writing : ', TRIM(fname1), ' W'
-         if (is_master()) print*, 'Writing : ', TRIM(fname1), ' DZ'
+ !!!     call prt_mxm('W', FV_Atm(1)%w, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
          r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%w(is:ie,js:je,1:npz)
          call MAPL_VarWrite(OutFmt,"W",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
          VERIFY_(status)
