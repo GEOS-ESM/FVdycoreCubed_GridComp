@@ -879,12 +879,6 @@ contains
   GRID%jed    = FV_Atm(1)%bd%jed
   if(.not.associated(GRID%AK)) allocate(GRID%AK(size(ak)))
   if(.not.associated(GRID%BK)) allocate(GRID%BK(size(bk)))
-  if (FV_Atm(1)%flagstruct%npz == 137) then
-     ak(0) = 1.000000
-     ak(1) = 1.825000
-     ak(2) = 3.000000
-     ak(3) = 4.630000
-  endif
   GRID%AK     = ak
   GRID%BK     = bk
 
