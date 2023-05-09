@@ -190,7 +190,7 @@ program interp_restarts
       FV_Atm(1)%flagstruct%stretch_fac=schmidt_parameters(3)
    end if
 
-   if (n_files > 0) allocate(rst_files(n_files)) 
+   if (n_files > 0) allocate(rst_files(n_files))
 
 ! Initialize SHMEM in MAPL
    call pfl_initialize()
@@ -216,7 +216,7 @@ program interp_restarts
    call print_memuse_stats('interp_restarts: rs_count')
    call mpp_broadcast(nmoist, mpp_root_pe())
 
-   if (is_master()) print*, 'HYDROSTATIC : ', FV_Atm(1)%flagstruct%hydrostatic  
+   if (is_master()) print*, 'HYDROSTATIC : ', FV_Atm(1)%flagstruct%hydrostatic
    if (is_master()) print*, 'Make_NH     : ', FV_Atm(1)%flagstruct%Make_NH
    if (is_master()) print*, 'Tracers     : ', FV_Atm(1)%ncnst
 
@@ -308,7 +308,7 @@ program interp_restarts
          InCfg(1) = InFmt%read()
          call MAPL_IOCountNonDimVars(InCfg(1),nVars)
 
-         if (InCfg(1)%has_dimension("unknown_dim1")) then 
+         if (InCfg(1)%has_dimension("unknown_dim1")) then
             rst_files(i)%ungrid_size = InCfg(1)%get_dimension("unknown_dim1")
          else
             rst_files(i)%ungrid_size = -1
@@ -322,7 +322,7 @@ program interp_restarts
          n=0
          do while (var_iter /= variables%end())
 
-            var_name => var_iter%key() 
+            var_name => var_iter%key()
             myVariable => var_iter%value()
             if (.not.InCfg(1)%is_coordinate_variable(var_name)) then
                n=n+1
@@ -342,7 +342,7 @@ program interp_restarts
                   else if (dim1 == km+1) then
                       rst_files(i)%vars(n)%nlev=npz+1
                   else
-                      stop 
+                      stop
                   end if
                else if (ndims==4) then
                   rst_files(i)%vars(n)%rank=4
@@ -353,12 +353,12 @@ program interp_restarts
                   else if (dim1 == km+1) then
                       rst_files(i)%vars(n)%nlev=npz+1
                   else
-                      stop 
+                      stop
                   end if
 
                   dname => myVariable%get_ith_dimension(4)
                   rst_files(i)%vars(n)%n_ungrid = InCfg(1)%get_dimension(dname)
-               end if 
+               end if
             end if
             call var_iter%next()
          enddo
@@ -391,9 +391,9 @@ program interp_restarts
       csfactory = CubedSphereGridFactory(im_world=npx-1,lm=npz,nx=npes_x,ny=npes_y,stretch_factor=schmidt_parameters(3), &
                   target_lon=schmidt_parameters(1),target_lat=schmidt_parameters(2))
    else
-      csfactory = CubedSphereGridFactory(im_world=npx-1,lm=npz,nx=npes_x,ny=npes_y) 
+      csfactory = CubedSphereGridFactory(im_world=npx-1,lm=npz,nx=npes_x,ny=npes_y)
    end if
-   grid = grid_manager%make_grid(csfactory,rc=status) 
+   grid = grid_manager%make_grid(csfactory,rc=status)
 
    FV_Atm(1)%flagstruct%Make_NH = .false. ! Do this after rescaling
    if (jm == 6*im) then
@@ -451,7 +451,7 @@ program interp_restarts
          call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon ','lat ','lev ','edge'/),(/imc,jmc,npz,npz+1/),rc=status)
          if (allocated(schmidt_parameters)) then
              call add_stretch_params(OutCfg(1),schmidt_parameters)
-         end if     
+         end if
 
          ! if dz and w were not in the original file add them
          ! they need to be in there for the restart
@@ -478,19 +478,19 @@ program interp_restarts
 
 ! U
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' U'
-      call prt_mxm('U', FV_Atm(1)%u, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
+      call prt_mxm('U', FV_Atm(1)%u, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
       r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%u(is:ie,js:je,1:npz)
       call MAPL_VarWrite(OutFmt,"U",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
       VERIFY_(status)
 ! V
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' V'
-      call prt_mxm('V', FV_Atm(1)%v, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
+      call prt_mxm('V', FV_Atm(1)%v, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
       r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%v(is:ie,js:je,1:npz)
       call MAPL_VarWrite(OutFmt,"V",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
       VERIFY_(status)
 ! PT
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PT'
-      call prt_mxm('T', FV_Atm(1)%pt, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
+      call prt_mxm('T', FV_Atm(1)%pt, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
 
       call MAPL_VarWrite(OutFmt,"PT",pt_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
        VERIFY_(status)
@@ -550,7 +550,7 @@ program interp_restarts
          call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev'/),(/imc,jmc,npz/),rc=status)
          if (allocated(schmidt_parameters)) then
              call add_stretch_params(OutCfg(1),schmidt_parameters)
-         end if     
+         end if
          if (AmWriter) then
             call OutFmt%create_par(fname1,comm=arrdes%writers_comm,info=info,rc=status)
             call OutFmt%write(OutCfg(1),rc=status)
@@ -589,12 +589,12 @@ program interp_restarts
       if (AmWriter) call OutFmt%close()
       deallocate(outCfg)
       deallocate(r4_local)
- 
+
 ! extra restarts
 !
       do ifile=1,size(rst_files)
 
-         if (is_master()) write(*,*)'Writing results of ',trim(rst_files(ifile)%file_name) 
+         if (is_master()) write(*,*)'Writing results of ',trim(rst_files(ifile)%file_name)
          fname1=extra_output(ifile)
          if (is_master()) print*, 'Writing : ', TRIM(fname1)
          call ArrDescrSet(arrdes,offset=0_MPI_OFFSET_KIND)
@@ -624,7 +624,7 @@ program interp_restarts
             end if
             if (allocated(schmidt_parameters)) then
                 call add_stretch_params(OutCfg(1),schmidt_parameters)
-            end if     
+            end if
 
             call OutFmt%create_par(fname1,comm=arrdes%writers_comm,info=info,rc=status)
             call OutFmt%write(OutCfg(1),rc=status)
@@ -645,7 +645,7 @@ program interp_restarts
             else if (rst_files(ifile)%vars(iq)%rank ==4) then
                do n=1,size(rst_files(ifile)%vars(iq)%ptr4d,4)
                   do k=1,size(rst_files(ifile)%vars(iq)%ptr4d,3)
-                     r4_local2d(is:ie,js:je)=rst_files(ifile)%vars(iq)%ptr4d(is:ie,js:je,k,n)            
+                     r4_local2d(is:ie,js:je)=rst_files(ifile)%vars(iq)%ptr4d(is:ie,js:je,k,n)
                      call MAPL_VarWrite(OutFmt,vname,r4_local2d(is:ie,js:je),arrdes=arrdes,lev=k,offset2=n)
                   enddo
                enddo
