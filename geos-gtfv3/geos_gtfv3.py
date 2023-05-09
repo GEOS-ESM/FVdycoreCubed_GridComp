@@ -7,6 +7,7 @@ from pace.util._optional_imports import cupy as cp
 import numpy as np
 from pace.dsl.gt4py_utils import is_gpu_backend
 from typing import TYPE_CHECKING
+import os
 
 if TYPE_CHECKING:
     import cffi
@@ -204,7 +205,6 @@ class GEOSGTFV3:
 # potentially by writing a geos_gtfv3_setup_interface and caching the ptr Fortran side
 GEOS_DYCORE = None
 
-
 def geos_gtfv3(
     comm: MPI.Intercomm,
     npx: int,
@@ -254,8 +254,11 @@ def geos_gtfv3(
     cy: "cffi.FFI.CData",
     diss_est: "cffi.FFI.CData",
 ):
-    BACKEND = "gt:gpu"
-    NAMELIST_PATH = "input.nml"
+    # Read in the backend
+    BACKEND = os.environ.get("GTFV3_BACKEND", "gt:gpu")
+    
+    # Read in the namelist
+    NAMELIST_PATH = os.environ.get("GTFV3_NAMELIST", "input.nml")
 
     global GEOS_DYCORE
     if GEOS_DYCORE is None:
