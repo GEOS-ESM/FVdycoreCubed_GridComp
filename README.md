@@ -1,7 +1,5 @@
 # FV dynamical core and gridded component
 
-alsdfjalsdkjf
-
 ## Contributing
 
 Please check out our [contributing guidelines](CONTRIBUTING.md).
