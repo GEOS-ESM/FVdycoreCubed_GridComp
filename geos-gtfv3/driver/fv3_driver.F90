@@ -89,7 +89,7 @@ program main
          FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
          MAPL_KAPPA, MAPL_CP, zvir, &
          scalars%ptop, scalars%ks, NUM_TRACERS, &
-         FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+         FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
          ! Input/Output
          arr%u, arr%v, arr%w, arr%delz, &
          ! Input

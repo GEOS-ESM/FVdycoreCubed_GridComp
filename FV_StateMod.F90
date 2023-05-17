@@ -1975,7 +1975,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
-            FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+            state%ksplit, state%nsplit, FV_Atm(1)%flagstruct%q_split, &
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
             FV_Atm(1)%flagstruct%hydrostatic, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
