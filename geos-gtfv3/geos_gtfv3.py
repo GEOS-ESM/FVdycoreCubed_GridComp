@@ -7,6 +7,7 @@ from pace.util._optional_imports import cupy as cp
 import numpy as np
 from pace.dsl.gt4py_utils import is_gpu_backend
 from typing import TYPE_CHECKING
+import os
 
 if TYPE_CHECKING:
     import cffi
@@ -256,7 +257,9 @@ def geos_gtfv3(
 ):
     global GEOS_DYCORE
     if not GEOS_DYCORE:
-        raise RuntimeError("[GEOS WRAPPER] Bad init, did you call init? Did you pass run_gtfv3?")
+        raise RuntimeError(
+            "[GEOS WRAPPER] Bad init, did you call init? Did you pass run_gtfv3?"
+        )
     GEOS_DYCORE(
         ng,
         ptop,
@@ -316,12 +319,16 @@ def geos_gtfv3_init(
     nq_tot: int,
     run_gtfv3: int,
 ):
-    BACKEND = "dace:gpu"
-    NAMELIST_PATH = "input.nml"
+    # Read in the backend
+    BACKEND = os.environ.get("GTFV3_BACKEND", "gt:gpu")
+
+    # Read in the namelist
+    NAMELIST_PATH = os.environ.get("GTFV3_NAMELIST", "input.nml")
+
     global GEOS_DYCORE
     if run_gtfv3 == 1 and GEOS_DYCORE is not None:
         raise RuntimeError("[GEOS WRAPPER] Double init")
-    if run_gtfv3 == 1 :
+    if run_gtfv3 == 1:
         GEOS_DYCORE = GEOSGTFV3(
             namelist_path=NAMELIST_PATH,
             bdt=bdt,
