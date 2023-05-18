@@ -2447,7 +2447,8 @@ contains
     VERIFY_(STATUS)
     call MAPL_GetResource ( MAPL, LAYOUT_FILE, 'LAYOUT:', default='fvcore_layout.rc', rc=status )
     VERIFY_(STATUS)
-    call DynSetup(GC, LAYOUT_FILE)
+    call DynSetup(GC, LAYOUT_FILE, rc=status)
+    VERIFY_(STATUS)
 
 ! Register prototype of cubed sphere grid and associated regridders
 !------------------------------------------------------------------
