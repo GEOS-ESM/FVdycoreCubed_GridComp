@@ -15,7 +15,24 @@ source = """
 from {} import ffi
 from datetime import datetime
 from mpi4py import MPI
-from geos_gtfv3 import geos_gtfv3, geos_gtfv3_finalize
+from geos_gtfv3 import geos_gtfv3_init, geos_gtfv3, geos_gtfv3_finalize
+
+@ffi.def_extern()
+def geos_gtfv3_interface_py_init(
+    comm_c,
+    npx, npy, npz, ntiles,
+    is_, ie, js, je, isd, ied, jsd, jed,
+    bdt, nq_tot, run_gtfv3):
+
+    # comm_c -> comm_py
+    comm_py = MPI.Intracomm() # new comm, internal MPI_Comm handle is MPI_COMM_NULL
+    comm_ptr = MPI._addressof(comm_py)  # internal MPI_Comm handle
+    comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
+    comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
+    geos_gtfv3_init(comm_py,
+        npx, npy, npz, ntiles,
+        is_, ie, js, je, isd, ied, jsd, jed,
+        bdt, nq_tot, run_gtfv3)
 
 @ffi.def_extern()
 def geos_gtfv3_interface_py(
@@ -55,14 +72,20 @@ def geos_gtfv3_interface_py(
         mfx, mfy, cx, cy, diss_est)
 
 @ffi.def_extern()
-def geos_gtfv3_interface_finalize_py():
+def geos_gtfv3_interface_py_finalize():
     geos_gtfv3_finalize()
 
 """.format(
-    TMPFILEBASE, _mpi_comm_t
+    TMPFILEBASE, _mpi_comm_t, _mpi_comm_t
 )
 
 header = """
+extern void geos_gtfv3_interface_py_init(
+    {} comm_c,
+    int npx, int npy, int npz, int ntiles,
+    int is_, int ie, int js, int je, int isd, int ied, int jsd, int jed,
+    float bdt, int nq_tot, int run_gtfv3
+);
 extern void geos_gtfv3_interface_py(
     {} comm_c,
     int npx, int npy, int npz, int ntiles,
@@ -79,9 +102,9 @@ extern void geos_gtfv3_interface_py(
     // input/output
     float* mfx, float* mfy, float* cx, float* cy, float* diss_est);
 
-extern void geos_gtfv3_interface_finalize_py();
+extern void geos_gtfv3_interface_py_finalize();
 """.format(
-    _mpi_comm_t
+    _mpi_comm_t, _mpi_comm_t
 )
 
 with open(TMPFILEBASE + ".h", "w") as f:

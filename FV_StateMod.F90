@@ -41,6 +41,7 @@ module FV_StateMod
 #ifdef RUN_GTFV3
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
    use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
+   use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f_init, geos_gtfv3_interface_f_finalize
 #endif
 
 implicit none
@@ -819,6 +820,11 @@ contains
   integer    :: tile_in
   integer    :: gid, masterproc
 
+#ifdef RUN_GTFV3
+  logical :: halting_mode(5)
+  integer :: comm
+#endif
+
 ! BEGIN
 
 ! Retrieve the pointer to the state
@@ -1143,6 +1149,22 @@ contains
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV Initialize', RC=STATUS )
   VERIFY_(STATUS)
 
+#ifdef RUN_GTFV3
+  if (run_gtfv3 /= 0) then
+     ! call ESMF_VMGetCurrent(VM, _RC)
+     call ESMF_VMGet(VM, mpiCommunicator=comm, _RC)
+     ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
+     ! disable trapping of FPEs temporarily, call the Python interface and resume trapping
+     call ieee_get_halting_mode(ieee_all, halting_mode)
+     call ieee_set_halting_mode(ieee_all, .false.)
+     call geos_gtfv3_interface_f_init( &
+          comm, &
+          FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
+          IS, IE, JS, JE, ISD, IED, JSD, JED, STATE%DT, 7, run_gtfv3)
+     call ieee_set_halting_mode(ieee_all, halting_mode)
+  end if
+#endif
+
   RETURN_(ESMF_SUCCESS)
 
 end subroutine FV_InitState
@@ -1238,15 +1260,13 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 #ifdef RUN_GTFV3
   type(ESMF_VM) :: vm
   integer :: comm, rank, mpierr
-  logical :: halting_mode(5)
   real :: start, finish
 #endif
 
 ! Begin
 
 #ifdef RUN_GTFV3
-  ! MPI communicator
-  call ESMF_VMGetCurrent(vm, rc=status)
+  call ESMF_VMGetCurrent(vm, rc=status) ! pchakrab: replace with ESMF_GridCompGet(gc, VM=VM, _RC)
   call ESMF_VMGet(vm, mpiCommunicator=comm)
   call MPI_Comm_rank(comm, rank, mpierr)
 #endif
@@ -1992,11 +2012,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        call cpu_time(finish)
        if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
     else
-       ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
-       ! disable trapping of floating point exceptions temporarily, call the interface
-       ! to the Python function and resume trapping
-       call ieee_get_halting_mode(ieee_all, halting_mode)
-       call ieee_set_halting_mode(ieee_all, .false.)
        call cpu_time(start)
        call geos_gtfv3_interface_f( &
             comm, &
@@ -2016,7 +2031,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             ! input/output
             FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
        call cpu_time(finish)
-       call ieee_set_halting_mode(ieee_all, halting_mode)
        print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
     end if
 #endif
@@ -2402,32 +2416,21 @@ end subroutine FV_Run
 
  subroutine FV_Finalize (STATE)
 
-  use fv_control_mod, only : fv_end
+   use fv_control_mod, only : fv_end
 
-  type (T_FVDYCORE_STATE),pointer              :: STATE
+   type (T_FVDYCORE_STATE),pointer              :: STATE
 
-  integer isc, iec, jsc, jec
-  integer isd, ied, jsd, jed
-  integer npz, ng
+   if (DEBUG) call debug_fv_state('FV_Finalize',STATE)
 
-  isc = FV_Atm(1)%bd%isc
-  iec = FV_Atm(1)%bd%iec
-  jsc = FV_Atm(1)%bd%jsc
-  jec = FV_Atm(1)%bd%jec
-  isd = FV_Atm(1)%bd%isd
-  ied = FV_Atm(1)%bd%ied
-  jsd = FV_Atm(1)%bd%jsd
-  jed = FV_Atm(1)%bd%jed
-  npz = FV_Atm(1)%npz
-  ng  = FV_Atm(1)%ng
-
-    if (DEBUG) call debug_fv_state('FV_Finalize',STATE)
-
-      call timing_off('TOTAL')
-      call fv_end(FV_Atm, grids_on_this_pe ,.false.)
+   call timing_off('TOTAL')
+   call fv_end(FV_Atm, grids_on_this_pe ,.false.)
 
 #if defined( MAPL_MODE )
-!    call ESMF_GridDestroy  (STATE%GRID%GRID)
+   !    call ESMF_GridDestroy  (STATE%GRID%GRID)
+#endif
+
+#ifdef RUN_GTFV3
+   if (run_gtfv3 /= 0) call geos_gtfv3_interface_f_finalize()
 #endif
 
  end subroutine FV_Finalize

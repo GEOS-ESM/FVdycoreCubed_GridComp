@@ -3,6 +3,22 @@
 #include "mpi.h"
 #include "geos_gtfv3_interface_py.h"
 
+void geos_gtfv3_interface_c_init(
+    MPI_Fint comm_f,
+    int npx, int npy, int npz, int ntiles,
+    int is, int ie, int js, int je,
+    int isd, int ied, int jsd, int jed,
+    float bdt, int nq_tot, int run_gtfv3)
+{
+    MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
+    geos_gtfv3_interface_py_init(
+        comm_c,
+        npx, npy, npz, ntiles,
+        is, ie, js, je,
+        isd, ied, jsd, jed,
+        bdt, nq_tot, run_gtfv3);
+}
+
 void geos_gtfv3_interface_c(
     // input
     MPI_Fint comm_f,
@@ -55,7 +71,7 @@ void geos_gtfv3_interface_c(
         mfx, mfy, cx, cy, diss_est);
 }
 
-void geos_gtfv3_interface_finalize_c()
+void geos_gtfv3_interface_c_finalize()
 {
-    geos_gtfv3_interface_finalize_py();
+    geos_gtfv3_interface_py_finalize();
 }
