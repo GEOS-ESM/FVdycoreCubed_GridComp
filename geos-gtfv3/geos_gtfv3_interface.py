@@ -21,18 +21,17 @@ from geos_gtfv3 import geos_gtfv3_init, geos_gtfv3, geos_gtfv3_finalize
 def geos_gtfv3_interface_py_init(
     comm_c,
     npx, npy, npz, ntiles,
-    is_, ie, js, je, isd, ied, jsd, jed,
-    bdt, nq_tot, run_gtfv3):
+    is_, ie, js, je, isd, ied, jsd, jed, bdt, nq_tot):
 
     # comm_c -> comm_py
     comm_py = MPI.Intracomm() # new comm, internal MPI_Comm handle is MPI_COMM_NULL
     comm_ptr = MPI._addressof(comm_py)  # internal MPI_Comm handle
     comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
     comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
-    geos_gtfv3_init(comm_py,
+    geos_gtfv3_init(
+        comm_py,
         npx, npy, npz, ntiles,
-        is_, ie, js, je, isd, ied, jsd, jed,
-        bdt, nq_tot, run_gtfv3)
+        is_, ie, js, je, isd, ied, jsd, jed, bdt, nq_tot)
 
 @ffi.def_extern()
 def geos_gtfv3_interface_py(
@@ -84,7 +83,7 @@ extern void geos_gtfv3_interface_py_init(
     {} comm_c,
     int npx, int npy, int npz, int ntiles,
     int is_, int ie, int js, int je, int isd, int ied, int jsd, int jed,
-    float bdt, int nq_tot, int run_gtfv3
+    float bdt, int nq_tot
 );
 extern void geos_gtfv3_interface_py(
     {} comm_c,

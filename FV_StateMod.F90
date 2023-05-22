@@ -1160,7 +1160,7 @@ contains
      call geos_gtfv3_interface_f_init( &
           comm, &
           FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
-          IS, IE, JS, JE, ISD, IED, JSD, JED, real(STATE%DT), 7, run_gtfv3)
+          IS, IE, JS, JE, ISD, IED, JSD, JED, real(STATE%DT), 7)
      call ieee_set_halting_mode(ieee_all, halting_mode)
   end if
 #endif
