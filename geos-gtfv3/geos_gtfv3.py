@@ -7,6 +7,7 @@ from pace.util._optional_imports import cupy as cp
 import numpy as np
 from pace.dsl.gt4py_utils import is_gpu_backend
 from typing import TYPE_CHECKING
+import os
 
 if TYPE_CHECKING:
     import cffi
@@ -254,28 +255,10 @@ def geos_gtfv3(
     cy: "cffi.FFI.CData",
     diss_est: "cffi.FFI.CData",
 ):
-    BACKEND = "gt:gpu"
-    NAMELIST_PATH = "input.nml"
-
     global GEOS_DYCORE
-    if GEOS_DYCORE is None:
-        GEOS_DYCORE = GEOSGTFV3(
-            namelist_path=NAMELIST_PATH,
-            bdt=bdt,
-            comm=comm,
-            npx=npx,
-            npy=npy,
-            npz=npz,
-            is_=is_,
-            ie=ie,
-            js=js,
-            je=je,
-            isd=isd,
-            ied=ied,
-            jsd=jsd,
-            jed=jed,
-            nq_tot=nq_tot,
-            backend=BACKEND,
+    if not GEOS_DYCORE:
+        raise RuntimeError(
+            "[GEOS WRAPPER] Bad init, did you call init?"
         )
     GEOS_DYCORE(
         ng,
@@ -316,3 +299,49 @@ def geos_gtfv3(
 def geos_gtfv3_finalize():
     if GEOS_DYCORE is not None:
         GEOS_DYCORE.finalize()
+
+
+def geos_gtfv3_init(
+    comm: MPI.Intercomm,
+    npx: int,
+    npy: int,
+    npz: int,
+    ntiles: int,
+    is_: int,
+    ie: int,
+    js: int,
+    je: int,
+    isd: int,
+    ied: int,
+    jsd: int,
+    jed: int,
+    bdt,
+    nq_tot: int,
+):
+    # Read in the backend
+    BACKEND = os.environ.get("GTFV3_BACKEND", "gt:gpu")
+
+    # Read in the namelist
+    NAMELIST_PATH = os.environ.get("GTFV3_NAMELIST", "input.nml")
+
+    global GEOS_DYCORE
+    if GEOS_DYCORE is not None:
+        raise RuntimeError("[GEOS WRAPPER] Double init")
+    GEOS_DYCORE = GEOSGTFV3(
+        namelist_path=NAMELIST_PATH,
+        bdt=bdt,
+        comm=comm,
+        npx=npx,
+        npy=npy,
+        npz=npz,
+        is_=is_,
+        ie=ie,
+        js=js,
+        je=je,
+        isd=isd,
+        ied=ied,
+        jsd=jsd,
+        jed=jed,
+        nq_tot=nq_tot,
+        backend=BACKEND,
+    )
