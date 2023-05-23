@@ -35,10 +35,8 @@
                            DynRun          => FV_Run,                &
                            DynFinalize     => FV_Finalize,           &
                            getAllWinds     => fv_getAllWinds,        &
-#if defined(__GFORTRAN__)
                            getVorticity    => fv_getVorticity,       &
                            getDivergence   => fv_getDivergence,      &
-#endif
                            fillMassFluxes  => fv_fillMassFluxes,     &
                            computeMassFluxes => fv_computeMassFluxes,&
                            getVerticalMassFlux => fv_getVerticalMassFlux,&
@@ -282,6 +280,8 @@
 
   real(kind=8) :: t1, t2
   real(kind=8) :: dyn_run_timer
+
+  logical :: DO_ADD_INCS = .true.
 
 contains
 
@@ -1313,6 +1313,30 @@ contains
     call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'SPEED',                               &
        LONG_NAME          = 'surface_wind_speed',                  &
+       UNITS              = 'm s-1',                               &
+       DIMS               = MAPL_DimsHorzOnly,                     &
+       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+       SHORT_NAME         = 'WSPD_10M',                               &
+       LONG_NAME          = 'wind_speed_at_10m',                  &
+       UNITS              = 'm s-1',                               &
+       DIMS               = MAPL_DimsHorzOnly,                     &
+       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+       SHORT_NAME         = 'VVEL_UP_100_1000',                    &
+       LONG_NAME          = 'max_vertical_velocity_up_between_100_1000_hPa', &
+       UNITS              = 'm s-1',                               &
+       DIMS               = MAPL_DimsHorzOnly,                     &
+       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+       SHORT_NAME         = 'VVEL_DN_100_1000',                    &
+       LONG_NAME          = 'max_vertical_velocity_down_between_100_1000_hPa', &
        UNITS              = 'm s-1',                               &
        DIMS               = MAPL_DimsHorzOnly,                     &
        VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
@@ -2423,7 +2447,8 @@ contains
     VERIFY_(STATUS)
     call MAPL_GetResource ( MAPL, LAYOUT_FILE, 'LAYOUT:', default='fvcore_layout.rc', rc=status )
     VERIFY_(STATUS)
-    call DynSetup(GC, LAYOUT_FILE)
+    call DynSetup(GC, LAYOUT_FILE, rc=status)
+    VERIFY_(STATUS)
 
 ! Register prototype of cubed sphere grid and associated regridders
 !------------------------------------------------------------------
@@ -2564,6 +2589,9 @@ contains
 ! !RESOURCE_ITEM: none :: name of layout file
     call MAPL_GetResource ( MAPL, layout_file, 'LAYOUT:', default='fvcore_layout.rc', rc=status )
 !EOR
+    VERIFY_(STATUS)
+
+    call MAPL_GetResource ( MAPL, DO_ADD_INCS, 'DO_ADD_INCS:', default=DO_ADD_INCS, rc=status )
     VERIFY_(STATUS)
 
 ! Check for ColdStart from the configuration
@@ -4352,16 +4380,9 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Get all wind derivatives
 ! ------------------------
-#if defined(__GFORTRAN__)
-      ! Note there is a bug with GNU 12.1 and getting vort and divg via
-      ! getAllWinds. The reason is unknown as the getAllWinds code is
-      ! valid Fortran. Until this can be fixed, we use a less-efficient
-      ! workaround
       call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
       call getVorticity(vars%u, vars%v, vort)
-#else
-      call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr, vort=vort, divg=divg)
-#endif
+      call getDivergence(uc, vc, divg)
 
 ! Compute absolute vorticity on the D grid
 ! -------------------------------------------------
@@ -5025,13 +5046,54 @@ subroutine Run(gc, import, export, clock, rc)
       if(associated(temp2d)) temp2d = sqrt( ur(:,:,km)**2 + vr(:,:,km)**2 )
    endif
 
+
+   call MAPL_GetPointer(export,temp2d,'WSPD_10M',rc=status)        
+   VERIFY_(STATUS)
+   if(associated(temp2d)) then
+       call VertInterp(temp2d,sqrt(ur**2 + vr**2),-zle,-10.0, status)
+       VERIFY_(STATUS)
+   end if
+
+   if (.not. HYDROSTATIC) then
+   call MAPL_GetPointer(export,temp2d,'VVEL_UP_100_1000',rc=status)
+   VERIFY_(STATUS)
+   if(associated(temp2d)) then
+       temp2d = vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,km)
+       do k=km-1,1,-1
+          do j=jfirstxy,jlastxy
+             do i=ifirstxy,ilastxy
+                if ( (vars%w(i,j,k) > temp2d(i-ifirstxy+1,j-jfirstxy+1)) .and. &
+                     (vars%pe(i,j,k) >= 10000.0) ) then
+                   temp2d(i-ifirstxy+1,j-jfirstxy+1) = vars%w(i,j,k)
+                endif
+             enddo
+          enddo
+       enddo
+   end if
+   call MAPL_GetPointer(export,temp2d,'VVEL_DN_100_1000',rc=status)
+   VERIFY_(STATUS)
+   if(associated(temp2d)) then
+       temp2d = vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,km)
+       do k=km-1,1,-1
+          do j=jfirstxy,jlastxy
+             do i=ifirstxy,ilastxy
+                if ( (vars%w(i,j,k) < temp2d(i-ifirstxy+1,j-jfirstxy+1)) .and. &
+                     (vars%pe(i,j,k) >= 10000.0) ) then
+                   temp2d(i-ifirstxy+1,j-jfirstxy+1) = vars%w(i,j,k)
+                endif
+             enddo
+          enddo
+       enddo 
+   end if
+   end if
+
 ! Updraft Helicty Exports
 
-      call MAPL_GetPointer(export,  uh25, 'UH25',  rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export,  uh03, 'UH03',  rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export, srh01,'SRH01',  rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export, srh03,'SRH03',  rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export, srh25,'SRH25',  rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export,  uh25, 'UH25', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export,  uh03, 'UH03', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, srh01,'SRH01', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, srh03,'SRH03', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, srh25,'SRH25', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
       ! Per WMP, this calculation is not useful if running hydrostatic
       if (.not. HYDROSTATIC) then
          if( associated( uh25) .or. associated( uh03) .or. &
@@ -5043,10 +5105,6 @@ subroutine Run(gc, import, export, clock, rc)
 ! Divergence Exports
 
       zle = log(vars%pe)
-
-#if defined(__GFORTRAN__)
-      call getDivergence(uc, vc, divg)
-#endif
 
       call MAPL_GetPointer(export,temp3d,'DIVG',  rc=status)
       VERIFY_(STATUS)
@@ -5081,10 +5139,6 @@ subroutine Run(gc, import, export, clock, rc)
        end if
 
 ! Vorticity Exports
-
-#if defined(__GFORTRAN__)
-      call getVorticity(vars%u, vars%v, vort)
-#endif
 
       call MAPL_GetPointer(export,temp3d,'VORT',  rc=status)
       VERIFY_(STATUS)
@@ -7090,7 +7144,7 @@ end subroutine RunAddIncs
         graupel = 6
     end select
 
-    if (.not. ADIABATIC) then
+    if ( (.not. ADIABATIC) .and. (DO_ADD_INCS) ) then
 
 
        ! **********************************************************************
@@ -7122,7 +7176,9 @@ end subroutine RunAddIncs
 
        ! Put the wind tendencies on the Native Dynamics grid
        ! ---------------------------------------------------
-       call Agrid_To_Native( tend_ua, tend_va, tend_un, tend_vn )
+       call Agrid_To_Native( tend_ua, tend_va, tend_un, tend_vn, &
+                             wind_increment_limiter = 800.d0/86400.d0 )
+
 
        ! Add the wind tendencies to the control variables
        ! ------------------------------------------------
@@ -7236,6 +7292,7 @@ end subroutine RunAddIncs
 
        DEALLOCATE (DPNEW)
        DEALLOCATE (DPOLD)
+
     endif ! .not. Adiabatic
 
 
