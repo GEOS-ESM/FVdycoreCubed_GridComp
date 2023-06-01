@@ -353,11 +353,11 @@ endif
 if (-e $EXPDIR/StandAlone_FV3_Dycore.x) then
    echo "Found StandAlone_FV3_Dycore.x in $EXPDIR"
 
-   # If SINGULARITY_SANDBOX is non-empty and GEOSgcm.x is found in the experiment directory,
-   # force the use of GEOSgcm.x in the installation directory
+   # If SINGULARITY_SANDBOX is non-empty and StandAlone_FV3_Dycore.x is found in the experiment directory,
+   # force the use of StandAlone_FV3_Dycore.x in the installation directory
    if( $SINGULARITY_SANDBOX != "" ) then
       echo "NOTE: Testing has shown Singularity only works when running with"
-      echo "      the GEOSgcm.x executable directly from the installation bin directory"
+      echo "      the StandAlone_FV3_Dycore.x executable directly from the installation bin directory"
       echo ""
       echo "      So, we will *ignore* the local StandAlone_FV3_Dycore.x and "
       echo "      instead use $GEOSBIN/StandAlone_FV3_Dycore.x"
