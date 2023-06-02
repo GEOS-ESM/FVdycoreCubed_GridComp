@@ -317,8 +317,43 @@ else if ( $SITE == 'NAS' ) then
       set NCPUS_PER_NODE = 128
    endif
 
+else if( $SITE == 'AWS' | $SITE == 'Azure' ) then
+
+   # Because we do not know the name of the model or the number of CPUs
+   # per node. We ask the user to set these variables in the script
+
+   # AWS and Azure users must set the MODEL and NCPUS_PER_NODE
+   set MODEL = USER_MUST_SET
+   set NCPUS_PER_NODE = USER_MUST_SET
+
+   # Above we need a user to set the MODEL and NCPUS_PER_NODE
+   # variables. Here we check that they have been set. If not,
+   # we ask the user to set them
+   # --------------------------------------------------------
+
+   if ( $MODEL == USER_MUST_SET | $NCPUS_PER_NODE == USER_MUST_SET ) then
+      echo "ERROR: We have detected you are on $SITE. As we do not have"
+      echo "       official fixed node info yet, we ask you to edit $0"
+      echo "       and set the MODEL and NCPUS_PER_NODE variables."
+      echo "       Look for the section that says:"
+      echo " "
+      echo "       # AWS and Azure users must set the MODEL and NCPUS_PER_NODE"
+      exit 1
+   endif
+
 else
    set MODEL = 'UNKNOWN'
+   # As we do not know how many CPUs per node, we detect the number
+   # of CPUs per node by looking at the number of CPUs. This is different
+   # on Linux and macOS
+   if ( $ARCH == 'Linux' ) then
+      set NCPUS_PER_NODE = `grep -c ^processor /proc/cpuinfo`
+   else if ( $ARCH == 'Darwin' ) then
+      set NCPUS_PER_NODE = `sysctl -n hw.ncpu`
+   else
+      echo "ERROR: Unknown architecture $ARCH"
+      exit 1
+   endif
 endif
 
 # Set DEFAULT SHMEM Parameter
@@ -394,9 +429,9 @@ else
    set DEF_IOS_NDS = 5
 endif
 
-# On desktop, we need default to 6 processes
+# On desktop, we default to 6 processes
 # Must be set here due to MODEL_NPES calc below
-if( $SITE != 'NAS' && $SITE != 'NCCS' && $SITE != 'AWS') then
+if( $SITE != 'NAS' && $SITE != 'NCCS' && $SITE != 'AWS' && $SITE != 'Azure' ) then
    set FV_NX = 1
 endif
 
@@ -418,7 +453,7 @@ else
    set IOS_NDS = 0
 endif
 
-setenv     RUN_N  $EXPID # RUN Job Name
+setenv    RUN_N  $EXPID # RUN Job Name
 
 if( $SITE == 'NAS' ) then
    setenv RUN_N            `echo $EXPID | cut -b1-200`_RUN # RUN Job Name
@@ -455,7 +490,7 @@ else if( $SITE == 'NCCS' ) then
 
    setenv WRKDIR /discover/nobackup/$LOGNAME # user work directory
 
-else if( $SITE == 'AWS' ) then
+else if( $SITE == 'AWS' | $SITE == "Azure" ) then
    setenv BATCH_CMD        "sbatch"             # SLURM Batch command
    setenv BATCH_GROUP      "DELETE"             # SLURM Syntax for account name
    setenv BATCH_TIME       "SBATCH --time="     # SLURM Syntax for walltime
@@ -464,15 +499,13 @@ else if( $SITE == 'AWS' ) then
    setenv BATCH_JOINOUTERR "DELETE"             # SLURM joins out and err by default
    setenv RUN_T            "01:00:00"           # Wallclock Time   for fv3.j
 
-   setenv RUN_Q "DELETE"
-   setenv RUN_P "SBATCH --ntasks=${MODEL_NPES}" # PE Configuration for fv3.j
+   @ NODES  = `echo "( ($MODEL_NPES + $NCPUS_PER_NODE) + ($IOS_NDS * $NCPUS_PER_NODE) - 1)/$NCPUS_PER_NODE" | bc`
 
-   # By default on AWS, just ignore IOSERVER for now until testing
-   set USE_IOSERVER   = 0
-   set IOS_NDS        = 0
-   set NCPUS_PER_NODE = 0
+   setenv RUN_Q "SBATCH --constraint=${MODEL}"                                # batch queue name for fv3.j
+   setenv RUN_P "SBATCH --nodes=${NODES} --ntasks-per-node=${NCPUS_PER_NODE}" # PE Configuration for fv3.j
 
    setenv WRKDIR /home/$LOGNAME # user work directory
+
 else
 # These are defaults for others (assume slurm)
    setenv BATCH_CMD        "sbatch"             # SLURM Batch command
@@ -489,7 +522,6 @@ else
    # By default on desktop, just ignore IOSERVER for now until testing
    set USE_IOSERVER   = 0
    set IOS_NDS        = 0
-   set NCPUS_PER_NODE = 0
 
    setenv WRKDIR /home/$LOGNAME # user work directory
 endif
@@ -751,7 +783,6 @@ foreach FILE ($FILES)
       exit 2
    endif
 
-
    sed -f $EXPDIR/sedfile $EXPDIR/tmpfile > $EXPDIR/$FILE
 
    echo "Creating ${C1}${FILE}${CN} for Experiment: $EXPID "
@@ -790,6 +821,9 @@ chmod   +x $EXPDIR/fv3.j
 
 echo "Done!"
 echo "-----"
+echo ""
+echo "You can find your experiment in the directory:"
+echo "      ${C2}${EXPDIR}${CN}"
 echo ""
 echo "NOTE: fv3.j by default will run StandAlone_FV3_Dycore.x from the installation directory:"
 echo "      $GEOSBIN"
