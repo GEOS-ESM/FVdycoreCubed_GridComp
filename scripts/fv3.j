@@ -142,11 +142,11 @@ module list
 @SETENVS
 
          setenv EXETAG "$TAG"
-         setenv FV3EXE '@FV_PRECISION'
+         setenv FV3PRC '@FV_PRECISION'
          setenv EXPID   "c${AGCM_IM}_L${AGCM_LM}_T${N_TRACERS}_${NX}x${NY}_${N_OMP}threads"
          setenv EXPDSC  "c${AGCM_IM}_L${AGCM_LM}_T${N_TRACERS}_${NX}x${NY}_${N_OMP}threads"
          setenv EXPDIR  @EXPDIR
-         setenv SCRDIR  $EXPDIR/scratch_${EXPID}_${EXETAG}-${FV3EXE}
+         setenv SCRDIR  $EXPDIR/scratch_${EXPID}_${EXETAG}-${FV3PRC}
 if ($NH) setenv SCRDIR  ${SCRDIR}_NH.$$
 
 #######################################################################
@@ -170,6 +170,32 @@ EOF
 /bin/rm -f ExtData.rc
 cat >      ExtData.rc << EOF
 USE_EXTDATA: .false.
+EOF
+
+/bin/rm -f logging.yaml
+cat >      logging.yaml << EOF
+schema_version: 1
+locks:
+   mpi: {class: MpiLock, comm: MPI_COMM_WORLD}
+formatters:
+   plain: {class: Formatter, format: '%(message)a'}
+   basic: {class: Formatter, format: '%(short_name)a15~: %(level_name)a~: %(message)a'}
+   mpi: {class: MpiFormatter, format: '%(mpi_rank)i4.4~: %(name)~: %(level_name)a~: %(message)a', comm: MPI_COMM_WORLD}
+handlers:
+   console: {class: streamhandler, formatter: basic, unit: OUTPUT_UNIT, level: INFO}
+   console_plain: {class: streamhandler, formatter: plain, unit: OUTPUT_UNIT, level: INFO}
+   warnings: {class: FileHandler, filename: warnings_and_errors.log, lock: mpi, level: WARNING, formatter: basic}
+   errors: {class: StreamHandler, formatter: basic, unit: ERROR_UNIT, level: ERROR}
+   mpi_shared: {class: FileHandler, filename: allPEs.log, formatter: mpi, comm: MPI_COMM_WORLD, lock: mpi, rank_keyword: rank, level: DEBUG}
+root:
+   handlers: [warnings, errors, console]
+   level: WARNING
+   root_level: WARNING
+loggers:
+   errors: {handlers: [errors], level: ERROR}
+   CAP: {level: WARNING, root_level: INFO}
+   MAPL: {handlers: [mpi_shared], level: WARNING, root_level: INFO}
+   MAPL.profiler: {handlers: [console_plain], propagate: FALSE, level: WARNING, root_level: INFO}
 EOF
 
 /bin/rm -f CAP.rc
@@ -210,6 +236,7 @@ IOSERVER_NODES: @IOS_NDS
         DYN.LM: ${AGCM_LM}
   DYN.IM_WORLD: ${AGCM_IM}
 FV3_STANDALONE: 1
+    FV3_CONFIG: MONOTONIC
         DYCORE: FV3
      COLDSTART: 1
        CASE_ID: 1
@@ -331,7 +358,6 @@ if ($N_OMP > 1) then
    setenv KMP_AFFINITY compact
    setenv KMP_STACKSIZE 16m
 endif
-#env | grep MPI
 
 #######################################################################
 #          Settings for Singularity - EXPERIMENTAL
@@ -396,7 +422,6 @@ endif
 #                          Run the Model
 #######################################################################
 echo "  "
-#pwd
 echo "***** USING **** $FV3EXE *********************"
 
 if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
@@ -407,7 +432,7 @@ else
    set IOSERVER_OPTIONS = ""
 endif
 
-$RUN_CMD $NPES $SINGULARITY_RUN $FV3EXE $IOSERVER_OPTIONS |& tee ${SCRDIR}.log
+$RUN_CMD $NPES $SINGULARITY_RUN $FV3EXE $IOSERVER_OPTIONS --logging_config logging.yaml |& tee ${SCRDIR}.log
 
 if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 
