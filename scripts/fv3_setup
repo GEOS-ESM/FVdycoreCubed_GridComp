@@ -61,6 +61,7 @@ setenv TMPDIR /tmp
 #                   Test for Command Line Flags
 #######################################################################
 
+set USER_SITE = ""
 while ( $#argv > 0 )
    set arg = $argv[1]
    shift argv
@@ -69,6 +70,23 @@ while ( $#argv > 0 )
       case -[Cc]:
       case --[Cc][Oo][Ll][Oo][Rr]:
          goto SETCOLOR
+
+      # Testing with singularity found we need the ability to override
+      # the SITE variable below because images might be built on, say,
+      # AWS and thus "block" us from running at NCCS.
+      #
+      # So, we make a --site flag that allows us to override the SITE
+      # variable
+      case -[Ss]:
+      case --[Ss][Ii][Tt][Ee]:
+         set USER_SITE = $1
+         # if USER_SITE is empty, then we error out
+         if ( "$USER_SITE" == "" ) then
+            echo "ERROR: --site flag requires a site name"
+            exit 1
+         endif
+         shift argv
+         breaksw
 
       # Here any string not above will trigger USAGE
       case -[Hh]:
@@ -84,7 +102,11 @@ end
 
 setenv NODE `uname -n`
 setenv ARCH `uname -s`
-setenv SITE `awk '{print $2}' $ETCDIR/SITE.rc`
+if ($USER_SITE == "") then
+   setenv SITE `awk '{print $2}' $ETCDIR/SITE.rc`
+else
+   setenv SITE $USER_SITE
+endif
 
 #######################################################################
 #                 Test for Compiler and MPI Setup
@@ -889,8 +911,9 @@ fv3_setup, a setup script for the GEOS-5 FV3 Standalone
 
    Usage: $0:t [optional flag]
 
-   -c --color      Set the colors for $0:t
-   -h --help       Show usage
+   -c --color        Set the colors for $0:t
+   -s --site <site>  Override the site for $0:t (valid values: NCCS, NAS, AWS, Azure)
+   -h --help         Show usage
 
    If invoked alone, the script runs as normal.
 
