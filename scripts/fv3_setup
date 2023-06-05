@@ -912,7 +912,7 @@ fv3_setup, a setup script for the GEOS-5 FV3 Standalone
    Usage: $0:t [optional flag]
 
    -c --color        Set the colors for $0:t
-   -s --site <site>  Set the site for $0:t (valid values: NCCS, NAS, AWS, Azure)
+   -s --site <site>  Override the site for $0:t (valid values: NCCS, NAS, AWS, Azure)
    -h --help         Show usage
 
    If invoked alone, the script runs as normal.
