@@ -556,7 +556,7 @@ contains
      FV_Atm(1)%flagstruct%do_sat_adj = .true. ! only valid when nwat >= 6
      FV_Atm(1)%flagstruct%dz_min = 6.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
-     FV_Atm(1)%flagstruct%tau = 2.0 
+     FV_Atm(1)%flagstruct%tau = 2.0
      FV_Atm(1)%flagstruct%rf_cutoff = 10.e2
     ! 6th order default damping options
      FV_Atm(1)%flagstruct%nord = 3
@@ -1208,7 +1208,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   real(REAL4), pointer     :: PTR3D(:,:,:)
 
-  real(REAL4), pointer     :: LONS(:,:), LATS(:,:) 
+  real(REAL4), pointer     :: LONS(:,:), LATS(:,:)
   real(REAL8), pointer     :: lonptr(:,:), latptr(:,:)
   real(REAL4), allocatable :: griddiffs(:,:)
   type (ESMF_Grid)         :: ESMFGRID
@@ -1223,10 +1223,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   integer :: qice = -1
   integer :: qlls = -1
   integer :: qlcn = -1
-  integer :: qlcnf= -1 
+  integer :: qlcnf= -1
   integer :: qils = -1
   integer :: qicn = -1
-  integer :: qicnf= -1 
+  integer :: qicnf= -1
   integer :: clls = -1
   integer :: clcn = -1
   integer :: clcnf= -1
@@ -1679,23 +1679,23 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
              else
                  FV_Atm(1)%q(i,j,k,qicnf) = 0.0
              endif
-           enddo 
-         enddo 
-       enddo 
+           enddo
+         enddo
+       enddo
     endif
     if ( (qcld /= -1) .and. (clcnf /= -1) ) then
        do k=1,npz
          do j=jsc,jec
-           do i=isc,iec      
-             if (FV_Atm(1)%q(i,j,k,qcld) > 0.0) then   
+           do i=isc,iec
+             if (FV_Atm(1)%q(i,j,k,qcld) > 0.0) then
                  FV_Atm(1)%q(i,j,k,clcnf) = FV_Atm(1)%q(i,j,k,clcnf) / &
                                             FV_Atm(1)%q(i,j,k,qcld)
              else
                  FV_Atm(1)%q(i,j,k,clcnf) = 0.0
              endif
-           enddo 
-         enddo 
-       enddo 
+           enddo
+         enddo
+       enddo
     endif
    ! Verify
     select case (FV_Atm(1)%flagstruct%nwat)
@@ -1799,7 +1799,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   else
 
-    if (mpp_pe()==0) print*, 'Running In Adiabatic Mode'
+    if (fv_first_run .and. (mpp_pe()==0)) print*, 'Running In Adiabatic Mode'
 
    ! Report total number and names of advected tracers
       if (fv_first_run .and. STATE%GRID%NQ > 0) then
@@ -1808,7 +1808,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
       endif
    ! Advect all tracers
       do n=1,STATE%GRID%NQ
-         call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+         if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
@@ -2203,25 +2203,25 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
          if ((clcnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLCN')) then
             CLCN_FILLED = .TRUE.
             nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then      
+            if (state%vars%tracer(n)%is_r4) then
                state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
                                         MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf)))
             else
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
                                         MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf)))
             endif
-         endif    
+         endif
          if ((clcnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLLS')) then
             CLLS_FILLED = .TRUE.
             nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then     
+            if (state%vars%tracer(n)%is_r4) then
                state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
-                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf))))       
+                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf))))
             else
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
                                    MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf))))
             endif
-         endif   
+         endif
        else
          if ((clcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLCN')) then
             CLCN_FILLED = .TRUE.
@@ -2525,7 +2525,7 @@ subroutine State_To_FV ( STATE )
     else
        STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
        STATE%NSPLIT = MAX(  FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT/1.25))
-    endif        
+    endif
     if (STATE%NSPLIT /= FV_Atm(1)%flagstruct%n_split) &
     call WRITE_PARALLEL( STATE%DT/real(STATE%KSPLIT*STATE%NSPLIT)   ,format='("Adjusted Dynamics time step : ",(F10.4))')
   endif
@@ -2860,7 +2860,7 @@ subroutine a2d3d(ua, va, ud, vd, wind_increment_limiter)
   ! end where
   ! where(abs(vatemp) > wind_increment_limiter)
   !     vatemp = (wind_increment_limiter/abs(vatemp)) * vatemp
-  ! end where        
+  ! end where
   ! endif
 
     if (FV_Atm(1)%flagstruct%grid_type<4) then
