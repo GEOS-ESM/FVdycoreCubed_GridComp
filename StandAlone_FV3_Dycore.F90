@@ -18,8 +18,7 @@ program StandAlone_FV3_Dycore
    type (MAPL_CapOptions) :: cap_options
    integer :: status
 
-   cap_options = FlapCLI(description = 'FV Standalone Dycore',&
-                              authors      =  'S.J. Lin, R. Rood, W. Putman')
+   cap_options = FargparseCLI()
    cap = MAPL_Cap('GCM', SetServices, cap_options = cap_options)
    call cap%run(_RC)
 
