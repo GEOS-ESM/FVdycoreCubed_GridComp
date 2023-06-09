@@ -1,5 +1,6 @@
 VENV_DIR="${VENV_DIR:-}"
 GTFV3_DIR="${GTFV3_DIR:-}"
+GEOS_INSTALL_DIR="${GEOS_INSTALL_DIR:-}"
 
 # Sanitize
 if [ -z "$VENV_DIR" ]; then
@@ -20,6 +21,8 @@ else
     source $VENV_DIR/bin/activate
     pip3 install -U pip wheel
     cd $GTFV3_DIR
+    git submodule init
+    git submodule update
     pip3 install -r requirements_dev.txt
     pip3 install cupy-cuda11x
     pip3 install cffi
@@ -28,4 +31,4 @@ else
 fi
 
 export PYTHONPATH=$PYTHONPATH:$GTFV3_DIR/../geos-gtfv3/
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GTFV3_DIR/../geos-gtfv3/driver/build/
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GEOS_INSTALL_DIR/lib
