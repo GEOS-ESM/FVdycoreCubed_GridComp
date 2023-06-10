@@ -535,6 +535,9 @@ contains
   ! Rayleigh & Divergence Damping
    if (index(FV3_CONFIG,"HWT") > 0) then
      FV_Atm(1)%flagstruct%fv_sg_adj = min(3600.0,DT*4.0)
+     if (FV_Atm(1)%flagstruct%npz >= 71) then
+       FV_Atm(1)%flagstruct%n_zfilter = 37 ! ~100mb
+     endif 
      if (FV_Atm(1)%flagstruct%npz >= 90) then
        FV_Atm(1)%flagstruct%n_zfilter = 46 ! ~100mb
      endif
@@ -544,11 +547,15 @@ contains
      if (FV_Atm(1)%flagstruct%npz >= 180) then
        FV_Atm(1)%flagstruct%n_zfilter = 92 ! ~100mb
      endif
-     FV_Atm(1)%flagstruct%do_sat_adj = .true. ! only valid when nwat >= 6
+     FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
      FV_Atm(1)%flagstruct%dz_min = 6.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
-     FV_Atm(1)%flagstruct%tau = 2.0 
-     FV_Atm(1)%flagstruct%rf_cutoff = 10.e2
+     if (FV_Atm(1)%flagstruct%npz == 72) then
+       FV_Atm(1)%flagstruct%tau = 0.0
+     else
+       FV_Atm(1)%flagstruct%tau = 2.0
+     endif
+     FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
     ! 6th order default damping options
      FV_Atm(1)%flagstruct%nord = 3
      FV_Atm(1)%flagstruct%dddmp = 0.1
@@ -644,7 +651,7 @@ contains
          FV_Atm(1)%flagstruct%d_con = 0.
       else
       ! Non-Monotonic advection
-         if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+         if (index(FV3_CONFIG,"HWT") > 0) then
            FV_Atm(1)%flagstruct%hord_mt =  6
            FV_Atm(1)%flagstruct%hord_vt =  6
            FV_Atm(1)%flagstruct%hord_tm =  6
