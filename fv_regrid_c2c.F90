@@ -355,7 +355,7 @@ contains
          allocate ( ps0(isd_i:ied_i,jsd_i:jed_i) )
          ps0(:,:) = 0.0
          tileoff = (tile-1)*(jm/ntiles)
-         call MAPL_VarRead(formatter,"PE",ps0(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr)
+         call MAPL_VarRead(formatter,"PE",ps0(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr,lev=km+1)
          call mpp_update_domains(ps0, domain_i)
 ! Read PKZ
          allocate ( pkz0(isd_i:ied_i,jsd_i:jed_i) )
