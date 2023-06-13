@@ -73,12 +73,21 @@ contains
       integer, intent(out), optional :: rc
       
       integer :: status,dims(3),funit
+      integer :: rank
+      type(ESMF_VM) :: vm
       real(real4), allocatable :: input(:,:)
+
+      call ESMF_VMGetCurrent(vm,_RC)
+      call ESMF_VMGet(vm,localPet=rank,_RC)
       call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
-      allocate(input(dims(1),dims(2)))
-      open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
-      _VERIFY(status)
-      read(funit)input
+      if (rank ==0) then
+         allocate(input(dims(1),dims(2)))
+         open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
+         _VERIFY(status)
+         read(funit)input
+      else
+         allocate(input(0,0))
+      end if
       call ArrayScatter(local_array=output,global_array=input,grid=grid,_RC)
       _RETURN(_SUCCESS)
    end subroutine read_topo_file_r4
@@ -91,13 +100,22 @@ contains
       
       integer :: status,dims(3),funit
       real, allocatable :: input(:,:)
+      integer :: rank
+      type(ESMF_VM) :: vm
       real(real8), allocatable :: input_r8(:,:)
+
+      call ESMF_VMGetCurrent(vm,_RC)
+      call ESMF_VMGet(vm,localPet=rank,_RC)
       call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
-      allocate(input(dims(1),dims(2)),input_r8(dims(2),dims(2)))
-      open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
-      _VERIFY(status)
-      read(funit)input
-      input_r8 = input      
+      if (rank ==0) then
+         allocate(input(dims(1),dims(2)),input_r8(dims(2),dims(2)))
+         open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
+         _VERIFY(status)
+         read(funit)input
+         input_r8 = input      
+      else
+         allocate(input(0,0),input_r8(0,0))
+      end if
       call ArrayScatter(local_array=output,global_array=input_r8,grid=grid,_RC)
       _RETURN(_SUCCESS)
    end subroutine read_topo_file_r8
