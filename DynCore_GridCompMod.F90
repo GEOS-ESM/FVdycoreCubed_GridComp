@@ -2447,7 +2447,8 @@ contains
     VERIFY_(STATUS)
     call MAPL_GetResource ( MAPL, LAYOUT_FILE, 'LAYOUT:', default='fvcore_layout.rc', rc=status )
     VERIFY_(STATUS)
-    call DynSetup(GC, LAYOUT_FILE)
+    call DynSetup(GC, LAYOUT_FILE, rc=status)
+    VERIFY_(STATUS)
 
 ! Register prototype of cubed sphere grid and associated regridders
 !------------------------------------------------------------------
@@ -5096,7 +5097,7 @@ subroutine Run(gc, import, export, clock, rc)
       ! Per WMP, this calculation is not useful if running hydrostatic
       if (.not. HYDROSTATIC) then
          if( associated( uh25) .or. associated( uh03) .or. &
-             associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
+            associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
             call fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
          endif
       endif
