@@ -151,7 +151,7 @@ if (CRAY_POINTER)
   set_target_properties (${this} PROPERTIES COMPILE_FLAGS ${CRAY_POINTER})
 endif()
 
-add_definitions (-DSPMD -DMAPL_MODE)
+add_definitions (-DSPMD -DMAPL_MODE -DFVREGRID_MAPL_MODE)
 
 foreach(flag ${tmp})
    target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)

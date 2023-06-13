@@ -1085,6 +1085,7 @@ contains
 
 
                      subroutine init_cubsph_grid(npts, is,ie, js,je, ntiles, sph_corner)  
+                        use mpp_mod, only: mpp_root_pe
 !------------------------------------------------------------------!
 ! read/generate cubed sphere grid                                  !
 ! calculate cell center from cell corners                          !
@@ -1104,15 +1105,16 @@ contains
 !------------------------------------------------------------------!
 ! local variables                                                  !
 !------------------------------------------------------------------!
-                        integer :: i, j, n
+                        integer :: i, j, n, masterproc
                         real*8, pointer :: xs(:,:), ys(:,:)
                         real*8, pointer :: grid_in(:,:,:,:)
                         integer :: grid_type = 0
 !------------------------------------------------------------------!
 ! create sph_corner                                                !
 !------------------------------------------------------------------!
-#ifdef SMEM_MAPL_MODE
+#ifdef FVREGRID_MAPL_MODE
 ! allocate global arrays (preferable in shared memory)
+                        masterproc = mpp_root_pe()
                         if(MAPL_ShmInitialized) then
                            if (is_master()) write(*,*) 'Using MAPL_Shmem in external_ic: init_cubsph_grid' 
                            call MAPL_AllocNodeArray(grid_in,Shp=(/npts,npts,2,ntiles/),rc=STATUS)
@@ -1172,7 +1174,7 @@ contains
                               if (ABS(sph_corner(2,i,j)) < 1.e-10) sph_corner(2,i,j) = 0.0
                            enddo
                         enddo
-#ifdef SMEM_MAPL_MODE
+#ifdef FVREGRID_MAPL_MODE
                         call MAPL_SyncSharedMemory(rc=STATUS)
                         DEALLOCGLOB_(grid_in)
                         call MAPL_SyncSharedMemory(rc=STATUS)
