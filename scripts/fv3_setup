@@ -608,6 +608,38 @@ echo $EXPDIRroot > $HOME/.EXPDIRroot
 
 set     GEOSDIR  = $GEOSDEF
 
+######################################################################
+#                        Singularity Sandbox
+#######################################################################
+
+setenv KEYFILE ".singularity.d"
+setenv singstat 0
+setenv ORIGPATH `pwd -P`
+cd $GEOSDIR
+while ($singstat == 0)
+   if (-d $KEYFILE) then
+      setenv singstat 1
+      setenv SINGPATH `pwd -P`
+   endif
+   if ($singstat == 0) then
+      if ("$cwd" == "/") then
+         break
+      else
+         cd ..
+      endif
+   endif
+end
+if ($singstat == 1) then
+   setenv SINGULARITY_SANDBOX $SINGPATH
+else
+   setenv SINGULARITY_SANDBOX ""
+endif
+
+cd $ORIGPATH
+
+setenv REAL_BIND_PATH `realpath $NOBACKUP`
+
+
 #
 # GEOSBIN does point to the bin/ directory in each
 #
@@ -758,6 +790,8 @@ s?@GEOSSRC?$GEOSSRC?g
 s?@GEOSBIN?$GEOSBIN?g
 s?@GEOSETC?$GEOSETC?g
 s?@GEOSUTIL?$GEOSUTIL?g
+s?@SINGULARITY_SANDBOX?$SINGULARITY_SANDBOX?g
+s?@REAL_BIND_PATH?$REAL_BIND_PATH?g
 
 s^@AGCM_GRIDNAME^$AGCM_GRIDNAME^g
 

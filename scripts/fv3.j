@@ -366,7 +366,7 @@ endif
 # -------------------------------------------------------------
 
 # If you are using singularity, set the path to the singularity sandbox here
-setenv SINGULARITY_SANDBOX ""
+setenv SINGULARITY_SANDBOX @SINGULARITY_SANDBOX
 
 # echo if we are running in singularity
 if( $SINGULARITY_SANDBOX != "" ) then
@@ -409,7 +409,8 @@ if( $SINGULARITY_SANDBOX != "" ) then
 
    # Set Singularity Bind Paths. Note: These are dependent on where you are running.
    # By default, we'll assume you are running this script from NOBACKUP
-   setenv SINGULARITY_BIND_PATH "-B ${NOBACKUP}:${NOBACKUP}"
+   setenv REAL_BIND_PATH @REAL_BIND_PATH
+   setenv SINGULARITY_BIND_PATH "-B ${NOBACKUP}:${NOBACKUP},${REAL_BIND_PATH}:${REAL_BIND_PATH}"
 
    # Set a variable to encapsulate all Singularity details
    setenv SINGULARITY_RUN "singularity exec $SINGULARITY_BIND_PATH $SINGULARITY_SANDBOX"
