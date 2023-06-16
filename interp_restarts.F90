@@ -394,6 +394,7 @@ program interp_restarts
       csfactory = CubedSphereGridFactory(im_world=npx-1,lm=npz,nx=npes_x,ny=npes_y)
    end if
    grid = grid_manager%make_grid(csfactory,rc=status)
+   call ESMF_AttributeSet(grid,name="num_reader",value=n_readers)
 
    FV_Atm(1)%flagstruct%Make_NH = .false. ! Do this after rescaling
    if (jm == 6*im) then

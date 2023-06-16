@@ -73,12 +73,21 @@ contains
       integer, intent(out), optional :: rc
       
       integer :: status,dims(3),funit
+      integer :: rank
+      type(ESMF_VM) :: vm
       real(real4), allocatable :: input(:,:)
+
+      call ESMF_VMGetCurrent(vm,_RC)
+      call ESMF_VMGet(vm,localPet=rank,_RC)
       call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
-      allocate(input(dims(1),dims(2)))
-      open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
-      _VERIFY(status)
-      read(funit)input
+      if (rank ==0) then
+         allocate(input(dims(1),dims(2)))
+         open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
+         _VERIFY(status)
+         read(funit)input
+      else
+         allocate(input(0,0))
+      end if
       call ArrayScatter(local_array=output,global_array=input,grid=grid,_RC)
       _RETURN(_SUCCESS)
    end subroutine read_topo_file_r4
@@ -91,13 +100,22 @@ contains
       
       integer :: status,dims(3),funit
       real, allocatable :: input(:,:)
+      integer :: rank
+      type(ESMF_VM) :: vm
       real(real8), allocatable :: input_r8(:,:)
+
+      call ESMF_VMGetCurrent(vm,_RC)
+      call ESMF_VMGet(vm,localPet=rank,_RC)
       call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
-      allocate(input(dims(1),dims(2)),input_r8(dims(2),dims(2)))
-      open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
-      _VERIFY(status)
-      read(funit)input
-      input_r8 = input      
+      if (rank ==0) then
+         allocate(input(dims(1),dims(2)),input_r8(dims(2),dims(2)))
+         open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
+         _VERIFY(status)
+         read(funit)input
+         input_r8 = input      
+      else
+         allocate(input(0,0),input_r8(0,0))
+      end if
       call ArrayScatter(local_array=output,global_array=input_r8,grid=grid,_RC)
       _RETURN(_SUCCESS)
    end subroutine read_topo_file_r8
@@ -200,8 +218,6 @@ contains
       type(FileMetadata), allocatable :: cfg(:)
       integer            :: nDims, nVars, ivar, n_ungrid
       character(len=128) :: vname
-      real(FVPRC),   allocatable  :: gslice_r4(:,:)
-      real*8, allocatable  :: gslice_r8(:,:)
       integer            :: tileoff,lvar_cnt,ifile,nlev
       type(fv_rst), pointer :: tracer_bundles(:) => null()
 
@@ -220,6 +236,8 @@ contains
       type(CubedSphereGridFactory) :: cs_factory
       type(ESMF_Grid) :: gridIn
       class(AbstractRegridder), pointer :: regridder=>null()
+      type(ArrDescr) :: input_arrdescr
+      integer :: n_writers,n_readers,input_i1,input_in,input_j1,input_jn
 
       npx = Atm(1)%npx
       npy = Atm(1)%npy
@@ -231,6 +249,7 @@ contains
 ! Read input FV core restart file
       fname = "fvcore_internal_restart_in"
 
+      call ESMF_AttributeGet(gridOut,name="num_reader",value=n_readers)
       if( file_exist(fname) ) then
 
          allocate(cfg(1))
@@ -239,7 +258,6 @@ contains
          im =cfg(1)%get_dimension('lon',rc=status)
          jm =cfg(1)%get_dimension('lat',rc=status)
          km =cfg(1)%get_dimension('lev',rc=status)
-         allocate(gslice_r8(im,jm),stat=status)
 
          if(is_master()) write(*,*) 'Using GEOS restart:', fname
 
@@ -253,6 +271,9 @@ contains
 
          cs_factory = CubedSphereGridFactory(nx=Atm(1)%layout(1),ny=Atm(1)%layout(2),im_world=im,lm=km)
          gridIn = grid_manager%make_grid(cs_factory,rc=status)
+         call MAPL_Grid_Interior(gridIn,input_i1,input_in,input_j1,input_jn)
+         call ArrDescrInit(input_arrdescr,MPI_COMM_WORLD,im,im*6,km, Atm(1)%layout(1),Atm(1)%layout(2)*6,n_readers, &
+              n_readers,input_i1,input_in,input_j1,input_jn,rc=status)
          regridder => new_regridder_manager%make_regridder(gridIn,gridOut,REGRID_METHOD_BILINEAR,rc=status)
 !--------------------------------------------------------------------!
 ! setup input cubed-sphere domain                                    !
@@ -297,8 +318,7 @@ contains
          u0(:,:,:) = 0.0 
          tileoff = (tile-1)*(jm/ntiles)
          do k=1,km
-            call MAPL_VarRead(formatter,"U",gslice_r8,lev=k)
-            u0(is_i:ie_i,js_i:je_i,k) = gslice_r8(is_i:ie_i,tileoff+js_i:tileoff+je_i)
+            call MAPL_VarRead(formatter,"U",u0(is_i:ie_i,js_i:je_i,k),arrdes=input_arrdescr,lev=k)
          enddo
          call print_memuse_stats('get_geos_cubed_ic: read U')
 ! Read V
@@ -306,8 +326,7 @@ contains
          v0(:,:,:) = 0.0
          tileoff = (tile-1)*(jm/ntiles)
          do k=1,km
-            call MAPL_VarRead(formatter,"V",gslice_r8,lev=k)
-            v0(is_i:ie_i,js_i:je_i,k) = gslice_r8(is_i:ie_i,tileoff+js_i:tileoff+je_i)
+            call MAPL_VarRead(formatter,"V",v0(is_i:ie_i,js_i:je_i,k),arrdes=input_arrdescr,lev=k)
          enddo
          call print_memuse_stats('get_geos_cubed_ic: read V')
          allocate ( sbuffer(is_i:ie_i,km) )
@@ -347,24 +366,21 @@ contains
          t0(:,:,:) = 0.0
          tileoff = (tile-1)*(jm/ntiles)
          do k=1,km
-            call MAPL_VarRead(formatter,"PT",gslice_r8,lev=k)
-            t0(is_i:ie_i,js_i:je_i,k) = gslice_r8(is_i:ie_i,tileoff+js_i:tileoff+je_i)
+            call MAPL_VarRead(formatter,"PT",t0(is_i:ie_i,js_i:je_i,k),arrdes=input_arrdescr,lev=k)
          enddo
          call print_memuse_stats('get_geos_cubed_ic: read T')
 ! Read PE at Surface only
          allocate ( ps0(isd_i:ied_i,jsd_i:jed_i) )
          ps0(:,:) = 0.0
          tileoff = (tile-1)*(jm/ntiles)
-         call MAPL_VarRead(formatter,"PE",gslice_r8,lev=km+1)
-         ps0(is_i:ie_i,js_i:je_i) = gslice_r8(is_i:ie_i,tileoff+js_i:tileoff+je_i)
+         call MAPL_VarRead(formatter,"PE",ps0(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr,lev=km+1)
          call mpp_update_domains(ps0, domain_i)
 ! Read PKZ
          allocate ( pkz0(isd_i:ied_i,jsd_i:jed_i) )
          pkz0(:,:) = 0.0
          tileoff = (tile-1)*(jm/ntiles)
          do k=1,km
-            call MAPL_VarRead(formatter,"PKZ",gslice_r8,lev=k)
-            pkz0(is_i:ie_i,js_i:je_i) = gslice_r8(is_i:ie_i,tileoff+js_i:tileoff+je_i)
+            call MAPL_VarRead(formatter,"PKZ",pkz0(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr,lev=k)
             t0(is_i:ie_i,js_i:je_i,k) = t0(is_i:ie_i,js_i:je_i,k)*pkz0(is_i:ie_i,js_i:je_i)
          enddo
          call print_memuse_stats('get_geos_cubed_ic: converted T')
@@ -372,7 +388,6 @@ contains
 
          call formatter%close()
          deallocate(cfg)
-         deallocate(gslice_r8)
 
          allocate ( gz0(isd_i:ied_i,jsd_i:jed_i) )
          gz0(:,:) = 0.0
@@ -425,7 +440,6 @@ contains
             call MAPL_NCIOGetFileType("moist_internal_restart_in",filetype)
 
             lvar_cnt = 0
-            allocate(gslice_r4(im,jm))
             allocate(cfg(1))
             call formatter%open("moist_internal_restart_in",pFIO_READ,rc=status)
             cfg(1) = formatter%read(rc=status)
@@ -454,8 +468,7 @@ contains
                end if
                call moist_tracers%insert(trim(vname),iq)
                do k=1,km
-                  call MAPL_VarRead(formatter,vname,gslice_r4,lev=k)
-                  q0(is_i:ie_i,js_i:je_i,k)=gslice_r4(is_i:ie_i,tileoff+js_i:tileoff+je_i)
+                  call MAPL_VarRead(formatter,vname,q0(is_i:ie_i,js_i:je_i,k),arrdes=input_arrdescr,lev=k)
                   call regridder%regrid(q0(is_i:ie_i,js_i:je_i,k),qp(:,:,k,iq),rc=status)
                enddo
                call prt_maxmin( 'Q_geos_moist', q0, is_i, ie_i, js_i, je_i, ng_i, km, 1._FVPRC)
@@ -463,7 +476,6 @@ contains
 
             call formatter%close()
             deallocate(cfg)
-            deallocate(gslice_r4)
 
          end if
 
@@ -490,7 +502,6 @@ contains
         do ifile=1,size(tracer_bundles)
             if (is_master()) print*, 'Trying to interpolate: ',trim(tracer_bundles(ifile)%file_name)
 
-            allocate(gslice_r4(im,jm))
             allocate(cfg(1))
             call formatter%open(trim(tracer_bundles(ifile)%file_name),pFIO_READ,rc=status)
             cfg(1) = formatter%read(rc=status)
@@ -504,20 +515,17 @@ contains
                nlev=tracer_bundles(ifile)%vars(ivar)%nLev
                vname = trim(tracer_bundles(ifile)%vars(ivar)%name)
                if (tracer_bundles(ifile)%vars(ivar)%rank ==2) then
-                  call MAPL_VarRead(formatter,vname,gslice_r4)
-                  qlev(is_i:ie_i,js_i:je_i)=gslice_r4(is_i:ie_i,tileoff+js_i:tileoff+je_i)
+                  call MAPL_VarRead(formatter,vname,qlev(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr)
                   call regridder%regrid(qlev(is_i:ie_i,js_i:je_i),tracer_bundles(ifile)%vars(ivar)%ptr2d(is:ie,js:je),rc=status)
                else if (tracer_bundles(ifile)%vars(ivar)%rank ==3) then
                   do k=1,nlev
-                     call MAPL_VarRead(formatter,vname,gslice_r4,lev=k)
-                     qlev(is_i:ie_i,js_i:je_i)=gslice_r4(is_i:ie_i,tileoff+js_i:tileoff+je_i)
+                     call MAPL_VarRead(formatter,vname,qlev(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr,lev=k)
                      call regridder%regrid(qlev(is_i:ie_i,js_i:je_i),tracer_bundles(ifile)%vars(ivar)%ptr3d(is:ie,js:je,k),rc=status)
                   enddo
                else if (tracer_bundles(ifile)%vars(ivar)%rank ==4) then
                   do n_ungrid=1,tracer_bundles(ifile)%vars(ivar)%n_ungrid
                      do k=1,nlev
-                        call MAPL_VarRead(formatter,vname,gslice_r4,lev=k,offset2=n_ungrid)
-                        qlev(is_i:ie_i,js_i:je_i)=gslice_r4(is_i:ie_i,tileoff+js_i:tileoff+je_i)
+                        call MAPL_VarRead(formatter,vname,qlev(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr,lev=k,offset2=n_ungrid)
                         call regridder%regrid(qlev(is_i:ie_i,js_i:je_i),tracer_bundles(ifile)%vars(ivar)%ptr4d(is:ie,js:je,k,n_ungrid),rc=status)
                      enddo
                   enddo
@@ -527,7 +535,6 @@ contains
 
             call formatter%close()
             deallocate(cfg)
-            deallocate(gslice_r4)
             deallocate(qlev)
 
          enddo
@@ -1078,6 +1085,7 @@ contains
 
 
                      subroutine init_cubsph_grid(npts, is,ie, js,je, ntiles, sph_corner)  
+                        use mpp_mod, only: mpp_root_pe
 !------------------------------------------------------------------!
 ! read/generate cubed sphere grid                                  !
 ! calculate cell center from cell corners                          !
@@ -1097,15 +1105,16 @@ contains
 !------------------------------------------------------------------!
 ! local variables                                                  !
 !------------------------------------------------------------------!
-                        integer :: i, j, n
+                        integer :: i, j, n, masterproc
                         real*8, pointer :: xs(:,:), ys(:,:)
                         real*8, pointer :: grid_in(:,:,:,:)
                         integer :: grid_type = 0
 !------------------------------------------------------------------!
 ! create sph_corner                                                !
 !------------------------------------------------------------------!
-#ifdef SMEM_MAPL_MODE
+#ifdef FVREGRID_MAPL_MODE
 ! allocate global arrays (preferable in shared memory)
+                        masterproc = mpp_root_pe()
                         if(MAPL_ShmInitialized) then
                            if (is_master()) write(*,*) 'Using MAPL_Shmem in external_ic: init_cubsph_grid' 
                            call MAPL_AllocNodeArray(grid_in,Shp=(/npts,npts,2,ntiles/),rc=STATUS)
@@ -1165,7 +1174,7 @@ contains
                               if (ABS(sph_corner(2,i,j)) < 1.e-10) sph_corner(2,i,j) = 0.0
                            enddo
                         enddo
-#ifdef SMEM_MAPL_MODE
+#ifdef FVREGRID_MAPL_MODE
                         call MAPL_SyncSharedMemory(rc=STATUS)
                         DEALLOCGLOB_(grid_in)
                         call MAPL_SyncSharedMemory(rc=STATUS)
