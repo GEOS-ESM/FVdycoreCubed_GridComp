@@ -481,7 +481,7 @@ contains
   ! when reading the tracer bundle in fv_first_run
    FV_Atm(1)%flagstruct%nwat = 0
   ! Trigger to enable autoconversion/cloud processes on the fv_mapz step
-   FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
+   FV_Atm(1)%flagstruct%do_sat_adj = .false.
   ! Veritical resolution dependencies
    FV_Atm(1)%flagstruct%external_eta = .true.
    if (FV_Atm(1)%flagstruct%npz >= 70) then
@@ -728,7 +728,9 @@ contains
     endif
 
 !! Setup GFDL microphysics module
-    call gfdl_cloud_microphys_init()
+    if (FV_Atm(1)%flagstruct%do_sat_adj) then
+       call gfdl_cloud_microphys_init()
+    endif
 
  _ASSERT(DT > 0.0, 'DT must be greater than zero')
 
@@ -1293,9 +1295,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
          endif
          if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL plus QCLD
        endif
-      !if (FV_Atm(1)%flagstruct%do_sat_adj) then
-      !   _ASSERT(FV_Atm(1)%flagstruct%nwat >= 6, 'when using fv saturation adjustment NWAT must >= 6')
-      !endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
 #ifdef VERIFY_GRID
@@ -1452,7 +1451,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
            endif
          endif
          if (qlcnf /= -1) then ! QLCN
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           if (fv_first_run) call WRITE_PARALLEL( trim('QLCNF') )
            QLCN_FILLED = .TRUE.
            nn = nn+1
            if (state%vars%tracer(n)%is_r4) then
@@ -1505,7 +1504,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
            endif
          endif
          if (qicnf /= -1) then ! QICN
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           if (fv_first_run) call WRITE_PARALLEL( trim('QICNF') )
            QICN_FILLED = .TRUE.
            nn = nn+1
            if (state%vars%tracer(n)%is_r4) then
@@ -1589,7 +1588,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
            endif
          endif
          if (clcnf /= -1) then ! CLCN
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           if (fv_first_run) call WRITE_PARALLEL( trim('CLCNF') )
            CLCN_FILLED = .TRUE.
            nn = nn+1
            if (state%vars%tracer(n)%is_r4) then
@@ -1700,7 +1699,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     select case (FV_Atm(1)%flagstruct%nwat)
     case (0)
        do n=1,STATE%GRID%NQ
-         if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+         if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
@@ -1715,7 +1714,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
               (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
            nn=nn+1
            if (state%vars%tracer(n)%is_r4) then
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
@@ -1731,7 +1730,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
               (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
            nn=nn+1
            if (state%vars%tracer(n)%is_r4) then
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
@@ -1752,7 +1751,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
               (TRIM(state%vars%tracer(n)%tname) /= 'QRAIN'   ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QSNOW'   ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QGRAUPEL') ) then
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
            nn=nn+1
            if (state%vars%tracer(n)%is_r4) then
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
