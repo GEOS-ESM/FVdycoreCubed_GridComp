@@ -1276,6 +1276,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
   VERIFY_(STATUS)
 
+  call MAPL_TimerOn(MAPL,"--PROLOGUE")
+
   call ESMF_ClockGet( CLOCK, currTime=fv_time, rc=STATUS )
   VERIFY_(STATUS)
   call ESMF_TimeGet( fv_time, dayOfYear=days, s=seconds, rc=STATUS )
@@ -1426,6 +1428,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     qicn = 4
     qils = 5
    end select
+   
+   call MAPL_TimerOff(MAPL,"--PROLOGUE")
+   call MAPL_TimerOn(MAPL,"--PULL_TRACERS")
 
  ! Pull Tracers
   nn = 0
@@ -1697,6 +1702,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
          enddo
        enddo
     endif
+
    ! Verify
     select case (FV_Atm(1)%flagstruct%nwat)
     case (6:7)
@@ -1820,6 +1826,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   endif
 
+   call MAPL_TimerOff(MAPL,"--PULL_TRACERS")
+   call MAPL_TimerOn(MAPL,"--STATE_TO_FV")
+
     myDT = state%dt
 
     elapsed_time = elapsed_time + myDT
@@ -1829,13 +1838,16 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 ! Update FV with Internal State
     call State_To_FV( STATE )
 
+    call MAPL_TimerOff(MAPL,"--STATE_TO_FV")
+
     ! Query for PSDRY from AGCM.rc and set to MAPL_PSDRY if not found
     call MAPL_GetResource( MAPL, massD0, 'PSDRY:', default=MAPL_PSDRY, RC=STATUS )
     VERIFY_(STATUS)
     FV_Atm(1)%flagstruct%dry_mass = massD0
 
     if (fv_first_run) then
-     ! Make_NH
+      call MAPL_TimerOn(MAPL,"--MAKE_NH")
+      ! Make_NH
       if ( .not. FV_Atm(1)%flagstruct%hydrostatic ) then
         if (all(FV_Atm(1)%w(isc:iec,jsc:jec,:) == 0.0)) FV_Atm(1)%flagstruct%Make_NH = .true.
         if ( FV_Atm(1)%flagstruct%Make_NH ) then
@@ -1852,7 +1864,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
       endif
      ! Mark FV setup complete
       fv_first_run = .false.
+      call MAPL_TimerOff(MAPL,"--MAKE_NH")
     endif
+    
 
 ! Check Dry Mass (Apply fixer is option is enabled)
    if ( check_mass .OR. fix_mass ) then
@@ -2094,6 +2108,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   QICN_FILLED = .FALSE.
   CLLS_FILLED = .FALSE.
   CLCN_FILLED = .FALSE.
+
+  call MAPL_TimerOn(MAPL,"--PUSH_TRACERS")
 
  ! Push Tracers
   nn = 0
@@ -2385,8 +2401,13 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   endif
 
+  call MAPL_TimerOff(MAPL,"--PUSH_TRACERS")
+  call MAPL_TimerOn(MAPL,"--FV_TO_STATE")
+
 ! Copy FV to internal State
    call FV_To_State ( STATE )
+
+  call MAPL_TimerOff(MAPL,"--FV_TO_STATE")
 
     if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
 
