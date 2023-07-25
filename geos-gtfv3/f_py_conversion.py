@@ -11,6 +11,14 @@ DeviceArray = cp.ndarray if cp else None
 PythonArray = Union[np.ndarray, (cp.ndarray if cp else None)]
 
 
+class DummyStream:
+    def __init__(self) -> None:
+        pass
+
+    def synchronize(self):
+        pass
+
+
 class FortranPythonConversion:
     """
     Convert Fortran arrays to NumPy and vice-versa
@@ -43,7 +51,10 @@ class FortranPythonConversion:
         if self._python_targets_gpu:
             self._stream_A = cp.cuda.Stream(non_blocking=True)
             self._stream_B = cp.cuda.Stream(non_blocking=True)
-            self._current_stream = self._stream_A
+        else:
+            self._stream_A = DummyStream()
+            self._stream_B = DummyStream()
+        self._current_stream = self._stream_A
 
         # Layout & indexing
         self._npx, self._npy, self._npz = npx, npy, npz
