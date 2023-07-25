@@ -639,6 +639,21 @@ cd $ORIGPATH
 
 setenv REAL_BIND_PATH `realpath $NOBACKUP`
 
+if ($singstat == 1) then
+   set USING_SINGULARITY = TRUE
+else
+   set USING_SINGULARITY = FALSE
+endif
+
+if ( $USING_SINGULARITY == FALSE ) then
+   # Set a couple variables for sed'ing out bits of the run script
+   set SINGULARITY_BUILD = "#DELETE"
+   set NATIVE_BUILD = ""
+else
+   # Set a couple variables for sed'ing out bits of the run script
+   set SINGULARITY_BUILD = ""
+   set NATIVE_BUILD = "#DELETE"
+endif
 
 #
 # GEOSBIN does point to the bin/ directory in each
@@ -748,12 +763,21 @@ EOF
 # specific compared to the above adjustments
 if ( $SITE == 'NCCS' ) then
 
-cat >> $EXPDIR/SETENV.commands << EOF
+cat >> $HOMDIR/SETENV.commands << EOF
 setenv I_MPI_SHM_HEAP_VSIZE 512
 setenv PSM2_MEMORY large
+EOF
+
+#Testing at NCCS showed these caused crash at higher res
+#Crashed at restart read
+if ( $USING_SINGULARITY == FALSE ) then
+
+cat >> $HOMDIR/SETENV.commands << EOF
 setenv I_MPI_EXTRA_FILESYSTEM 1
 setenv I_MPI_EXTRA_FILESYSTEM_FORCE gpfs
 EOF
+
+endif # if NOT Singularity
 
 endif # if NCCS
 
@@ -790,6 +814,8 @@ s?@GEOSSRC?$GEOSSRC?g
 s?@GEOSBIN?$GEOSBIN?g
 s?@GEOSETC?$GEOSETC?g
 s?@GEOSUTIL?$GEOSUTIL?g
+s?@SINGULARITY_BUILD?$SINGULARITY_BUILD?g
+s?@NATIVE_BUILD?$NATIVE_BUILD?g
 s?@SINGULARITY_SANDBOX?$SINGULARITY_SANDBOX?g
 s?@REAL_BIND_PATH?$REAL_BIND_PATH?g
 

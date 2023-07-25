@@ -358,65 +358,65 @@ if ($N_OMP > 1) then
    setenv KMP_STACKSIZE 16m
 endif
 
-#######################################################################
-#          Settings for Singularity - EXPERIMENTAL
-#######################################################################
-
-# Detect if StandAlone_FV3_Dycore.x is in the current directory
-# -------------------------------------------------------------
-
-# If you are using singularity, set the path to the singularity sandbox here
-setenv SINGULARITY_SANDBOX @SINGULARITY_SANDBOX
-
-# echo if we are running in singularity
-if( $SINGULARITY_SANDBOX != "" ) then
-   echo "We are running under Singularity"
-   echo ""
-endif
-
-# Detect if StandAlone_FV3_Dycore.x is in the experiment directory
-if (-e $EXPDIR/StandAlone_FV3_Dycore.x) then
-   echo "Found StandAlone_FV3_Dycore.x in $EXPDIR"
-
-   # If SINGULARITY_SANDBOX is non-empty and StandAlone_FV3_Dycore.x is found in the experiment directory,
-   # force the use of StandAlone_FV3_Dycore.x in the installation directory
-   if( $SINGULARITY_SANDBOX != "" ) then
-      echo "NOTE: Testing has shown Singularity only works when running with"
-      echo "      the StandAlone_FV3_Dycore.x executable directly from the installation bin directory"
-      echo ""
-      echo "      So, we will *ignore* the local StandAlone_FV3_Dycore.x and "
-      echo "      instead use $GEOSBIN/StandAlone_FV3_Dycore.x"
-      echo ""
-
-      setenv FV3EXE $GEOSBIN/StandAlone_FV3_Dycore.x
-   else
-      echo "Copying $EXPDIR/StandAlone_FV3_Dycore.x to $SCRDIR"
-      /bin/cp $EXPDIR/StandAlone_FV3_Dycore.x $SCRDIR/StandAlone_FV3_Dycore.x
-
-      setenv FV3EXE $SCRDIR/StandAlone_FV3_Dycore.x
-   endif
-else
-   echo "Using StandAlone_FV3_Dycore.x from $GEOSBIN"
-
-   setenv FV3EXE $GEOSBIN/StandAlone_FV3_Dycore.x
-endif
-echo ""
-
-# If SINGULARITY_SANDBOX is non-empty, then run executable in singularity sandbox
-if( $SINGULARITY_SANDBOX != "" ) then
-   # Load the Singularity module
-   module load singularity
-
-   # Set Singularity Bind Paths. Note: These are dependent on where you are running.
-   # By default, we'll assume you are running this script from NOBACKUP
-   setenv REAL_BIND_PATH @REAL_BIND_PATH
-   setenv SINGULARITY_BIND_PATH "-B ${NOBACKUP}:${NOBACKUP},${REAL_BIND_PATH}:${REAL_BIND_PATH}"
-
-   # Set a variable to encapsulate all Singularity details
-   setenv SINGULARITY_RUN "singularity exec $SINGULARITY_BIND_PATH $SINGULARITY_SANDBOX"
-else
-   setenv SINGULARITY_RUN ""
-endif
+@SINGULARITY_BUILD  #######################################################################
+@SINGULARITY_BUILD  #          Settings for Singularity - EXPERIMENTAL
+@SINGULARITY_BUILD  #######################################################################
+@SINGULARITY_BUILD
+@SINGULARITY_BUILD  # Detect if StandAlone_FV3_Dycore.x is in the current directory
+@SINGULARITY_BUILD  # -------------------------------------------------------------
+@SINGULARITY_BUILD
+@SINGULARITY_BUILD  # If you are using singularity, set the path to the singularity sandbox here
+@SINGULARITY_BUILD  setenv SINGULARITY_SANDBOX @SINGULARITY_SANDBOX
+@SINGULARITY_BUILD
+@SINGULARITY_BUILD  # echo if we are running in singularity
+@SINGULARITY_BUILD  if( $SINGULARITY_SANDBOX != "" ) then
+@SINGULARITY_BUILD     echo "We are running under Singularity"
+@SINGULARITY_BUILD     echo ""
+@SINGULARITY_BUILD  endif
+@SINGULARITY_BUILD
+@SINGULARITY_BUILD  # Detect if StandAlone_FV3_Dycore.x is in the experiment directory
+@SINGULARITY_BUILD  if (-e $EXPDIR/StandAlone_FV3_Dycore.x) then
+@SINGULARITY_BUILD     echo "Found StandAlone_FV3_Dycore.x in $EXPDIR"
+@SINGULARITY_BUILD
+@SINGULARITY_BUILD     # If SINGULARITY_SANDBOX is non-empty and StandAlone_FV3_Dycore.x is found in the experiment directory,
+@SINGULARITY_BUILD     # force the use of StandAlone_FV3_Dycore.x in the installation directory
+@SINGULARITY_BUILD     if( $SINGULARITY_SANDBOX != "" ) then
+@SINGULARITY_BUILD        echo "NOTE: Testing has shown Singularity only works when running with"
+@SINGULARITY_BUILD        echo "      the StandAlone_FV3_Dycore.x executable directly from the installation bin directory"
+@SINGULARITY_BUILD        echo ""
+@SINGULARITY_BUILD        echo "      So, we will *ignore* the local StandAlone_FV3_Dycore.x and "
+@SINGULARITY_BUILD        echo "      instead use $GEOSBIN/StandAlone_FV3_Dycore.x"
+@SINGULARITY_BUILD        echo ""
+@SINGULARITY_BUILD
+@SINGULARITY_BUILD        setenv FV3EXE $GEOSBIN/StandAlone_FV3_Dycore.x
+@SINGULARITY_BUILD     else
+@SINGULARITY_BUILD        echo "Copying $EXPDIR/StandAlone_FV3_Dycore.x to $SCRDIR"
+@SINGULARITY_BUILD        /bin/cp $EXPDIR/StandAlone_FV3_Dycore.x $SCRDIR/StandAlone_FV3_Dycore.x
+@SINGULARITY_BUILD
+@SINGULARITY_BUILD        setenv FV3EXE $SCRDIR/StandAlone_FV3_Dycore.x
+@SINGULARITY_BUILD     endif
+@SINGULARITY_BUILD  else
+@SINGULARITY_BUILD     echo "Using StandAlone_FV3_Dycore.x from $GEOSBIN"
+@SINGULARITY_BUILD
+@SINGULARITY_BUILD     setenv FV3EXE $GEOSBIN/StandAlone_FV3_Dycore.x
+@SINGULARITY_BUILD  endif
+@SINGULARITY_BUILD  echo ""
+@SINGULARITY_BUILD
+@SINGULARITY_BUILD  # If SINGULARITY_SANDBOX is non-empty, then run executable in singularity sandbox
+@SINGULARITY_BUILD  if( $SINGULARITY_SANDBOX != "" ) then
+@SINGULARITY_BUILD     # Load the Singularity module
+@SINGULARITY_BUILD     module load singularity
+@SINGULARITY_BUILD
+@SINGULARITY_BUILD     # Set Singularity Bind Paths. Note: These are dependent on where you are running.
+@SINGULARITY_BUILD     # By default, we'll assume you are running this script from NOBACKUP
+@SINGULARITY_BUILD     setenv REAL_BIND_PATH @REAL_BIND_PATH
+@SINGULARITY_BUILD     setenv SINGULARITY_BIND_PATH "-B ${NOBACKUP}:${NOBACKUP},${REAL_BIND_PATH}:${REAL_BIND_PATH}"
+@SINGULARITY_BUILD
+@SINGULARITY_BUILD     # Set a variable to encapsulate all Singularity details
+@SINGULARITY_BUILD     setenv SINGULARITY_RUN "singularity exec $SINGULARITY_BIND_PATH $SINGULARITY_SANDBOX"
+@SINGULARITY_BUILD  else
+@SINGULARITY_BUILD     setenv SINGULARITY_RUN ""
+@SINGULARITY_BUILD  endif
 
 #######################################################################
 #                          Run the Model
@@ -432,7 +432,8 @@ else
    set IOSERVER_OPTIONS = ""
 endif
 
-$RUN_CMD $NPES $SINGULARITY_RUN $FV3EXE $IOSERVER_OPTIONS --logging_config logging.yaml |& tee ${SCRDIR}.log
+@SINGULARITY_BUILD  $RUN_CMD $NPES $SINGULARITY_RUN $FV3EXE $IOSERVER_OPTIONS --logging_config logging.yaml |& tee ${SCRDIR}.log
+@NATIVE_BUILD  $RUN_CMD $NPES $FV3EXE $IOSERVER_OPTIONS --logging_config logging.yaml |& tee ${SCRDIR}.log
 
 if( $USE_SHMEM == 1 ) $GEOSBIN/RmShmKeys_sshmpi.csh >& /dev/null
 
