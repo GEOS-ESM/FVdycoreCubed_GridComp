@@ -54,7 +54,7 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
     BYPRODUCTS ${GEOS_GTFV3_INTERFACE_HEADER_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     MAIN_DEPENDENCY ${GEOS_GTFV3_INTERFACE_SRCS}
-    COMMENT "Building gtfv3 interface library with Python"
+    COMMENT "Building gtfv3 interface library with Python (${Python3_EXECUTABLE})"
     VERBATIM
     )
 
