@@ -608,6 +608,16 @@ set     GEOSDIR  = $GEOSDEF
 #                        Singularity Sandbox
 #######################################################################
 
+# This section is to determine if we are running in a Singularity
+# sandbox by looking for the .singularity.d directory. If we are,
+# then we set the SINGULARITY_SANDBOX environment variable to the
+# path to the sandbox. If we are not, then we set it to an empty
+# string.
+#
+# We also set the REAL_BIND_PATH environment variable. This is used
+# to set the bind paths for Singularity runs. REAL_BIND_PATH is the
+# physical path to the NOBACKUP directory
+
 setenv KEYFILE ".singularity.d"
 setenv singstat 0
 setenv ORIGPATH `pwd -P`
@@ -625,31 +635,24 @@ while ($singstat == 0)
       endif
    endif
 end
+
 if ($singstat == 1) then
    setenv SINGULARITY_SANDBOX $SINGPATH
+   setenv REAL_BIND_PATH `realpath $NOBACKUP`
+
+   set USING_SINGULARITY = TRUE
+   set SINGULARITY_BUILD = ""
+   set NATIVE_BUILD = "#DELETE"
 else
    setenv SINGULARITY_SANDBOX ""
+   setenv REAL_BIND_PATH ""
+
+   set USING_SINGULARITY = FALSE
+   set SINGULARITY_BUILD = "#DELETE"
+   set NATIVE_BUILD = ""
 endif
 
 cd $ORIGPATH
-
-setenv REAL_BIND_PATH `realpath $NOBACKUP`
-
-if ($singstat == 1) then
-   set USING_SINGULARITY = TRUE
-else
-   set USING_SINGULARITY = FALSE
-endif
-
-if ( $USING_SINGULARITY == FALSE ) then
-   # Set a couple variables for sed'ing out bits of the run script
-   set SINGULARITY_BUILD = "#DELETE"
-   set NATIVE_BUILD = ""
-else
-   # Set a couple variables for sed'ing out bits of the run script
-   set SINGULARITY_BUILD = ""
-   set NATIVE_BUILD = "#DELETE"
-endif
 
 #
 # GEOSBIN does point to the bin/ directory in each
