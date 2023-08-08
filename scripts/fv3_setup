@@ -257,7 +257,6 @@ ASKPROC:
 
 if ( $SITE == 'NCCS' ) then
    echo "Enter the ${C1}Processor Type${CN} you wish to run on:"
-   echo "   ${C2}hasw (Haswell)${CN}"
    echo "   ${C2}sky  (Skylake)${CN}"
    echo "   ${C2}cas  (Cascade Lake)${CN} (default)"
    echo " "
@@ -267,13 +266,10 @@ if ( $SITE == 'NCCS' ) then
       set MODEL = 'cas'
    endif
 
-   if( $MODEL != 'hasw' & \
-       $MODEL != 'sky'  & \
+   if( $MODEL != 'sky'  & \
        $MODEL != 'cas' ) goto ASKPROC
 
-   if (     $MODEL == 'hasw') then
-      set NCPUS_PER_NODE = 28
-   else if ($MODEL == 'sky') then
+   if ($MODEL == 'sky') then
       set NCPUS_PER_NODE = 40
    else if ($MODEL == 'cas') then
       # NCCS currently recommends that users do not run with
@@ -763,7 +759,7 @@ EOF
 # specific compared to the above adjustments
 if ( $SITE == 'NCCS' ) then
 
-cat >> $HOMDIR/SETENV.commands << EOF
+cat >> $EXPDIR/SETENV.commands << EOF
 setenv I_MPI_SHM_HEAP_VSIZE 512
 setenv PSM2_MEMORY large
 EOF
@@ -772,7 +768,7 @@ EOF
 #Crashed at restart read
 if ( $USING_SINGULARITY == FALSE ) then
 
-cat >> $HOMDIR/SETENV.commands << EOF
+cat >> $EXPDIR/SETENV.commands << EOF
 setenv I_MPI_EXTRA_FILESYSTEM 1
 setenv I_MPI_EXTRA_FILESYSTEM_FORCE gpfs
 EOF
