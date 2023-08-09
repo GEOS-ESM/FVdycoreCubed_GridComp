@@ -34,6 +34,8 @@ endif
 # Set Current Working Path to fv3_setup
 # -------------------------------------
 setenv ARCH `uname -s`
+setenv NODE `uname -n`
+
 if ($ARCH == Darwin) then
    set FINDPATH = realpath
 else
@@ -52,6 +54,56 @@ if (! -x ${BINDIR}/StandAlone_FV3_Dycore.x) then
    exit 1
 endif
 
+######################################################################
+#                        Singularity Sandbox
+#######################################################################
+
+# This section is to determine if we are running in a Singularity
+# sandbox by looking for the .singularity.d directory. If we are,
+# then we set the SINGULARITY_SANDBOX environment variable to the
+# path to the sandbox. If we are not, then we set it to an empty
+# string.
+#
+# We also set the REAL_BIND_PATH environment variable. This is used
+# to set the bind paths for Singularity runs. REAL_BIND_PATH is the
+# physical path to the NOBACKUP directory
+
+setenv KEYFILE ".singularity.d"
+setenv singstat 0
+setenv ORIGPATH `pwd -P`
+cd $GEOSDIR
+while ($singstat == 0)
+   if (-d $KEYFILE) then
+      setenv singstat 1
+      setenv SINGPATH `pwd -P`
+   endif
+   if ($singstat == 0) then
+      if ("$cwd" == "/") then
+         break
+      else
+         cd ..
+      endif
+   endif
+end
+
+if ($singstat == 1) then
+   setenv SINGULARITY_SANDBOX $SINGPATH
+   setenv REAL_BIND_PATH `realpath $NOBACKUP`
+
+   set USING_SINGULARITY = TRUE
+   set SINGULARITY_BUILD = ""
+   set NATIVE_BUILD = "#DELETE"
+else
+   setenv SINGULARITY_SANDBOX ""
+   setenv REAL_BIND_PATH ""
+
+   set USING_SINGULARITY = FALSE
+   set SINGULARITY_BUILD = "#DELETE"
+   set NATIVE_BUILD = ""
+endif
+
+cd $ORIGPATH
+
 # Set TMPDIR to /tmp due to issues with heredocs in Singularity sandboxes
 # -----------------------------------------------------------------------
 
@@ -61,7 +113,24 @@ setenv TMPDIR /tmp
 #                   Test for Command Line Flags
 #######################################################################
 
-set USER_SITE = ""
+set SINGULARITY_RUN_SITE = ""
+if ($singstat == 1) then
+   set USING_SINGULARITY = TRUE
+
+   # If we are using Singularity, then where the image was built (say
+   # AWS) might not match where we run. We at least know NCCS and NAS,
+   # so we can use that to set the site.
+
+   if (($NODE =~ discover*) || ($NODE =~ borg*) || ($NODE =~ warp*)) then
+      set SINGULARITY_RUN_SITE = "NCCS"
+   else if (($NODE =~ pfe*) || \
+            ($NODE =~ r[0-9]*i[0-9]*n[0-9]*) || \
+            ($NODE =~ r[0-9]*c[0-9]*t[0-9]*n[0-9]*)) then
+      set SINGULARITY_RUN_SITE = "NAS"
+   endif
+else
+   set USING_SINGULARITY = FALSE
+endif
 while ( $#argv > 0 )
    set arg = $argv[1]
    shift argv
@@ -70,23 +139,6 @@ while ( $#argv > 0 )
       case -[Cc]:
       case --[Cc][Oo][Ll][Oo][Rr]:
          goto SETCOLOR
-
-      # Testing with singularity found we need the ability to override
-      # the SITE variable below because images might be built on, say,
-      # AWS and thus "block" us from running at NCCS.
-      #
-      # So, we make a --site flag that allows us to override the SITE
-      # variable
-      case -[Ss]:
-      case --[Ss][Ii][Tt][Ee]:
-         set USER_SITE = $1
-         # if USER_SITE is empty, then we error out
-         if ( "$USER_SITE" == "" ) then
-            echo "ERROR: --site flag requires a site name"
-            exit 1
-         endif
-         shift argv
-         breaksw
 
       # Here any string not above will trigger USAGE
       case -[Hh]:
@@ -100,12 +152,10 @@ end
 #                        Determine site
 #######################################################################
 
-setenv NODE `uname -n`
-setenv ARCH `uname -s`
-if ($USER_SITE == "") then
+if ($SINGULARITY_RUN_SITE == "") then
    setenv SITE `awk '{print $2}' $ETCDIR/SITE.rc`
 else
-   setenv SITE $USER_SITE
+   setenv SITE $SINGULARITY_RUN_SITE
 endif
 
 #######################################################################
@@ -603,56 +653,6 @@ echo $EXPDIRroot > $HOME/.EXPDIRroot
 #######################################################################
 
 set     GEOSDIR  = $GEOSDEF
-
-######################################################################
-#                        Singularity Sandbox
-#######################################################################
-
-# This section is to determine if we are running in a Singularity
-# sandbox by looking for the .singularity.d directory. If we are,
-# then we set the SINGULARITY_SANDBOX environment variable to the
-# path to the sandbox. If we are not, then we set it to an empty
-# string.
-#
-# We also set the REAL_BIND_PATH environment variable. This is used
-# to set the bind paths for Singularity runs. REAL_BIND_PATH is the
-# physical path to the NOBACKUP directory
-
-setenv KEYFILE ".singularity.d"
-setenv singstat 0
-setenv ORIGPATH `pwd -P`
-cd $GEOSDIR
-while ($singstat == 0)
-   if (-d $KEYFILE) then
-      setenv singstat 1
-      setenv SINGPATH `pwd -P`
-   endif
-   if ($singstat == 0) then
-      if ("$cwd" == "/") then
-         break
-      else
-         cd ..
-      endif
-   endif
-end
-
-if ($singstat == 1) then
-   setenv SINGULARITY_SANDBOX $SINGPATH
-   setenv REAL_BIND_PATH `realpath $NOBACKUP`
-
-   set USING_SINGULARITY = TRUE
-   set SINGULARITY_BUILD = ""
-   set NATIVE_BUILD = "#DELETE"
-else
-   setenv SINGULARITY_SANDBOX ""
-   setenv REAL_BIND_PATH ""
-
-   set USING_SINGULARITY = FALSE
-   set SINGULARITY_BUILD = "#DELETE"
-   set NATIVE_BUILD = ""
-endif
-
-cd $ORIGPATH
 
 #
 # GEOSBIN does point to the bin/ directory in each
