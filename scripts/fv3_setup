@@ -71,7 +71,7 @@ endif
 setenv KEYFILE ".singularity.d"
 setenv singstat 0
 setenv ORIGPATH `pwd -P`
-cd $GEOSDIR
+cd $GEOSDEF
 while ($singstat == 0)
    if (-d $KEYFILE) then
       setenv singstat 1
