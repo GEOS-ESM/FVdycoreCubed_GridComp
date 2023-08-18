@@ -2533,7 +2533,7 @@ subroutine State_To_FV ( STATE )
 
        if ( FV_Atm(1)%flagstruct%range_warn ) then
           call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            130., 335., bad_range=bad_range_T)
+                            100., 335., bad_range=bad_range_T)
        endif
 
 !------------
@@ -2600,7 +2600,7 @@ subroutine FV_To_State ( STATE )
 !-----------------------------------
       !if ( FV_Atm(1)%flagstruct%range_warn ) then
       !   call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-      !                     130., 335., bad_range)
+      !                     100., 335., bad_range)
       !endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 
