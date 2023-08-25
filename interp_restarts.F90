@@ -318,12 +318,13 @@ program interp_restarts
          allocate(rst_files(i)%vars(nVars))
 
          variables => InCfg(1)%get_variables()
-         var_iter = variables%begin()
+         var_iter = variables%ftn_begin()
          n=0
-         do while (var_iter /= variables%end())
+         do while (var_iter /= variables%ftn_end())
+            call var_iter%next()
 
-            var_name => var_iter%key()
-            myVariable => var_iter%value()
+            var_name => var_iter%first()
+            myVariable => var_iter%second()
             if (.not.InCfg(1)%is_coordinate_variable(var_name)) then
                n=n+1
                var_dimensions => myVariable%get_dimensions()
@@ -360,7 +361,6 @@ program interp_restarts
                   rst_files(i)%vars(n)%n_ungrid = InCfg(1)%get_dimension(dname)
                end if
             end if
-            call var_iter%next()
          enddo
 
          rst_files(i)%have_descriptor=.true.
