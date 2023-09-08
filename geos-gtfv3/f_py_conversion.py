@@ -305,13 +305,14 @@ class FortranPythonConversion:
         if self._python_targets_gpu:
             numpy_array = self._transform_and_download(array, dtype, swap_axes)
         else:
-            numpy_array = array.astype(dtype).flatten(order="F")
             if swap_axes:
                 numpy_array = np.swapaxes(
-                    numpy_array,
+                    array,
                     swap_axes[0],
                     swap_axes[1],
                 )
+            numpy_array = numpy_array.astype(dtype).flatten(order="F")
+
         return numpy_array
 
     def _python_to_fortran_trf(
