@@ -311,6 +311,8 @@ class FortranPythonConversion:
                     swap_axes[0],
                     swap_axes[1],
                 )
+            else:
+                numpy_array = array
             numpy_array = numpy_array.astype(dtype).flatten(order="F")
 
         return numpy_array
