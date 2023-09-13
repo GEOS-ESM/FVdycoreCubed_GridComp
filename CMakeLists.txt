@@ -21,6 +21,12 @@ set (srcs
   fv_regrid_c2c_bin.F90
   fv_regridding_utils.F90
   rs_scaleMod.F90
+  # Begin Coarse GC files
+  SSI_FineToCoarseMod.F90
+  SSI_CoarseToFineMod.F90
+  SSI_TypeMod.F90
+  CoarseDynCore_GridCompMod.F90
+  # End Coarse GC files
   )
 if (BUILD_GEOS_GTFV3_INTERFACE)
   list (APPEND srcs
