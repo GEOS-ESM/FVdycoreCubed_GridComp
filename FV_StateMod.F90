@@ -1,5 +1,7 @@
 #include "MAPL_Generic.h"
 
+#define DEALLOCGLOB_(A) if(associated(A))then;A=0;if(MAPL_ShmInitialized)then; call MAPL_DeAllocNodeArray(A,rc=STATUS);else; deallocate(A,stat=STATUS);endif;VERIFY_(STATUS);NULLIFY(A);endif
+
 module FV_StateMod
 !BOP
 !
@@ -323,6 +325,8 @@ contains
  subroutine FV_Setup(GC,LAYOUT_FILE, RC)
 
   use test_cases_mod, only : test_case
+  use fv_arrays_mod,  only : R_GRID
+  use fv_mp_mod,      only:  ng, is_master
 
   type (ESMF_GridComp)         , intent(INOUT) :: GC
   character(LEN=*)             , intent(IN   ) :: LAYOUT_FILE
@@ -344,6 +348,13 @@ contains
   integer :: p_split=1
 
   real :: temp_real
+!--------------------------------------------------------
+    real(kind=R_GRID), pointer, dimension(:,:,:,:) :: grid_global
+    real(kind=R_GRID), pointer   ::  xs(:,:)
+    real(kind=R_GRID), pointer   ::  ys(:,:)
+    logical :: root_node, use_shmem
+    integer :: ntiles, ndims, npx, npy
+    !--------------------------------------------------------
 
 ! BEGIN
 
@@ -726,7 +737,33 @@ contains
 
 !! Start up FV
     call MAPL_TimerOn(MAPL,"--FV_INIT")
-    call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
+    use_shmem = MAPL_ShmInitialized
+
+    npx = FV_Atm(1)%flagstruct%npx
+    npy = FV_Atm(1)%flagstruct%npy
+!    ng  = FV_Atm(1)%flagstruct%ng
+    ntiles=FV_Atm(1)%flagstruct%ntiles
+    ndims = 2
+
+    if(use_shmem) then
+       call MAPL_AllocNodeArray(grid_global, &
+            Shp=[npx+2*ng,npy+2*ng,ndims,ntiles], &
+            lbd=[1-ng,1-ng,1,1], _RC)
+       call MAPL_AllocNodeArray(xs, Shp=[npx,npy], _RC)
+       call MAPL_AllocNodeArray(ys, Shp=[npx,npy], _RC)
+       root_node = MAPL_AmNodeRoot
+    else
+       root_node = is_master()
+       allocate(grid_global(1-ng:npx+ng,1-ng:npy+ng,ndims,1:ntiles), _STAT)
+       allocate(xs(npx,npy),_STAT)
+       allocate(ys(npx,npy),_STAT)
+    end if
+
+    call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split, grid_global, xs, ys, root_node, use_shmem)
+    DEALLOCGLOB_(grid_global)
+    DEALLOCGLOB_(xs)
+    DEALLOCGLOB_(ys)
+    
     call MAPL_TimerOff(MAPL,"--FV_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
