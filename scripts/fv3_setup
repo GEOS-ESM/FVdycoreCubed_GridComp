@@ -305,9 +305,9 @@ endif
 
 ASKPROC:
 
-set BUILT_ON_SLES15 = @BUILT_ON_SLES15@
-
 if ( $SITE == 'NCCS' ) then
+
+   set BUILT_ON_SLES15 = @BUILT_ON_SLES15@
 
    if ("$BUILT_ON_SLES15" == "TRUE") then
       set DEFAULT_MODEL = 'mil'
@@ -730,7 +730,7 @@ EOF
 # The below settings seem to be recommended for hybrid
 # systems using MVAPICH2 but could change
 
-else if( $MPI == mvapich2 ) then
+else if( $MPI == mvapich ) then
 
 cat > $EXPDIR/SETENV.commands << EOF
    setenv MV2_ENABLE_AFFINITY     0
@@ -799,6 +799,17 @@ setenv I_MPI_EXTRA_FILESYSTEM_FORCE gpfs
 EOF
 
 endif # if NOT Singularity
+
+# Testing on SLES15 showed that the mlx provider did not seem
+# to work at scale. So we move to use the verbs provider. Note:
+# still seems to have issues at c720
+if ("$BUILT_ON_SLES15" == "TRUE") then
+cat >> $EXPDIR/SETENV.commands << EOF
+setenv I_MPI_OFI_PROVIDER verbs
+setenv I_MPI_COLL_EXTERNAL 0
+EOF
+
+endif # if SLES15
 
 endif # if NCCS
 
