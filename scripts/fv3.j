@@ -328,6 +328,7 @@ cat >      input.nml << EOF
        fv_sg_adj = -1
        n_sponge = -1
        n_zfilter = 0
+       compute_coords_locally = .false.
 /
 
 &fv_grid_nml
