@@ -526,7 +526,7 @@ contains
   ! when reading the tracer bundle in fv_first_run
    FV_Atm(1)%flagstruct%nwat = 0
   ! Trigger to enable autoconversion/cloud processes on the fv_mapz step
-   FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
+   FV_Atm(1)%flagstruct%do_sat_adj = .false.
   ! Veritical resolution dependencies
    FV_Atm(1)%flagstruct%external_eta = .true.
    if (FV_Atm(1)%flagstruct%npz >= 70) then
@@ -580,6 +580,9 @@ contains
   ! Rayleigh & Divergence Damping
    if (index(FV3_CONFIG,"HWT") > 0) then
      FV_Atm(1)%flagstruct%fv_sg_adj = min(3600.0,DT*4.0)
+     if (FV_Atm(1)%flagstruct%npz >= 71) then
+       FV_Atm(1)%flagstruct%n_zfilter = 37 ! ~100mb
+     endif 
      if (FV_Atm(1)%flagstruct%npz >= 90) then
        FV_Atm(1)%flagstruct%n_zfilter = 46 ! ~100mb
      endif
@@ -589,11 +592,15 @@ contains
      if (FV_Atm(1)%flagstruct%npz >= 180) then
        FV_Atm(1)%flagstruct%n_zfilter = 92 ! ~100mb
      endif
-     FV_Atm(1)%flagstruct%do_sat_adj = .true. ! only valid when nwat >= 6
+     FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
      FV_Atm(1)%flagstruct%dz_min = 6.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
-     FV_Atm(1)%flagstruct%tau = 2.0
-     FV_Atm(1)%flagstruct%rf_cutoff = 10.e2
+     if (FV_Atm(1)%flagstruct%npz == 72) then
+       FV_Atm(1)%flagstruct%tau = 0.0
+     else
+       FV_Atm(1)%flagstruct%tau = 2.0
+     endif
+     FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
     ! 6th order default damping options
      FV_Atm(1)%flagstruct%nord = 3
      FV_Atm(1)%flagstruct%dddmp = 0.1
@@ -689,7 +696,7 @@ contains
          FV_Atm(1)%flagstruct%d_con = 0.
       else
       ! Non-Monotonic advection
-         if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+         if (index(FV3_CONFIG,"HWT") > 0) then
            FV_Atm(1)%flagstruct%hord_mt =  6
            FV_Atm(1)%flagstruct%hord_vt =  6
            FV_Atm(1)%flagstruct%hord_tm =  6
@@ -793,7 +800,9 @@ contains
       f2c_SSI_arr_map%nx  = nx
 
 !! Setup GFDL microphysics module
-    call gfdl_cloud_microphys_init()
+    if (FV_Atm(1)%flagstruct%do_sat_adj) then
+       call gfdl_cloud_microphys_init()
+    endif
 
  _ASSERT(DT > 0.0, 'DT must be greater than zero')
 
@@ -1464,9 +1473,6 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
          endif
          if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL plus QCLD
        endif
-      !if (FV_Atm(1)%flagstruct%do_sat_adj) then
-      !   _ASSERT(FV_Atm(1)%flagstruct%nwat >= 6, 'when using fv saturation adjustment NWAT must >= 6')
-      !endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
 #ifdef VERIFY_GRID
@@ -1623,7 +1629,7 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
            endif
          endif
          if (qlcnf /= -1) then ! QLCN
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           if (fv_first_run) call WRITE_PARALLEL( trim('QLCNF') )
            QLCN_FILLED = .TRUE.
            nn = nn+1
            if (state%vars%tracer(n)%is_r4) then
@@ -1676,7 +1682,7 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
            endif
          endif
          if (qicnf /= -1) then ! QICN
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           if (fv_first_run) call WRITE_PARALLEL( trim('QICNF') )
            QICN_FILLED = .TRUE.
            nn = nn+1
            if (state%vars%tracer(n)%is_r4) then
@@ -1760,7 +1766,7 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
            endif
          endif
          if (clcnf /= -1) then ! CLCN
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           if (fv_first_run) call WRITE_PARALLEL( trim('CLCNF') )
            CLCN_FILLED = .TRUE.
            nn = nn+1
            if (state%vars%tracer(n)%is_r4) then
@@ -1871,7 +1877,7 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
     select case (FV_Atm(1)%flagstruct%nwat)
     case (0)
        do n=1,STATE%GRID%NQ
-         if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+         if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
          nn = nn+1
          if (state%vars%tracer(n)%is_r4) then
             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
@@ -1886,7 +1892,7 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
               (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
            nn=nn+1
            if (state%vars%tracer(n)%is_r4) then
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
@@ -1902,7 +1908,7 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
               (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
            nn=nn+1
            if (state%vars%tracer(n)%is_r4) then
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
@@ -1923,7 +1929,7 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
               (TRIM(state%vars%tracer(n)%tname) /= 'QRAIN'   ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QSNOW'   ) .and. &
               (TRIM(state%vars%tracer(n)%tname) /= 'QGRAUPEL') ) then
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+           if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
            nn=nn+1
            if (state%vars%tracer(n)%is_r4) then
               FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
@@ -2779,7 +2785,7 @@ subroutine State_To_FV ( STATE, internal )
 
        if ( FV_Atm(1)%flagstruct%range_warn ) then
           call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            130., 335., bad_range=bad_range_T)
+                            100., 335., bad_range=bad_range_T)
        endif
 
 !------------
@@ -2847,7 +2853,7 @@ subroutine FV_To_State ( STATE, internal )
 !-----------------------------------
       !if ( FV_Atm(1)%flagstruct%range_warn ) then
       !   call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-      !                     130., 335., bad_range)
+      !                     100., 335., bad_range)
       !endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 

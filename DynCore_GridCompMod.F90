@@ -5719,83 +5719,7 @@ end subroutine RunAddIncs
     if (.not. ADIABATIC) then
        _ASSERT(nwat >= 1, 'expecting water species (nwat) to match')
     endif
-    if (nwat >= 1) then
-    ALLOCATE(   Q(is:ie,js:je,1:km,nwat) )
-    ALLOCATE( CVM(is:ie,js:je,1:km) )
-    Q(:,:,:,:) = 0.0
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='Q', RC=rc )
-    if (DYN_COLDSTART .and. overwrite_Q .and. (.not. ADIABATIC)) then
-      ! USE Q computed by FV3
-       call getQ(Q(:,:,:,1), 'Q')
-       overwrite_Q=.false.
-       call WRITE_PARALLEL("Using QV from FV3 Initial Conditions")
-       fac = 1.0
-       call prt_maxmin('AI Q', Q(:,:,:,1),  is, ie, js, je, 0, km, fac)
-       if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
-          if (size(Q(:,:,:,1))==size(qqq%content_r4)) qqq%content_r4 = Q(:,:,:,1)
-       elseif (associated(qqq%content)) then
-          if (size(Q(:,:,:,1))==size(qqq%content)) qqq%content = Q(:,:,:,1)
-       endif
-    else
-      ! Grab QV from imports
-       if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
-          if (size(Q(:,:,:,1))==size(qqq%content_r4)) Q(:,:,:,1) = qqq%content_r4
-       elseif (associated(qqq%content)) then
-          if (size(Q(:,:,:,1))==size(qqq%content)) Q(:,:,:,1) = qqq%content
-       endif
-    endif
-    endif
-    if (nwat >= 3) then
-    ! Grab QLIQ from imports
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QLLS', RC=rc )
-    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
-       if (size(Q(:,:,:,2))==size(qqq%content_r4)) Q(:,:,:,2) = Q(:,:,:,2) + qqq%content_r4
-    elseif (associated(qqq%content)) then
-       if (size(Q(:,:,:,2))==size(qqq%content)) Q(:,:,:,2) = Q(:,:,:,2) + qqq%content
-    endif
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QLCN', RC=rc )
-    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
-       if (size(Q(:,:,:,2))==size(qqq%content_r4)) Q(:,:,:,2) = Q(:,:,:,2) + qqq%content_r4
-    elseif (associated(qqq%content)) then
-       if (size(Q(:,:,:,2))==size(qqq%content)) Q(:,:,:,2) = Q(:,:,:,2) + qqq%content
-    endif
-    ! Grab QICE from imports
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QILS', RC=rc )
-    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
-       if (size(Q(:,:,:,3))==size(qqq%content_r4)) Q(:,:,:,3) = Q(:,:,:,3) + qqq%content_r4
-    elseif (associated(qqq%content)) then
-       if (size(Q(:,:,:,3))==size(qqq%content)) Q(:,:,:,3) = Q(:,:,:,3) + qqq%content
-    endif
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QICN', RC=rc )
-    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
-       if (size(Q(:,:,:,3))==size(qqq%content_r4)) Q(:,:,:,3) = Q(:,:,:,3) + qqq%content_r4
-    elseif (associated(qqq%content)) then
-       if (size(Q(:,:,:,3))==size(qqq%content)) Q(:,:,:,3) = Q(:,:,:,3) + qqq%content
-    endif
-    endif
-    if (nwat >= 6) then
-    ! Grab RAIN from imports
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QRAIN', RC=rc )
-    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
-       if (size(Q(:,:,:,4))==size(qqq%content_r4)) Q(:,:,:,4) = qqq%content_r4
-    elseif (associated(qqq%content)) then
-       if (size(Q(:,:,:,4))==size(qqq%content)) Q(:,:,:,4) = qqq%content
-    endif
-    ! Grab SNOW from imports
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QSNOW', RC=rc )
-    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
-       if (size(Q(:,:,:,5))==size(qqq%content_r4)) Q(:,:,:,5) = qqq%content_r4
-    elseif (associated(qqq%content)) then
-       if (size(Q(:,:,:,5))==size(qqq%content)) Q(:,:,:,5) = qqq%content
-    endif
-    ! Grab GRAUPEL from imports
-    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QGRAUPEL', RC=rc )
-    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
-       if (size(Q(:,:,:,6))==size(qqq%content_r4)) Q(:,:,:,6) = qqq%content_r4
-    elseif (associated(qqq%content)) then
-       if (size(Q(:,:,:,6))==size(qqq%content)) Q(:,:,:,6) = qqq%content
-    endif
-    endif
+
     select case(nwat)
     case(1)
         sphum   = 1
@@ -5819,6 +5743,84 @@ end subroutine RunAddIncs
         snowwat = 5
         graupel = 6
     end select
+
+    if (nwat >= 1) then
+    ALLOCATE(   Q(is:ie,js:je,1:km,nwat) )
+    ALLOCATE( CVM(is:ie,js:je,1:km) )
+    Q(:,:,:,:) = 0.0
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='Q', RC=rc )
+    if (DYN_COLDSTART .and. overwrite_Q .and. (.not. ADIABATIC)) then
+      ! USE Q computed by FV3
+       call getQ(Q(:,:,:,sphum), 'Q')
+       overwrite_Q=.false.
+       call WRITE_PARALLEL("Using QV from FV3 Initial Conditions")
+       fac = 1.0
+       call prt_maxmin('AI Q', Q(:,:,:,sphum),  is, ie, js, je, 0, km, fac)
+       if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
+          if (size(Q(:,:,:,sphum))==size(qqq%content_r4)) qqq%content_r4 = Q(:,:,:,sphum)
+       elseif (associated(qqq%content)) then
+          if (size(Q(:,:,:,sphum))==size(qqq%content)) qqq%content = Q(:,:,:,sphum)
+       endif
+    else
+      ! Grab QV from imports
+       if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
+          if (size(Q(:,:,:,sphum))==size(qqq%content_r4)) Q(:,:,:,sphum) = qqq%content_r4
+       elseif (associated(qqq%content)) then
+          if (size(Q(:,:,:,sphum))==size(qqq%content)) Q(:,:,:,sphum) = qqq%content
+       endif
+    endif
+    endif
+    if (nwat >= 3) then
+    ! Grab QLIQ from imports
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QLLS', RC=rc )
+    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
+       if (size(Q(:,:,:,liq_wat))==size(qqq%content_r4)) Q(:,:,:,liq_wat) = Q(:,:,:,liq_wat) + qqq%content_r4
+    elseif (associated(qqq%content)) then
+       if (size(Q(:,:,:,liq_wat))==size(qqq%content)) Q(:,:,:,liq_wat) = Q(:,:,:,liq_wat) + qqq%content
+    endif
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QLCN', RC=rc )
+    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
+       if (size(Q(:,:,:,liq_wat))==size(qqq%content_r4)) Q(:,:,:,liq_wat) = Q(:,:,:,liq_wat) + qqq%content_r4
+    elseif (associated(qqq%content)) then
+       if (size(Q(:,:,:,liq_wat))==size(qqq%content)) Q(:,:,:,liq_wat) = Q(:,:,:,liq_wat) + qqq%content
+    endif
+    ! Grab QICE from imports
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QILS', RC=rc )
+    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
+       if (size(Q(:,:,:,ice_wat))==size(qqq%content_r4)) Q(:,:,:,ice_wat) = Q(:,:,:,ice_wat) + qqq%content_r4
+    elseif (associated(qqq%content)) then
+       if (size(Q(:,:,:,ice_wat))==size(qqq%content)) Q(:,:,:,ice_wat) = Q(:,:,:,ice_wat) + qqq%content
+    endif
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QICN', RC=rc )
+    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
+       if (size(Q(:,:,:,ice_wat))==size(qqq%content_r4)) Q(:,:,:,ice_wat) = Q(:,:,:,ice_wat) + qqq%content_r4
+    elseif (associated(qqq%content)) then
+       if (size(Q(:,:,:,ice_wat))==size(qqq%content)) Q(:,:,:,ice_wat) = Q(:,:,:,ice_wat) + qqq%content
+    endif
+    endif
+    if (nwat >= 6) then
+    ! Grab RAIN from imports
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QRAIN', RC=rc )
+    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
+       if (size(Q(:,:,:,rainwat))==size(qqq%content_r4)) Q(:,:,:,rainwat) = qqq%content_r4
+    elseif (associated(qqq%content)) then
+       if (size(Q(:,:,:,rainwat))==size(qqq%content)) Q(:,:,:,rainwat) = qqq%content
+    endif
+    ! Grab SNOW from imports
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QSNOW', RC=rc )
+    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
+       if (size(Q(:,:,:,snowwat))==size(qqq%content_r4)) Q(:,:,:,snowwat) = qqq%content_r4
+    elseif (associated(qqq%content)) then
+       if (size(Q(:,:,:,snowwat))==size(qqq%content)) Q(:,:,:,snowwat) = qqq%content
+    endif
+    ! Grab GRAUPEL from imports
+    call PULL_Q ( STATE, IMPORT, qqq, NXQ, InFieldName='QGRAUPEL', RC=rc )
+    if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
+       if (size(Q(:,:,:,graupel))==size(qqq%content_r4)) Q(:,:,:,graupel) = qqq%content_r4
+    elseif (associated(qqq%content)) then
+       if (size(Q(:,:,:,graupel))==size(qqq%content)) Q(:,:,:,graupel) = qqq%content
+    endif
+    endif
 
     if ( (.not. ADIABATIC) .and. (DO_ADD_INCS) ) then
 
