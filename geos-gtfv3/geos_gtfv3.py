@@ -1,6 +1,5 @@
 import f90nml
 from f_py_conversion import FortranPythonConversion
-from pace.fv3core.initialization.geos_wrapper import GeosDycoreWrapper, MemorySpace
 from cuda_profiler import CUDAProfiler, TimedCUDAProfiler
 from mpi4py import MPI
 from pace.util._optional_imports import cupy as cp
@@ -8,6 +7,13 @@ import numpy as np
 from pace.dsl.gt4py_utils import is_gpu_backend
 from typing import TYPE_CHECKING
 import os
+
+# Backward compatibility (Nov 2023)
+try:
+    from pace.fv3core.initialization.geos_wrapper import GeosDycoreWrapper, MemorySpace
+except ModuleNotFoundError:
+    from pace.fv3core.wrappers.geos_wrapper import GeosDycoreWrapper, MemorySpace
+
 
 if TYPE_CHECKING:
     import cffi

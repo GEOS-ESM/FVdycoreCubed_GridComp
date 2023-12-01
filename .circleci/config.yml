@@ -1,8 +1,8 @@
 version: 2.1
 
-# Anchors to prevent forgetting to update a version
-baselibs_version: &baselibs_version v7.7.0
-bcs_version: &bcs_version v10.25.0
+# Anchors in case we need to override the defaults from the orb
+#baselibs_version: &baselibs_version v7.14.0
+#bcs_version: &bcs_version v11.1.0
 
 
 orbs:
@@ -18,7 +18,7 @@ workflows:
           matrix:
             parameters:
               compiler: [ifort, gfortran]
-          baselibs_version: *baselibs_version
+          #baselibs_version: *baselibs_version
           repo: GEOSgcm
           checkout_fixture: true
           mepodevelop: true
@@ -30,7 +30,7 @@ workflows:
           matrix:
             parameters:
               compiler: [gfortran, ifort]
-          baselibs_version: *baselibs_version
+          #baselibs_version: *baselibs_version
           requires:
             - build-GEOSgcm-on-<< matrix.compiler >>
           repo: GEOSgcm
@@ -42,7 +42,7 @@ workflows:
             parameters:
               compiler: [ifort, gfortran]
               fv_precision: ["R4", "R8"]
-          baselibs_version: *baselibs_version
+          #baselibs_version: *baselibs_version
           repo: GEOSfvdycore
           checkout_fixture: true
           mepodevelop: false
@@ -55,7 +55,7 @@ workflows:
             parameters:
               compiler: [gfortran, ifort]
               fv_precision: ["R4", "R8"]
-          baselibs_version: *baselibs_version
+          #baselibs_version: *baselibs_version
           requires:
             - build-GEOSfvdycore-as-<< matrix.fv_precision >>-on-<< matrix.compiler >>
           repo: GEOSfvdycore
