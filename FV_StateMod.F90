@@ -1837,22 +1837,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
       if ( .not. FV_Atm(1)%flagstruct%hydrostatic ) then
         if (all(FV_Atm(1)%w(isc:iec,jsc:jec,:) == 0.0)) FV_Atm(1)%flagstruct%Make_NH = .true.
         if ( FV_Atm(1)%flagstruct%Make_NH ) then
-          FV_Atm(1)%flagstruct%na_init = 1800/myDT
-         ! Monotonic advection schemes
-          FV_Atm(1)%flagstruct%hord_mt =  10
-          FV_Atm(1)%flagstruct%hord_vt =  10
-          FV_Atm(1)%flagstruct%hord_tm =  10
-          FV_Atm(1)%flagstruct%hord_dp =  10
-         ! 2nd order damping
-          FV_Atm(1)%flagstruct%nord = 0
+          if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT))
+         ! increased damping
           FV_Atm(1)%flagstruct%dddmp = 0.2
-          FV_Atm(1)%flagstruct%d4_bg = 0.0
-          FV_Atm(1)%flagstruct%d2_bg = 0.0075
-          FV_Atm(1)%flagstruct%d_ext = 0.02
-         ! disable vorticity damping 
-          FV_Atm(1)%flagstruct%vtdm4 = 0.0
-          FV_Atm(1)%flagstruct%do_vort_damp = .false.
-          FV_Atm(1)%flagstruct%d_con = 0.
           if (mpp_pe()==0) print*, 'fv_first_run: FV3 is making Non-Hydrostatic W and DZ'
           if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart with increased damping during spinup'
           FV_Atm(1)%w = 0.0
