@@ -197,6 +197,24 @@ contains
          VLOCATION  = MAPL_VLocationEdge,             RC=STATUS  )
      VERIFY_(STATUS)
 
+    call MAPL_AddImportSpec ( gc,                                  &
+         SHORT_NAME = 'QW_BEFORE_DYN',                             &
+         LONG_NAME  = 'total_water_mixing_ratio_before_dynamics',  & 
+         UNITS      = 'kg m-2',                                    & 
+         PRECISION  = ESMF_KIND_R8,                                &
+         DIMS       = MAPL_DimsHorzVert,                           &
+         VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddImportSpec ( gc,                                  &
+         SHORT_NAME = 'QW_AFTER_DYN',                              &
+         LONG_NAME  = 'total_water_mixing_ratio_after_dynamics',   & 
+         UNITS      = 'kg m-2',                                    & 
+         PRECISION  = ESMF_KIND_R8,                                &
+         DIMS       = MAPL_DimsHorzVert,                           &
+         VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
     call MAPL_AddImportSpec( gc,                              &
         SHORT_NAME = 'TRADV',                                        &
         LONG_NAME  = 'advected_quantities',                        &
@@ -464,6 +482,8 @@ contains
       REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iMFY
       REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iPLE0
       REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iPLE1
+      REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iQW0
+      REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iQW1
 
 ! Locals
       REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: CX
@@ -476,8 +496,8 @@ contains
       REAL(FVPRC), POINTER, DIMENSION(:)       :: BK
       REAL(REAL8), allocatable :: ak_r8(:),bk_r8(:)
       REAL(FVPRC), POINTER, DIMENSION(:,:,:,:) :: TRACERS
-      REAL(FVPRC) :: TMASS0(ntracers)
-      REAL(FVPRC) :: TMASS1(ntracers)
+      REAL(REAL8), allocatable :: TMASS0(:)
+      REAL(REAL8), allocatable :: TMASS1(:)
       TYPE(AdvCoreTracers), POINTER :: advTracers(:)
       type(ESMF_FieldBundle) :: TRADV
       type(ESMF_Field)       :: field
@@ -547,6 +567,10 @@ contains
       ak=ak_r8
       bk=bk_r8
 
+      CALL MAPL_GetPointer(IMPORT, iQW0,  'QW_BEFORE_DYN',  ALLOC = .TRUE., RC=STATUS)
+      VERIFY_(STATUS)
+      CALL MAPL_GetPointer(IMPORT, iQW1,  'QW_AFTER_DYN',  ALLOC = .TRUE., RC=STATUS)
+      VERIFY_(STATUS)
       CALL MAPL_GetPointer(IMPORT, iPLE0, 'PLE0', ALLOC = .TRUE., RC=STATUS)
       VERIFY_(STATUS)
       CALL MAPL_GetPointer(IMPORT, iPLE1, 'PLE1', ALLOC = .TRUE., RC=STATUS)
@@ -699,6 +723,7 @@ contains
                deallocate(xlist)
             end if
 
+            firstRun=.false.
          end if ! firstRun
          TRADV = bundleAdv
       end if ! adjustTracers
@@ -752,11 +777,10 @@ contains
             NQ_SAVED = NQ
          end if
 
-         if (chk_mass) then
-        ! Check Mass conservation
-             call global_integral(TMASS0, TRACERS, PLE0, IM,JM,LM, min(ntracers,NQ))
-         endif
-         firstRun=.false.
+         ! Get Tracer Mass before advection
+         !---------------------------------
+         allocate( TMASS0(NQ) )
+         call global_integral(TMASS0, TRACERS, PLE0, IM,JM,LM, NQ)
 
          ! Run FV3 advection
          !------------------
@@ -767,22 +791,39 @@ contains
                                        NQ, dt)
          endif
 
-         ! Update tracer mass conservation
-         !-------------------------------------------------------------------------
-         if (chk_mass) then 
-            call global_integral(TMASS1, TRACERS, PLE1, IM,JM,LM, min(ntracers,NQ))
-         endif
+         ! Update Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air 
+         ! ------------------------------------------------------------------------------
+         do N=1,NQ
+            TRACERS(:,:,:,N) = TRACERS(:,:,:,N) * (1.0-iQW1)/(1.0-iQW0)
+         end do
 
-         if (chk_mass .and. is_master()) then
-            do N=1,min(ntracers,NQ)
-              if (TMASS0(N) > 0.0) then
-              if (ABS((TMASS1(N)-TMASS0(N))/TMASS0(N)) >= epsilon(1.0_REAL4)) then
-                 write(6,126) trim(advTracers(N)%tName), (TMASS1(N)-TMASS0(N))/TMASS0(N)
-               end if
-              endif
-            enddo
+         ! Get Tracer Mass after advection
+         !--------------------------------
+         allocate( TMASS1(NQ) )
+         call global_integral(TMASS1, TRACERS, PLE1, IM,JM,LM, NQ)
+
+         ! Conserve Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air 
+         ! --------------------------------------------------------------------------------
+         do N=1,NQ
+            if (TMASS1(N) > 0.0) TRACERS(:,:,:,N) = TRACERS(:,:,:,N) * TMASS0(N)/TMASS1(N)
+         end do
+
+         if (chk_mass) then
+            call global_integral(TMASS1, TRACERS, PLE1, IM,JM,LM, NQ)
+            if (is_master()) then
+              do N=1,min(ntracers,NQ)
+                if (TMASS0(N) > 0.0) then
+                if (ABS((TMASS1(N)-TMASS0(N))/TMASS0(N)) >= epsilon(1.0_REAL4)) then
+                   write(6,126) trim(advTracers(N)%tName), (TMASS1(N)-TMASS0(N))/TMASS0(N)
+                 end if
+                endif
+              enddo
+            endif
             126 format('Mass Conservation Error > epsilon relative found in AdvCore:'2x,A,2x,g21.14)
          endif
+
+         deallocate( TMASS0 )
+         deallocate( TMASS1 )
 
          ! Go through the bundle copying tracers back to the bundle.
          !-------------------------------------------------------------------------
@@ -890,7 +931,7 @@ contains
 
 subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
 
-      real(FVPRC), intent(OUT)   :: QG(NQ)
+      real(REAL8), intent(OUT)   :: QG(NQ)
       real(FVPRC), intent(IN)    :: Q(IM,JM,KM,NQ)
       real(FVPRC), intent(IN)    :: PLE(IM,JM,KM+1)
       integer,     intent(IN)    :: IM,JM,KM,NQ

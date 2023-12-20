@@ -1912,7 +1912,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        endif
       endif
 
-      massD  = g_sum(FV_Atm(1)%domain, mass-tqtot, isc, iec, jsc, jec, state%grid%ng, fv_atm(1)%gridstruct%area_64, 1, reproduce = .true.)
+      massD = g_sum(FV_Atm(1)%domain, mass-tqtot, isc, iec, jsc, jec, state%grid%ng, &
+                    fv_atm(1)%gridstruct%area_64, 1, reproduce=.true.)
 
       ! If PSDRY is negative, set to use the incoming drymass.
       ! NOTE: THIS WILL NOT TIME REGRESS
