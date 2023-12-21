@@ -77,7 +77,7 @@ module AdvCore_GridCompMod
       real(FVPRC) :: dt
       logical     :: FV3_DynCoreIsRunning=.false.
       integer     :: AdvCore_Advection=1
-      logical     :: chk_mass=.false.
+      logical     :: rpt_mass=.false.
 
       integer,  parameter :: ntiles_per_pe = 1
 
@@ -330,7 +330,7 @@ contains
       VERIFY_(STATUS)
       DT = ndt
 
-      call MAPL_GetResource( MAPL, chk_mass, 'N_TRACER_MASS_CHECK:', default=chk_mass, RC=STATUS )
+      call MAPL_GetResource( MAPL, rpt_mass, 'ADV_CORE_REPORT_TRACER_MASS:', default=rpt_mass, RC=STATUS )
       VERIFY_(STATUS)
 
       ! Start up FV if AdvCore is running without FV3_DynCoreIsRunning
@@ -519,7 +519,7 @@ contains
       type(ESMF_Alarm)                    :: predictorAlarm
       type(ESMF_Grid)                     :: bgrid
       integer, save                       :: nq_saved = 0
-      integer                             :: i,j
+      integer                             :: i,j,k
       integer                             :: nqt
       logical                             :: tend
       logical                             :: exclude
@@ -537,7 +537,7 @@ contains
       VERIFY_(STATUS)
       Iam = trim(COMP_NAME) // Iam
 
-!WMP  if (AdvCore_Advection>0) then
+      if (AdvCore_Advection>0) then
 
 ! Get parameters from generic state.
 !-----------------------------------
@@ -784,12 +784,10 @@ contains
 
          ! Run FV3 advection
          !------------------
-         if (AdvCore_Advection>0) then
          call offline_tracer_advection(TRACERS, PLE0, PLE1, MFX, MFY, CX, CY, &
                                        FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, FV_Atm(1)%bd, &
                                        FV_Atm(1)%domain, AK, BK, PTOP, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz,   &
                                        NQ, dt)
-         endif
 
          ! Update Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air 
          ! ------------------------------------------------------------------------------
@@ -805,22 +803,14 @@ contains
          ! Conserve Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air 
          ! --------------------------------------------------------------------------------
          do N=1,NQ
-            if (TMASS1(N) > 0.0) TRACERS(:,:,:,N) = TRACERS(:,:,:,N) * TMASS0(N)/TMASS1(N)
+            if (TMASS1(N) > 0.0) then
+            if (ABS((TMASS0(N)-TMASS1(N))/TMASS1(N)) >= epsilon(1.0_REAL4)) then
+              if (rpt_mass .and. is_master()) write(6,125) trim(advTracers(N)%tName), (TMASS1(N)-TMASS0(N))/TMASS0(N)
+              TRACERS(:,:,:,N) = TRACERS(:,:,:,N) * TMASS0(N)/TMASS1(N)
+            end if
+            125 format('Mass Conservation Adjustment in AdvCore:'2x,A,2x,g21.14)
+            end if
          end do
-
-         if (chk_mass) then
-            call global_integral(TMASS1, TRACERS, PLE1, IM,JM,LM, NQ)
-            if (is_master()) then
-              do N=1,min(ntracers,NQ)
-                if (TMASS0(N) > 0.0) then
-                if (ABS((TMASS1(N)-TMASS0(N))/TMASS0(N)) >= epsilon(1.0_REAL4)) then
-                   write(6,126) trim(advTracers(N)%tName), (TMASS1(N)-TMASS0(N))/TMASS0(N)
-                 end if
-                endif
-              enddo
-            endif
-            126 format('Mass Conservation Error > epsilon relative found in AdvCore:'2x,A,2x,g21.14)
-         endif
 
          deallocate( TMASS0 )
          deallocate( TMASS1 )
@@ -871,7 +861,7 @@ contains
       call MAPL_TimerOff(MAPL,"RUN")
       call MAPL_TimerOff(MAPL,"TOTAL")
 
-!WMP  end if ! AdvCore_Advection
+      end if ! AdvCore_Advection
 
       RETURN_(ESMF_SUCCESS)
 
