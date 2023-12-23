@@ -635,13 +635,13 @@ contains
       if (adjustTracers) then
          if (firstRun) then
             ! get the list of excluded tracers from resource
+            allocate(xlist(XLIST_MAX), stat=status)
+            VERIFY_(STATUS)
             n = 0
             call ESMF_ConfigFindLabel ( CF,'EXCLUDE_ADVECTION_TRACERS_LIST:',rc=STATUS )
             if(STATUS==ESMF_SUCCESS) then
 
                tend  = .false.
-               allocate(xlist(XLIST_MAX), stat=status)
-               VERIFY_(STATUS)
                do while (.not.tend)
                   call ESMF_ConfigGetAttribute (CF,value=tmpstring,default='',rc=STATUS) !ALT: we don't check return status!!!
                   if (tmpstring /= '')  then
@@ -714,13 +714,11 @@ contains
             end do
 
             if (allocated(xlist)) then
-           !   ! Just in case xlist was allocated, but nothing was in it, could have garbage
-           !   if (n > 0) then
-           !      call ESMF_FieldBundleRemove(TRADV, fieldNameList=xlist, &
-           !         relaxedFlag=.true., rc=status)
-           !      VERIFY_(STATUS)
-           !   end if
                deallocate(xlist)
+            end if
+
+            if (allocated(biggerlist)) then
+               deallocate(biggerlist)      
             end if
 
             firstRun=.false.
