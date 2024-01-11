@@ -554,12 +554,22 @@ contains
        FV_Atm(1)%flagstruct%tau = 2.0
      endif
      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
-    ! 6th order default damping options
-     FV_Atm(1)%flagstruct%nord = 3
-     FV_Atm(1)%flagstruct%dddmp = 0.1
-     FV_Atm(1)%flagstruct%d4_bg = 0.12
-     FV_Atm(1)%flagstruct%d2_bg = 0.0
-     FV_Atm(1)%flagstruct%d_ext = 0.0
+     if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
+       ! 6th order default damping options
+        FV_Atm(1)%flagstruct%nord = 3
+        FV_Atm(1)%flagstruct%dddmp = 0.1
+        FV_Atm(1)%flagstruct%d4_bg = 0.12
+        FV_Atm(1)%flagstruct%d2_bg = 0.0
+        FV_Atm(1)%flagstruct%d_ext = 0.0
+     else
+       ! 4th order default damping options
+        FV_Atm(1)%flagstruct%nord = 2
+        FV_Atm(1)%flagstruct%dddmp = 0.2
+        FV_Atm(1)%flagstruct%d4_bg = 0.12
+        FV_Atm(1)%flagstruct%d2_bg = 0.0
+        FV_Atm(1)%flagstruct%d_ext = 0.0
+     endif
+    ! Sponge damping and TE conservation
      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.15
      FV_Atm(1)%flagstruct%consv_te = 1.0
@@ -572,7 +582,7 @@ contains
        FV_Atm(1)%flagstruct%tau = 2.0
      endif
      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
-    ! 6th order default damping options
+    ! 4th order default damping options
      FV_Atm(1)%flagstruct%nord = 2
      FV_Atm(1)%flagstruct%dddmp = 0.2
      FV_Atm(1)%flagstruct%d4_bg = 0.12

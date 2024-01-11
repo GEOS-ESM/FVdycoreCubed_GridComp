@@ -3256,8 +3256,8 @@ subroutine Run(gc, import, export, clock, rc)
                  (TRIM(fieldname) /= 'QRAIN'   ) .and. &
                  (TRIM(fieldname) /= 'QSNOW'   ) .and. &
                  (TRIM(fieldname) /= 'QGRAUPEL') ) then
-                    write(STRING,'(A,A)') "FV3+ADV is excluding ", TRIM(fieldname)
-                    call WRITE_PARALLEL( trim(STRING)   )
+                   ! write(STRING,'(A,A)') "FV3 is excluding ", TRIM(fieldname)
+                   ! call WRITE_PARALLEL( trim(STRING)   )
                      n = n + 1
                      if (n > size(xlist)) then
                         allocate( biggerlist(2*n), stat=status )
