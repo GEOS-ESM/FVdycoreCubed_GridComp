@@ -557,7 +557,7 @@ contains
      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
        ! 6th order default damping options
         FV_Atm(1)%flagstruct%nord = 3
-        FV_Atm(1)%flagstruct%dddmp = 0.1
+        FV_Atm(1)%flagstruct%dddmp = 0.2
         FV_Atm(1)%flagstruct%d4_bg = 0.12
         FV_Atm(1)%flagstruct%d2_bg = 0.0
         FV_Atm(1)%flagstruct%d_ext = 0.0
