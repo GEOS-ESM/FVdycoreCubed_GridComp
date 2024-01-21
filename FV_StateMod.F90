@@ -521,8 +521,6 @@ contains
      FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
-   FV_Atm(1)%flagstruct%n_sponge = 0
-!!!FV_Atm(1)%flagstruct%n_zfilter = FV_Atm(1)%flagstruct%npz
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
    if (FV_Atm(1)%flagstruct%npz == 72) then
      FV_Atm(1)%flagstruct%gmao_remap = 0   ! GFDL Schemes
@@ -543,20 +541,9 @@ contains
    FV_Atm(1)%flagstruct%ke_bg = 0.0
   ! Rayleigh & Divergence Damping
    if (index(FV3_CONFIG,"HWT") > 0) then
-     FV_Atm(1)%flagstruct%fv_sg_adj = min(3600.0,DT*4.0)
-     if (FV_Atm(1)%flagstruct%npz >= 71) then
-       FV_Atm(1)%flagstruct%n_zfilter = 37 ! ~100mb
-     endif 
-     if (FV_Atm(1)%flagstruct%npz >= 90) then
-       FV_Atm(1)%flagstruct%n_zfilter = 46 ! ~100mb
-     endif
-     if (FV_Atm(1)%flagstruct%npz >= 136) then
-       FV_Atm(1)%flagstruct%n_zfilter = 60 ! ~100mb
-     endif
-     if (FV_Atm(1)%flagstruct%npz >= 180) then
-       FV_Atm(1)%flagstruct%n_zfilter = 92 ! ~100mb
-     endif
-     FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
+     FV_Atm(1)%flagstruct%fv_sg_adj = -1
+     FV_Atm(1)%flagstruct%n_zfilter = -1
+     FV_Atm(1)%flagstruct%do_sat_adj = .true. ! only valid when nwat >= 6
      FV_Atm(1)%flagstruct%dz_min = 6.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
      if (FV_Atm(1)%flagstruct%npz == 72) then
@@ -565,12 +552,23 @@ contains
        FV_Atm(1)%flagstruct%tau = 2.0
      endif
      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
-    ! 6th order default damping options
-     FV_Atm(1)%flagstruct%nord = 3
-     FV_Atm(1)%flagstruct%dddmp = 0.1
-     FV_Atm(1)%flagstruct%d4_bg = 0.12
-     FV_Atm(1)%flagstruct%d2_bg = 0.0
-     FV_Atm(1)%flagstruct%d_ext = 0.0
+     if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
+       ! 6th order default damping options
+        FV_Atm(1)%flagstruct%nord = 3
+        FV_Atm(1)%flagstruct%dddmp = 0.2
+        FV_Atm(1)%flagstruct%d4_bg = 0.12
+        FV_Atm(1)%flagstruct%d2_bg = 0.0
+        FV_Atm(1)%flagstruct%d_ext = 0.0
+     else
+       ! 4th order default damping options
+        FV_Atm(1)%flagstruct%nord = 2
+        FV_Atm(1)%flagstruct%dddmp = 0.2
+        FV_Atm(1)%flagstruct%d4_bg = 0.12
+        FV_Atm(1)%flagstruct%d2_bg = 0.0
+        FV_Atm(1)%flagstruct%d_ext = 0.0
+     endif
+    ! Sponge damping and TE conservation
+     FV_Atm(1)%flagstruct%n_sponge = 0
      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.15
      FV_Atm(1)%flagstruct%consv_te = 1.0
@@ -583,14 +581,14 @@ contains
        FV_Atm(1)%flagstruct%tau = 2.0
      endif
      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
-    ! 6th order default damping options
+    ! 4th order default damping options
      FV_Atm(1)%flagstruct%nord = 2
      FV_Atm(1)%flagstruct%dddmp = 0.2
      FV_Atm(1)%flagstruct%d4_bg = 0.12
      FV_Atm(1)%flagstruct%d2_bg = 0.0
      FV_Atm(1)%flagstruct%d_ext = 0.0
-     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
-     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.02
+     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
+     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
      FV_Atm(1)%flagstruct%consv_te = 1.0
    endif
   ! Some default time-splitting options
@@ -1216,6 +1214,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   real(FVPRC) :: FQC
 
   real(REAL4), pointer     :: PTR3D(:,:,:)
+
+  real(FVPRC), allocatable           :: DEBUG_ARRAY(:,:,:)
+  real(FVPRC) :: fac1    = 1.0
 
   real(REAL4), pointer     :: LONS(:,:), LATS(:,:)
   real(REAL8), pointer     :: lonptr(:,:), latptr(:,:)
@@ -1845,7 +1846,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
       if ( .not. FV_Atm(1)%flagstruct%hydrostatic ) then
         if (all(FV_Atm(1)%w(isc:iec,jsc:jec,:) == 0.0)) FV_Atm(1)%flagstruct%Make_NH = .true.
         if ( FV_Atm(1)%flagstruct%Make_NH ) then
+          if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT))
           if (mpp_pe()==0) print*, 'fv_first_run: FV3 is making Non-Hydrostatic W and DZ'
+          if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
+          FV_Atm(1)%w = 0.0
           call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
                      FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
                      FV_Atm(1)%pk,   FV_Atm(1)%pkz, kappa, FV_Atm(1)%q, FV_Atm(1)%ng, &
@@ -1915,7 +1919,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        endif
       endif
 
-      massD  = g_sum(FV_Atm(1)%domain, mass-tqtot, isc, iec, jsc, jec, state%grid%ng, fv_atm(1)%gridstruct%area_64, 1, reproduce = .true.)
+      massD = g_sum(FV_Atm(1)%domain, mass-tqtot, isc, iec, jsc, jec, state%grid%ng, &
+                    fv_atm(1)%gridstruct%area_64, 1, reproduce=.true.)
 
       ! If PSDRY is negative, set to use the incoming drymass.
       ! NOTE: THIS WILL NOT TIME REGRESS
@@ -1980,6 +1985,20 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
           !    write(6,*) 'Advecting tracers: ', FV_Atm(1)%ncnst, STATE%GRID%NQ
           ! endif
 
+    call MAPL_TimerOn(MAPL,"--NH_ADIABATIC_INIT")
+       if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
+          allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
+          call nullify_domain ( )
+          DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:) 
+          call prt_maxmin('Before adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
+          call adiabatic_init(myDT,DEBUG_ARRAY,fac1)
+          DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
+          call prt_maxmin('After adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   ) 
+          deallocate( DEBUG_ARRAY )
+          FV_Atm(1)%flagstruct%na_init=0
+       endif  
+    call MAPL_TimerOff(MAPL,"--NH_ADIABATIC_INIT")
+
     call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
     if (.not. FV_OFF) then
     call set_domain(FV_Atm(1)%domain)  ! needed for diagnostic output done in fv_dynamics
@@ -1996,6 +2015,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     if (run_gtfv3 == 0) then
        call cpu_time(start)
 #endif
+
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
             FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
@@ -4917,6 +4937,7 @@ subroutine echo_fv3_setup()
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%nf_omega ,format='("FV3 nf_omega: ",(I7))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%fv_sg_adj ,format='("FV3 fv_sg_adj: ",(I7))' )
 !   integer :: na_init = 0             ! Perform adiabatic initialization
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%na_init ,format='("FV3 na_init: ",(I7))' )
 !   real(FVPRC)    :: p_ref = 1.E5
 !   real(FVPRC)    :: dry_mass = 98290.
 !   integer :: nt_prog = 0
@@ -4981,6 +5002,225 @@ subroutine echo_fv3_setup()
 !  integer, pointer :: grid_number
 
 end subroutine echo_fv3_setup
+
+ subroutine adiabatic_init(myDT,DEBUG_ARRAY,fac1)
+   use fv_nwp_nudge_mod,    only: do_adiabatic_init
+   real(FVPRC), intent(IN   ) :: myDT
+   real(FVPRC), intent(INOUT) :: DEBUG_ARRAY(:,:,:)
+   real(FVPRC), intent(IN   ) :: fac1
+   real(FVPRC), allocatable, dimension(:,:,:):: u0, v0, t0, dp0
+   real(FVPRC), parameter:: wt = 2.
+!***********
+! Haloe Data
+!***********
+   real(FVPRC), parameter::    q1_h2o = 2.2E-6
+   real(FVPRC), parameter::    q7_h2o = 3.8E-6
+   real(FVPRC), parameter::  q100_h2o = 3.8E-6
+   real(FVPRC), parameter:: q1000_h2o = 3.1E-6
+   real(FVPRC), parameter:: q2000_h2o = 2.8E-6
+   real(FVPRC), parameter:: q3000_h2o = 3.0E-6
+   real(FVPRC):: xt, p00, q00
+   integer:: isc, iec, jsc, jec, npz
+   integer:: m, n, i,j,k
+   integer :: sphum=1
+
+   real(FVPRC) :: time_total
+
+   real(FVPRC), allocatable :: u_dt(:,:,:)
+   real(FVPRC), allocatable :: v_dt(:,:,:)
+   real(FVPRC), allocatable :: t_dt(:,:,:)
+   real(FVPRC), allocatable :: w_dt(:,:,:)
+
+    xt = 1./(1.+wt)
+
+    npz = FV_Atm(1)%npz
+
+    isc = FV_Atm(1)%bd%isc
+    iec = FV_Atm(1)%bd%iec
+    jsc = FV_Atm(1)%bd%jsc
+    jec = FV_Atm(1)%bd%jec
+
+    allocate ( u_dt(isc:iec,jsc:jec,npz) )
+    allocate ( v_dt(isc:iec,jsc:jec,npz) )
+    allocate ( t_dt(isc:iec,jsc:jec,npz) )
+    allocate ( w_dt(isc:iec,jsc:jec,npz) )
+    u_dt(:,:,:) = 0.0
+    v_dt(:,:,:) = 0.0
+    t_dt(:,:,:) = 0.0
+    w_dt(:,:,:) = 0.0
+
+     do_adiabatic_init = .true.
+
+     allocate ( u0(isc:iec,  jsc:jec+1, npz) )
+     allocate ( v0(isc:iec+1,jsc:jec,   npz) )
+     allocate ( t0(isc:iec,jsc:jec, npz) )
+     allocate (dp0(isc:iec,jsc:jec, npz) )
+
+!$omp parallel do default (none) & 
+!$omp              shared (npz, jsc, jec, isc, iec, n, sphum, u0, v0, t0, dp0, FV_Atm, zvir) &
+!$omp             private (k, j, i) 
+       do k=1,npz
+          do j=jsc,jec+1
+             do i=isc,iec
+                u0(i,j,k) = FV_Atm(1)%u(i,j,k)
+             enddo
+          enddo
+          do j=jsc,jec
+             do i=isc,iec+1
+                v0(i,j,k) = FV_Atm(1)%v(i,j,k)
+             enddo
+          enddo
+          do j=jsc,jec
+             do i=isc,iec
+                t0(i,j,k) = FV_Atm(1)%pt(i,j,k)*(1.+zvir*FV_Atm(1)%q(i,j,k,sphum))  ! virt T
+               dp0(i,j,k) = FV_Atm(1)%delp(i,j,k)
+             enddo
+          enddo
+       enddo
+
+     do m=1,FV_Atm(1)%flagstruct%na_init
+       call WRITE_PARALLEL ( (/m,FV_Atm(1)%flagstruct%na_init/) ,format='("FV3 adiabatic_init: step ",(I7)," of ",(I7))' )
+! Forward call
+       call fv_dynamics( &
+            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, 0.0, &
+            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            kappa, cp, zvir, &
+            FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
+            FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+            FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
+            FV_Atm(1)%flagstruct%hydrostatic, &
+            FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
+            FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
+            FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
+            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
+            FV_Atm(1)%ak, FV_Atm(1)%bk, &
+            FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
+            FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
+            FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
+            FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
+            time_total)
+! Backward
+       call fv_dynamics( & 
+            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, -myDT, 0.0, &
+            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            kappa, cp, zvir, &
+            FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
+            FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+            FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
+            FV_Atm(1)%flagstruct%hydrostatic, &
+            FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
+            FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
+            FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
+            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, & 
+            FV_Atm(1)%ak, FV_Atm(1)%bk, &
+            FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
+            FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
+            FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
+            FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
+            time_total)
+!Nudging back to IC
+!$omp parallel do default (none) &
+!$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) & 
+!$omp private (i, j, k, p00, q00)
+       do k=1,npz
+          do j=jsc,jec+1
+             do i=isc,iec
+                FV_Atm(1)%u(i,j,k) = xt*(FV_Atm(1)%u(i,j,k) + wt*u0(i,j,k))
+             enddo
+          enddo
+          do j=jsc,jec
+             do i=isc,iec+1
+                FV_Atm(1)%v(i,j,k) = xt*(FV_Atm(1)%v(i,j,k) + wt*v0(i,j,k))
+             enddo
+          enddo
+          do j=jsc,jec
+             do i=isc,iec
+                FV_Atm(1)%pt(i,j,k) = xt*(FV_Atm(1)%pt(i,j,k) + wt*t0(i,j,k)/(1.+zvir*FV_Atm(1)%q(i,j,k,sphum)))
+                FV_Atm(1)%delp(i,j,k) = xt*(FV_Atm(1)%delp(i,j,k) + wt*dp0(i,j,k))
+             enddo
+          enddo
+       enddo
+
+! Backward
+       call fv_dynamics( & 
+            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, -myDT, 0.0, &
+            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            kappa, cp, zvir, &
+            FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
+            FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+            FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
+            FV_Atm(1)%flagstruct%hydrostatic, &
+            FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
+            FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
+            FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
+            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, & 
+            FV_Atm(1)%ak, FV_Atm(1)%bk, &
+            FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
+            FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
+            FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
+            FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
+            time_total)
+! Forward call
+       call fv_dynamics( & 
+            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, 0.0, &
+            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            kappa, cp, zvir, &
+            FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
+            FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+            FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
+            FV_Atm(1)%flagstruct%hydrostatic, &
+            FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
+            FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
+            FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
+            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, & 
+            FV_Atm(1)%ak, FV_Atm(1)%bk, &
+            FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
+            FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
+            FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
+            FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
+            time_total)
+! Nudging back to IC
+!$omp parallel do default (none) &
+!$omp             shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) &
+!$omp            private (i, j, k)
+       do k=1,npz
+          do j=jsc,jec+1
+             do i=isc,iec
+                FV_Atm(1)%u(i,j,k) = xt*(FV_Atm(1)%u(i,j,k) + wt*u0(i,j,k))
+             enddo
+          enddo
+          do j=jsc,jec
+             do i=isc,iec+1
+                FV_Atm(1)%v(i,j,k) = xt*(FV_Atm(1)%v(i,j,k) + wt*v0(i,j,k))
+             enddo
+          enddo
+          do j=jsc,jec
+             do i=isc,iec
+                FV_Atm(1)%pt(i,j,k) = xt*(FV_Atm(1)%pt(i,j,k) + wt*t0(i,j,k)/(1.+zvir*FV_Atm(1)%q(i,j,k,sphum)))
+                FV_Atm(1)%delp(i,j,k) = xt*(FV_Atm(1)%delp(i,j,k) + wt*dp0(i,j,k))
+             enddo
+          enddo
+       enddo
+
+       DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
+       call prt_maxmin('Before adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
+
+     enddo
+
+     deallocate ( u0 )
+     deallocate ( v0 )
+     deallocate ( t0 )
+     deallocate (dp0 )
+
+     deallocate ( u_dt )
+     deallocate ( v_dt )
+     deallocate ( t_dt )
+     deallocate ( w_dt )
+
+     do_adiabatic_init = .false.
+
+ end subroutine adiabatic_init
+
 
 subroutine WRITE_PARALLEL_L ( field, format )
   logical, intent(in) :: field
