@@ -543,7 +543,7 @@ contains
    if (index(FV3_CONFIG,"HWT") > 0) then
      FV_Atm(1)%flagstruct%fv_sg_adj = -1
      FV_Atm(1)%flagstruct%n_zfilter = -1
-     FV_Atm(1)%flagstruct%do_sat_adj = .true. ! only valid when nwat >= 6
+     FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
      FV_Atm(1)%flagstruct%dz_min = 6.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
      if (FV_Atm(1)%flagstruct%npz == 72) then
