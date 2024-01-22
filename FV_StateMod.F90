@@ -546,11 +546,7 @@ contains
      FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
      FV_Atm(1)%flagstruct%dz_min = 6.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
-     if (FV_Atm(1)%flagstruct%npz == 72) then
-       FV_Atm(1)%flagstruct%tau = 0.0
-     else
-       FV_Atm(1)%flagstruct%tau = 2.0
-     endif
+     FV_Atm(1)%flagstruct%tau = 2.0
      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
        ! 6th order default damping options
@@ -575,11 +571,7 @@ contains
    else
      FV_Atm(1)%flagstruct%fv_sg_adj = DT
      FV_Atm(1)%flagstruct%RF_fast = .false.
-     if (FV_Atm(1)%flagstruct%npz == 72) then
-       FV_Atm(1)%flagstruct%tau = 0.0
-     else
-       FV_Atm(1)%flagstruct%tau = 2.0
-     endif
+     FV_Atm(1)%flagstruct%tau = 0.0
      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
     ! 4th order default damping options
      FV_Atm(1)%flagstruct%nord = 2
