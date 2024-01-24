@@ -1167,11 +1167,11 @@ contains
          VLOCATION  = MAPL_VLocationCenter,                 RC=STATUS  )
      VERIFY_(STATUS)
 
-    call MAPL_AddExportSpec ( gc,                                      &
-         SHORT_NAME = 'DOXDTDYN',                                      &
-         LONG_NAME  = 'tendency_of_ozone_due_to_dynamics',             &
-         UNITS      = 'mol mol-1 s-1',                                 &
-         DIMS       = MAPL_DimsHorzVert,                               &
+    call MAPL_AddExportSpec ( gc,                                             &
+         SHORT_NAME = 'DOXDTDYN',                                             &
+         LONG_NAME  = 'tendency_of_odd_oxygen_mixing_ratio_due_to_dynamics',  &
+         UNITS      = 'mol mol-1 s-1',                                        &
+         DIMS       = MAPL_DimsHorzVert,                                      &
          VLOCATION  = MAPL_VLocationCenter,                 RC=STATUS  )
      VERIFY_(STATUS)
 
