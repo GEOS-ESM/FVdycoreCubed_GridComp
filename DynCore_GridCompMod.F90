@@ -3637,13 +3637,6 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'W850', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(85000.)  , status)
-         VERIFY_(STATUS)
-      end if
-
-      call MAPL_GetPointer(export,temp2d,'W850', rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp2d)) then
          call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(85000.)  , status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'W850', STATE%f2c_SSI_arr_map, rc=status)
@@ -5577,12 +5570,15 @@ end subroutine RUN
 ! Deallocate Memory
 ! -----------------
 
+    if (doEnergetics) then
     DEALLOCATE(  kenrg )
     DEALLOCATE(  penrg )
     DEALLOCATE(  tenrg )
     DEALLOCATE( kenrg0 )
     DEALLOCATE( penrg0 )
     DEALLOCATE( tenrg0 )
+    endif
+
     DEALLOCATE(  tmp3d )
 
     DEALLOCATE( phisxy )
@@ -5599,6 +5595,7 @@ end subroutine RUN
     DEALLOCATE( tempxy )
 
     DEALLOCATE(    thv )
+    DEALLOCATE(    plk )
     DEALLOCATE(    pke )
     DEALLOCATE(  logpl )
     DEALLOCATE(  logpe )
