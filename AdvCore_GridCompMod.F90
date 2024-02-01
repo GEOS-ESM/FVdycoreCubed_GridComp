@@ -63,7 +63,7 @@ module AdvCore_GridCompMod
       use fv_control_mod,  only: fv_init1, fv_init2, fv_end
       use fv_tracer2d_mod, only: offline_tracer_advection
       use fv_mp_mod,       only: is,ie, js,je, is_master, tile
-      use fv_grid_utils_mod, only: g_sum
+      use fv_grid_utils_mod, only: g_sum_r8
 
       USE FV_StateMod,     only: AdvCoreTracers => T_TRACERS
       USE FV_StateMod,     only: FV_Atm
@@ -77,18 +77,16 @@ module AdvCore_GridCompMod
       real(FVPRC) :: dt
       logical     :: FV3_DynCoreIsRunning=.false.
       integer     :: AdvCore_Advection=1
-      logical     :: chk_mass=.false.
+      logical     :: rpt_mass=.false.
 
       integer,  parameter :: ntiles_per_pe = 1
 
 ! Tracer I/O History stuff
 ! -------------------------------------
-      integer, parameter         :: ntracers=11
+      integer, parameter         :: ntracers=38
       integer                    :: ntracer
       character(len=ESMF_MAXSTR) :: myTracer
       character(len=ESMF_MAXSTR) :: tMassStr
-      real(FVPRC), SAVE          :: TMASS0(ntracers)
-      real(REAL8), SAVE          ::  MASS0
       logical    , SAVE          :: firstRun=.true.
 
 ! !PUBLIC MEMBER FUNCTIONS:
@@ -314,6 +312,9 @@ contains
       VERIFY_(STATUS)
       DT = ndt
 
+      call MAPL_GetResource( MAPL, rpt_mass, 'ADV_CORE_REPORT_TRACER_MASS:', default=rpt_mass, RC=STATUS )
+      VERIFY_(STATUS)
+
       ! Start up FV if AdvCore is running without FV3_DynCoreIsRunning
       !--------------------------------------------------
       if (.NOT. FV3_DynCoreIsRunning) then
@@ -471,18 +472,14 @@ contains
       REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: MFY
       REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: PLE0
       REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: PLE1
-      REAL(FVPRC), POINTER, DIMENSION(:)       :: AK
-      REAL(FVPRC), POINTER, DIMENSION(:)       :: BK
-      REAL(REAL8), allocatable :: ak_r8(:),bk_r8(:)
       REAL(FVPRC), POINTER, DIMENSION(:,:,:,:) :: TRACERS
-      REAL(FVPRC) :: MASS1, TMASS1(ntracers)
+      REAL(REAL8), allocatable :: TMASS0(:)
+      REAL(REAL8), allocatable :: TMASS1(:)
       TYPE(AdvCoreTracers), POINTER :: advTracers(:)
       type(ESMF_FieldBundle) :: TRADV
       type(ESMF_Field)       :: field
       type(ESMF_Array)       :: array
       INTEGER :: IM, JM, LM, N, NQ, LS
-      REAL(FVPRC) :: PTOP, PINT
-      REAL(REAL8) :: ptop_r8,pint_r8
 ! Temporaries for exports/tracers
       REAL, POINTER :: temp3D(:,:,:)
       real(REAL4),        pointer     :: tracer_r4 (:,:,:)
@@ -497,7 +494,7 @@ contains
       type(ESMF_Alarm)                    :: predictorAlarm
       type(ESMF_Grid)                     :: bgrid
       integer, save                       :: nq_saved = 0
-      integer                             :: i,j
+      integer                             :: i,j,k
       integer                             :: nqt
       logical                             :: tend
       logical                             :: exclude
@@ -515,7 +512,7 @@ contains
       VERIFY_(STATUS)
       Iam = trim(COMP_NAME) // Iam
 
-!WMP  if (AdvCore_Advection>0) then
+      if (AdvCore_Advection>0) then
 
 ! Get parameters from generic state.
 !-----------------------------------
@@ -528,22 +525,6 @@ contains
 
       call MAPL_TimerOn(MAPL,"TOTAL")
       call MAPL_TimerOn(MAPL,"RUN")
-
-! Get AKs and BKs for vertical grid
-!----------------------------------
-      AllOCATE( AK(LM+1) ,stat=STATUS )
-      VERIFY_(STATUS)
-      AllOCATE( BK(LM+1) ,stat=STATUS )
-      VERIFY_(STATUS)
-      AllOCATE( AK_r8(LM+1) ,stat=STATUS )
-      VERIFY_(STATUS)
-      AllOCATE( BK_r8(LM+1) ,stat=STATUS )
-      VERIFY_(STATUS)
-      call set_eta(LM,LS,ptop_r8,pint_r8,ak_r8,bk_r8)
-      ptop=ptop_r8
-      pint=pint_r8
-      ak=ak_r8
-      bk=bk_r8
 
       CALL MAPL_GetPointer(IMPORT, iPLE0, 'PLE0', ALLOC = .TRUE., RC=STATUS)
       VERIFY_(STATUS)
@@ -609,13 +590,13 @@ contains
       if (adjustTracers) then
          if (firstRun) then
             ! get the list of excluded tracers from resource
+            allocate(xlist(XLIST_MAX), stat=status)
+            VERIFY_(STATUS)
             n = 0
             call ESMF_ConfigFindLabel ( CF,'EXCLUDE_ADVECTION_TRACERS_LIST:',rc=STATUS )
             if(STATUS==ESMF_SUCCESS) then
 
                tend  = .false.
-               allocate(xlist(XLIST_MAX), stat=status)
-               VERIFY_(STATUS)
                do while (.not.tend)
                   call ESMF_ConfigGetAttribute (CF,value=tmpstring,default='',rc=STATUS) !ALT: we don't check return status!!!
                   if (tmpstring /= '')  then
@@ -688,15 +669,14 @@ contains
             end do
 
             if (allocated(xlist)) then
-           !   ! Just in case xlist was allocated, but nothing was in it, could have garbage
-           !   if (n > 0) then
-           !      call ESMF_FieldBundleRemove(TRADV, fieldNameList=xlist, &
-           !         relaxedFlag=.true., rc=status)
-           !      VERIFY_(STATUS)
-           !   end if
                deallocate(xlist)
             end if
 
+            if (allocated(biggerlist)) then
+               deallocate(biggerlist)      
+            end if
+
+            firstRun=.false.
          end if ! firstRun
          TRADV = bundleAdv
       end if ! adjustTracers
@@ -750,59 +730,41 @@ contains
             NQ_SAVED = NQ
          end if
 
-         if (chk_mass) then
-        ! Check Mass conservation
-            if (firstRun .and. AdvCore_Advection>0) then
-               MASS0 = g_sum(FV_Atm(1)%domain, PLE0(:,:,LM), is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, .true.)
-               call global_integral(TMASS0, TRACERS, PLE0, IM,JM,LM,NQ)
-               if (MASS0 /= 0.0) TMASS0=TMASS0/MASS0
-            elseif (firstRun) then
-               MASS0 = g_sum(FV_Atm(1)%domain, PLE1(:,:,LM), is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, .true.)
-               call global_integral(TMASS0, TRACERS, PLE1, IM,JM,LM,NQ)
-               if (MASS0 /= 0.0) TMASS0=TMASS0/MASS0
-            endif
+         ! Get Tracer Mass before advection
+         !---------------------------------
+         if (rpt_mass) then
+         allocate( TMASS0(NQ) )
+         call global_integral(TMASS0, TRACERS, PLE0, IM,JM,LM, NQ)
          endif
-         firstRun=.false.
 
          ! Run FV3 advection
          !------------------
-         if (AdvCore_Advection>0) then
          call offline_tracer_advection(TRACERS, PLE0, PLE1, MFX, MFY, CX, CY, &
                                        FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, FV_Atm(1)%bd, &
-                                       FV_Atm(1)%domain, AK, BK, PTOP, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz,   &
+                                       FV_Atm(1)%domain, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz,   &
                                        NQ, dt)
+
+         ! Get Tracer Mass after advection
+         !--------------------------------
+         if (rpt_mass) then
+         allocate( TMASS1(NQ) )
+         call global_integral(TMASS1, TRACERS, PLE1, IM,JM,LM, NQ)
          endif
 
-         ! Update tracer mass conservation
-         !-------------------------------------------------------------------------
-         if (chk_mass) then 
-            MASS1 = g_sum(FV_Atm(1)%domain, PLE1(:,:,LM), is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, .true.)
-            call global_integral(TMASS1, TRACERS, PLE1, IM,JM,LM,NQ)
-            if (MASS1 /= 0.0) TMASS1=TMASS1/MASS1
-         endif
-
-         if (chk_mass .and. is_master()) then
-#ifdef PRINT_MASS
-            write(6,100)  MASS0   , &
-                         TMASS0(2), &
-                         TMASS0(3), &
-                         TMASS0(4), &
-                         TMASS0(5)
-            write(6,102)  MASS1   , &
-                         TMASS1(2), &
-                         TMASS1(3), &
-                         TMASS1(4), &
-                         TMASS1(5)
-#endif
-            write(6,103) ( MASS1   - MASS0   )/ MASS0   , &
-                         (TMASS1(2)-TMASS0(2))/TMASS0(2), &
-                         (TMASS1(3)-TMASS0(3))/TMASS0(3), &
-                         (TMASS1(4)-TMASS0(4))/TMASS0(4), &
-                         (TMASS1(5)-TMASS0(5))/TMASS0(5)
- 100        format('Tracer M0  : ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14)
- 101        format('Tracer Ma  : ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14)
- 102        format('Tracer M1  : ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14)
- 103        format('Tracer Mdif: ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14)
+         ! Conserve Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air 
+         ! --------------------------------------------------------------------------------
+         if (rpt_mass) then
+         do N=1,NQ
+            if (TMASS1(N) > 0.0) then
+            if (ABS((TMASS0(N)-TMASS1(N))/TMASS1(N)) >= epsilon(1.0_REAL4)) then
+              if (is_master()) write(6,125) trim(advTracers(N)%tName), (TMASS1(N)-TMASS0(N))/TMASS0(N)
+            !!TRACERS(:,:,:,N) = TRACERS(:,:,:,N) * TMASS0(N)/TMASS1(N)
+            end if
+            125 format('Mass Conservation Adjustment in AdvCore:'2x,A,2x,g21.14)
+            end if
+         end do
+         deallocate( TMASS0 )
+         deallocate( TMASS1 )
          endif
 
          ! Go through the bundle copying tracers back to the bundle.
@@ -819,7 +781,7 @@ contains
             !--> This section is used for diagnostics only.
             !--> It has no effect on CTM experiments.
             !-----------------------------------------------
-            if (N<=ntracers) then
+            if (N<=min(ntracers,NQ)) then
                write(myTracer, "('TEST_TRACER',i5.5)") N-1
                call MAPL_GetPointer(EXPORT, temp3D, TRIM(myTracer), rc=status)
                VERIFY_(STATUS)
@@ -836,10 +798,6 @@ contains
 
       deallocate( advTracers, stat=STATUS )
       VERIFY_(STATUS)
-      DEALLOCATE( AK ,stat=STATUS )
-      VERIFY_(STATUS)
-      DEALLOCATE( BK ,stat=STATUS )
-      VERIFY_(STATUS)
 
       DEALLOCATE( PLE0 )
       DEALLOCATE( PLE1 )
@@ -851,7 +809,7 @@ contains
       call MAPL_TimerOff(MAPL,"RUN")
       call MAPL_TimerOff(MAPL,"TOTAL")
 
-!WMP  end if ! AdvCore_Advection
+      end if ! AdvCore_Advection
 
       RETURN_(ESMF_SUCCESS)
 
@@ -911,14 +869,15 @@ contains
 
 subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
 
-      real(FVPRC), intent(OUT)   :: QG(NQ)
+      real(REAL8), intent(OUT)   :: QG(NQ)
       real(FVPRC), intent(IN)    :: Q(IM,JM,KM,NQ)
       real(FVPRC), intent(IN)    :: PLE(IM,JM,KM+1)
       integer,     intent(IN)    :: IM,JM,KM,NQ
 ! Locals
       integer   :: k,n
       real(REAL8), allocatable ::    dp(:,:,:)
-      real(FVPRC), allocatable :: qsum1(:,:)
+      real(REAL8), allocatable :: qsum1(:,:)
+      real(REAL8) :: mass
 
       allocate(    dp(im,jm,km) )
       allocate( qsum1(im,jm)    )
@@ -929,6 +888,14 @@ subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
          dp(:,:,k) = PLE(:,:,k+1)-PLE(:,:,k)
       enddo
 
+! Compute Global Mass
+! -------------------
+      qsum1(:,:) = 0.d0
+      do k=1,KM
+         qsum1(:,:) = qsum1(:,:) + dp(:,:,k)
+      enddo
+      mass = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, .true.)
+
 ! Loop over Tracers
 ! -----------------
      do n=1,NQ
@@ -936,7 +903,8 @@ subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
         do k=1,KM
            qsum1(:,:) = qsum1(:,:) + Q(:,:,k,n)*dp(:,:,k)
         enddo
-        qg(n) = g_sum(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, .true.)
+        qg(n) = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, .true.)
+        if (mass > 0.0) qg(n) = qg(n)/mass
      enddo
 
      deallocate( dp )
