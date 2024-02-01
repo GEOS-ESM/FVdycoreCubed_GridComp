@@ -296,7 +296,11 @@ contains
 ! initialize cubed sphere grid: in                                   !
 !--------------------------------------------------------------------!
          allocate(corner_in(2,is_i:ie_i+1,js_i:je_i+1,tile:tile))
-         call init_cubsph_grid(im+1, is_i,ie_i, js_i,je_i, ntiles, corner_in, do_schmidt_in, real(schmidt_parameters_in,kind=R_GRID))
+         if (do_schmidt_in) then
+            call init_cubsph_grid(im+1, is_i,ie_i, js_i,je_i, ntiles, corner_in, do_schmidt_in, real(schmidt_parameters_in,kind=R_GRID))
+         else
+            call init_cubsph_grid(im+1, is_i,ie_i, js_i,je_i, ntiles, corner_in, do_schmidt_in)
+         end if
          call print_memuse_stats('get_geos_cubed_ic: init corner_in')
 !--------------------------------------------------------------------!
 ! initialize cubed sphere grid: out                                  !
@@ -1115,7 +1119,7 @@ contains
                         integer, intent(in) :: npts, is,ie, js,je, ntiles
                         real*8, dimension(2,is:ie+1,js:je+1), intent(out) :: sph_corner
                         logical, intent(in) :: do_schmidt
-                        real(kind=R_GRID), intent(in) :: schmidt_parameters(3)
+                        real(kind=R_GRID), optional, intent(in) :: schmidt_parameters(3)
 !------------------------------------------------------------------!
 ! local variables                                                  !
 !------------------------------------------------------------------!
