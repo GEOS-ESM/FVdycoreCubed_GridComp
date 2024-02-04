@@ -373,9 +373,6 @@ contains
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
-  if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
-
-
 ! FV grid dimensions setup from MAPL
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'AGCM_IM:', default= 32, RC=STATUS )
       VERIFY_(STATUS)
@@ -383,6 +380,9 @@ contains
       VERIFY_(STATUS)
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'AGCM_LM:', default= 72, RC=STATUS )
       VERIFY_(STATUS)
+
+      if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
+  
       ! stretch_fac is kind(R_GRID) in FV, so to prevent a MAPL failure on RC check, we pull
       ! AGCM.STRETCH_FACTOR: as a REAL32 and then cast it to REAL64. This is because
       ! FV_Atm(1)%flagstruct%stretch_fac is R_GRID => REAL64, and the MAPL_GetResource call
