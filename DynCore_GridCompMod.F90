@@ -4280,10 +4280,9 @@ subroutine Run(gc, import, export, clock, rc)
       LCONSV = CONSV.eq.1
       LFILL  =  FILL.eq.1
 
-! Fill pressures before dynamics export
+! Get pressures before dynamics
 !-------------------------------------------------------
       pe0=vars%pe
-      call FILLOUT3r8 (export, 'PLE0', pe0, rc=status); VERIFY_(STATUS)
 
       call MAPL_TimerOff(MAPL,"-DYN_PROLOGUE")
 
@@ -4291,7 +4290,7 @@ subroutine Run(gc, import, export, clock, rc)
 
       call MAPL_TimerOn(MAPL,"-DYN_CORE")
       t1 = MPI_Wtime(status)
-      call DynRun (STATE, EXPORT, CLOCK, GC, RC=STATUS)
+      call DynRun (STATE, EXPORT, CLOCK, GC, PLE0=pe0, RC=STATUS)
       VERIFY_(STATUS)
       t2 = MPI_Wtime(status)
       dyn_run_timer = t2-t1
@@ -4503,6 +4502,8 @@ subroutine Run(gc, import, export, clock, rc)
       call FILLOUT3 (export, 'DDELPDTDYN',ddpdt, rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'DPLEDTDYN' ,dpedt, rc=status); VERIFY_(STATUS)
 
+      ! fill pressure exports (PLE0: Before) & (PLE1: After) from FV3
+      call FILLOUT3r8 (export, 'PLE0', pe0, rc=status); VERIFY_(STATUS)
       pe1=vars%pe
       call FILLOUT3r8 (export, 'PLE1', pe1    , rc=status); VERIFY_(STATUS)
 

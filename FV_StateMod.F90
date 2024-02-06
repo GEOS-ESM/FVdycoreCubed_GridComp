@@ -1168,12 +1168,13 @@ contains
 
 end subroutine FV_InitState
 
-subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
+subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
   type (T_FVDYCORE_STATE),pointer              :: STATE
   type (ESMF_State),             intent(INOUT) :: EXPORT
   type (ESMF_Clock), target,     intent(IN   ) :: CLOCK
   type (ESMF_GridComp)         , intent(INOUT) :: GC
+  real(REAL8), optional        , intent(INOUT) :: PLE0(:,:,:)
   integer, optional            , intent(OUT  ) :: RC
 
 ! Local variables
@@ -1952,6 +1953,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
          ! Fix Dry Mass after increments have been applied
          ! -----------------------------------------------
          FV_Atm(1)%pe = FV_Atm(1)%pe*massD0/massD
+         if (present(PLE0)) PLE0 = FV_Atm(1)%pe(isc:iec,jsc:jec,:)
 
          if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
             if (mpp_pe()==mpp_root_pe()) then
