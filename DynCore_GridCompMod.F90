@@ -1415,24 +1415,6 @@ contains
     VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                  &
-         SHORT_NAME = 'QW_BEFORE_DYN',                             &
-         LONG_NAME  = 'total_water_mixing_ratio_before_dynamics',  &
-         UNITS      = 'kg m-2',                                    &
-         PRECISION  = ESMF_KIND_R8,                                &
-         DIMS       = MAPL_DimsHorzVert,                           &
-         VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-     VERIFY_(STATUS)
-
-    call MAPL_AddExportSpec ( gc,                                  &
-         SHORT_NAME = 'QW_AFTER_DYN',                              &
-         LONG_NAME  = 'total_water_mixing_ratio_before_dynamics',  &
-         UNITS      = 'kg m-2',                                    &
-         PRECISION  = ESMF_KIND_R8,                                &
-         DIMS       = MAPL_DimsHorzVert,                           &
-         VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-     VERIFY_(STATUS)
-
-    call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'PLE0',                                      &
          LONG_NAME  = 'pressure_at_layer_edges_before_dynamics',   &
          UNITS      = 'Pa',                                        &
@@ -2883,7 +2865,6 @@ subroutine Run(gc, import, export, clock, rc)
     real(r8), allocatable ::     qr(:,:,:) ! temporary array
     real(r8), allocatable ::     qs(:,:,:) ! temporary array
     real(r8), allocatable ::     qg(:,:,:) ! temporary array
-    real(r8), allocatable ::  qwtot(:,:,:) ! temporary array         
     real(r8), allocatable ::  qdnew(:,:,:) ! temporary array
     real(r8), allocatable ::  qdold(:,:,:) ! temporary array
     real(r8), allocatable ::  qvold(:,:,:) ! temporary array
@@ -3201,15 +3182,16 @@ subroutine Run(gc, import, export, clock, rc)
       end if
       if (adjustTracers) then
          if (firstime) then
-            allocate(xlist(XLIST_MAX), stat=status)
-            VERIFY_(STATUS)          
             firstime=.false.
             ! get the list of excluded tracers from resource
             n = 0
             call ESMF_ConfigFindLabel ( CF,'EXCLUDE_ADVECTION_TRACERS_LIST:',isPresent=isPresent,rc=STATUS )
             VERIFY_(STATUS)
             if(isPresent) then
+
                tend  = .false.
+               allocate(xlist(XLIST_MAX), stat=status)
+               VERIFY_(STATUS)
                do while (.not.tend)
                   call ESMF_ConfigGetAttribute (CF,value=tmpstring,default='',rc=STATUS) !ALT: we don't check return status!!!
                   if (tmpstring /= '')  then
@@ -3256,8 +3238,8 @@ subroutine Run(gc, import, export, clock, rc)
                  (TRIM(fieldname) /= 'QRAIN'   ) .and. &
                  (TRIM(fieldname) /= 'QSNOW'   ) .and. &
                  (TRIM(fieldname) /= 'QGRAUPEL') ) then
-                   ! write(STRING,'(A,A)') "FV3 is excluding ", TRIM(fieldname)
-                   ! call WRITE_PARALLEL( trim(STRING)   )
+                    write(STRING,'(A,A)') "FV3+ADV is excluding ", TRIM(fieldname)
+                    call WRITE_PARALLEL( trim(STRING)   )
                      n = n + 1
                      if (n > size(xlist)) then
                         allocate( biggerlist(2*n), stat=status )
@@ -3282,6 +3264,12 @@ subroutine Run(gc, import, export, clock, rc)
             end do
 
             if (allocated(xlist)) then
+           !   ! Just in case xlist was allocated, but nothing was in it, could have garbage
+           !   if (n > 0) then
+           !      call ESMF_FieldBundleRemove(BUNDLE, fieldNameList=xlist, &
+           !         relaxedFlag=.true., rc=status)
+           !      VERIFY_(STATUS)
+           !   end if
                deallocate(xlist)
             end if
 
@@ -4296,54 +4284,10 @@ subroutine Run(gc, import, export, clock, rc)
       LCONSV = CONSV.eq.1
       LFILL  =  FILL.eq.1
 
-! Fill pressure and water before dynamics export
+! Fill pressures before dynamics export
 !-------------------------------------------------------
       pe0=vars%pe
       call FILLOUT3r8 (export, 'PLE0', pe0, rc=status); VERIFY_(STATUS)
-      
-      ALLOCATE(  qwtot(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      qwtot = 0.0
-      do N = 1,size(names)
-           if( trim(names(N)).eq.'QLCN' .or. &
-               trim(names(N)).eq.'QLLS' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then
-                     qwtot = qwtot + state%vars%tracer(N)%content_r4
-                 else
-                     qwtot = qwtot + state%vars%tracer(N)%content
-                 endif
-           endif
-           if( trim(names(N)).eq.'QICN' .or. &
-               trim(names(N)).eq.'QILS' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then
-                     qwtot = qwtot + state%vars%tracer(N)%content_r4
-                 else
-                     qwtot = qwtot + state%vars%tracer(N)%content
-                 endif
-           endif
-           if( trim(names(N)).eq.'QRAIN' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then
-                     qwtot = qwtot + state%vars%tracer(N)%content_r4
-                 else
-                     qwtot = qwtot + state%vars%tracer(N)%content
-                 endif
-           endif
-           if( trim(names(N)).eq.'QSNOW' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then
-                     qwtot = qwtot + state%vars%tracer(N)%content_r4
-                 else
-                     qwtot = qwtot + state%vars%tracer(N)%content
-                 endif
-           endif
-           if( trim(names(N)).eq.'QGRAUPEL' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then
-                     qwtot = qwtot + state%vars%tracer(N)%content_r4
-                 else
-                     qwtot = qwtot + state%vars%tracer(N)%content
-                 endif
-           endif
-      enddo
-      call FILLOUT3r8 (export, 'QW_BEFORE_DYN', qwtot, rc=status); VERIFY_(STATUS)
-      DEALLOCATE( qwtot )
 
       call MAPL_TimerOff(MAPL,"-DYN_PROLOGUE")
 
@@ -4565,50 +4509,6 @@ subroutine Run(gc, import, export, clock, rc)
 
       pe1=vars%pe
       call FILLOUT3r8 (export, 'PLE1', pe1    , rc=status); VERIFY_(STATUS)
-
-      ALLOCATE(  qwtot(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      qwtot = 0.0
-      do N = 1,size(names)
-           if( trim(names(N)).eq.'QLCN' .or. &
-               trim(names(N)).eq.'QLLS' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then
-                     qwtot = qwtot + state%vars%tracer(N)%content_r4
-                 else
-                     qwtot = qwtot + state%vars%tracer(N)%content
-                 endif
-           endif
-           if( trim(names(N)).eq.'QICN' .or. &
-               trim(names(N)).eq.'QILS' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then
-                     qwtot = qwtot + state%vars%tracer(N)%content_r4
-                 else
-                     qwtot = qwtot + state%vars%tracer(N)%content
-                 endif
-           endif
-           if( trim(names(N)).eq.'QRAIN' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then
-                     qwtot = qwtot + state%vars%tracer(N)%content_r4
-                 else
-                     qwtot = qwtot + state%vars%tracer(N)%content
-                 endif
-           endif
-           if( trim(names(N)).eq.'QSNOW' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then
-                     qwtot = qwtot + state%vars%tracer(N)%content_r4
-                 else
-                     qwtot = qwtot + state%vars%tracer(N)%content
-                 endif
-           endif
-           if( trim(names(N)).eq.'QGRAUPEL' ) then
-                 if( state%vars%tracer(N)%is_r4 ) then
-                     qwtot = qwtot + state%vars%tracer(N)%content_r4
-                 else
-                     qwtot = qwtot + state%vars%tracer(N)%content
-                 endif
-           endif
-      enddo
-      call FILLOUT3r8 (export, 'QW_AFTER_DYN', qwtot, rc=status); VERIFY_(STATUS)
-      DEALLOCATE( qwtot )
 
       if (AdvCore_Advection==2) then
       ! Compute time-centered C-Grid Courant Numbers and Mass Fluxes on Cubed Orientation

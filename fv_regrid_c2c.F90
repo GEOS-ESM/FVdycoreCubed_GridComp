@@ -5,7 +5,7 @@ module fv_regrid_c2c
 #define DEALLOCGLOB_(A) if(associated(A)) then;A=0;if(MAPL_ShmInitialized) then; call MAPL_DeAllocNodeArray(A,rc=status);else; deallocate(A);endif;NULLIFY(A);endif
 #endif
 
-   use fv_arrays_mod,  only: REAL4, REAL8, FVPRC
+   use fv_arrays_mod,  only: REAL4, REAL8, FVPRC, R_GRID
    use fms_mod,            only: file_exist, read_data, field_exist
    use fms_io_mod,         only: get_tile_string, field_size
    use mpp_mod,            only: mpp_error, FATAL, NOTE, mpp_broadcast,mpp_npes
@@ -25,6 +25,7 @@ module fv_regrid_c2c
          is,js,ie,je, isd,jsd,ied,jed, fill_corners, YDir
    use fv_grid_utils_mod, only: ptop_min
    use fv_grid_utils_mod, only: normalize_vect
+   use fv_grid_utils_mod, only: direct_transform
    use fv_mapz_mod,       only: mappm
    use fv_surf_map_mod,   only: surfdrv
    use fv_timing_mod,     only: timing_on, timing_off
@@ -120,13 +121,15 @@ contains
       _RETURN(_SUCCESS)
    end subroutine read_topo_file_r8
 
-   subroutine get_geos_ic( Atm, extra_rst, rstcube, gridOut)
+   subroutine get_geos_ic( Atm, extra_rst, rstcube, gridOut, do_schmidt_in, schmidt_parameters_in)
 
       type(fv_atmos_type), intent(inout) :: Atm(:)
       type(fv_rst), pointer, intent(inout) :: extra_rst(:)
       logical :: rstcube
       type(ESMF_Grid), intent(inout) :: gridOut
-      real(FVPRC):: alpha = 0.
+      logical, intent(in) :: do_schmidt_in
+      real, intent(in) :: schmidt_parameters_in(3) 
+      real(FVPRC):: alpha
       integer i,j
       logical :: cubed_sphere,fv_diag_ic
 
@@ -161,7 +164,7 @@ contains
 
       if (allocated(Atm(1)%q)) deallocate( Atm(1)%q )
       allocate  ( Atm(1)%q(isd:ied,jsd:jed,Atm(1)%npz,Atm(1)%ncnst) )
-      call get_geos_cubed_ic( Atm, extra_rst, gridOut )
+      call get_geos_cubed_ic( Atm, extra_rst, gridOut, do_schmidt_in, schmidt_parameters_in )
 
       call prt_maxmin('T', Atm(1)%pt, is, ie, js, je, ng, Atm(1)%npz, 1.0_FVPRC)
 
@@ -175,13 +178,15 @@ contains
 
    end subroutine get_geos_ic
 
-   subroutine get_geos_cubed_ic( Atm, extra_rst, gridOut )
+   subroutine get_geos_cubed_ic( Atm, extra_rst, gridOut, do_schmidt_in, schmidt_parameters_in )
       use GHOST_CUBSPH_mod,  only : A_grid, ghost_cubsph_update
       use CUB2CUB_mod,    only: get_c2c_weight,                 &
             interpolate_c2c
       type(fv_atmos_type), intent(inout) :: Atm(:)
       type(fv_rst), pointer, intent(inout) :: extra_rst(:)
       type(ESMF_Grid), intent(inout) :: gridOut
+      logical, intent(in) :: do_schmidt_in
+      real, intent(in) :: schmidt_parameters_in(3)
 
       character(len=128) :: fname, fname1
       real(FVPRC), allocatable:: pkz0(:,:)
@@ -269,7 +274,14 @@ contains
                   & field not found')
          endif
 
-         cs_factory = CubedSphereGridFactory(nx=Atm(1)%layout(1),ny=Atm(1)%layout(2),im_world=im,lm=km)
+         if (do_schmidt_in) then
+            cs_factory = CubedSphereGridFactory(nx=Atm(1)%layout(1),ny=Atm(1)%layout(2),im_world=im,lm=km, &
+                         stretch_factor=schmidt_parameters_in(3), &
+                             target_lon=schmidt_parameters_in(1),&
+                             target_lat=schmidt_parameters_in(2))
+         else
+            cs_factory = CubedSphereGridFactory(nx=Atm(1)%layout(1),ny=Atm(1)%layout(2),im_world=im,lm=km)
+         end if
          gridIn = grid_manager%make_grid(cs_factory,rc=status)
          call MAPL_Grid_Interior(gridIn,input_i1,input_in,input_j1,input_jn)
          call ArrDescrInit(input_arrdescr,MPI_COMM_WORLD,im,im*6,km, Atm(1)%layout(1),Atm(1)%layout(2)*6,n_readers, &
@@ -284,7 +296,11 @@ contains
 ! initialize cubed sphere grid: in                                   !
 !--------------------------------------------------------------------!
          allocate(corner_in(2,is_i:ie_i+1,js_i:je_i+1,tile:tile))
-         call init_cubsph_grid(im+1, is_i,ie_i, js_i,je_i, ntiles, corner_in)
+         if (do_schmidt_in) then
+            call init_cubsph_grid(im+1, is_i,ie_i, js_i,je_i, ntiles, corner_in, do_schmidt_in, real(schmidt_parameters_in,kind=R_GRID))
+         else
+            call init_cubsph_grid(im+1, is_i,ie_i, js_i,je_i, ntiles, corner_in, do_schmidt_in)
+         end if
          call print_memuse_stats('get_geos_cubed_ic: init corner_in')
 !--------------------------------------------------------------------!
 ! initialize cubed sphere grid: out                                  !
@@ -1084,7 +1100,7 @@ contains
 
 
 
-                     subroutine init_cubsph_grid(npts, is,ie, js,je, ntiles, sph_corner)  
+                     subroutine init_cubsph_grid(npts, is,ie, js,je, ntiles, sph_corner, do_schmidt, schmidt_parameters)  
                         use mpp_mod, only: mpp_root_pe
 !------------------------------------------------------------------!
 ! read/generate cubed sphere grid                                  !
@@ -1102,6 +1118,8 @@ contains
 
                         integer, intent(in) :: npts, is,ie, js,je, ntiles
                         real*8, dimension(2,is:ie+1,js:je+1), intent(out) :: sph_corner
+                        logical, intent(in) :: do_schmidt
+                        real(kind=R_GRID), optional, intent(in) :: schmidt_parameters(3)
 !------------------------------------------------------------------!
 ! local variables                                                  !
 !------------------------------------------------------------------!
@@ -1159,6 +1177,7 @@ contains
 
 ! mirror_grid assumes that the tile=1 is centered on equator and greenwich meridian Lon[-pi,pi]
                         call mirror_grid(grid_in, 0, npts, npts, 2, ntiles)
+
                         sph_corner(1,is:ie+1,js:je+1) = grid_in(is:ie+1,js:je+1,1,tile)
                         sph_corner(2,is:ie+1,js:je+1) = grid_in(is:ie+1,js:je+1,2,tile)
                         do j=js,je+1
@@ -1167,13 +1186,23 @@ contains
 ! Shift the corner away from Japan
 !---------------------------------
 ! This will result in the corner close to east coast of China
-                              sph_corner(1,i,j) = sph_corner(1,i,j) - pi/18.
+                              if ( .not.do_schmidt ) &
+                                 sph_corner(1,i,j) = sph_corner(1,i,j) - pi/18.
                               if ( sph_corner(1,i,j) < 0. )              &
-                                    sph_corner(1,i,j) = sph_corner(1,i,j) + 2.*pi
+                                   sph_corner(1,i,j) = sph_corner(1,i,j) + 2.*pi
                               if (ABS(sph_corner(1,i,j)) < 1.e-10) sph_corner(1,i,j) = 0.0
                               if (ABS(sph_corner(2,i,j)) < 1.e-10) sph_corner(2,i,j) = 0.0
                            enddo
                         enddo
+!------------------------
+! Schmidt transformation:
+!------------------------
+                        if ( do_schmidt ) then
+                           call direct_transform(schmidt_parameters(3), is, ie+1, js, je+1, &
+                                schmidt_parameters(1), schmidt_parameters(2), &
+                                tile, sph_corner(1,is:ie+1,js:je+1), sph_corner(2,is:ie+1,js:je+1))
+                        endif
+
 #ifdef FVREGRID_MAPL_MODE
                         call MAPL_SyncSharedMemory(rc=STATUS)
                         DEALLOCGLOB_(grid_in)

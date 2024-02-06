@@ -521,8 +521,6 @@ contains
      FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
    endif
-   FV_Atm(1)%flagstruct%n_sponge = 0
-!!!FV_Atm(1)%flagstruct%n_zfilter = FV_Atm(1)%flagstruct%npz
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
    if (FV_Atm(1)%flagstruct%npz == 72) then
      FV_Atm(1)%flagstruct%gmao_remap = 0   ! GFDL Schemes
@@ -545,14 +543,10 @@ contains
    if (index(FV3_CONFIG,"HWT") > 0) then
      FV_Atm(1)%flagstruct%fv_sg_adj = -1
      FV_Atm(1)%flagstruct%n_zfilter = -1
-     FV_Atm(1)%flagstruct%do_sat_adj = .true. ! only valid when nwat >= 6
+     FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
      FV_Atm(1)%flagstruct%dz_min = 6.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
-     if (FV_Atm(1)%flagstruct%npz == 72) then
-       FV_Atm(1)%flagstruct%tau = 0.0
-     else
-       FV_Atm(1)%flagstruct%tau = 2.0
-     endif
+     FV_Atm(1)%flagstruct%tau = 2.0
      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
        ! 6th order default damping options
@@ -570,17 +564,14 @@ contains
         FV_Atm(1)%flagstruct%d_ext = 0.0
      endif
     ! Sponge damping and TE conservation
+     FV_Atm(1)%flagstruct%n_sponge = 0
      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.15
      FV_Atm(1)%flagstruct%consv_te = 1.0
    else
      FV_Atm(1)%flagstruct%fv_sg_adj = DT
      FV_Atm(1)%flagstruct%RF_fast = .false.
-     if (FV_Atm(1)%flagstruct%npz == 72) then
-       FV_Atm(1)%flagstruct%tau = 0.0
-     else
-       FV_Atm(1)%flagstruct%tau = 2.0
-     endif
+     FV_Atm(1)%flagstruct%tau = 0.0
      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
     ! 4th order default damping options
      FV_Atm(1)%flagstruct%nord = 2
@@ -588,8 +579,8 @@ contains
      FV_Atm(1)%flagstruct%d4_bg = 0.12
      FV_Atm(1)%flagstruct%d2_bg = 0.0
      FV_Atm(1)%flagstruct%d_ext = 0.0
-     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
-     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.02
+     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
+     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
      FV_Atm(1)%flagstruct%consv_te = 1.0
    endif
   ! Some default time-splitting options
@@ -1848,10 +1839,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
         if (all(FV_Atm(1)%w(isc:iec,jsc:jec,:) == 0.0)) FV_Atm(1)%flagstruct%Make_NH = .true.
         if ( FV_Atm(1)%flagstruct%Make_NH ) then
           if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT))
-         ! increased damping
-          FV_Atm(1)%flagstruct%dddmp = 0.2
           if (mpp_pe()==0) print*, 'fv_first_run: FV3 is making Non-Hydrostatic W and DZ'
-          if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart with increased damping during spinup'
+          if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
           FV_Atm(1)%w = 0.0
           call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
                      FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &

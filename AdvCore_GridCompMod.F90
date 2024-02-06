@@ -197,24 +197,6 @@ contains
          VLOCATION  = MAPL_VLocationEdge,             RC=STATUS  )
      VERIFY_(STATUS)
 
-    call MAPL_AddImportSpec ( gc,                                  &
-         SHORT_NAME = 'QW_BEFORE_DYN',                             &
-         LONG_NAME  = 'total_water_mixing_ratio_before_dynamics',  & 
-         UNITS      = 'kg m-2',                                    & 
-         PRECISION  = ESMF_KIND_R8,                                &
-         DIMS       = MAPL_DimsHorzVert,                           &
-         VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-     VERIFY_(STATUS)
-
-    call MAPL_AddImportSpec ( gc,                                  &
-         SHORT_NAME = 'QW_AFTER_DYN',                              &
-         LONG_NAME  = 'total_water_mixing_ratio_after_dynamics',   & 
-         UNITS      = 'kg m-2',                                    & 
-         PRECISION  = ESMF_KIND_R8,                                &
-         DIMS       = MAPL_DimsHorzVert,                           &
-         VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-     VERIFY_(STATUS)
-
     call MAPL_AddImportSpec( gc,                              &
         SHORT_NAME = 'TRADV',                                        &
         LONG_NAME  = 'advected_quantities',                        &
@@ -482,8 +464,6 @@ contains
       REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iMFY
       REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iPLE0
       REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iPLE1
-      REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iQW0
-      REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iQW1
 
 ! Locals
       REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: CX
@@ -492,9 +472,6 @@ contains
       REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: MFY
       REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: PLE0
       REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: PLE1
-      REAL(FVPRC), POINTER, DIMENSION(:)       :: AK
-      REAL(FVPRC), POINTER, DIMENSION(:)       :: BK
-      REAL(REAL8), allocatable :: ak_r8(:),bk_r8(:)
       REAL(FVPRC), POINTER, DIMENSION(:,:,:,:) :: TRACERS
       REAL(REAL8), allocatable :: TMASS0(:)
       REAL(REAL8), allocatable :: TMASS1(:)
@@ -503,8 +480,6 @@ contains
       type(ESMF_Field)       :: field
       type(ESMF_Array)       :: array
       INTEGER :: IM, JM, LM, N, NQ, LS
-      REAL(FVPRC) :: PTOP, PINT
-      REAL(REAL8) :: ptop_r8,pint_r8
 ! Temporaries for exports/tracers
       REAL, POINTER :: temp3D(:,:,:)
       real(REAL4),        pointer     :: tracer_r4 (:,:,:)
@@ -551,26 +526,6 @@ contains
       call MAPL_TimerOn(MAPL,"TOTAL")
       call MAPL_TimerOn(MAPL,"RUN")
 
-! Get AKs and BKs for vertical grid
-!----------------------------------
-      AllOCATE( AK(LM+1) ,stat=STATUS )
-      VERIFY_(STATUS)
-      AllOCATE( BK(LM+1) ,stat=STATUS )
-      VERIFY_(STATUS)
-      AllOCATE( AK_r8(LM+1) ,stat=STATUS )
-      VERIFY_(STATUS)
-      AllOCATE( BK_r8(LM+1) ,stat=STATUS )
-      VERIFY_(STATUS)
-      call set_eta(LM,LS,ptop_r8,pint_r8,ak_r8,bk_r8)
-      ptop=ptop_r8
-      pint=pint_r8
-      ak=ak_r8
-      bk=bk_r8
-
-      CALL MAPL_GetPointer(IMPORT, iQW0,  'QW_BEFORE_DYN',  ALLOC = .TRUE., RC=STATUS)
-      VERIFY_(STATUS)
-      CALL MAPL_GetPointer(IMPORT, iQW1,  'QW_AFTER_DYN',  ALLOC = .TRUE., RC=STATUS)
-      VERIFY_(STATUS)
       CALL MAPL_GetPointer(IMPORT, iPLE0, 'PLE0', ALLOC = .TRUE., RC=STATUS)
       VERIFY_(STATUS)
       CALL MAPL_GetPointer(IMPORT, iPLE1, 'PLE1', ALLOC = .TRUE., RC=STATUS)
@@ -777,41 +732,40 @@ contains
 
          ! Get Tracer Mass before advection
          !---------------------------------
+         if (rpt_mass) then
          allocate( TMASS0(NQ) )
          call global_integral(TMASS0, TRACERS, PLE0, IM,JM,LM, NQ)
+         endif
 
          ! Run FV3 advection
          !------------------
          call offline_tracer_advection(TRACERS, PLE0, PLE1, MFX, MFY, CX, CY, &
                                        FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, FV_Atm(1)%bd, &
-                                       FV_Atm(1)%domain, AK, BK, PTOP, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz,   &
+                                       FV_Atm(1)%domain, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz,   &
                                        NQ, dt)
-
-         ! Update Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air 
-         ! ------------------------------------------------------------------------------
-         do N=1,NQ
-            TRACERS(:,:,:,N) = TRACERS(:,:,:,N) * (1.0-iQW1)/(1.0-iQW0)
-         end do
 
          ! Get Tracer Mass after advection
          !--------------------------------
+         if (rpt_mass) then
          allocate( TMASS1(NQ) )
          call global_integral(TMASS1, TRACERS, PLE1, IM,JM,LM, NQ)
+         endif
 
          ! Conserve Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air 
          ! --------------------------------------------------------------------------------
+         if (rpt_mass) then
          do N=1,NQ
             if (TMASS1(N) > 0.0) then
             if (ABS((TMASS0(N)-TMASS1(N))/TMASS1(N)) >= epsilon(1.0_REAL4)) then
-              if (rpt_mass .and. is_master()) write(6,125) trim(advTracers(N)%tName), (TMASS1(N)-TMASS0(N))/TMASS0(N)
-              TRACERS(:,:,:,N) = TRACERS(:,:,:,N) * TMASS0(N)/TMASS1(N)
+              if (is_master()) write(6,125) trim(advTracers(N)%tName), (TMASS1(N)-TMASS0(N))/TMASS0(N)
+            !!TRACERS(:,:,:,N) = TRACERS(:,:,:,N) * TMASS0(N)/TMASS1(N)
             end if
             125 format('Mass Conservation Adjustment in AdvCore:'2x,A,2x,g21.14)
             end if
          end do
-
          deallocate( TMASS0 )
          deallocate( TMASS1 )
+         endif
 
          ! Go through the bundle copying tracers back to the bundle.
          !-------------------------------------------------------------------------
@@ -843,10 +797,6 @@ contains
       end if ! NQ > 0
 
       deallocate( advTracers, stat=STATUS )
-      VERIFY_(STATUS)
-      DEALLOCATE( AK ,stat=STATUS )
-      VERIFY_(STATUS)
-      DEALLOCATE( BK ,stat=STATUS )
       VERIFY_(STATUS)
 
       DEALLOCATE( PLE0 )

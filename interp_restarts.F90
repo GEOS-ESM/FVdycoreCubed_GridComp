@@ -87,7 +87,9 @@ program interp_restarts
    character(len=:), pointer :: dname
    integer :: dim1,ndims
    type(CubedSphereGridFactory) :: csfactory
-   real, allocatable :: schmidt_parameters(:)
+   real, allocatable :: schmidt_parameters_out(:)
+   real, allocatable :: schmidt_parameters_in(:)
+   logical :: do_schmidt_in = .false.
 
 ! Start up FMS/MPP
    print_memory_usage = .true.
@@ -159,14 +161,23 @@ program interp_restarts
         else
            write(*,*)'bad argument to scalers, will scale by default'
         end if
-     case('-stretched_grid')
-        allocate(schmidt_parameters(3))
+     case('-stretched_grid_in')
+        allocate(schmidt_parameters_in(3))
         call get_command_argument(i+1,astr)
-        read(astr,*)schmidt_parameters(1)
+        read(astr,*)schmidt_parameters_in(1)
         call get_command_argument(i+2,astr)
-        read(astr,*)schmidt_parameters(2)
+        read(astr,*)schmidt_parameters_in(2)
         call get_command_argument(i+3,astr)
-        read(astr,*)schmidt_parameters(3)
+        read(astr,*)schmidt_parameters_in(3)
+        do_schmidt_in = .true.
+     case('-stretched_grid_out')
+        allocate(schmidt_parameters_out(3))
+        call get_command_argument(i+1,astr)
+        read(astr,*)schmidt_parameters_out(1)
+        call get_command_argument(i+2,astr)
+        read(astr,*)schmidt_parameters_out(2)
+        call get_command_argument(i+3,astr)
+        read(astr,*)schmidt_parameters_out(3)
      end select
    end do
 
@@ -183,11 +194,11 @@ program interp_restarts
    if (ihydro == 0) FV_Atm(1)%flagstruct%hydrostatic = .false.
    FV_Atm(1)%flagstruct%Make_NH = .false.
    if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%flagstruct%Make_NH = .true.
-   if (allocated(schmidt_parameters)) then
+   if (allocated(schmidt_parameters_out)) then
       FV_Atm(1)%flagstruct%do_schmidt = .true.
-      FV_Atm(1)%flagstruct%target_lon=schmidt_parameters(1)
-      FV_Atm(1)%flagstruct%target_lat=schmidt_parameters(2)
-      FV_Atm(1)%flagstruct%stretch_fac=schmidt_parameters(3)
+      FV_Atm(1)%flagstruct%target_lon=schmidt_parameters_out(1)
+      FV_Atm(1)%flagstruct%target_lat=schmidt_parameters_out(2)
+      FV_Atm(1)%flagstruct%stretch_fac=schmidt_parameters_out(3)
    end if
 
    if (n_files > 0) allocate(rst_files(n_files))
@@ -387,9 +398,9 @@ program interp_restarts
 
    call ArrDescrInit(Arrdes,MPI_COMM_WORLD,npx-1,(npx-1)*6,npz,npes_x,npes_y*6,n_readers,n_writers,isl,iel,jsl,jel,rc=status)
    call ArrDescrSet(arrdes,offset=0_MPI_OFFSET_KIND)
-   if (allocated(schmidt_parameters)) then
-      csfactory = CubedSphereGridFactory(im_world=npx-1,lm=npz,nx=npes_x,ny=npes_y,stretch_factor=schmidt_parameters(3), &
-                  target_lon=schmidt_parameters(1),target_lat=schmidt_parameters(2))
+   if (allocated(schmidt_parameters_out)) then
+      csfactory = CubedSphereGridFactory(im_world=npx-1,lm=npz,nx=npes_x,ny=npes_y,stretch_factor=schmidt_parameters_out(3), &
+                  target_lon=schmidt_parameters_out(1),target_lat=schmidt_parameters_out(2))
    else
       csfactory = CubedSphereGridFactory(im_world=npx-1,lm=npz,nx=npes_x,ny=npes_y)
    end if
@@ -398,9 +409,9 @@ program interp_restarts
 
    FV_Atm(1)%flagstruct%Make_NH = .false. ! Do this after rescaling
    if (jm == 6*im) then
-      call get_geos_ic( FV_Atm, rst_files, .true., grid)
+      call get_geos_ic( FV_Atm, rst_files, .true., grid, do_schmidt_in, schmidt_parameters_in)
    else
-      call get_geos_ic( FV_Atm, rst_files, .false., grid)
+      call get_geos_ic( FV_Atm, rst_files, .false., grid, do_schmidt_in, schmidt_parameters_in)
    endif
    FV_Atm(1)%flagstruct%Make_NH = .true. ! Reset this for later
 
@@ -450,8 +461,8 @@ program interp_restarts
          imc = npx-1
          jmc = imc*6
          call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon ','lat ','lev ','edge'/),(/imc,jmc,npz,npz+1/),rc=status)
-         if (allocated(schmidt_parameters)) then
-             call add_stretch_params(OutCfg(1),schmidt_parameters)
+         if (allocated(schmidt_parameters_out)) then
+             call add_stretch_params(OutCfg(1),schmidt_parameters_out)
          end if
 
          ! if dz and w were not in the original file add them
@@ -549,8 +560,8 @@ program interp_restarts
          allocate(InCfg(1),OutCfg(1))
          InCfg(1)=InFmt%read(rc=status)
          call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev'/),(/imc,jmc,npz/),rc=status)
-         if (allocated(schmidt_parameters)) then
-             call add_stretch_params(OutCfg(1),schmidt_parameters)
+         if (allocated(schmidt_parameters_out)) then
+             call add_stretch_params(OutCfg(1),schmidt_parameters_out)
          end if
          if (AmWriter) then
             call OutFmt%create_par(fname1,comm=arrdes%writers_comm,info=info,rc=status)
@@ -623,8 +634,8 @@ program interp_restarts
             .and. (rst_files(ifile)%ungrid_size > 0)) then
                call MAPL_IOChangeRes(InCfg(1),OutCfg(1),[character(len=12):: 'lon ','lat ','lev ','unknown_dim1'],[imc,jmc,npz,rst_files(ifile)%ungrid_size],rc=status)
             end if
-            if (allocated(schmidt_parameters)) then
-                call add_stretch_params(OutCfg(1),schmidt_parameters)
+            if (allocated(schmidt_parameters_out)) then
+                call add_stretch_params(OutCfg(1),schmidt_parameters_out)
             end if
 
             call OutFmt%create_par(fname1,comm=arrdes%writers_comm,info=info,rc=status)
