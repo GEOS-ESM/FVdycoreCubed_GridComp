@@ -457,7 +457,7 @@ contains
 ! Horz/Vert remap for scalars
          nqmap =  Atm(1)%ncnst
 
-         call remap_scalar(im, jm, km, npz, nqmap, nqmap, ak0, bk0, psc, gzc, tp, qp, Atm(1),tracer_bundles,extra_rst)
+      !! call remap_scalar(im, jm, km, npz, nqmap, nqmap, ak0, bk0, psc, gzc, tp, qp, Atm(1),tracer_bundles,extra_rst)
 
          deallocate ( tp )
          deallocate ( qp )
@@ -991,7 +991,7 @@ contains
 ! -----------------------------------------------------------------------------------------------
          nqmap = nmoist + ngocart + npchem 
 
-         call remap_scalar(im, jm, km, npz, nqmap, nqmap, ak0, bk0, psc, gzc, tp, qp, Atm(1), tracer_bundles, extra_rst)
+     !!  call remap_scalar(im, jm, km, npz, nqmap, nqmap, ak0, bk0, psc, gzc, tp, qp, Atm(1), tracer_bundles, extra_rst)
 
          deallocate ( tp )
          deallocate ( qp ) 

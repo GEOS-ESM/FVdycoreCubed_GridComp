@@ -476,6 +476,7 @@ contains
       REAL(REAL8), allocatable :: TMASS0(:)
       REAL(REAL8), allocatable :: TMASS1(:)
       TYPE(AdvCoreTracers), POINTER :: advTracers(:)
+      LOGICAL, allocatable :: SCALED(:)
       type(ESMF_FieldBundle) :: TRADV
       type(ESMF_Field)       :: field
       type(ESMF_Array)       :: array
@@ -691,6 +692,8 @@ contains
          VERIFY_(STATUS)
          ALLOCATE( advTracers(NQ),stat=STATUS )
          VERIFY_(STATUS)
+         ALLOCATE( SCALED(NQ),stat=STATUS )
+         VERIFY_(STATUS)
 
          if (NQ /= NQ_SAVED) then
             write(STRING,'(A,I5,A)') "AdvCore is Advecting the following ", nq, " tracers in FV3:"
@@ -709,9 +712,13 @@ contains
             advTracers(N)%is_r4 = (kind == ESMF_TYPEKIND_R4)   ! Is real*4?
             advTracers(N)%tName = fieldName
 
-            if (NQ /= NQ_SAVED) then
-               call WRITE_PARALLEL( trim(fieldName) )
-            endif
+           !if (fieldName(1:5) == 'PCHEM') then
+              SCALED(N) = .false.
+              if (NQ /= NQ_SAVED) call WRITE_PARALLEL( trim(fieldName)//' [Not Scaled]' )
+           !else
+           !  SCALED(N) = .true.
+           !  if (NQ /= NQ_SAVED) call WRITE_PARALLEL( trim(fieldName) )
+           !endif
 
             if (advTracers(N)%is_r4) then
                call ESMF_ArrayGet(array,farrayptr=tracer_r4, rc=status )
@@ -742,7 +749,7 @@ contains
          call offline_tracer_advection(TRACERS, PLE0, PLE1, MFX, MFY, CX, CY, &
                                        FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, FV_Atm(1)%bd, &
                                        FV_Atm(1)%domain, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz,   &
-                                       NQ, dt)
+                                       NQ, dt, SCALED)
 
          ! Get Tracer Mass after advection
          !--------------------------------
@@ -755,12 +762,14 @@ contains
          ! --------------------------------------------------------------------------------
          if (rpt_mass) then
          do N=1,NQ
+            if (SCALED(N)) then
             if (TMASS1(N) > 0.0) then
             if (ABS((TMASS0(N)-TMASS1(N))/TMASS1(N)) >= epsilon(1.0_REAL4)) then
               if (is_master()) write(6,125) trim(advTracers(N)%tName), (TMASS1(N)-TMASS0(N))/TMASS0(N)
             !!TRACERS(:,:,:,N) = TRACERS(:,:,:,N) * TMASS0(N)/TMASS1(N)
             end if
             125 format('Mass Conservation Adjustment in AdvCore:'2x,A,2x,g21.14)
+            end if
             end if
          end do
          deallocate( TMASS0 )
@@ -791,13 +800,14 @@ contains
 
          ! Deallocate the list of tracers
          !-------------------------------------------------------------------------
-         DEALLOCATE( TRACERS,stat=STATUS )
+         deallocate( TRACERS, stat=STATUS )
+         VERIFY_(STATUS)
+         deallocate( advTracers, stat=STATUS )
+         VERIFY_(STATUS)
+         deallocate( SCALED, stat=STATUS )
          VERIFY_(STATUS)
 
       end if ! NQ > 0
-
-      deallocate( advTracers, stat=STATUS )
-      VERIFY_(STATUS)
 
       DEALLOCATE( PLE0 )
       DEALLOCATE( PLE1 )

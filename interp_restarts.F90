@@ -192,8 +192,8 @@ program interp_restarts
 
    FV_Atm(1)%flagstruct%hydrostatic = .true.
    if (ihydro == 0) FV_Atm(1)%flagstruct%hydrostatic = .false.
-   FV_Atm(1)%flagstruct%Make_NH = .false.
-   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%flagstruct%Make_NH = .true.
+   FV_Atm(1)%flagstruct%Make_NH = .true.
+   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%flagstruct%Make_NH = .false.
    if (allocated(schmidt_parameters_out)) then
       FV_Atm(1)%flagstruct%do_schmidt = .true.
       FV_Atm(1)%flagstruct%target_lon=schmidt_parameters_out(1)
@@ -407,32 +407,7 @@ program interp_restarts
    grid = grid_manager%make_grid(csfactory,rc=status)
    call ESMF_AttributeSet(grid,name="num_reader",value=n_readers)
 
-   FV_Atm(1)%flagstruct%Make_NH = .false. ! Do this after rescaling
-   if (jm == 6*im) then
-      call get_geos_ic( FV_Atm, rst_files, .true., grid, do_schmidt_in, schmidt_parameters_in)
-   else
-      call get_geos_ic( FV_Atm, rst_files, .false., grid, do_schmidt_in, schmidt_parameters_in)
-   endif
-   FV_Atm(1)%flagstruct%Make_NH = .true. ! Reset this for later
-
-   if (scale_rst) then
-      call scale_drymass(fv_atm,tracer_names,rc=status)
-      VERIFY_(status)
-   end if
-
-   if (FV_Atm(1)%flagstruct%Make_NH) then
-      if (is_master()) print*, 'Updating FV3 NonHydrostatic State'
-      do k=1,npz
-      do j=js,je
-      do i=is,ie
-      FV_Atm(1)%w(i,j,k) = 0.0
-      FV_Atm(1)%delz(i,j,k) = (-MAPL_RGAS/MAPL_GRAV)*FV_Atm(1)%pt(i,j,k)*(log(FV_Atm(1)%pe(i,k+1,j))-log(FV_Atm(1)%pe(i,k,j)))
-      FV_Atm(1)%pkz(i,j,k)  = exp( MAPL_KAPPA*log((-MAPL_RGAS/MAPL_GRAV)*FV_Atm(1)%delp(i,j,k)*FV_Atm(1)%pt(i,j,k)*    &
-                                       (1.0+(MAPL_RVAP/MAPL_RGAS - 1.)*FV_Atm(1)%q(i,j,k,1))/FV_Atm(1)%delz(i,j,k)) )
-      enddo
-      enddo
-      enddo
-   endif
+   call get_geos_ic( FV_Atm, rst_files, (jm == 6*im), grid, do_schmidt_in, schmidt_parameters_in)
 
    allocate(pt_local(is:ie,js:je,npz))
    pt_local=0.0d0
@@ -525,14 +500,14 @@ program interp_restarts
       if (.not. fv_atm(1)%flagstruct%hydrostatic) then
 ! DZ
          if (is_master()) print*, 'Writing : ', TRIM(fname1), ' DZ'
- !!!     call prt_mxm('DZ', FV_Atm(1)%delz, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
+         call prt_mxm('DZ', FV_Atm(1)%delz, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
          r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%delz(is:ie,js:je,1:npz)
          call MAPL_VarWrite(OutFmt,"DZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
          VERIFY_(status)
 
 ! W
          if (is_master()) print*, 'Writing : ', TRIM(fname1), ' W'
- !!!     call prt_mxm('W', FV_Atm(1)%w, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
+         call prt_mxm('W', FV_Atm(1)%w, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
          r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%w(is:ie,js:je,1:npz)
          call MAPL_VarWrite(OutFmt,"W",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
          VERIFY_(status)

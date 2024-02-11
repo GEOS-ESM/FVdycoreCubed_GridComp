@@ -131,7 +131,6 @@ contains
       real, intent(in) :: schmidt_parameters_in(3) 
       real(FVPRC):: alpha
       integer i,j
-      logical :: cubed_sphere,fv_diag_ic
 
 ! * Initialize coriolis param:
 
@@ -149,10 +148,8 @@ contains
          enddo
       enddo
 
-      cubed_sphere=.true.
-      fv_diag_ic=.false.
       call mpp_update_domains( Atm(1)%gridstruct%f0, Atm(1)%domain )
-      if ( cubed_sphere ) call fill_corners(Atm(1)%gridstruct%f0, Atm(1)%npx, Atm(1)%npy, YDir)
+      call fill_corners(Atm(1)%gridstruct%f0, Atm(1)%npx, Atm(1)%npy, YDir)
 
       Atm(1)%phis = 0.
 
@@ -166,15 +163,18 @@ contains
       allocate  ( Atm(1)%q(isd:ied,jsd:jed,Atm(1)%npz,Atm(1)%ncnst) )
       call get_geos_cubed_ic( Atm, extra_rst, gridOut, do_schmidt_in, schmidt_parameters_in )
 
-      call prt_maxmin('T', Atm(1)%pt, is, ie, js, je, ng, Atm(1)%npz, 1.0_FVPRC)
+      call prt_maxmin('T_model', Atm(1)%pt, is, ie, js, je, ng, Atm(1)%npz, 1.0_FVPRC)
 
-      Atm(1)%flagstruct%moist_phys=.false.
+      Atm(1)%flagstruct%dry_mass = MAPL_PSDRY
+      Atm(1)%flagstruct%adjust_dry_mass = .true.
+      Atm(1)%flagstruct%moist_phys = .true.
+
       call p_var(Atm(1)%npz,  is, ie, js, je, Atm(1)%ak(1),  ptop_min,         &
             Atm(1)%delp, Atm(1)%delz, Atm(1)%pt, Atm(1)%ps,               &
             Atm(1)%pe,   Atm(1)%peln, Atm(1)%pk, Atm(1)%pkz,              &
             kappa, Atm(1)%q, ng, Atm(1)%ncnst, dble(Atm(1)%gridstruct%area),Atm(1)%flagstruct%dry_mass,           &
             Atm(1)%flagstruct%adjust_dry_mass, Atm(1)%flagstruct%mountain, Atm(1)%flagstruct%moist_phys,   &
-            Atm(1)%flagstruct%hydrostatic, Atm(1)%flagstruct%nwat, Atm(1)%domain,Atm(1)%flagstruct%make_nh, do_pkz=.false.)
+            Atm(1)%flagstruct%hydrostatic, Atm(1)%flagstruct%nwat, Atm(1)%domain,Atm(1)%flagstruct%make_nh, do_pkz=.true.)
 
    end subroutine get_geos_ic
 
@@ -190,8 +190,8 @@ contains
 
       character(len=128) :: fname, fname1
       real(FVPRC), allocatable:: pkz0(:,:)
-      real(FVPRC), allocatable:: ps0(:,:), gz0(:,:), t0(:,:,:), q0(:,:,:),qlev(:,:)
-      real(FVPRC), allocatable:: u0(:,:,:), v0(:,:,:)
+      real(FVPRC), allocatable:: ps0(:,:), gz0(:,:), t0(:,:,:), q0(:,:,:), qlev(:,:)
+      real(FVPRC), allocatable:: dp0(:,:,:), pe0(:,:,:), u0(:,:,:), v0(:,:,:), w0(:,:,:), dz0(:,:,:)
       real(FVPRC), allocatable:: ak0(:), bk0(:)
       integer :: i, j, k, l, iq, im, jm, km, npts, npx, npy, npz
       integer :: ntiles=6
@@ -201,6 +201,7 @@ contains
       real(FVPRC) gzc(is:ie,js:je)
       real(FVPRC), allocatable:: tp(:,:,:), qp(:,:,:,:)
       real(FVPRC), allocatable:: ua(:,:,:), va(:,:,:)
+      real(FVPRC), allocatable:: wp(:,:,:), dzp(:,:,:), dpp(:,:,:)
 
       real(REAL64), allocatable :: akbk_r8(:)
 
@@ -316,7 +317,6 @@ contains
          enddo
          call print_memuse_stats('get_geos_cubed_ic: init corner_out')
          npts = im
-         call print_memuse_stats('get_geos_cubed_ic: get_c2c_weight')
 
          allocate ( ak0(km+1) )
          allocate ( bk0(km+1) )
@@ -377,6 +377,28 @@ contains
          deallocate ( u0 )
          deallocate ( corner_in )
          deallocate ( corner_out )
+! Read W
+         if (.not. Atm(1)%flagstruct%hydrostatic) then
+         allocate (  w0(isd_i:ied_i,jsd_i:jed_i,km) )
+         w0(:,:,:) = 0.0
+         tileoff = (tile-1)*(jm/ntiles)
+         do k=1,km
+            call MAPL_VarRead(formatter,"W",w0(is_i:ie_i,js_i:je_i,k),arrdes=input_arrdescr,lev=k)
+         enddo
+         call prt_maxmin(' W_geos', w0, is_i, ie_i, js_i, je_i, ng_i, km, 1.0_FVPRC)
+         call print_memuse_stats('get_geos_cubed_ic: read W')
+         endif
+! Read DZ
+         if (.not. Atm(1)%flagstruct%hydrostatic) then
+         allocate (  dz0(isd_i:ied_i,jsd_i:jed_i,km) )
+         dz0(:,:,:) = 0.0
+         tileoff = (tile-1)*(jm/ntiles)
+         do k=1,km
+            call MAPL_VarRead(formatter,"DZ",dz0(is_i:ie_i,js_i:je_i,k),arrdes=input_arrdescr,lev=k)
+         enddo
+         call prt_maxmin('DZ_geos', dz0, is_i, ie_i, js_i, je_i, ng_i, km, 1.0_FVPRC)
+         call print_memuse_stats('get_geos_cubed_ic: read T')
+         endif
 ! Read T
          allocate (  t0(isd_i:ied_i,jsd_i:jed_i,km) )
          t0(:,:,:) = 0.0
@@ -385,12 +407,24 @@ contains
             call MAPL_VarRead(formatter,"PT",t0(is_i:ie_i,js_i:je_i,k),arrdes=input_arrdescr,lev=k)
          enddo
          call print_memuse_stats('get_geos_cubed_ic: read T')
-! Read PE at Surface only
+! Read PE 
+         allocate ( pe0(isd_i:ied_i,jsd_i:jed_i,km+1) )
          allocate ( ps0(isd_i:ied_i,jsd_i:jed_i) )
+         pe0(:,:,:) = 0.0
          ps0(:,:) = 0.0
          tileoff = (tile-1)*(jm/ntiles)
-         call MAPL_VarRead(formatter,"PE",ps0(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr,lev=km+1)
+         do k=1,km+1
+           call MAPL_VarRead(formatter,"PE",pe0(is_i:ie_i,js_i:je_i,k),arrdes=input_arrdescr,lev=k)
+         enddo
+! Get PS
+         ps0(:,:) = pe0(:,:,km+1)
          call mpp_update_domains(ps0, domain_i)
+! Get dp0
+         allocate ( dp0(is_i:ie_i,js_i:je_i,km) )
+         do k=1,km
+            dp0(is_i:ie_i,js_i:je_i,k) = pe0(is_i:ie_i,js_i:je_i,k+1) - pe0(is_i:ie_i,js_i:je_i,k)
+         enddo          
+         deallocate ( pe0 )
 ! Read PKZ
          allocate ( pkz0(isd_i:ied_i,jsd_i:jed_i) )
          pkz0(:,:) = 0.0
@@ -472,12 +506,22 @@ contains
             enddo
             if (moist_variables%size() /= atm(1)%ncnst) call mpp_error(FATAL,'Wrong number of variables in moist file') 
             tileoff = (tile-1)*(jm/ntiles)
-            lvar_cnt=2
+
+            Atm(1)%flagstruct%nwat = 5
+            lvar_cnt=6
 
             do ivar=1,Atm(1)%ncnst
                vname = moist_variables%at(ivar)
                if (trim(vname)=='Q') then
                   iq=1
+               elseif (trim(vname)=='QLLS') then
+                  iq=2
+               elseif (trim(vname)=='QLCN') then
+                  iq=3
+               elseif (trim(vname)=='QILS') then
+                  iq=4
+               elseif (trim(vname)=='QICN') then
+                  iq=5
                else
                   iq=lvar_cnt
                   lvar_cnt=lvar_cnt+1
@@ -487,7 +531,7 @@ contains
                   call MAPL_VarRead(formatter,vname,q0(is_i:ie_i,js_i:je_i,k),arrdes=input_arrdescr,lev=k)
                   call regridder%regrid(q0(is_i:ie_i,js_i:je_i,k),qp(:,:,k,iq),rc=status)
                enddo
-               call prt_maxmin( 'Q_geos_moist', q0, is_i, ie_i, js_i, je_i, ng_i, km, 1._FVPRC)
+               call prt_maxmin( trim(vname)//'_geos_moist', q0, is_i, ie_i, js_i, je_i, ng_i, km, 1._FVPRC)
             enddo
 
             call formatter%close()
@@ -554,9 +598,9 @@ contains
             deallocate(qlev)
 
          enddo
+         deallocate ( q0 )
                    
 ! Horiz Interp for T
-         deallocate ( q0 )
          call mpp_update_domains(t0, domain_i)
          call prt_maxmin( 'T_geos', t0, is_i, ie_i, js_i, je_i, ng_i, km, 1.0_FVPRC)
          allocate (  tp(is:ie,js:je,km) )
@@ -565,11 +609,46 @@ contains
          enddo
          deallocate ( t0 )
 
+! Horiz Interp for W
+         if (.not. Atm(1)%flagstruct%hydrostatic) then
+         call mpp_update_domains(w0, domain_i)
+         call prt_maxmin( 'W_geos', w0, is_i, ie_i, js_i, je_i, ng_i, km, 1.0_FVPRC)
+         allocate (  wp(is:ie,js:je,km) )
+         do k=1,km
+            call regridder%regrid(w0(is_i:ie_i,js_i:je_i,k),wp(:,:,k),rc=status)
+         enddo
+         deallocate ( w0 )
+         endif
+
+! Horiz Interp for DZ & DP
+         if (.not. Atm(1)%flagstruct%hydrostatic) then
+         call mpp_update_domains(dz0, domain_i)
+         call prt_maxmin( 'DZ_geos', dz0, is_i, ie_i, js_i, je_i, ng_i, km, 1.0_FVPRC)
+         allocate (  dzp(is:ie,js:je,km) )
+         do k=1,km
+            call regridder%regrid(dz0(is_i:ie_i,js_i:je_i,k),dzp(:,:,k),rc=status)
+         enddo
+         call prt_maxmin( 'DP_geos', dp0, is_i, ie_i, js_i, je_i, 0, km, 1.0_FVPRC)
+         allocate (  dpp(is:ie,js:je,km) )
+         do k=1,km
+            call regridder%regrid(dp0(is_i:ie_i,js_i:je_i,k),dpp(:,:,k),rc=status)
+         enddo
+         dzp = -dzp/dpp ! ="specific volume"/grav
+         deallocate ( dz0 )
+         deallocate ( dpp ) 
+         endif
+         deallocate ( dp0 )
+
 ! Horz/Vert remap for scalars
          nqmap =  Atm(1)%ncnst
+         call remap_scalar(im, jm, km, npz, nqmap, nqmap, ak0, bk0, psc, gzc, tp, wp, dzp, qp, Atm(1), &
+                           tracer_bundles, extra_rst )
 
-         call remap_scalar(im, jm, km, npz, nqmap, nqmap, ak0, bk0, psc, gzc, tp, qp, Atm(1),tracer_bundles,extra_rst)
-
+         if (.not. Atm(1)%flagstruct%hydrostatic) then
+            Atm(1)%delz = -Atm(1)%delz*Atm(1)%delp
+            deallocate ( wp )
+            deallocate ( dzp )
+         endif
          deallocate ( tp )
          deallocate ( qp )
          call print_memuse_stats('get_geos_cubed_ic: remap_scalar')
@@ -595,6 +674,11 @@ contains
       call prt_maxmin(' U_model', Atm(1)%u, is, ie, js, je, ng, npz, 1.0_FVPRC)
       call prt_maxmin(' V_model', Atm(1)%v, is, ie, js, je, ng, npz, 1.0_FVPRC)
       call prt_maxmin('PT_model', Atm(1)%pt, is, ie, js, je, ng, npz, 1.0_FVPRC)
+      if (.not. Atm(1)%flagstruct%hydrostatic) then
+        call prt_maxmin(' W_model', Atm(1)%w, is, ie, js, je, ng, npz, 1.0_FVPRC)
+        call prt_maxmin('DZ_model', Atm(1)%delz, is, ie, js, je, ng, npz, 1.0_FVPRC)
+      endif
+
 ! Range check the MOIST tracers
 ! Iterate over tracer names
   
@@ -762,7 +846,7 @@ contains
 !------
 ! map u
 !------
-                  call mappm(km, pe0, ua(is:ie,j,1:km), npz, pe1, qn1, is,ie, -1, 4, Atm(1)%ptop)
+                  call mappm(km, pe0, ua(is:ie,j,1:km), npz, pe1, qn1, is,ie, -1, 9, Atm(1)%ptop)
                   do k=1,npz
                      do i=is,ie
                         ut(i,j,k) = qn1(i,k)
@@ -771,7 +855,7 @@ contains
 !------
 ! map v
 !------
-                  call mappm(km, pe0, va(is:ie,j,1:km), npz, pe1, qn1, is,ie, -1, 4, Atm(1)%ptop)
+                  call mappm(km, pe0, va(is:ie,j,1:km), npz, pe1, qn1, is,ie, -1, 9, Atm(1)%ptop)
                   do k=1,npz
                      do i=is,ie
                         vt(i,j,k) = qn1(i,k)
@@ -793,51 +877,6 @@ contains
 
                end subroutine remap_winds
 
-
-               subroutine remap_wz(im, jm, km, npz, mg, ak0, bk0, psc, wa, wz, Atm)
-                  type(fv_atmos_type), intent(inout) :: Atm(:)
-                  integer, intent(in):: im, jm, km, npz
-                  integer, intent(in):: mg     ! mg = 0 for delz; mg=3 for w
-                  real(FVPRC),    intent(in):: ak0(km+1), bk0(km+1)
-                  real(FVPRC),    intent(in):: psc(is:ie,js:je)
-                  real(FVPRC),    intent(in), dimension(is:ie,js:je,km):: wa
-                  real(FVPRC),   intent(out):: wz(is-mg:ie+mg,js-mg:je+mg,npz)
-! local:
-                  real(FVPRC), dimension(is:ie, km+1):: pe0
-                  real(FVPRC), dimension(is:ie,npz+1):: pe1
-                  real(FVPRC), dimension(is:ie,npz):: qn1
-                  integer i,j,k
-
-                  do 5000 j=js,je
-
-                     do k=1,km+1
-                        do i=is,ie
-                           pe0(i,k) = ak0(k) + bk0(k)*psc(i,j)
-                        enddo
-                     enddo
-
-                     do k=1,npz+1
-                        do i=is,ie
-                           pe1(i,k) = Atm(1)%ak(k) + Atm(1)%bk(k)*Atm(1)%ps(i,j)
-                        enddo
-                     enddo
-
-!------
-! map w
-!------
-                     call mappm(km, pe0, wa(is:ie,j,1:km), npz, pe1, qn1, is,ie, -1, 4, Atm(1)%ptop)
-                     do k=1,npz
-                        do i=is,ie
-                           wz(i,j,k) = qn1(i,k)
-                        enddo
-                     enddo
-
-5000                 continue
-
-! call prt_maxmin('WZ', wz, is, ie, js, je, mg, npz, 1._FVPRC, is_master())
-! if (is_master()) write(*,*) 'done remap_wz'
-
-                  end subroutine remap_wz
 
   subroutine remap_xyz( im, jbeg, jend, jm, km, npz, nq, ncnst, lon, lat, ak0, bk0, ps0, gz0,   &
                         ua, va, ta, qa, Atm )
@@ -1064,7 +1103,7 @@ contains
       do iq=1,ncnst
 ! Note: AM2 physics tracers only
 !         if ( iq==sphum .or. iq==liq_wat .or. iq==ice_wat .or. iq==cld_amt ) then
-         call mappm(km, pe0, qp(is,1,iq), npz, pe1,  qn1, is,ie, 0, 11, Atm%ptop)
+         call mappm(km, pe0, qp(is,1,iq), npz, pe1,  qn1, is,ie, 0, 9, Atm%ptop)
          do k=1,npz
             do i=is,ie
                Atm%q(i,j,k,iq) = qn1(i,k)

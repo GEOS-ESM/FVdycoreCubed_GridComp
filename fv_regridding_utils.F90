@@ -7,7 +7,7 @@ module fv_regridding_utils
    use fv_diagnostics_mod,only: prt_maxmin
    use fv_mp_mod,         only: is_master, ng
    use fv_mapz_mod,       only: mappm
-   use mpp_mod,            only: mpp_error, FATAL, NOTE, mpp_broadcast,mpp_npes
+   use mpp_mod,           only: mpp_error, FATAL, NOTE, mpp_broadcast,mpp_npes
    use MAPL
 
    implicit none
@@ -120,12 +120,12 @@ contains
    
  end subroutine copy_fv_rst
 
- subroutine remap_scalar(im, jm, km, npz, nq, ncnst, ak0, bk0, psc, gzc, ta, qa, Atm, in_fv_rst,out_fv_rst)
+ subroutine remap_scalar(im, jm, km, npz, nq, ncnst, ak0, bk0, psc, gzc, ta, wa, dza, qa, Atm, in_fv_rst, out_fv_rst)
   type(fv_atmos_type), intent(inout) :: Atm
   integer, intent(in):: im, jm, km, npz, nq, ncnst
   real(FVPRC),    intent(in):: ak0(km+1), bk0(km+1)
   real(FVPRC),    intent(in), dimension(Atm%bd%is:Atm%bd%ie,Atm%bd%js:Atm%bd%je):: psc, gzc
-  real(FVPRC),    intent(in), dimension(Atm%bd%is:Atm%bd%ie,Atm%bd%js:Atm%bd%je,km):: ta
+  real(FVPRC),    intent(in), dimension(Atm%bd%is:Atm%bd%ie,Atm%bd%js:Atm%bd%je,km):: ta, wa, dza
   real(FVPRC),    intent(in), dimension(Atm%bd%is:Atm%bd%ie,Atm%bd%js:Atm%bd%je,km,ncnst):: qa
   type(fv_rst), pointer,   intent(inout) :: in_fv_rst(:)
   type(fv_rst), pointer,   intent(inout) :: out_fv_rst(:)
@@ -184,7 +184,7 @@ contains
            gz(k) = gz(k+1) + rdgas*tp(i,k)*(pn0(i,k+1)-pn0(i,k))
        enddo
 ! Only lowest layer potential temp is needed
-          pt0(km) = tp(i,km)/(pk0(km+1)-pk0(km))*(kappa*(pn0(i,km+1)-pn0(i,km)))
+       pt0(km) = tp(i,km)/(pk0(km+1)-pk0(km))*(kappa*(pn0(i,km+1)-pn0(i,km)))
        if( Atm%phis(i,j)>gzc(i,j) ) then
            do k=km,1,-1
               if( Atm%phis(i,j) <  gz(k)  .and.    &
@@ -220,11 +220,41 @@ contains
         enddo
      enddo
 
+! Remap vertical wind:
+     if ( .not. Atm%flagstruct%hydrostatic ) then
+        do k=1,km
+           do i=is,ie
+              qp1(i,k) = wa(i,j,k)
+           enddo
+        enddo
+        call mappm(km, pn0, qp1, npz, pn1, qn1, is,ie, -1, 9, Atm%ptop)
+        do k=1,npz
+           do i=is,ie
+              Atm%w(i,j,k) = qn1(i,k)
+           enddo
+        enddo
+     endif
+
+! Remap delz for hybrid sigma-p coordinate
+     if ( .not. Atm%flagstruct%hydrostatic ) then
+        do k=1,km
+           do i=is,ie
+              qp1(i,k) = dza(i,j,k)
+           enddo
+        enddo
+        call mappm(km, pn0, qp1, npz, pn1, qn1, is,ie, 1, 9, Atm%ptop)
+        do k=1,npz
+           do i=is,ie
+              Atm%delz(i,j,k) = qn1(i,k)
+           enddo
+        enddo
+     endif
+
 !---------------
 ! map tracers
 !----------------
      do iq=1,ncnst
-        call mappm(km, pe0, qp(is,1,iq), npz, pe1,  qn1, is,ie, 0, 11, Atm%ptop)
+        call mappm(km, pe0, qp(is,1,iq), npz, pe1,  qn1, is,ie, 0, 9, Atm%ptop)
         do k=1,npz
            do i=is,ie
               Atm%q(i,j,k,iq) = qn1(i,k)
@@ -247,7 +277,7 @@ contains
                     do k=1,in_fv_rst(ifile)%vars(ivar)%nLev
                        qp1(is:ie,k)=in_fv_rst(ifile)%vars(ivar)%ptr3d(is:ie,j,k)
                     enddo
-                    call mappm(km, pe0, qp1, npz, pe1,  qn1, is,ie, 0, 11, Atm%ptop)
+                    call mappm(km, pe0, qp1, npz, pe1,  qn1, is,ie, 0, 9, Atm%ptop)
                     do k=1,npz
                        do i=is,ie
                           out_fv_rst(ifile)%vars(ivar)%ptr3d(i,j,k) = qn1(i,k)
@@ -270,7 +300,7 @@ contains
                        do k=1,in_fv_rst(ifile)%vars(ivar)%nLev
                           qp1(is:ie,k)=in_fv_rst(ifile)%vars(ivar)%ptr4d(is:ie,j,k,n_ungrid)
                        enddo
-                       call mappm(km, pe0, qp1, npz, pe1,  qn1, is,ie, 0, 11, Atm%ptop)
+                       call mappm(km, pe0, qp1, npz, pe1,  qn1, is,ie, 0, 9, Atm%ptop)
                        do k=1,npz
                           do i=is,ie
                              out_fv_rst(ifile)%vars(ivar)%ptr4d(i,j,k,n_ungrid) = qn1(i,k)
