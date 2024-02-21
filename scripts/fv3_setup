@@ -162,26 +162,8 @@ endif
 #                 Test for Compiler and MPI Setup
 #######################################################################
 
-setenv BASEDIR `awk '{print $2}' $ETCDIR/BASEDIR.rc`
-
-     if ( `echo $BASEDIR | grep -i mvapich2` != '') then
-   set MPI = mvapich2
-else if ( `echo $BASEDIR | grep -i mpich`    != '') then
-   set MPI = mpich
-else if ( `echo $BASEDIR | grep -i openmpi`  != '') then
-   set MPI = openmpi
-else if ( `echo $BASEDIR | grep -i hpcx`     != '') then
-   set MPI = openmpi
-else if ( `echo $BASEDIR | grep -i impi`     != '') then
-   set MPI = intelmpi
-else if ( `echo $BASEDIR | grep -i intelmpi` != '') then
-   set MPI = intelmpi
-else if ( `echo $BASEDIR | grep -i mpt`      != '') then
-   set MPI = mpt
-else
-   # Assume default is Intel MPI in case of older baselibs
-   set MPI = intelmpi
-endif
+# Get MPI stack from CMake
+set MPI_STACK = @MPI_STACK@
 
 #######################################################################
 #               Enter Experiment Specific Run Parameters
@@ -717,7 +699,7 @@ echo $GROUP > $HOME/.GROUProot
 
 /bin/rm -f $EXPDIR/SETENV.commands
 
-if( $MPI == openmpi ) then
+if( $MPI_STACK == openmpi ) then
 
 # This turns off an annoying warning when running
 # Open MPI on a system where TMPDIRs are on a networked
@@ -730,7 +712,7 @@ EOF
 # The below settings seem to be recommended for hybrid
 # systems using MVAPICH2 but could change
 
-else if( $MPI == mvapich ) then
+else if( $MPI_STACK == mvapich ) then
 
 cat > $EXPDIR/SETENV.commands << EOF
    setenv MV2_ENABLE_AFFINITY     0
@@ -739,7 +721,7 @@ cat > $EXPDIR/SETENV.commands << EOF
    setenv MV2_GATHERV_SSEND_THRESHOLD 256
 EOF
 
-else if( $MPI == mpt ) then
+else if( $MPI_STACK == mpt ) then
 
 cat > $EXPDIR/SETENV.commands << EOF
 
@@ -768,7 +750,7 @@ cat > $EXPDIR/SETENV.commands << EOF
 
 EOF
 
-else if( $MPI == intelmpi ) then
+else if( $MPI_STACK == intelmpi ) then
 
 cat > $EXPDIR/SETENV.commands << EOF
 #setenv MPS_STAT_LEVEL 4
