@@ -127,7 +127,7 @@ contains
             Atm(1)%pe,   Atm(1)%peln, Atm(1)%pk, Atm(1)%pkz,              &
             kappa, Atm(1)%q, ng, Atm(1)%ncnst, dble(Atm(1)%gridstruct%area),Atm(1)%flagstruct%dry_mass,           &
             Atm(1)%flagstruct%adjust_dry_mass, Atm(1)%flagstruct%mountain, Atm(1)%flagstruct%moist_phys,   &
-            Atm(1)%flagstruct%hydrostatic, Atm(1)%flagstruct%nwat, Atm(1)%domain,Atm(1)%flagstruct%make_nh, do_pkz=.false.)
+            Atm(1)%flagstruct%hydrostatic, Atm(1)%flagstruct%nwat, Atm(1)%domain,Atm(1)%flagstruct%make_nh)
 
    end subroutine get_geos_ic_bin
 

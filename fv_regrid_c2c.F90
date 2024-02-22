@@ -20,13 +20,13 @@ module fv_regrid_c2c
    use, intrinsic :: iso_fortran_env, only: REAL64, REAL32
 
    use fv_arrays_mod,     only: fv_atmos_type, fv_grid_type, fv_grid_bounds_type, FVPRC, REAL4, REAL8
-   use fv_diagnostics_mod,only: prt_maxmin
+   use fv_diagnostics_mod,only: prt_mxm, prt_maxmin
    use fv_mp_mod,         only: is_master, ng, mp_barrier, mp_gather, mp_bcst, &
          is,js,ie,je, isd,jsd,ied,jed, fill_corners, YDir
    use fv_grid_utils_mod, only: ptop_min
    use fv_grid_utils_mod, only: normalize_vect
    use fv_grid_utils_mod, only: direct_transform
-   use fv_mapz_mod,       only: mappm
+   use fv_mapz_mod,       only: mappm, map_scalar
    use fv_surf_map_mod,   only: surfdrv
    use fv_timing_mod,     only: timing_on, timing_off
    use init_hydro_mod,    only: p_var
@@ -163,18 +163,18 @@ contains
       allocate  ( Atm(1)%q(isd:ied,jsd:jed,Atm(1)%npz,Atm(1)%ncnst) )
       call get_geos_cubed_ic( Atm, extra_rst, gridOut, do_schmidt_in, schmidt_parameters_in )
 
-      call prt_maxmin('T_model', Atm(1)%pt, is, ie, js, je, ng, Atm(1)%npz, 1.0_FVPRC)
-
       Atm(1)%flagstruct%dry_mass = MAPL_PSDRY
       Atm(1)%flagstruct%adjust_dry_mass = .true.
-      Atm(1)%flagstruct%moist_phys = .true.
 
-      call p_var(Atm(1)%npz,  is, ie, js, je, Atm(1)%ak(1),  ptop_min,         &
+     ! Atm(1)%pt must be Dry T
+     ! nh_pkz=.false. since FV3 restarts right now expect the hydrostatic pkz ALWAYS !
+      call p_var(Atm(1)%npz,  is, ie, js, je, Atm(1)%ak(1),  ptop_min,    &
             Atm(1)%delp, Atm(1)%delz, Atm(1)%pt, Atm(1)%ps,               &
             Atm(1)%pe,   Atm(1)%peln, Atm(1)%pk, Atm(1)%pkz,              &
-            kappa, Atm(1)%q, ng, Atm(1)%ncnst, dble(Atm(1)%gridstruct%area),Atm(1)%flagstruct%dry_mass,           &
+            kappa, Atm(1)%q, ng, Atm(1)%ncnst, dble(Atm(1)%gridstruct%area),Atm(1)%flagstruct%dry_mass,    &
             Atm(1)%flagstruct%adjust_dry_mass, Atm(1)%flagstruct%mountain, Atm(1)%flagstruct%moist_phys,   &
-            Atm(1)%flagstruct%hydrostatic, Atm(1)%flagstruct%nwat, Atm(1)%domain,Atm(1)%flagstruct%make_nh, do_pkz=.true.)
+            Atm(1)%flagstruct%hydrostatic, Atm(1)%flagstruct%nwat, Atm(1)%domain, Atm(1)%flagstruct%make_nh, nh_pkz=.false.)
+       if (Atm(1)%flagstruct%make_nh) Atm(1)%w = 0.0
 
    end subroutine get_geos_ic
 
@@ -399,13 +399,14 @@ contains
          call prt_maxmin('DZ_geos', dz0, is_i, ie_i, js_i, je_i, ng_i, km, 1.0_FVPRC)
          call print_memuse_stats('get_geos_cubed_ic: read T')
          endif
-! Read T
+! Read PT
          allocate (  t0(isd_i:ied_i,jsd_i:jed_i,km) )
          t0(:,:,:) = 0.0
          tileoff = (tile-1)*(jm/ntiles)
          do k=1,km
             call MAPL_VarRead(formatter,"PT",t0(is_i:ie_i,js_i:je_i,k),arrdes=input_arrdescr,lev=k)
          enddo
+         call prt_maxmin('PT_geos', t0, is_i, ie_i, js_i, je_i, ng_i, km, 1.0_FVPRC)
          call print_memuse_stats('get_geos_cubed_ic: read T')
 ! Read PE 
          allocate ( pe0(isd_i:ied_i,jsd_i:jed_i,km+1) )
@@ -433,6 +434,7 @@ contains
             call MAPL_VarRead(formatter,"PKZ",pkz0(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr,lev=k)
             t0(is_i:ie_i,js_i:je_i,k) = t0(is_i:ie_i,js_i:je_i,k)*pkz0(is_i:ie_i,js_i:je_i)
          enddo
+         call prt_maxmin( 'T_geos', t0, is_i, ie_i, js_i, je_i, ng_i, km, 1.0_FVPRC)
          call print_memuse_stats('get_geos_cubed_ic: converted T')
          deallocate ( pkz0 )
 
@@ -507,8 +509,29 @@ contains
             if (moist_variables%size() /= atm(1)%ncnst) call mpp_error(FATAL,'Wrong number of variables in moist file') 
             tileoff = (tile-1)*(jm/ntiles)
 
-            Atm(1)%flagstruct%nwat = 5
-            lvar_cnt=6
+            lvar_cnt=0
+            do ivar=1,Atm(1)%ncnst
+               vname = moist_variables%at(ivar)
+               if (trim(vname)=='Q') then
+                  lvar_cnt=lvar_cnt+1
+               elseif (trim(vname)=='QLLS') then
+                  lvar_cnt=lvar_cnt+1
+               elseif (trim(vname)=='QLCN') then
+                  lvar_cnt=lvar_cnt+1
+               elseif (trim(vname)=='QILS') then
+                  lvar_cnt=lvar_cnt+1
+               elseif (trim(vname)=='QICN') then
+                  lvar_cnt=lvar_cnt+1
+               elseif (trim(vname)=='QRAIN') then
+                  lvar_cnt=lvar_cnt+1
+               elseif (trim(vname)=='QSNOW') then
+                  lvar_cnt=lvar_cnt+1
+               elseif (trim(vname)=='QGRAUPEL') then
+                  lvar_cnt=lvar_cnt+1
+               endif
+            enddo
+            Atm(1)%flagstruct%nwat = lvar_cnt
+            lvar_cnt=lvar_cnt+1
 
             do ivar=1,Atm(1)%ncnst
                vname = moist_variables%at(ivar)
@@ -522,6 +545,12 @@ contains
                   iq=4
                elseif (trim(vname)=='QICN') then
                   iq=5
+               elseif (trim(vname)=='QRAIN') then
+                  iq=6
+               elseif (trim(vname)=='QSNOW') then
+                  iq=7
+               elseif (trim(vname)=='QGRAUPEL') then
+                  iq=8
                else
                   iq=lvar_cnt
                   lvar_cnt=lvar_cnt+1
@@ -602,7 +631,6 @@ contains
                    
 ! Horiz Interp for T
          call mpp_update_domains(t0, domain_i)
-         call prt_maxmin( 'T_geos', t0, is_i, ie_i, js_i, je_i, ng_i, km, 1.0_FVPRC)
          allocate (  tp(is:ie,js:je,km) )
          do k=1,km
             call regridder%regrid(t0(is_i:ie_i,js_i:je_i,k),tp(:,:,k),rc=status)
@@ -612,7 +640,6 @@ contains
 ! Horiz Interp for W
          if (.not. Atm(1)%flagstruct%hydrostatic) then
          call mpp_update_domains(w0, domain_i)
-         call prt_maxmin( 'W_geos', w0, is_i, ie_i, js_i, je_i, ng_i, km, 1.0_FVPRC)
          allocate (  wp(is:ie,js:je,km) )
          do k=1,km
             call regridder%regrid(w0(is_i:ie_i,js_i:je_i,k),wp(:,:,k),rc=status)
@@ -623,12 +650,10 @@ contains
 ! Horiz Interp for DZ & DP
          if (.not. Atm(1)%flagstruct%hydrostatic) then
          call mpp_update_domains(dz0, domain_i)
-         call prt_maxmin( 'DZ_geos', dz0, is_i, ie_i, js_i, je_i, ng_i, km, 1.0_FVPRC)
          allocate (  dzp(is:ie,js:je,km) )
          do k=1,km
             call regridder%regrid(dz0(is_i:ie_i,js_i:je_i,k),dzp(:,:,k),rc=status)
          enddo
-         call prt_maxmin( 'DP_geos', dp0, is_i, ie_i, js_i, je_i, 0, km, 1.0_FVPRC)
          allocate (  dpp(is:ie,js:je,km) )
          do k=1,km
             call regridder%regrid(dp0(is_i:ie_i,js_i:je_i,k),dpp(:,:,k),rc=status)
@@ -654,6 +679,7 @@ contains
          call print_memuse_stats('get_geos_cubed_ic: remap_scalar')
 ! Horz/Vert remap for U/V
          call remap_winds(im, jm, km, npz, ak0, bk0, psc, ua, va, Atm)
+         call mp_barrier()
          deallocate ( ua )
          deallocate ( va )
          call print_memuse_stats('get_geos_cubed_ic: remap_winds')
@@ -673,7 +699,7 @@ contains
       call prt_maxmin('DP_model', Atm(1)%delp, is, ie, js, je, ng, npz, 1.0_FVPRC)
       call prt_maxmin(' U_model', Atm(1)%u, is, ie, js, je, ng, npz, 1.0_FVPRC)
       call prt_maxmin(' V_model', Atm(1)%v, is, ie, js, je, ng, npz, 1.0_FVPRC)
-      call prt_maxmin('PT_model', Atm(1)%pt, is, ie, js, je, ng, npz, 1.0_FVPRC)
+      call prt_maxmin(' T_model', Atm(1)%pt, is, ie, js, je, ng, npz, 1.0_FVPRC)
       if (.not. Atm(1)%flagstruct%hydrostatic) then
         call prt_maxmin(' W_model', Atm(1)%w, is, ie, js, je, ng, npz, 1.0_FVPRC)
         call prt_maxmin('DZ_model', Atm(1)%delz, is, ie, js, je, ng, npz, 1.0_FVPRC)
@@ -815,6 +841,7 @@ contains
  end subroutine remap_coef
 
             subroutine remap_winds(im, jm, km, npz, ak0, bk0, psc, ua, va, Atm)
+               integer, parameter :: kord_mt = 9
                type(fv_atmos_type), intent(inout) :: Atm(:)
                integer, intent(in):: im, jm, km, npz
                real(FVPRC),    intent(in):: ak0(km+1), bk0(km+1)
@@ -826,6 +853,9 @@ contains
                real(FVPRC), dimension(is:ie,npz+1):: pe1
                real(FVPRC), dimension(is:ie,npz):: qn1
                integer i,j,k
+
+               call prt_mxm('REMAP_WINDS: UA', ua, is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+               call prt_mxm('REMAP_WINDS: VA', va, is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
 
                ut = 0.0
                vt = 0.0
@@ -846,7 +876,10 @@ contains
 !------
 ! map u
 !------
-                  call mappm(km, pe0, ua(is:ie,j,1:km), npz, pe1, qn1, is,ie, -1, 9, Atm(1)%ptop)
+                  call mappm(km, pe0, ua(is:ie,j,1:km), npz, pe1, qn1, is,ie, -1, kord_mt, Atm(1)%ptop)
+                 !call map_scalar( km, pe0, ua(is:ie,j,1:km),    &
+                 !                npz, pe1, qn1,   is, ie,       &
+                 !                j,  is, ie, j, j, -1, kord_mt, -1.e25 )
                   do k=1,npz
                      do i=is,ie
                         ut(i,j,k) = qn1(i,k)
@@ -855,7 +888,10 @@ contains
 !------
 ! map v
 !------
-                  call mappm(km, pe0, va(is:ie,j,1:km), npz, pe1, qn1, is,ie, -1, 9, Atm(1)%ptop)
+                  call mappm(km, pe0, va(is:ie,j,1:km), npz, pe1, qn1, is,ie, -1, kord_mt, Atm(1)%ptop)
+                 !call map_scalar( km, pe0, va(is:ie,j,1:km),    &
+                 !                npz, pe1, qn1,   is, ie,       &
+                 !                j,  is, ie, j, j, -1, kord_mt, -1.e25 )
                   do k=1,npz
                      do i=is,ie
                         vt(i,j,k) = qn1(i,k)
@@ -864,14 +900,19 @@ contains
 
 5000              continue
 
-                  call prt_maxmin('UT', ut, is, ie, js, je, ng, npz, 1.0_FVPRC)
-                  call prt_maxmin('VT', vt, is, ie, js, je, ng, npz, 1.0_FVPRC)
+                  call prt_mxm('REMAP_WINDS: UT', ut, is, ie, js, je, ng, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+                  call prt_mxm('REMAP_WINDS: VT', vt, is, ie, js, je, ng, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
 
 !----------------------------------------------
 ! winds: lat-lon ON A to Cubed-D transformation:
 !----------------------------------------------
                   call cubed_a2d(Atm(1)%npx, Atm(1)%npy, npz, ut, vt, Atm(1)%u, Atm(1)%v, Atm(1)%gridstruct, &
                   Atm(1)%domain, Atm(1)%bd )
+
+                  ut = Atm(1)%u(isd:ied,jsd:jed,1:npz)
+                  vt = Atm(1)%v(isd:ied,jsd:jed,1:npz)
+                  call prt_mxm('REMAP_WINDS: U', ut, is, ie, js, je, ng, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+                  call prt_mxm('REMAP_WINDS: V', vt, is, ie, js, je, ng, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
 
                   if (is_master()) write(*,*) 'done remap_winds'
 
@@ -1470,9 +1511,6 @@ contains
 ! Compute 3D wind on A grid
        do j=js-1,je+1
           do i=is-1,ie+1
-             !v3(1,i,j) = ua(i,j,k)*vlon(1,i,j) + va(i,j,k)*vlat(1,i,j)
-             !v3(2,i,j) = ua(i,j,k)*vlon(2,i,j) + va(i,j,k)*vlat(2,i,j)
-             !v3(3,i,j) = ua(i,j,k)*vlon(3,i,j) + va(i,j,k)*vlat(3,i,j)
              v3(1,i,j) = ua(i,j,k)*vlon(i,j,1) + va(i,j,k)*vlat(i,j,1)
              v3(2,i,j) = ua(i,j,k)*vlon(i,j,2) + va(i,j,k)*vlat(i,j,2)
              v3(3,i,j) = ua(i,j,k)*vlon(i,j,3) + va(i,j,k)*vlat(i,j,3)

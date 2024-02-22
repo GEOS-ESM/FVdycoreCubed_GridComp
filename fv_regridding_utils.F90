@@ -6,7 +6,7 @@ module fv_regridding_utils
    use fv_arrays_mod,     only: fv_atmos_type, fv_grid_type, fv_grid_bounds_type, FVPRC, REAL4, REAL8
    use fv_diagnostics_mod,only: prt_maxmin
    use fv_mp_mod,         only: is_master, ng
-   use fv_mapz_mod,       only: mappm
+   use fv_mapz_mod,       only: mappm, map_scalar
    use mpp_mod,           only: mpp_error, FATAL, NOTE, mpp_broadcast,mpp_npes
    use MAPL
 
@@ -26,6 +26,13 @@ module fv_regridding_utils
    real(FVPRC), parameter :: RVGAS        = MAPL_RVAP
    real(FVPRC), parameter :: CP_AIR       = MAPL_CP
    real(FVPRC), parameter:: zvir = rvgas/rdgas - 1.
+
+   integer, parameter :: kord_tm = 9
+   integer, parameter :: kord_mt = 9
+   integer, parameter :: kord_wz = 9
+   integer, parameter :: kord_tr = 9
+
+   real, parameter:: t_min= 184. !< temperature below which applies stricter remapping constraint
 
    type fv_var
       character(len=128)   :: name
@@ -135,7 +142,7 @@ contains
   real(FVPRC), dimension(Atm%bd%is:Atm%bd%ie,npz):: qn1
   real(FVPRC), dimension(Atm%bd%is:Atm%bd%ie,npz+1):: pe1, pn1
   real(FVPRC), dimension(Atm%bd%is:Atm%bd%ie,npz+1):: q_edge_old,q_edge_new
-  real(FVPRC) pt0(km), gz(km+1), pk0(km+1)
+  real(FVPRC) pt0(km), gz(km+1), pk0(km+1), pk1(Atm%bd%is:Atm%bd%ie,npz+1)
   real(FVPRC) qp( Atm%bd%is:Atm%bd%ie,km,ncnst)
   real(FVPRC) qp1(Atm%bd%is:Atm%bd%ie,km)
   real(FVPRC) pst, p1, p2, alpha, rdg
@@ -167,7 +174,7 @@ contains
           enddo
        enddo
        do k=1,km
-          tp(i,k) = ta(i,j,k)*(1.+zvir*qp(i,k,sphum))
+          tp(i,k) = ta(i,j,k) ! Dry T
        enddo
 
 ! Tracers:
@@ -205,11 +212,13 @@ contains
      do i=is,ie
         pe1(i,1) = Atm%ak(1)
         pn1(i,1) = log(pe1(i,1))
+        pk1(i,1) = pe1(i,1)**kappa
      enddo
      do k=2,npz+1
        do i=is,ie
           pe1(i,k) = Atm%ak(k) + Atm%bk(k)*Atm%ps(i,j)
           pn1(i,k) = log(pe1(i,k))
+          pk1(i,k) = pe1(i,k)**kappa
        enddo
      enddo
 
@@ -227,7 +236,10 @@ contains
               qp1(i,k) = wa(i,j,k)
            enddo
         enddo
-        call mappm(km, pn0, qp1, npz, pn1, qn1, is,ie, -1, 9, Atm%ptop)
+        call mappm(km, pn0, qp1, npz, pn1, qn1, is,ie, -1, kord_wz, Atm%ptop)
+       !call map_scalar( km, pn0, qp1,                 &
+       !                npz, pn1, qn1,   is, ie,       &
+       !                j,  is, ie, j, j, -1, kord_wz, -1.e25 )
         do k=1,npz
            do i=is,ie
               Atm%w(i,j,k) = qn1(i,k)
@@ -242,7 +254,10 @@ contains
               qp1(i,k) = dza(i,j,k)
            enddo
         enddo
-        call mappm(km, pn0, qp1, npz, pn1, qn1, is,ie, 1, 9, Atm%ptop)
+        call mappm(km, pn0, qp1, npz, pn1, qn1, is,ie, 1, kord_wz, Atm%ptop)
+       !call map_scalar( km, pn0, qp1,                 &
+       !                npz, pn1, qn1,   is, ie,       &
+       !                j,  is, ie, j, j, 1, kord_wz, -1.e25 )
         do k=1,npz
            do i=is,ie
               Atm%delz(i,j,k) = qn1(i,k)
@@ -254,7 +269,10 @@ contains
 ! map tracers
 !----------------
      do iq=1,ncnst
-        call mappm(km, pe0, qp(is,1,iq), npz, pe1,  qn1, is,ie, 0, 9, Atm%ptop)
+        call mappm(km, pe0, qp(is,1,iq), npz, pe1,  qn1, is,ie, 0, kord_tr, Atm%ptop)
+       !call map_scalar( km, pe0, qp(is,1,iq),         &
+       !                npz, pe1, qn1,   is, ie,       &
+       !                j,  is, ie, j, j, 0, kord_tr, -1.e25 )
         do k=1,npz
            do i=is,ie
               Atm%q(i,j,k,iq) = qn1(i,k)
@@ -277,7 +295,10 @@ contains
                     do k=1,in_fv_rst(ifile)%vars(ivar)%nLev
                        qp1(is:ie,k)=in_fv_rst(ifile)%vars(ivar)%ptr3d(is:ie,j,k)
                     enddo
-                    call mappm(km, pe0, qp1, npz, pe1,  qn1, is,ie, 0, 9, Atm%ptop)
+                    call mappm(km, pe0, qp1, npz, pe1,  qn1, is,ie, 0, kord_tr, Atm%ptop)
+                   !call map_scalar( km, pe0, qp1,                 &       
+                   !                npz, pe1, qn1,   is, ie,       &
+                   !                j,  is, ie, j, j, 0, kord_tr, -1.e25 )
                     do k=1,npz
                        do i=is,ie
                           out_fv_rst(ifile)%vars(ivar)%ptr3d(i,j,k) = qn1(i,k)
@@ -300,7 +321,10 @@ contains
                        do k=1,in_fv_rst(ifile)%vars(ivar)%nLev
                           qp1(is:ie,k)=in_fv_rst(ifile)%vars(ivar)%ptr4d(is:ie,j,k,n_ungrid)
                        enddo
-                       call mappm(km, pe0, qp1, npz, pe1,  qn1, is,ie, 0, 9, Atm%ptop)
+                       call mappm(km, pe0, qp1, npz, pe1,  qn1, is,ie, 0, kord_tr, Atm%ptop)
+                      !call map_scalar( km, pe0, qp1,                 &         
+                      !                npz, pe1, qn1,   is, ie,       &        
+                      !                j,  is, ie, j, j, 0, kord_tr, -1.e25 )        
                        do k=1,npz
                           do i=is,ie
                              out_fv_rst(ifile)%vars(ivar)%ptr4d(i,j,k,n_ungrid) = qn1(i,k)
@@ -328,12 +352,18 @@ contains
      enddo
 
 !-------------------------------------------------------------
-! map virtual temperature using geopotential conserving scheme.
+! map dry temperature using cubic scheme.
 !-------------------------------------------------------------
-     call mappm(km, pn0, tp, npz, pn1, qn1, is,ie, 1, 9, Atm%ptop)
+     call mappm(km, pn0, tp, npz, pn1, qn1, is,ie, 1, kord_tm, Atm%ptop)
+    !call map_scalar( km,  pn0,  tp,                 &
+    !                 npz, pn1, qn1,   is, ie,       &
+    !                 j,  is, ie, j, j, 1, kord_tm, t_min )
+    !call map1_gmao ( km,  pe0,  tp,                 &
+    !                 npz, pe1, qn1,   is, ie,       &
+    !                 j,  is, ie, j, j, kappa, 3, P_MAP=1, conserv=.false.)
      do k=1,npz
         do i=is,ie
-           Atm%pt(i,j,k) = qn1(i,k)/(1.+zvir*Atm%q(i,j,k,sphum))
+           Atm%pt(i,j,k) = qn1(i,k) ! Still Dry T at this point
         enddo
      enddo
 

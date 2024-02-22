@@ -69,7 +69,7 @@ program interp_restarts
    type(StringVectorIterator) :: siter
    type(StringIntegerMap) :: tracer_names
    ! bma added
-   integer :: p_split, npx, npy, npz, ivar, lcnt_var, iq0
+   integer :: p_split, npx, npy, npz, iwat, ivar, lcnt_var, iq0
    integer :: n_args,n_files,ifile,nlev,n_output
    character(len=ESMF_MAXPATHLEN), allocatable :: extra_files(:),extra_output(:)
    type(fv_rst), pointer :: rst_files(:) => null()
@@ -193,7 +193,7 @@ program interp_restarts
    FV_Atm(1)%flagstruct%hydrostatic = .true.
    if (ihydro == 0) FV_Atm(1)%flagstruct%hydrostatic = .false.
    FV_Atm(1)%flagstruct%Make_NH = .true.
-   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%flagstruct%Make_NH = .false.
+   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%flagstruct%Make_NH = .false. 
    if (allocated(schmidt_parameters_out)) then
       FV_Atm(1)%flagstruct%do_schmidt = .true.
       FV_Atm(1)%flagstruct%target_lon=schmidt_parameters_out(1)
@@ -412,7 +412,7 @@ program interp_restarts
    allocate(pt_local(is:ie,js:je,npz))
    pt_local=0.0d0
    do k=1,npz
-! Convert to Potential Temperature
+! Convert to Dry Potential Temperature
       pt_local(is:ie,js:je,k) = FV_Atm(1)%pt(is:ie,js:je,k)/FV_Atm(1)%pkz(is:ie,js:je,k)
    enddo
 
@@ -461,6 +461,7 @@ program interp_restarts
       if (AmWriter) call MAPL_VarWrite(OutFmt,"BK",r8_akbk)
       deallocate ( r8_akbk )
 
+      allocate(r4_local(is:ie,js:je,npz+1))
       allocate(r8_local(is:ie,js:je,npz+1))
 
 ! U
@@ -477,14 +478,17 @@ program interp_restarts
       VERIFY_(status)
 ! PT
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PT'
-      call prt_mxm('T', FV_Atm(1)%pt, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
-
+      r4_local = pt_local
+      call prt_mxm('PT', r4_local, is, ie, js, je, 0, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
       call MAPL_VarWrite(OutFmt,"PT",pt_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
        VERIFY_(status)
 
 ! PE
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PE'
- !!!  call prt_mxm('PE', FV_Atm(1)%pe, is, ie, js, je, FV_Atm(1)%ng, npz+1, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
+      do k=1,npz+1
+         r4_local(is:ie,js:je,k)= FV_Atm(1)%pe(is:ie,k,js:je)
+      enddo
+      call prt_mxm('PE', r4_local, is, ie, js, je, 0, npz+1, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
       do k=1,npz+1
          r8_local(is:ie,js:je,k) = FV_Atm(1)%pe(is:ie,k,js:je)
       enddo
@@ -492,7 +496,8 @@ program interp_restarts
       VERIFY_(status)
 ! PKZ
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PKZ'
- !!!  call prt_mxm('PKZ', FV_Atm(1)%pkz, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
+      r4_local = FV_Atm(1)%pkz(is:ie,js:je,1:npz)
+      call prt_mxm('PKZ', r4_local, is, ie, js, je, 0, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
       r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%pkz(is:ie,js:je,1:npz)
       call MAPL_VarWrite(OutFmt,"PKZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
       VERIFY_(status)
@@ -500,14 +505,16 @@ program interp_restarts
       if (.not. fv_atm(1)%flagstruct%hydrostatic) then
 ! DZ
          if (is_master()) print*, 'Writing : ', TRIM(fname1), ' DZ'
-         call prt_mxm('DZ', FV_Atm(1)%delz, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
+         r4_local = FV_Atm(1)%delz(is:ie,js:je,1:npz)
+         call prt_mxm('DZ', r4_local, is, ie, js, je, 0, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
          r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%delz(is:ie,js:je,1:npz)
          call MAPL_VarWrite(OutFmt,"DZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
          VERIFY_(status)
 
 ! W
          if (is_master()) print*, 'Writing : ', TRIM(fname1), ' W'
-         call prt_mxm('W', FV_Atm(1)%w, is, ie, js, je, FV_Atm(1)%ng, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
+         r4_local = FV_Atm(1)%w(is:ie,js:je,1:npz)
+         call prt_mxm('W', r4_local, is, ie, js, je, 0, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
          r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%w(is:ie,js:je,1:npz)
          call MAPL_VarWrite(OutFmt,"W",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
          VERIFY_(status)
@@ -516,6 +523,7 @@ program interp_restarts
       if (AmWriter) call OutFmt%close()
       deallocate(InCfg,OutCfg)
 
+      deallocate (r4_local)
       deallocate (r8_local)
       deallocate (pt_local)
 
@@ -547,8 +555,9 @@ program interp_restarts
       end if
       siter = all_moist_Vars%begin()
       Variables => OutCfg(1)%get_variables()
-      lcnt_var=2
+      lcnt_var=FV_Atm(1)%flagstruct%nwat+1
       ivar=0
+      iwat=0
       do while (siter /= all_moist_vars%end())
          ivar=ivar+1
          var_name => siter%get()
@@ -561,13 +570,36 @@ program interp_restarts
             call MAPL_VarWrite(OutFmt,trim(var_name),r4_local2d(is:ie,js:je),arrdes=arrdes,rc=status)
             VERIFY_(status)
          else if (ndims==3) then
-            if (trim(var_name)=='Q') then
+            if ((iwat<FV_Atm(1)%flagstruct%nwat) .and. trim(var_name)=='Q') then
                iq0=1
+               iwat=iwat+1
+            elseif ((iwat<FV_Atm(1)%flagstruct%nwat) .and. trim(var_name)=='QLLS') then
+               iq0=2
+               iwat=iwat+1
+            elseif ((iwat<FV_Atm(1)%flagstruct%nwat) .and. trim(var_name)=='QLCN') then
+               iq0=3
+               iwat=iwat+1
+            elseif ((iwat<FV_Atm(1)%flagstruct%nwat) .and. trim(var_name)=='QILS') then
+               iq0=4
+               iwat=iwat+1
+            elseif ((iwat<FV_Atm(1)%flagstruct%nwat) .and. trim(var_name)=='QICN') then
+               iq0=5
+               iwat=iwat+1
+            elseif ((iwat<FV_Atm(1)%flagstruct%nwat) .and. trim(var_name)=='QRAIN') then
+               iq0=6
+               iwat=iwat+1
+            elseif ((iwat<FV_Atm(1)%flagstruct%nwat) .and. trim(var_name)=='QSNOW') then
+               iq0=7
+               iwat=iwat+1
+            elseif ((iwat<FV_Atm(1)%flagstruct%nwat) .and. trim(var_name)=='QGRAUPEL') then
+               iq0=8
+               iwat=iwat+1
             else
                iq0=lcnt_var
                lcnt_var=lcnt_var+1
             end if
             r4_local(is:ie,js:je,1:npz) = FV_Atm(1)%q(is:ie,js:je,:,iq0)
+            call prt_mxm(trim(var_name), r4_local, is, ie, js, je, 0, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
             call MAPL_VarWrite(OutFmt,triM(var_name),r4_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
             VERIFY_(status)
          end if
@@ -625,14 +657,17 @@ program interp_restarts
             allocate(r4_local(is:ie,js:je,nlev))
             if (rst_files(ifile)%vars(iq)%rank ==2) then
                r4_local2d(is:ie,js:je)=rst_files(ifile)%vars(iq)%ptr2d(is:ie,js:je)
+               call prt_mxm(trim(vname), r4_local2d, is, ie, js, je, 0, 1, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
                call MAPL_VarWrite(OutFmt,vname,r4_local2d(is:ie,js:je),arrdes=arrdes)
             else if (rst_files(ifile)%vars(iq)%rank ==3) then
                r4_local(is:ie,js:je,1:nlev)=rst_files(ifile)%vars(iq)%ptr3d(is:ie,js:je,1:nlev)
+               call prt_mxm(trim(vname), r4_local, is, ie, js, je, 0, nlev, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
                call MAPL_VarWrite(OutFmt,vname,r4_local(is:ie,js:je,1:nlev),arrdes)
             else if (rst_files(ifile)%vars(iq)%rank ==4) then
                do n=1,size(rst_files(ifile)%vars(iq)%ptr4d,4)
                   do k=1,size(rst_files(ifile)%vars(iq)%ptr4d,3)
                      r4_local2d(is:ie,js:je)=rst_files(ifile)%vars(iq)%ptr4d(is:ie,js:je,k,n)
+                     call prt_mxm(trim(vname), r4_local2d, is, ie, js, je, 0, 1, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
                      call MAPL_VarWrite(OutFmt,vname,r4_local2d(is:ie,js:je),arrdes=arrdes,lev=k,offset2=n)
                   enddo
                enddo
