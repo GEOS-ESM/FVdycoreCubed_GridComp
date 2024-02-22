@@ -2122,10 +2122,10 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
           allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
           call nullify_domain ( )
           DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:) 
-          call prt_maxmin('Before adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   ) 
+          call prt_maxmin('Before adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
           call adiabatic_init(myDT,DEBUG_ARRAY,fac1)
           DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
-          call prt_maxmin('After adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
+          call prt_maxmin('After adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   ) 
           deallocate( DEBUG_ARRAY )
           FV_Atm(1)%flagstruct%na_init=0
        endif  
