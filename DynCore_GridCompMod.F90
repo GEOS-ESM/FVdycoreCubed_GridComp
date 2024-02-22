@@ -605,8 +605,8 @@ contains
 
   type (DynGrid),  pointer           :: DycoreGrid
 
-  real(r4), pointer                      :: temp2d(:,:)
-  real(r4), pointer                      :: temp3d(:,:,:) => Null()
+  real(r4), allocatable                      :: temp2d(:,:) 
+  real(r4), allocatable                      :: temp3d(:,:,:)
 
   integer                            :: ifirst
   integer                            :: ilast
@@ -708,10 +708,7 @@ contains
       !T = PT*PK
     !PLE = PE
 
-    if(.not.associated(temp3d)) then
-       allocate(temp3d(ifirst:ilast,jfirst:jlast,1:km), stat=status)
-       VERIFY_(STATUS)
-    endif
+    allocate(temp3d(ifirst:ilast,jfirst:jlast,1:km), _STAT)
     temp3d = UR
     call SSI_CopyCoarseToFine(export, temp3d, 'U', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
@@ -721,16 +718,12 @@ contains
     temp3d = state%vars%pt * state%vars%pkz
     call SSI_CopyCoarseToFine(export, temp3d, 'T', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
-    if (associated(temp3d)) then
-       deallocate(temp3d)
-    endif
-    if(.not.associated(temp3d)) then
-       allocate(temp3d(ifirst:ilast,jfirst:jlast,1:km+1), stat=status)
-       VERIFY_(STATUS)
-    endif
+    deallocate(temp3d)
+    allocate(temp3d(ifirst:ilast,jfirst:jlast,1:km+1), _STAT)
     temp3d = state%vars%pe
     call SSI_CopyCoarseToFine(export, temp3d, 'PLE', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
+    deallocate(temp3d, _STAT)
 
     deallocate( UR )
     deallocate( VR )
@@ -738,10 +731,7 @@ contains
 ! Fill Grid-Cell Area Delta-X/Y
 ! -----------------------------
 
-    if(.not.associated(temp2d)) then
-       allocate(temp2d(ifirst:ilast,jfirst:jlast), stat=status)
-       VERIFY_(STATUS)
-    endif
+    allocate(temp2d(ifirst:ilast,jfirst:jlast), _STAT)
 
     temp2d = DycoreGrid%dxc
     call SSI_CopyCoarseToFine(export, temp2d, 'DXC', STATE%f2c_SSI_arr_map, rc=status)
@@ -755,6 +745,7 @@ contains
     call SSI_CopyCoarseToFine(export, temp2d, 'AREA', STATE%f2c_SSI_arr_map, rc=status)
     VERIFY_(STATUS)
 
+    deallocate(temp2d, _STAT)
 !=====Begin intemittent replay=======================
 
 ! Set the intermittent replay alarm, if needed.
@@ -5651,8 +5642,10 @@ end subroutine RunAddIncs
 
     real(FVPRC), allocatable :: u_dt(:,:,:), v_dt(:,:,:), t_dt(:,:,:)
 
-    real(kind=4), pointer :: tend(:,:,:)
-    real(kind=4), pointer :: tend_kp1(:,:,:) => Null()
+    !real(kind=4), pointer :: tend(:,:,:) => Null()
+    !real(kind=4), pointer :: tend_kp1(:,:,:) => Null()
+    real(kind=4), allocatable :: tend(:,:,:) 
+    real(kind=4), allocatable :: tend_kp1(:,:,:)
 
     type(DynTracers)      :: qqq       ! Specific Humidity
     real(FVPRC), allocatable :: Q(:,:,:,:), CVM(:,:,:)
@@ -5834,10 +5827,12 @@ end subroutine RunAddIncs
        ALLOCATE( tend_vn(is:ie+1,js:je  ,km) )
        !call ESMFL_StateGetPointerToData ( IMPORT,TEND,'DUDT',RC=STATUS )
        !VERIFY_(STATUS)
-       if(.not.associated(tend)) then
-          allocate(tend(is:ie,js:je,km), stat=status)
-          VERIFY_(STATUS)
-       endif
+       !if(.not.associated(tend)) then
+       !   allocate(tend(is:ie,js:je,km), stat=status)
+       !   VERIFY_(STATUS)
+       !endif
+       allocate(tend(is:ie,js:je,km), _STAT)
+
        call SSI_CopyFineToCoarse(import, tend, 'DUDT', STATE%f2c_SSI_arr_map, _RC)
 
        tend_ua(is:ie,js:je,1:km) = tend
@@ -5890,10 +5885,11 @@ end subroutine RunAddIncs
 
        !call ESMFL_StateGetPointerToData ( IMPORT,TEND,'DPEDT',RC=STATUS )
        !VERIFY_(STATUS)
-       if(.not.associated(tend_kp1)) then
-          allocate(tend_kp1(is:ie,js:je,km+1), stat=status)
-          VERIFY_(STATUS)
-       endif
+       !if(.not.associated(tend_kp1)) then
+       !   allocate(tend_kp1(is:ie,js:je,km+1), stat=status)
+       !   VERIFY_(STATUS)
+       !endif
+       allocate(tend_kp1(is:ie,js:je,km+1), _STAT)
        call SSI_CopyFineToCoarse(import, tend_kp1, 'DPEDT', STATE%f2c_SSI_arr_map, _RC)
 
        STATE%VARS%PE = STATE%VARS%PE + DT*TEND_kp1
@@ -5987,6 +5983,9 @@ end subroutine RunAddIncs
 
     if (ALLOCATED(Q  )) DEALLOCATE( Q   )
     if (ALLOCATED(CVM)) DEALLOCATE( CVM )
+
+    deallocate(tend, _STAT)
+    deallocate(tend_kp1, _STAT)
 
    return
 
