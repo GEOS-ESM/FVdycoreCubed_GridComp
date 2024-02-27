@@ -605,21 +605,26 @@ contains
                vname = trim(tracer_bundles(ifile)%vars(ivar)%name)
                if (tracer_bundles(ifile)%vars(ivar)%rank ==2) then
                   call MAPL_VarRead(formatter,vname,qlev(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr)
+                  q0(is_i:ie_i,js_i:je_i,1) = qlev(is_i:ie_i,js_i:je_i)
                   call regridder%regrid(qlev(is_i:ie_i,js_i:je_i),tracer_bundles(ifile)%vars(ivar)%ptr2d(is:ie,js:je),rc=status)
+                  call prt_maxmin( trim(vname)//'_geos_'//trim(tracer_bundles(ifile)%file_name), q0, is_i, ie_i, js_i, je_i, ng_i, 1, 1._FVPRC)
                else if (tracer_bundles(ifile)%vars(ivar)%rank ==3) then
                   do k=1,nlev
                      call MAPL_VarRead(formatter,vname,qlev(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr,lev=k)
+                     q0(is_i:ie_i,js_i:je_i,k) = qlev(is_i:ie_i,js_i:je_i)
                      call regridder%regrid(qlev(is_i:ie_i,js_i:je_i),tracer_bundles(ifile)%vars(ivar)%ptr3d(is:ie,js:je,k),rc=status)
                   enddo
+                  call prt_maxmin( trim(vname)//'_geos_'//trim(tracer_bundles(ifile)%file_name), q0, is_i, ie_i, js_i, je_i, ng_i, nlev, 1._FVPRC)
                else if (tracer_bundles(ifile)%vars(ivar)%rank ==4) then
                   do n_ungrid=1,tracer_bundles(ifile)%vars(ivar)%n_ungrid
                      do k=1,nlev
                         call MAPL_VarRead(formatter,vname,qlev(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr,lev=k,offset2=n_ungrid)
+                        q0(is_i:ie_i,js_i:je_i,k) = qlev(is_i:ie_i,js_i:je_i)       
                         call regridder%regrid(qlev(is_i:ie_i,js_i:je_i),tracer_bundles(ifile)%vars(ivar)%ptr4d(is:ie,js:je,k,n_ungrid),rc=status)
                      enddo
+                     call prt_maxmin( trim(vname)//'_geos_'//trim(tracer_bundles(ifile)%file_name), q0, is_i, ie_i, js_i, je_i, ng_i, nlev, 1._FVPRC)
                   enddo
                end if
-               !call prt_maxmin( 'Q_geos_gocart', q0, is_i, ie_i, js_i, je_i, ng_i, km, 1._FVPRC)
             enddo
 
             call formatter%close()
@@ -854,8 +859,8 @@ contains
                real(FVPRC), dimension(is:ie,npz):: qn1
                integer i,j,k
 
-               call prt_mxm('REMAP_WINDS: UA', ua, is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
-               call prt_mxm('REMAP_WINDS: VA', va, is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+               call prt_mxm('REMAP_WINDS: UA', ua, is, ie, js, je, 0, km, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+               call prt_mxm('REMAP_WINDS: VA', va, is, ie, js, je, 0, km, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
 
                ut = 0.0
                vt = 0.0

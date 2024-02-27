@@ -174,7 +174,7 @@ contains
           enddo
        enddo
        do k=1,km
-          tp(i,k) = ta(i,j,k) ! Dry T
+          tp(i,k) = ta(i,j,k)*(1.+zvir*qp(i,k,sphum)) ! fill tp with Virtual T
        enddo
 
 ! Tracers:
@@ -352,7 +352,7 @@ contains
      enddo
 
 !-------------------------------------------------------------
-! map dry temperature using cubic scheme.
+! map virtual temperature using cubic scheme.
 !-------------------------------------------------------------
      call mappm(km, pn0, tp, npz, pn1, qn1, is,ie, 1, kord_tm, Atm%ptop)
     !call map_scalar( km,  pn0,  tp,                 &
@@ -363,7 +363,7 @@ contains
     !                 j,  is, ie, j, j, kappa, 3, P_MAP=1, conserv=.false.)
      do k=1,npz
         do i=is,ie
-           Atm%pt(i,j,k) = qn1(i,k) ! Still Dry T at this point
+           Atm%pt(i,j,k) = qn1(i,k)/(1.+zvir*Atm%q(i,j,k,sphum)) ! Convert back to dry T
         enddo
      enddo
 
