@@ -106,6 +106,8 @@ program interp_restarts
    n_readers=1
    ihydro = 1
    scale_rst = .true.
+   allocate(schmidt_parameters_in(3))
+   schmidt_parameters_in = 0.0
    do i=1,n_args
      call get_command_argument(i,str)
      select case(trim(str))
@@ -162,7 +164,6 @@ program interp_restarts
            write(*,*)'bad argument to scalers, will scale by default'
         end if
      case('-stretched_grid_in')
-        allocate(schmidt_parameters_in(3))
         call get_command_argument(i+1,astr)
         read(astr,*)schmidt_parameters_in(1)
         call get_command_argument(i+2,astr)
@@ -193,7 +194,7 @@ program interp_restarts
    FV_Atm(1)%flagstruct%hydrostatic = .true.
    if (ihydro == 0) FV_Atm(1)%flagstruct%hydrostatic = .false.
    FV_Atm(1)%flagstruct%Make_NH = .true.
-   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%flagstruct%Make_NH = .false. 
+   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%flagstruct%Make_NH = .false.
    if (allocated(schmidt_parameters_out)) then
       FV_Atm(1)%flagstruct%do_schmidt = .true.
       FV_Atm(1)%flagstruct%target_lon=schmidt_parameters_out(1)
@@ -436,6 +437,7 @@ program interp_restarts
          imc = npx-1
          jmc = imc*6
          call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon ','lat ','lev ','edge'/),(/imc,jmc,npz,npz+1/),rc=status)
+         call reset_stretch_params(OutCfg(1))
          if (allocated(schmidt_parameters_out)) then
              call add_stretch_params(OutCfg(1),schmidt_parameters_out)
          end if
@@ -478,7 +480,7 @@ program interp_restarts
       VERIFY_(status)
 ! PT
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PT'
-      r4_local = pt_local
+      r4_local(is:ie,js:je,1:npz) = pt_local
       call prt_mxm('PT', r4_local, is, ie, js, je, 0, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
       call MAPL_VarWrite(OutFmt,"PT",pt_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
        VERIFY_(status)
@@ -496,7 +498,7 @@ program interp_restarts
       VERIFY_(status)
 ! PKZ
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PKZ'
-      r4_local = FV_Atm(1)%pkz(is:ie,js:je,1:npz)
+      r4_local(is:ie,js:je,1:npz) = FV_Atm(1)%pkz(is:ie,js:je,1:npz)
       call prt_mxm('PKZ', r4_local, is, ie, js, je, 0, npz, 1.0, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
       r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%pkz(is:ie,js:je,1:npz)
       call MAPL_VarWrite(OutFmt,"PKZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
@@ -505,7 +507,7 @@ program interp_restarts
       if (.not. fv_atm(1)%flagstruct%hydrostatic) then
 ! DZ
          if (is_master()) print*, 'Writing : ', TRIM(fname1), ' DZ'
-         r4_local = FV_Atm(1)%delz(is:ie,js:je,1:npz)
+         r4_local(is:ie,js:je,1:npz) = FV_Atm(1)%delz(is:ie,js:je,1:npz)
          call prt_mxm('DZ', r4_local, is, ie, js, je, 0, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
          r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%delz(is:ie,js:je,1:npz)
          call MAPL_VarWrite(OutFmt,"DZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
@@ -513,7 +515,7 @@ program interp_restarts
 
 ! W
          if (is_master()) print*, 'Writing : ', TRIM(fname1), ' W'
-         r4_local = FV_Atm(1)%w(is:ie,js:je,1:npz)
+         r4_local(is:ie,js:je,1:npz) = FV_Atm(1)%w(is:ie,js:je,1:npz)
          call prt_mxm('W', r4_local, is, ie, js, je, 0, npz, 1.0_FVPRC, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%domain)
          r8_local(is:ie,js:je,1:npz) = FV_Atm(1)%w(is:ie,js:je,1:npz)
          call MAPL_VarWrite(OutFmt,"W",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
@@ -543,6 +545,7 @@ program interp_restarts
          allocate(InCfg(1),OutCfg(1))
          InCfg(1)=InFmt%read(rc=status)
          call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev'/),(/imc,jmc,npz/),rc=status)
+         call reset_stretch_params(OutCfg(1))
          if (allocated(schmidt_parameters_out)) then
              call add_stretch_params(OutCfg(1),schmidt_parameters_out)
          end if
@@ -641,6 +644,7 @@ program interp_restarts
             .and. (rst_files(ifile)%ungrid_size > 0)) then
                call MAPL_IOChangeRes(InCfg(1),OutCfg(1),[character(len=12):: 'lon ','lat ','lev ','unknown_dim1'],[imc,jmc,npz,rst_files(ifile)%ungrid_size],rc=status)
             end if
+            call reset_stretch_params(OutCfg(1))
             if (allocated(schmidt_parameters_out)) then
                 call add_stretch_params(OutCfg(1),schmidt_parameters_out)
             end if
@@ -716,5 +720,19 @@ contains
       call meta%add_attribute('STRETCH_FACTOR',stretch_parameters(3))
 
    end subroutine add_stretch_params
+
+   subroutine reset_stretch_params(meta)
+      type(FileMetadata), intent(inout) :: meta
+
+      logical :: has_attr
+      has_attr = meta%has_attribute('TARGET_LON')
+      call meta%remove_attribute('TARGET_LON')
+      has_attr = meta%has_attribute('TARGET_LAT')
+      call meta%remove_attribute('TARGET_LAT')
+      has_attr = meta%has_attribute('STRETCH_FACTOR')
+      call meta%remove_attribute('STRETCH_FACTOR')
+
+   end subroutine reset_stretch_params
+
 
 end program interp_restarts

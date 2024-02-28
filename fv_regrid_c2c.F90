@@ -64,15 +64,15 @@ module fv_regrid_c2c
       module procedure read_topo_file_r4
       module procedure read_topo_file_r8
    end interface
-                        
+
 contains
-                        
+
    subroutine read_topo_file_r4(fname,output,grid,rc)
       character(len=*), intent(in) :: fname
       type(ESMF_Grid), intent(in) :: grid
       real(real4), intent(inout) :: output(:,:)
       integer, intent(out), optional :: rc
-      
+
       integer :: status,dims(3),funit
       integer :: rank
       type(ESMF_VM) :: vm
@@ -98,7 +98,7 @@ contains
       type(ESMF_Grid), intent(in) :: grid
       real(real8), intent(inout) :: output(:,:)
       integer, intent(out), optional :: rc
-      
+
       integer :: status,dims(3),funit
       real, allocatable :: input(:,:)
       integer :: rank
@@ -113,7 +113,7 @@ contains
          open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
          _VERIFY(status)
          read(funit)input
-         input_r8 = input      
+         input_r8 = input
       else
          allocate(input(0,0),input_r8(0,0))
       end if
@@ -128,8 +128,8 @@ contains
       logical :: rstcube
       type(ESMF_Grid), intent(inout) :: gridOut
       logical, intent(in) :: do_schmidt_in
-      real, intent(in) :: schmidt_parameters_in(3) 
-      real(FVPRC):: alpha
+      real, intent(in) :: schmidt_parameters_in(3)
+      real(FVPRC):: alpha = 0.
       integer i,j
 
 ! * Initialize coriolis param:
@@ -231,7 +231,7 @@ contains
       character(len=:), pointer :: var_name
       type(StringVariableMap), pointer :: variables
       type(Variable), pointer :: myVariable
-      type(StringVector) :: all_moist_vars 
+      type(StringVector) :: all_moist_vars
       type(StringVector), pointer :: var_dimensions
       type(StringVectorIterator) :: siter
       type(StringVector) :: moist_variables
@@ -331,7 +331,7 @@ contains
 
 ! Read U
          allocate (  u0(isd_i:ied_i,jsd_i:jed_i+1,km) )
-         u0(:,:,:) = 0.0 
+         u0(:,:,:) = 0.0
          tileoff = (tile-1)*(jm/ntiles)
          do k=1,km
             call MAPL_VarRead(formatter,"U",u0(is_i:ie_i,js_i:je_i,k),arrdes=input_arrdescr,lev=k)
@@ -354,7 +354,7 @@ contains
                sbufferx=sbuffer, nbufferx=nbuffer, &
                gridtype=DGRID_NE )
          do k=1,km
-            do i=is_i,ie_i    
+            do i=is_i,ie_i
                u0(i,je_i+1,k) = nbuffer(i,k)
             enddo
             do j=js_i,je_i
@@ -408,7 +408,7 @@ contains
          enddo
          call prt_maxmin('PT_geos', t0, is_i, ie_i, js_i, je_i, ng_i, km, 1.0_FVPRC)
          call print_memuse_stats('get_geos_cubed_ic: read T')
-! Read PE 
+! Read PE
          allocate ( pe0(isd_i:ied_i,jsd_i:jed_i,km+1) )
          allocate ( ps0(isd_i:ied_i,jsd_i:jed_i) )
          pe0(:,:,:) = 0.0
@@ -424,7 +424,7 @@ contains
          allocate ( dp0(is_i:ie_i,js_i:je_i,km) )
          do k=1,km
             dp0(is_i:ie_i,js_i:je_i,k) = pe0(is_i:ie_i,js_i:je_i,k+1) - pe0(is_i:ie_i,js_i:je_i,k)
-         enddo          
+         enddo
          deallocate ( pe0 )
 ! Read PKZ
          allocate ( pkz0(isd_i:ied_i,jsd_i:jed_i) )
@@ -468,7 +468,7 @@ contains
          Atm(1)%phis = Atm(1)%phis*grav
          call print_memuse_stats('get_geos_cubed_ic: phis')
 
-! Horiz Interp for surface pressure 
+! Horiz Interp for surface pressure
          call prt_maxmin('PS_geos', ps0, is_i, ie_i, js_i, je_i, ng_i, 1, 1.0_FVPRC)
          call regridder%regrid(ps0(is_i:ie_i,js_i:je_i),psc(is:ie,js:je),rc=status)
          deallocate ( ps0 )
@@ -478,7 +478,7 @@ contains
          deallocate ( gz0 )
 
 ! Horiz Interp for Q
-         allocate ( q0(isd_i:ied_i,jsd_i:jed_i,km) )
+         allocate ( q0(isd_i:ied_i,jsd_i:jed_i,km+1) )
          allocate ( qp(is:ie,js:je,km,Atm(1)%ncnst) )
          q0(:,:,:) = 0.0
          qp(:,:,:,:) = 0.0
@@ -506,7 +506,7 @@ contains
                if (ndims == 3) call moist_variables%push_back(trim(var_name))
                call siter%next()
             enddo
-            if (moist_variables%size() /= atm(1)%ncnst) call mpp_error(FATAL,'Wrong number of variables in moist file') 
+            if (moist_variables%size() /= atm(1)%ncnst) call mpp_error(FATAL,'Wrong number of variables in moist file')
             tileoff = (tile-1)*(jm/ntiles)
 
             lvar_cnt=0
@@ -575,15 +575,15 @@ contains
         do i=1,size(extra_rst)
            do j=1,size(extra_rst(i)%vars)
               if (extra_rst(i)%vars(j)%nLev/=1) then
-                 if (extra_rst(i)%vars(j)%nLev == npz) then 
+                 if (extra_rst(i)%vars(j)%nLev == npz) then
                     tracer_bundles(i)%vars(j)%nLev=km
                     call tracer_bundles(i)%vars(j)%alloc_var(is,ie,js,je,km)
                  else if (extra_rst(i)%vars(j)%nLev == npz+1) then
                     tracer_bundles(i)%vars(j)%nLev=km+1
                     call tracer_bundles(i)%vars(j)%alloc_var(is,ie,js,je,km+1)
-                 end if    
+                 end if
               else
-                 call tracer_bundles(i)%vars(j)%alloc_Var(is,ie,js,je) 
+                 call tracer_bundles(i)%vars(j)%alloc_Var(is,ie,js,je)
               end if
            enddo
         enddo
@@ -619,7 +619,7 @@ contains
                   do n_ungrid=1,tracer_bundles(ifile)%vars(ivar)%n_ungrid
                      do k=1,nlev
                         call MAPL_VarRead(formatter,vname,qlev(is_i:ie_i,js_i:je_i),arrdes=input_arrdescr,lev=k,offset2=n_ungrid)
-                        q0(is_i:ie_i,js_i:je_i,k) = qlev(is_i:ie_i,js_i:je_i)       
+                        q0(is_i:ie_i,js_i:je_i,k) = qlev(is_i:ie_i,js_i:je_i)
                         call regridder%regrid(qlev(is_i:ie_i,js_i:je_i),tracer_bundles(ifile)%vars(ivar)%ptr4d(is:ie,js:je,k,n_ungrid),rc=status)
                      enddo
                      call prt_maxmin( trim(vname)//'_geos_'//trim(tracer_bundles(ifile)%file_name), q0, is_i, ie_i, js_i, je_i, ng_i, nlev, 1._FVPRC)
@@ -633,7 +633,7 @@ contains
 
          enddo
          deallocate ( q0 )
-                   
+
 ! Horiz Interp for T
          call mpp_update_domains(t0, domain_i)
          allocate (  tp(is:ie,js:je,km) )
@@ -665,7 +665,7 @@ contains
          enddo
          dzp = -dzp/dpp ! ="specific volume"/grav
          deallocate ( dz0 )
-         deallocate ( dpp ) 
+         deallocate ( dpp )
          endif
          deallocate ( dp0 )
 
@@ -712,12 +712,12 @@ contains
 
 ! Range check the MOIST tracers
 ! Iterate over tracer names
-  
+
       iter = moist_tracers%begin()
       do while (iter /= moist_tracers%end())
          iptr => iter%value()
          cptr => iter%key()
-         if (.not.match(cptr)) then 
+         if (.not.match(cptr)) then
             do k=1,npz
                do j=js,je
                   do i=is,ie
@@ -811,7 +811,7 @@ contains
             endif
             enddo
        endif
-111    continue       
+111    continue
        if ( agrid(i,j,2)<lat(1) ) then
             jc = 1
             b1 = 0.
@@ -938,7 +938,7 @@ contains
   real(FVPRC), pointer, dimension(:,:,:) :: agrid
 
 ! local:
-  real(FVPRC), dimension(Atm%bd%isd:Atm%bd%ied,Atm%bd%jsd:Atm%bd%jed,npz):: ut, vt   ! winds 
+  real(FVPRC), dimension(Atm%bd%isd:Atm%bd%ied,Atm%bd%jsd:Atm%bd%jed,npz):: ut, vt   ! winds
   real(FVPRC), dimension(Atm%bd%is:Atm%bd%ie,km):: up, vp, tp
   real(FVPRC), dimension(Atm%bd%is:Atm%bd%ie,km+1):: pe0, pn0
   real(FVPRC) pt0(km), gz(km+1), pk0(km+1)
@@ -1185,7 +1185,7 @@ contains
 
 
 
-                     subroutine init_cubsph_grid(npts, is,ie, js,je, ntiles, sph_corner, do_schmidt, schmidt_parameters)  
+                     subroutine init_cubsph_grid(npts, is,ie, js,je, ntiles, sph_corner, do_schmidt, schmidt_parameters)
                         use mpp_mod, only: mpp_root_pe
 !------------------------------------------------------------------!
 ! read/generate cubed sphere grid                                  !
@@ -1197,7 +1197,7 @@ contains
 ! output:                                                          !
 ! sph_corner             cell corners in spherical coor            !
 !------------------------------------------------------------------!
-                        use GHOST_CUBSPH_mod, only: B_grid, ghost_cubsph_update             
+                        use GHOST_CUBSPH_mod, only: B_grid, ghost_cubsph_update
                         use fv_grid_utils_mod, only : gnomonic_grids
                         use fv_grid_tools_mod, only : mirror_grid
 
@@ -1219,7 +1219,7 @@ contains
 ! allocate global arrays (preferable in shared memory)
                         masterproc = mpp_root_pe()
                         if(MAPL_ShmInitialized) then
-                           if (is_master()) write(*,*) 'Using MAPL_Shmem in external_ic: init_cubsph_grid' 
+                           if (is_master()) write(*,*) 'Using MAPL_Shmem in external_ic: init_cubsph_grid'
                            call MAPL_AllocNodeArray(grid_in,Shp=(/npts,npts,2,ntiles/),rc=STATUS)
                         else
                            if (is_master()) write(*,*) 'WARNING... in external_ic: Global grid allocate'
@@ -1757,7 +1757,7 @@ contains
 
                      subroutine pmaxmin4d( qname, a, im, jm, km, lm, fac )
 
-                        character*(*)  qname 
+                        character*(*)  qname
                         integer, intent(in):: im, jm, km, lm
                         integer i, j, k, l
                         real(FVPRC) a(im,jm,km,lm)
@@ -2041,6 +2041,6 @@ contains
 !
 ! ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ !
 !-------------------------------------------------------------------------------
-                        
+
                   end module fv_regrid_c2c
 
