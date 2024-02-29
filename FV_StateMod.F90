@@ -1163,8 +1163,63 @@ contains
      call ieee_set_halting_mode(ieee_all, halting_mode)
   end if
 #endif
+  call reset_esmf_coord(grid%grid, _RC)
 
   RETURN_(ESMF_SUCCESS)
+
+contains
+  subroutine reset_esmf_coord(grid, rc)
+!    use esmf
+!    use FV_StateMod, only : FV_Atm
+    implicit none
+    
+    type(ESMF_Grid), intent(INOUT) :: grid
+    integer, optional, intent(OUT) :: rc
+    
+    integer :: dim, i, j, isc, jsc
+    integer :: lb1, lb2
+    integer :: counts(3)
+    real (ESMF_KIND_R8), pointer :: ptr(:,:)
+    
+    isc = FV_Atm(1)%bd%isc
+    jsc = FV_Atm(1)%bd%jsc
+
+    call MAPL_GridGet(grid, localCellCountPerDim=counts, _RC)
+
+    ! the two blocks of code below are very similar. They differ only in two lines:
+    ! stagger location, and agrid_64 vs grid_64
+    !    
+    ! A-grid (i.e. grid centers) first
+    do dim=1,2 ! i.e. X and Y
+       call ESMF_GridGetCoord(grid, localDE=0, coordDim=dim, &
+            staggerloc=ESMF_STAGGERLOC_CENTER, &
+            farrayPtr=ptr, _RC)
+       lb1=lbound(ptr,1)
+       lb2=lbound(ptr,2)
+
+       do j=1,counts(2)
+          do i=1,counts(1)
+             ptr(lb1+i-1,lb2+j-1) = FV_Atm(1)%gridstruct%agrid_64(isc+i-1,jsc+j-1,dim)
+          end do
+       end do
+    end do
+
+    ! Corners
+    do dim=1,2 ! i.e. X and Y
+       call ESMF_GridGetCoord(grid, localDE=0, coordDim=dim, &
+            staggerloc=ESMF_STAGGERLOC_CORNER, &
+            farrayPtr=ptr, _RC)
+       lb1=lbound(ptr,1)
+       lb2=lbound(ptr,2)
+       
+       do j=1,counts(2)
+          do i=1,counts(1)
+             ptr(lb1+i-1,lb2+j-1) = FV_Atm(1)%gridstruct%grid_64(isc+i-1,jsc+j-1,dim)
+          end do
+       end do
+    end do
+    _RETURN(ESMF_SUCCESS)
+  end subroutine reset_esmf_coord
 
 end subroutine FV_InitState
 
