@@ -541,6 +541,7 @@ contains
    FV_Atm(1)%flagstruct%ke_bg = 0.0
   ! Rayleigh & Divergence Damping
    if (index(FV3_CONFIG,"HWT") > 0) then
+     FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
      FV_Atm(1)%flagstruct%fv_sg_adj = -1
      FV_Atm(1)%flagstruct%n_zfilter = -1
      FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
@@ -630,7 +631,11 @@ contains
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )
+      endif
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 10800) then
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375)
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  7.5 )
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       ! Monotonic Hydrostatic defaults
@@ -743,8 +748,9 @@ contains
     format='("                 stretch_fac       =",F10.4)'  )
 
   FV_HYDROSTATIC = FV_Atm(1)%flagstruct%hydrostatic
-  DEBUG          = FV_Atm(1)%flagstruct%fv_debug
   prt_minmax     = FV_Atm(1)%flagstruct%fv_debug
+  DEBUG          = FV_Atm(1)%flagstruct%fv_debug
+  call MAPL_GetResource(MAPL, DEBUG, 'DEBUG_STATE:', default=DEBUG, RC=STATUS)
 
   call MAPL_MemUtilsWrite(VM, trim(Iam), RC=STATUS )
   VERIFY_(STATUS)
@@ -1168,12 +1174,13 @@ contains
 
 end subroutine FV_InitState
 
-subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
+subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
   type (T_FVDYCORE_STATE),pointer              :: STATE
   type (ESMF_State),             intent(INOUT) :: EXPORT
   type (ESMF_Clock), target,     intent(IN   ) :: CLOCK
   type (ESMF_GridComp)         , intent(INOUT) :: GC
+  real(REAL8), optional        , intent(INOUT) :: PLE0(:,:,:)
   integer, optional            , intent(OUT  ) :: RC
 
 ! Local variables
@@ -1952,6 +1959,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
          ! Fix Dry Mass after increments have been applied
          ! -----------------------------------------------
          FV_Atm(1)%pe = FV_Atm(1)%pe*massD0/massD
+         if (present(PLE0)) PLE0 = FV_Atm(1)%pe(isc:iec,jsc:jec,:)
 
          if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
             if (mpp_pe()==mpp_root_pe()) then
@@ -4650,7 +4658,7 @@ end subroutine fv_getAllWinds_2D
   JSC    = FV_Atm(1)%bd%jsc
   JEC    = FV_Atm(1)%bd%jec
   NPZ    = FV_Atm(1)%npz
-  prt_minmax     = FV_Atm(1)%flagstruct%fv_debug
+  prt_minmax     = DEBUG
   allocate( DEBUG_ARRAY(ISC:IEC,JSC:JEC,NPZ+1) )
   if (mpp_pe()==0) print*,''
   if (mpp_pe()==0) print*,'--------------', TRIM(debug_txt), '--------------'
@@ -5005,13 +5013,7 @@ end subroutine echo_fv3_setup
 !***********
 ! Haloe Data
 !***********
-   real(FVPRC), parameter::    q1_h2o = 2.2E-6
-   real(FVPRC), parameter::    q7_h2o = 3.8E-6
-   real(FVPRC), parameter::  q100_h2o = 3.8E-6
-   real(FVPRC), parameter:: q1000_h2o = 3.1E-6
-   real(FVPRC), parameter:: q2000_h2o = 2.8E-6
-   real(FVPRC), parameter:: q3000_h2o = 3.0E-6
-   real(FVPRC):: xt, p00, q00
+   real(FVPRC):: xt
    integer:: isc, iec, jsc, jec, npz
    integer:: m, n, i,j,k
    integer :: sphum=1
@@ -5022,6 +5024,23 @@ end subroutine echo_fv3_setup
    real(FVPRC), allocatable :: v_dt(:,:,:)
    real(FVPRC), allocatable :: t_dt(:,:,:)
    real(FVPRC), allocatable :: w_dt(:,:,:)
+
+   integer :: nord
+   real(FVPRC):: dddmp, d4_bg, d2_bg, d_ext
+
+! Save input damping state
+   nord  = FV_Atm(1)%flagstruct%nord
+   dddmp = FV_Atm(1)%flagstruct%dddmp
+   d4_bg = FV_Atm(1)%flagstruct%d4_bg
+   d2_bg = FV_Atm(1)%flagstruct%d2_bg
+   d_ext = FV_Atm(1)%flagstruct%d_ext
+
+! Use 2nd order damping for spinup
+   FV_Atm(1)%flagstruct%nord = 0
+   FV_Atm(1)%flagstruct%dddmp = 0.2
+   FV_Atm(1)%flagstruct%d4_bg = 0.0
+   FV_Atm(1)%flagstruct%d2_bg = 0.0075
+   FV_Atm(1)%flagstruct%d_ext = 0.02
 
     xt = 1./(1.+wt)
 
@@ -5113,7 +5132,7 @@ end subroutine echo_fv3_setup
 !Nudging back to IC
 !$omp parallel do default (none) &
 !$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) & 
-!$omp private (i, j, k, p00, q00)
+!$omp private (i, j, k)
        do k=1,npz
           do j=jsc,jec+1
              do i=isc,iec
@@ -5210,6 +5229,13 @@ end subroutine echo_fv3_setup
      deallocate ( w_dt )
 
      do_adiabatic_init = .false.
+
+! Reset input damping parameters
+     FV_Atm(1)%flagstruct%nord  = nord
+     FV_Atm(1)%flagstruct%dddmp = dddmp
+     FV_Atm(1)%flagstruct%d4_bg = d4_bg
+     FV_Atm(1)%flagstruct%d2_bg = d2_bg
+     FV_Atm(1)%flagstruct%d_ext = d_ext
 
  end subroutine adiabatic_init
 
