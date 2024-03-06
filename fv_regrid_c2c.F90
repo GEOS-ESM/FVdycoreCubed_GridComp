@@ -20,7 +20,7 @@ module fv_regrid_c2c
    use fv_diagnostics_mod,only: prt_mxm, prt_maxmin
    use fv_mp_mod,         only: is_master
    use fv_grid_utils_mod, only: ptop_min
-   use fv_mapz_mod,       only: mappm, map_scalar, map1_ppm
+   use fv_mapz_mod,       only: map_scalar
    use init_hydro_mod,    only: p_var
    use mpp_mod,           only: mpp_pe
    use memutils_mod, only: print_memuse_stats
@@ -139,7 +139,7 @@ contains
             kappa, Atm(1)%q, Atm(1)%ng, Atm(1)%ncnst, dble(Atm(1)%gridstruct%area),Atm(1)%flagstruct%dry_mass,    &
             Atm(1)%flagstruct%adjust_dry_mass, Atm(1)%flagstruct%mountain, Atm(1)%flagstruct%moist_phys,   &
             Atm(1)%flagstruct%hydrostatic, Atm(1)%flagstruct%nwat, Atm(1)%domain, Atm(1)%flagstruct%make_nh, nh_pkz=.false.)
-       if (Atm(1)%flagstruct%make_nh) Atm(1)%w = 0.0
+       if (Atm(1)%flagstruct%make_nh) Atm(1)%w = tiny(1.0_FVPRC)
 
    end subroutine get_geos_ic
 
@@ -152,7 +152,7 @@ contains
       character(len=128) :: fname, fname1
       real(FVPRC), allocatable:: pkz0(:,:)
       real(FVPRC), allocatable:: ps0(:,:), gz0(:,:), t0(:,:,:), q0(:,:,:), qlev(:,:)
-      real(FVPRC), allocatable:: dp0(:,:,:), pe0(:,:,:), u0(:,:,:), v0(:,:,:), w0(:,:,:), dz0(:,:,:)
+      real(FVPRC), allocatable:: pe0(:,:,:), u0(:,:,:), v0(:,:,:), w0(:,:,:), dz0(:,:,:)
       real(FVPRC), allocatable:: ak0(:), bk0(:)
       integer :: i, j, k, l, iq, im, jm, km, npx, npy, npz
       integer :: ntiles=6
@@ -349,8 +349,8 @@ contains
          deallocate ( nbuffer )
          deallocate ( ebuffer )
          call mpp_update_domains( ud, vd, Atm(1)%domain, gridtype=DGRID_NE, complete=.true. )
-         call prt_maxmin(' U_interp', ud, is, ie  , js, je+1, Atm(1)%ng, km, 1.0_FVPRC)
-         call prt_maxmin(' V_interp', vd, is, ie+1, js, je  , Atm(1)%ng, km, 1.0_FVPRC)
+         call prt_maxmin(' U_rgrd', ud, is, ie  , js, je+1, Atm(1)%ng, km, 1.0_FVPRC)
+         call prt_maxmin(' V_rgrd', vd, is, ie+1, js, je  , Atm(1)%ng, km, 1.0_FVPRC)
       !  ! ud and vd and new winds on D-Grid: Cubed-Sphere oriented
          deallocate ( v0 )
          deallocate ( u0 )
@@ -358,26 +358,31 @@ contains
 ! Read W
          if (.not. Atm(1)%flagstruct%hydrostatic) then
          allocate (  w0(is_i:ie_i,js_i:je_i,km) )
-         w0(:,:,:) = 0.0
+         allocate (  wp(is  :ie  ,js  :je  ,km) )
          do k=1,km
             call MAPL_VarRead(formatter,"W",w0(is_i:ie_i,js_i:je_i,k),arrdes=Arrdes_i,lev=k)
+            call regridder%regrid(w0(is_i:ie_i,js_i:je_i,k),wp(:,:,k),rc=status)
          enddo
          call prt_maxmin(' W_geos', w0, is_i, ie_i, js_i, je_i, 0, km, 1.0_FVPRC)
+         call prt_maxmin(' W_rgrd', wp, is, ie, js, je, 0, km, 1.0_FVPRC)
+         deallocate ( w0 )
          call print_memuse_stats('get_geos_cubed_ic: read W')
          endif
 ! Read DZ
          if (.not. Atm(1)%flagstruct%hydrostatic) then
          allocate (  dz0(is_i:ie_i,js_i:je_i,km) )
-         dz0(:,:,:) = 0.0
+         allocate (  dzp(is  :ie  ,js  :je  ,km) )
          do k=1,km
             call MAPL_VarRead(formatter,"DZ",dz0(is_i:ie_i,js_i:je_i,k),arrdes=Arrdes_i,lev=k)
+            call regridder%regrid(dz0(is_i:ie_i,js_i:je_i,k),dzp(:,:,k),rc=status)
          enddo
          call prt_maxmin('DZ_geos', dz0, is_i, ie_i, js_i, je_i, 0, km, 1.0_FVPRC)
-         call print_memuse_stats('get_geos_cubed_ic: read T')
+         call prt_maxmin('DZ_rgrd', dzp, is, ie, js, je, 0, km, 1.0_FVPRC)
+         deallocate ( dz0 )
+         call print_memuse_stats('get_geos_cubed_ic: read DZ')
          endif
 ! Read PT
          allocate (  t0(is_i:ie_i,js_i:je_i,km) )
-         t0(:,:,:) = 0.0
          do k=1,km
             call MAPL_VarRead(formatter,"PT",t0(is_i:ie_i,js_i:je_i,k),arrdes=Arrdes_i,lev=k)
          enddo
@@ -385,35 +390,33 @@ contains
          call print_memuse_stats('get_geos_cubed_ic: read T')
 ! Read PE 
          allocate ( pe0(is_i:ie_i,js_i:je_i,km+1) )
-         pe0(:,:,:) = 0.0
          do k=1,km+1
            call MAPL_VarRead(formatter,"PE",pe0(is_i:ie_i,js_i:je_i,k),arrdes=Arrdes_i,lev=k)
          enddo
 ! Get PS
          allocate ( ps0(is_i:ie_i,js_i:je_i) )
          ps0(:,:) = pe0(:,:,km+1)
-! Get dp0
-         allocate ( dp0(is_i:ie_i,js_i:je_i,km) )
-         do k=1,km
-            dp0(:,:,k) = pe0(:,:,k+1) - pe0(:,:,k)
-         enddo          
-         deallocate ( pe0 )
 ! Read PKZ
          allocate ( pkz0(is_i:ie_i,js_i:je_i) )
-         pkz0(:,:) = 0.0
          do k=1,km
             call MAPL_VarRead(formatter,"PKZ",pkz0(is_i:ie_i,js_i:je_i),arrdes=Arrdes_i,lev=k)
             t0(:,:,k) = t0(:,:,k)*pkz0(:,:)
          enddo
-         call prt_maxmin( 'T_geos', t0, is_i, ie_i, js_i, je_i, 0, km, 1.0_FVPRC)
-         call print_memuse_stats('get_geos_cubed_ic: converted T')
+         call prt_maxmin( ' T_geos', t0, is_i, ie_i, js_i, je_i, 0, km, 1.0_FVPRC)
          deallocate ( pkz0 )
+         call print_memuse_stats('get_geos_cubed_ic: converted T')
+
+! Horiz Interp for T
+         allocate (  tp(is:ie,js:je,km) )
+         do k=1,km
+            call regridder%regrid(t0(is_i:ie_i,js_i:je_i,k),tp(:,:,k),rc=status)
+         enddo
+         call prt_maxmin( ' T_rgrd', tp, is, ie, js, je, 0, km, 1.0_FVPRC)
+         deallocate ( t0 )
+         call print_memuse_stats('get_geos_cubed_ic: converted T')
 
          call formatter%close()
          deallocate(cfg)
-
-         allocate ( gz0(is_i:ie_i,js_i:je_i) )
-         gz0(:,:) = 0.0
 
          write(imc, "(i8)") im
          write(jmc, "(i8)") jm
@@ -425,6 +428,7 @@ contains
          if (.not. file_exist(fname1)) then
             call mpp_error(FATAL,'get_geos_cubed_ic: cannot find topo_DYN_ave file')
          endif
+         allocate ( gz0(is_i:ie_i,js_i:je_i) )
          call print_memuse_stats('get_geos_cubed_ic: '//TRIM(fname1)//' being read')
          call read_topo_file(fname1,gz0(is_i:ie_i,js_i:je_i),grid_i)
          gz0 = gz0*grav
@@ -440,8 +444,8 @@ contains
          call regridder%regrid(gz0(is_i:ie_i,js_i:je_i),gzc(is:ie,js:je),rc=status)
          deallocate ( gz0 )
 
-         call prt_maxmin('PS_interp', psc, is, ie, js, je, 0, 1, 1.0_FVPRC)
-         call prt_maxmin('GZ_interp', gzc, is, ie, js, je, 0, 1, 1.0/grav)
+         call prt_maxmin('PS_rgrd', psc, is, ie, js, je, 0, 1, 1.0_FVPRC)
+         call prt_maxmin('GZ_rgrd', gzc, is, ie, js, je, 0, 1, 1.0/grav)
 
 ! Horiz Interp for Q
          allocate ( q0(is_i:ie_i,js_i:je_i,km+1) )
@@ -453,7 +457,8 @@ contains
 ! is there a moist restart file to interpolate?
 ! Read in tracers: only sphum at this point
          if( file_exist("moist_internal_restart_in") ) then
-            if (is_master()) print*, 'Trying to interpolate moist_internal_restart_in'
+            if (is_master()) print*, ''
+            if (is_master()) print*, 'Regridding moist_internal_restart_in'
 
             call MAPL_NCIOGetFileType("moist_internal_restart_in",filetype)
 
@@ -554,7 +559,8 @@ contains
         enddo
 
         do ifile=1,size(tracer_bundles)
-            if (is_master()) print*, 'Trying to interpolate: ',trim(tracer_bundles(ifile)%file_name)
+            if (is_master()) print*, ''
+            if (is_master()) print*, 'Regridding: ',trim(tracer_bundles(ifile)%file_name)
 
             allocate(cfg(1))
             call formatter%open(trim(tracer_bundles(ifile)%file_name),pFIO_READ,rc=status)
@@ -598,39 +604,9 @@ contains
          enddo
          deallocate ( q0 )
                    
-! Horiz Interp for T
-         allocate (  tp(is:ie,js:je,km) )
-         do k=1,km
-            call regridder%regrid(t0(is_i:ie_i,js_i:je_i,k),tp(:,:,k),rc=status)
-         enddo
-         deallocate ( t0 )
-
-! Horiz Interp for W
-         if (.not. Atm(1)%flagstruct%hydrostatic) then
-         allocate (  wp(is:ie,js:je,km) )
-         do k=1,km
-            call regridder%regrid(w0(is_i:ie_i,js_i:je_i,k),wp(:,:,k),rc=status)
-         enddo
-         deallocate ( w0 )
-         endif
-
-! Horiz Interp for DZ & DP
-         if (.not. Atm(1)%flagstruct%hydrostatic) then
-         allocate (  dzp(is:ie,js:je,km) )
-         do k=1,km
-            call regridder%regrid(dz0(is_i:ie_i,js_i:je_i,k),dzp(:,:,k),rc=status)
-         enddo
-         allocate (  dpp(is:ie,js:je,km) )
-         do k=1,km
-            call regridder%regrid(dp0(is_i:ie_i,js_i:je_i,k),dpp(:,:,k),rc=status)
-         enddo
-         dzp = -dzp/dpp ! ="specific volume"/grav
-         deallocate ( dz0 )
-         deallocate ( dpp ) 
-         endif
-         deallocate ( dp0 )
-
-! Horz/Vert remap for scalars
+         if (is_master()) print*, ''
+         if (is_master()) print*, 'Vertical Remapping: '
+! Vert remap for scalars
          call read_topo_file('topo_dynave.data',Atm(1)%phis(is:ie,js:je),grid)
          call mpp_update_domains(Atm(1)%phis, Atm(1)%domain)
          Atm(1)%phis = Atm(1)%phis*grav
@@ -638,7 +614,6 @@ contains
                            tp, wp, dzp, qp, Atm(1), tracer_bundles, extra_rst )
 
          if (.not. Atm(1)%flagstruct%hydrostatic) then
-            Atm(1)%delz = -Atm(1)%delz*Atm(1)%delp
             deallocate ( wp )
             deallocate ( dzp )
          endif
@@ -775,9 +750,9 @@ contains
                         pe1d(i,k) = 0.5*(pe1(i,j-1,k)+pe1(i,j,k))                    
                      enddo
                   enddo
-                  call map1_ppm( km, pe0d, ud(is:ie,j,1:km),         &
-                                npz, pe1d, qn1,                      &
-                                is, ie, j, is, ie, j, j, -1, kord_mt)
+                  call map_scalar( km, pe0d, ud(is:ie,j,1:km),    &
+                                  npz, pe1d, qn1,   is, ie,       &
+                                  j,  is, ie, j, j, -1, kord_mt, -1.e25 )
                   do k=1,npz
                      do i=is,ie
                         ut(i,j,k) = qn1(i,k)
@@ -796,9 +771,9 @@ contains
                         pe1d(i,k) = 0.5*(pe1(i-1,j,k)+pe1(i,j,k))                    
                      enddo
                   enddo
-                  call map1_ppm( km, pe0d, vd(is:ie,j,1:km),         &
-                                npz, pe1d, qn1,                      &
-                                is, ie, j, is, ie, j, j, -1, kord_mt)
+                  call map_scalar( km, pe0d, vd(is:ie,j,1:km),    &
+                                  npz, pe1d, qn1,   is, ie,       &
+                                  j,  is, ie, j, j, -1, kord_mt, -1.e25 )
                   do k=1,npz
                      do i=is,ie
                         vt(i,j,k) = qn1(i,k)

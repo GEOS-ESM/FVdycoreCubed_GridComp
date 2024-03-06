@@ -1285,6 +1285,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
   VERIFY_(STATUS)
 
+  call MAPL_GetResource(MAPL, DEBUG, 'DEBUG_STATE:', default=DEBUG, RC=STATUS)
+
   call ESMF_ClockGet( CLOCK, currTime=fv_time, rc=STATUS )
   VERIFY_(STATUS)
   call ESMF_TimeGet( fv_time, dayOfYear=days, s=seconds, rc=STATUS )
