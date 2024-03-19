@@ -2457,7 +2457,6 @@ subroutine Run(gc, import, export, clock, rc)
       !call MAPL_TimerOn(MAPL,"-DYN_CORE")
       t1 = MPI_Wtime(status)
       call DynRun (GC, STATE, EXPORT, CLOCK, internal, import, RC=STATUS)
-      !call DynRun (GC, STATE, EXPORT, CLOCK, internal, RC=STATUS)
       VERIFY_(STATUS)
       t2 = MPI_Wtime(status)
       dyn_run_timer = t2-t1

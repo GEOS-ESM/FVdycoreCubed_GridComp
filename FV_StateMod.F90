@@ -1283,7 +1283,6 @@ contains
 end subroutine FV_InitState
 
 subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
-!subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, RC)
 
   type (ESMF_GridComp)         , intent(INOUT) :: GC
   type (T_FVDYCORE_STATE),pointer              :: STATE
