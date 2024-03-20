@@ -786,7 +786,7 @@ contains
       STATE%f2c_SSI_arr_map => f2c_SSI_arr_map
 
       ! CK: Adding npx and nx to f2c_SSI_arr_map
-      f2c_SSI_arr_map%npx = FV_Atm(1)%npx !FV_Atm(1)%flagstruct%npx
+      call MAPL_GetResource( MAPL, f2c_SSI_arr_map%npx, 'AGCM_IM:', default= 32, RC=STATUS )
       f2c_SSI_arr_map%nx  = nx
 
 !! Setup GFDL microphysics module
