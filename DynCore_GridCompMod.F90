@@ -288,7 +288,7 @@
 
   logical :: DO_ADD_INCS = .true.
 
-  type(ESMF_State) :: internal
+  !type(ESMF_State) :: internal
 
 contains
 
@@ -480,16 +480,7 @@ contains
 ! Register services for this component
 ! ------------------------------------
     call ESMF_GridCompSetEntryPoint (gc, ESMF_METHOD_INITIALIZE, &
-       userRoutine=set_esmf_internal_state, PHASE=1, rc=status)
-    VERIFY_(STATUS)
-
-    call ESMF_GridCompSetEntryPoint (gc, ESMF_METHOD_INITIALIZE, &
-       userRoutine=Initialize, PHASE=2, rc=status)
-    VERIFY_(STATUS)
-
-    call ESMF_GridCompSetEntryPoint (gc, ESMF_METHOD_INITIALIZE, &
-       userRoutine=get_esmf_internal_state, PHASE=3, rc=status)
-    VERIFY_(STATUS)
+       userRoutine=Initialize, _RC)
 
     call ESMF_GridCompSetEntryPoint (gc, ESMF_METHOD_RUN, &
        userRoutine=Run, PHASE=1, rc=status)
@@ -515,45 +506,6 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine set_esmf_internal_state(gc, import, export, clock, rc)
-     type(ESMF_GridComp) :: gc       !  gridded component
-     type(ESMF_State)    :: import   ! import state
-     type(ESMF_State)    :: export   ! export state
-     type(ESMF_Clock)    :: clock    ! the clock
-
-     integer, intent(out)     :: rc       ! Error code:
-     character(len=ESMF_MAXSTR)         :: IAm
-
-     IAm = 'set_esmf_internal_state'
-
-     internal = import
-
-     RETURN_(ESMF_SUCCESS)
-
-  end subroutine set_esmf_internal_state
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-  subroutine get_esmf_internal_state(gc, import, export, clock, rc)
-     type(ESMF_GridComp) :: gc       !  gridded component
-     type(ESMF_State)    :: import   ! import state
-     type(ESMF_State)    :: export   ! export state
-     type(ESMF_Clock)    :: clock    ! the clock
-
-     integer, intent(out)     :: rc       ! Error code:
-     character(len=ESMF_MAXSTR)         :: IAm
-
-     IAm = 'get_esmf_internal_state'
-
-     export = internal
-
-     RETURN_(ESMF_SUCCESS)
-
-  end subroutine get_esmf_internal_state
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
   subroutine Initialize ( gc, import, export, clock, rc )
 
 ! !ARGUMENTS:
@@ -566,6 +518,7 @@ contains
   integer, intent(out)  :: rc       ! Error code:
                                                  ! = 0 all is well
                                                  ! otherwise, error
+  type(ESMF_State) :: INTERNAL
   type (ESMF_Config)                 :: cf
 
   type (DYN_wrap)                    :: wrap
@@ -649,6 +602,8 @@ contains
 
     call MAPL_GetObjectFromGC (fineGC, MAPL,  RC=STATUS )
     VERIFY_(STATUS)
+ 
+    call MAPL_Get ( MAPL, INTERNAL_ESMF_STATE=INTERNAL, _RC)
 
 ! Get the private internal state
 !-------------------------------
@@ -818,6 +773,7 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! !Local Variables:
 
+    type (ESMF_State) :: internal
     integer                                          :: status
     type (ESMF_FieldBundle)                          :: bundle
     type (ESMF_FieldBundle)                          :: ANA_Bundle
@@ -1076,6 +1032,8 @@ subroutine Run(gc, import, export, clock, rc)
   call MAPL_GetObjectFromGC (fineGC, MAPL,  RC=STATUS )
   VERIFY_(STATUS)
 
+  call MAPL_Get ( MAPL, INTERNAL_ESMF_STATE=INTERNAL, _RC)
+
   call INTERNAL_FineToCoarse(STATE, internal, rc=status)
   VERIFY_(status)
 
@@ -1193,6 +1151,17 @@ subroutine Run(gc, import, export, clock, rc)
       ALLOCATE( mfxxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE( mfyxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE( mfzxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
+
+! Pointers to copy back from coarse to fine as needed
+      if(.not.associated(dummy3d)) then
+         allocate(dummy3d(ifirstxy:ilastxy,jfirstxy:jlastxy,km), _STAT)
+      endif
+      if(.not.associated(dummy3d_kmplus1)) then
+         allocate(dummy3d_kmplus1(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1), _STAT)
+      endif
+      if(.not.associated(dummy2d)) then
+         allocate(dummy2d(ifirstxy:ilastxy,jfirstxy:jlastxy), _STAT)
+      endif
 
 ! Report advected friendlies
 !---------------------------
@@ -1701,19 +1670,6 @@ subroutine Run(gc, import, export, clock, rc)
       if (doEnergetics) &
       call Energetics (ur,vr,tempxy,vars%pe,delp,vars%pkz,phisxy,kenrg,penrg,tenrg)
 
-! Pointers to copy back from coarse to fine as needed
-      if(.not.associated(dummy3d)) then
-         allocate(dummy3d(ifirstxy:ilastxy,jfirstxy:jlastxy,km), stat=status)
-         VERIFY_(STATUS)
-      endif
-      if(.not.associated(dummy3d_kmplus1)) then
-         allocate(dummy3d_kmplus1(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1), stat=status)
-         VERIFY_(STATUS)
-      endif
-      if(.not.associated(dummy2d)) then
-         allocate(dummy2d(ifirstxy:ilastxy,jfirstxy:jlastxy), stat=status)
-         VERIFY_(STATUS)
-      endif
 ! DUDTANA
 ! -------
       call MAPL_GetPointer ( export, temp3d, 'DUDTANA', rc=status )
@@ -4771,6 +4727,7 @@ end subroutine RUN
 
 ! !Local Variables:
 
+    type (ESMF_State) :: internal
     integer                                          :: status
     character(len=ESMF_MAXSTR) :: IAm
 
@@ -4862,8 +4819,9 @@ end subroutine RUN
 ! Retrieve the pointer to the generic state
 ! -----------------------------------------
 
-    call MAPL_GetObjectFromGC (fineGC, GENSTATE,  RC=STATUS )
-    VERIFY_(STATUS)
+    call MAPL_GetObjectFromGC (fineGC, GENSTATE,  _RC)
+
+    call MAPL_Get ( GENSTATE, INTERNAL_ESMF_STATE=INTERNAL, _RC)
 
     !call MAPL_TimerOn(GENSTATE,"TOTAL")
     !call MAPL_TimerOn(GENSTATE,"RUN2")
@@ -6471,12 +6429,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
     call MAPL_GetResource ( MAPL, T0, 'T0:', default=273., RC=STATUS )
     VERIFY_(STATUS)
 !EOR
-    !call MAPL_Get ( MAPL,                &
-    !       INTERNAL_ESMF_STATE=INTERNAL, &
-    !       lats = LATS,                  &
-    !       lons = LONS,                  &
-    !                           RC=STATUS )
-    !VERIFY_(STATUS)
+    call MAPL_Get ( MAPL, INTERNAL_ESMF_STATE=INTERNAL, _RC)
 
    allocate(LONS(is:ie,js:je), stat=status)
    VERIFY_(STATUS)
@@ -6493,41 +6446,18 @@ subroutine Coldstart(gc, import, export, clock, rc)
      LATS(:,:) = 15.0*PI/180.0
    endif
 
-!! A-Grid U Wind
-!        call MAPL_GetPointer(Internal,U,'U'  ,rc=STATUS)
-!        VERIFY_(STATUS)
-!! A-Grid V Wind
-!        call MAPL_GetPointer(Internal,V,'V'  ,rc=STATUS)
-!! Surface Geopotential
-!        call MAPL_GetPointer ( IMPORT, phis, 'PHIS', RC=STATUS )
-!        VERIFY_(STATUS)
-!! Potential-Temperature
-!        call MAPL_GetPointer(Internal,PT,'PT',rc=STATUS)
-!        VERIFY_(STATUS)
-!! Edge Pressures
-!        call MAPL_GetPointer(Internal,PE  ,'PE',rc=STATUS)
-!        VERIFY_(STATUS)
-!! Presssure ^ kappa at mid-layers
-!        call MAPL_GetPointer(Internal,PKZ ,'PKZ',rc=STATUS)
-!        VERIFY_(STATUS)
 ! AK and BK for vertical coordinate
         call MAPL_GetPointer(Internal,ak  ,'AK' ,rc=STATUS)
         VERIFY_(STATUS)
         call MAPL_GetPointer(Internal,bk  ,'BK' ,rc=STATUS)
         VERIFY_(STATUS)
 
-   allocate(U(is:ie,js:je,1:km), stat=status)
-   VERIFY_(STATUS)
-   allocate(V(is:ie,js:je,1:km), stat=status)
-   VERIFY_(STATUS)
-   allocate(PT(is:ie,js:je,1:km), stat=status)
-   VERIFY_(STATUS)
-   allocate(PE(is:ie,js:je,0:km), stat=status)
-   VERIFY_(STATUS)
-   allocate(PKZ(is:ie,js:je,1:km), stat=status)
-   VERIFY_(STATUS)
-   allocate(phis(is:ie,js:je), stat=status)
-   VERIFY_(STATUS)
+   allocate(U(is:ie,js:je,1:km), _STAT)
+   allocate(V(is:ie,js:je,1:km), _STAT) 
+   allocate(PT(is:ie,js:je,1:km),  _STAT)
+   allocate(PE(is:ie,js:je,0:km),  _STAT)
+   allocate(PKZ(is:ie,js:je,1:km),  _STAT)
+   allocate(phis(is:ie,js:je),  _STAT)
 
     U = 0.0
 

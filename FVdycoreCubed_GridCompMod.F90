@@ -2654,12 +2654,8 @@ contains
     call ESMF_GridCompSet( coarseGC, grid=grid, RC=STATUS )
     VERIFY_(STATUS)
 
-    call ESMF_GridCompInitialize(coarseGC, importState=INTERNAL, &
-       PHASE=1, rc=status) ! set FV ESMF internal state
-    VERIFY_(STATUS)
     call ESMF_GridCompInitialize(coarseGC, importState=IMPORT, &
-       exportState=EXPORT, clock=clock, PHASE=2, rc=status) ! run Initialize
-    VERIFY_(STATUS)
+       exportState=EXPORT, clock=clock, _RC) ! run Initialize
 ! End Coarse GC stuff
 
 ! ======================================================================
