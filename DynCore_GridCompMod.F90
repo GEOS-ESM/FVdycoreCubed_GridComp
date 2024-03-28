@@ -1862,7 +1862,7 @@ subroutine Run(gc, import, export, clock, rc)
          elsewhere
                 qsum2 = MAPL_UNDEF
          end where
-         call MAPL_AreaMean( TRSUM1(n), qsum2, real(grid%area), esmfgrid, rc=STATUS )
+         call MAPL_AreaMean( TRSUM1(n), qsum2, real(grid%area,kind=r4), esmfgrid, rc=STATUS )
          VERIFY_(STATUS)
       enddo
       endif
@@ -1913,7 +1913,7 @@ subroutine Run(gc, import, export, clock, rc)
          elsewhere
                 qsum2 = MAPL_UNDEF
          end where
-         call MAPL_AreaMean( TRSUM2(n), qsum2, real(grid%area), esmfgrid, rc=STATUS )
+         call MAPL_AreaMean( TRSUM2(n), qsum2, real(grid%area,kind=r4), esmfgrid, rc=STATUS )
          VERIFY_(STATUS)
       enddo
       endif
