@@ -1,18 +1,14 @@
+import os
 import f90nml
 from f_py_conversion import FortranPythonConversion
 from cuda_profiler import CUDAProfiler, TimedCUDAProfiler
 from mpi4py import MPI
-from pace.util._optional_imports import cupy as cp
+from ndsl.optional_imports import cupy as cp
 import numpy as np
-from pace.dsl.gt4py_utils import is_gpu_backend
+from ndsl.dsl.gt4py_utils import is_gpu_backend
 from typing import TYPE_CHECKING
-import os
-
-# Backward compatibility (Nov 2023)
-try:
-    from pace.fv3core.initialization.geos_wrapper import GeosDycoreWrapper, MemorySpace
-except ModuleNotFoundError:
-    from pace.fv3core.wrappers.geos_wrapper import GeosDycoreWrapper, MemorySpace
+from pyFV3_wrapper import GeosDycoreWrapper, MemorySpace
+from fv_flags import FVFlags
 
 
 if TYPE_CHECKING:
@@ -23,6 +19,7 @@ class GEOSGTFV3:
     def __init__(
         self,
         namelist_path: str,
+        fv_flags: FVFlags,
         bdt: float,
         comm: MPI.Intercomm,
         npx: int,
@@ -64,9 +61,14 @@ class GEOSGTFV3:
             nq_tot,
             numpy_module,
         )
-        # Setup Pace's dynamical core
+        # Setup pyFV3's dynamical core
         self.dycore = GeosDycoreWrapper(
-            self.namelist, bdt, comm, self.backend, fortran_mem_space
+            namelist=self.namelist,
+            fv_flags=fv_flags,
+            bdt=bdt,
+            comm=comm,
+            backend=self.backend,
+            fortran_mem_space=fortran_mem_space,
         )
 
         self._timings = {}
@@ -263,9 +265,7 @@ def geos_gtfv3(
 ):
     global GEOS_DYCORE
     if not GEOS_DYCORE:
-        raise RuntimeError(
-            "[GEOS WRAPPER] Bad init, did you call init?"
-        )
+        raise RuntimeError("[GEOS WRAPPER] Bad init, did you call init?")
     GEOS_DYCORE(
         ng,
         ptop,
@@ -308,6 +308,7 @@ def geos_gtfv3_finalize():
 
 
 def geos_gtfv3_init(
+    fv_flags: FVFlags,
     comm: MPI.Intercomm,
     npx: int,
     npy: int,
@@ -335,6 +336,7 @@ def geos_gtfv3_init(
         raise RuntimeError("[GEOS WRAPPER] Double init")
     GEOS_DYCORE = GEOSGTFV3(
         namelist_path=NAMELIST_PATH,
+        fv_flags=fv_flags,
         bdt=bdt,
         comm=comm,
         npx=npx,

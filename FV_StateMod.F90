@@ -41,7 +41,8 @@ module FV_StateMod
 #ifdef RUN_GTFV3
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
    use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
-   use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f_init, geos_gtfv3_interface_f_finalize
+   use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f_init, geos_gtfv3_interface_f_finalize, &
+                                       fv_flags_interface_type, make_fv_flags_C_interop
 #endif
 
 implicit none
@@ -822,6 +823,7 @@ contains
 #ifdef RUN_GTFV3
   logical :: halting_mode(5)
   integer :: comm
+  type(fv_flags_interface_type) :: c_fv_flags
 #endif
 
 ! BEGIN
@@ -1156,7 +1158,9 @@ contains
      ! disable trapping of FPEs temporarily, call the Python interface and resume trapping
      call ieee_get_halting_mode(ieee_all, halting_mode)
      call ieee_set_halting_mode(ieee_all, .false.)
+     call make_fv_flags_C_interop(FV_Atm(1)%flagstruct, FV_Atm(1)%layout, c_fv_flags)
      call geos_gtfv3_interface_f_init( &
+          c_fv_flags, &
           comm, &
           FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
           IS, IE, JS, JE, ISD, IED, JSD, JED, real(STATE%DT), 7)

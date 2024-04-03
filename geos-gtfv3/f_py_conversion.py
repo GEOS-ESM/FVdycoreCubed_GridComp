@@ -2,10 +2,10 @@ import cffi
 import numpy as np
 from math import prod
 from cuda_profiler import CUDAProfiler
-from pace.dsl.typing import Float
+from ndsl.dsl.typing import Float
 from typing import Tuple, Optional, List, Dict, Union
 from types import ModuleType
-from pace.util._optional_imports import cupy as cp
+from ndsl.optional_imports import cupy as cp
 
 DeviceArray = cp.ndarray if cp else None
 PythonArray = Union[np.ndarray, (cp.ndarray if cp else None)]

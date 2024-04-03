@@ -42,6 +42,7 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
   # Set up some variables in case names change
   set(GEOS_GTFV3_INTERFACE_LIBRARY     ${CMAKE_CURRENT_BINARY_DIR}/libgeos_gtfv3_interface_py.so)
   set(GEOS_GTFV3_INTERFACE_HEADER_FILE ${CMAKE_CURRENT_BINARY_DIR}/geos_gtfv3_interface_py.h)
+  set(GEOS_GTFV3_INTERFACE_FLAG_HEADER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/geos-gtfv3/fv_flags.h)
   set(GEOS_GTFV3_INTERFACE_SRCS        ${CMAKE_CURRENT_SOURCE_DIR}/geos-gtfv3/geos_gtfv3_interface.py)
 
   # This command creates the shared object library from Python
@@ -50,6 +51,7 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
     # Note below is essentially:
     #  mpirun -np 1 python file
     # but we use the CMake options as much as we can for flexibility
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GEOS_GTFV3_INTERFACE_FLAG_HEADER_FILE} ${CMAKE_CURRENT_BINARY_DIR}
     COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ${Python3_EXECUTABLE} ${GEOS_GTFV3_INTERFACE_SRCS}
     BYPRODUCTS ${GEOS_GTFV3_INTERFACE_HEADER_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -192,17 +194,5 @@ ecbuild_add_executable (
    SOURCES interp_restarts_bin.F90
    LIBS ${this} OpenMP::OpenMP_Fortran)
 
-if (BUILD_GEOS_GTFV3_INTERFACE)
-  ecbuild_add_executable (
-    TARGET fv3_driver.x
-    SOURCES
-    geos-gtfv3/driver/FV_State_Utilities.F90
-    geos-gtfv3/driver/input/domain_dim.f90
-    geos-gtfv3/driver/input/grid_bounds.f90
-    geos-gtfv3/driver/input/input_scalars.f90
-    geos-gtfv3/driver/input/input_arrays.f90
-    geos-gtfv3/driver/fv3_driver.F90
-    LIBS ${this})
-endif ()
 
 add_subdirectory(scripts)
