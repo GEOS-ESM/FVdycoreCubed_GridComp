@@ -552,7 +552,7 @@ contains
      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
        ! 6th order default damping options
         FV_Atm(1)%flagstruct%nord = 3
-        FV_Atm(1)%flagstruct%dddmp = 0.2
+        FV_Atm(1)%flagstruct%dddmp = 0.0
         FV_Atm(1)%flagstruct%d4_bg = 0.12
         FV_Atm(1)%flagstruct%d2_bg = 0.0
         FV_Atm(1)%flagstruct%d_ext = 0.0
@@ -676,19 +676,19 @@ contains
            FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.02
+           FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.03
+           FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.04
+           FV_Atm(1)%flagstruct%vtdm4 = 0.02
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.05
+           FV_Atm(1)%flagstruct%vtdm4 = 0.03
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.06
+           FV_Atm(1)%flagstruct%vtdm4 = 0.04
          endif
       endif
       if (index(FV3_CONFIG,"MERRA-2") > 0) then
@@ -1919,7 +1919,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
       endif
 
       massD = g_sum(FV_Atm(1)%domain, mass-tqtot, isc, iec, jsc, jec, state%grid%ng, &
-                    fv_atm(1)%gridstruct%area_64, 1, reproduce=.true.)
+                    fv_atm(1)%gridstruct%area_64, 1, reproduce=FV_Atm(1)%flagstruct%exact_sum)
 
       ! If PSDRY is negative, set to use the incoming drymass.
       ! NOTE: THIS WILL NOT TIME REGRESS
@@ -2018,7 +2018,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
-            FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             state%ksplit, state%nsplit, FV_Atm(1)%flagstruct%q_split, &
@@ -4966,7 +4966,7 @@ subroutine echo_fv3_setup()
 !   logical :: do_Held_Suarez = .false.
 !   logical :: do_reed_physics = .false.
 !   logical :: reed_cond_only = .false.
-   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%reproduce_sum ,format='("FV3 reproduce_sum: ",(A))' )
+   call WRITE_PARALLEL   ( FV_Atm(1)%flagstruct%exact_sum ,format='("FV3 exact_sum: ",(I1))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%adjust_dry_mass ,format='("FV3 adjust_dry_mass: ",(A))' )
 !   logical :: fv_debug  = .false.
 !   logical :: srf_init  = .false.
@@ -5094,7 +5094,7 @@ end subroutine echo_fv3_setup
 ! Forward call
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
@@ -5113,7 +5113,7 @@ end subroutine echo_fv3_setup
 ! Backward
        call fv_dynamics( & 
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, -myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
@@ -5155,7 +5155,7 @@ end subroutine echo_fv3_setup
 ! Backward
        call fv_dynamics( & 
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, -myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
@@ -5174,7 +5174,7 @@ end subroutine echo_fv3_setup
 ! Forward call
        call fv_dynamics( & 
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
