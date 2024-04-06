@@ -2900,7 +2900,8 @@ subroutine Run(gc, import, export, clock, rc)
     real(r8), allocatable ::delpold(:,:,:) ! temporary array
     real(r8), allocatable ::     ox(:,:,:) ! temporary array
     real(r8), allocatable ::     zl(:,:,:) ! temporary array
-    real(r8), allocatable ::    zle(:,:,:) ! temporary array
+    real(r8), allocatable ::    zle(:,:,:) ! temporary array 
+    real(r8), allocatable ::  logpe(:,:,:) ! temporary array
     real(r8), allocatable ::   delp(:,:,:) ! temporary array
     real(r8), allocatable ::   dudt(:,:,:) ! temporary array
     real(r8), allocatable ::   dvdt(:,:,:) ! temporary array
@@ -3166,6 +3167,7 @@ subroutine Run(gc, import, export, clock, rc)
       ALLOCATE(   pkxy   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
       ALLOCATE(     zl   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE(    zle   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
+      ALLOCATE(  logpe   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
       ALLOCATE( omaxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE( epvxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE(  cxxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
@@ -4805,11 +4807,6 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Compute/Get Omega
 ! --------------------------
-      zle(:,:,km+1) = phisxy(:,:)
-      do k=km,1,-1
-        zle(:,:,k) = zle(:,:,k+1) + cp*tempxy(:,:,k)*( pkxy(:,:,k+1)-pkxy(:,:,k) )
-      enddo
-      zle = zle/grav
       call getOmega ( omaxyz )
 
 ! Fluxes: UKE & VKE
@@ -4963,13 +4960,16 @@ subroutine Run(gc, import, export, clock, rc)
 ! -------------------
       call MAPL_GetPointer(export,tempu,'UPHI',rc=status); VERIFY_(STATUS)
       call MAPL_GetPointer(export,tempv,'VPHI',rc=status); VERIFY_(STATUS)
-      if(associated(tempu).or.associated(tempv) ) zl = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
+
+      if( associated(tempu).or.associated(tempv) ) zl = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
+
       if(associated(tempu)) then
          tempu = 0.0
          do k=1,km
             tempu = tempu + ur(:,:,k)*zl(:,:,k)*delp(:,:,k)
          enddo
       end if
+
       if(associated(tempv)) then
          tempv = 0.0
          do k=1,km
@@ -4977,31 +4977,21 @@ subroutine Run(gc, import, export, clock, rc)
          enddo
       end if
 
-! Get the height above the surface
-! --------------------------------
-      do k=1,km+1
-         zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
-      enddo
-
-      call MAPL_GetPointer(export,temp3d,'ZLE0',rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp3d)) temp3d = zle
-
-      call MAPL_GetPointer(export,temp3d,'ZL0' ,rc=status)
-      VERIFY_(STATUS)
-      if(associated(temp3d)) temp3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
-
-      call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT= 50.0, RC=STATUS)
-      VERIFY_(STATUS)
-
 ! Fill Surface and Near-Surface Variables
 ! ----------------------------------------------
+   call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT= 50.0, RC=STATUS)
+   VERIFY_(STATUS)
    if ( (KM .ne. 72) .and. (HGT_SURFACE .gt. 0.0) ) then
      ! Near surface height for surface
      ! -------------------------------
       call MAPL_GetPointer(export,temp2d,'DZ', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) temp2d = HGT_SURFACE
+
+    ! Get the height above the surface
+      do k=1,km+1
+         zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
+      enddo
 
       call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
       VERIFY_(STATUS)
@@ -5135,7 +5125,7 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Divergence Exports
 
-      zle = log(vars%pe)
+      logpe = log(vars%pe)
 
       call MAPL_GetPointer(export,temp3d,'DIVG',  rc=status)
       VERIFY_(STATUS)
@@ -5144,28 +5134,28 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'DIVG200',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(divg),zle,log(20000.)  ,  status)
+         call VertInterp(temp2d,dble(divg),logpe,log(20000.)  ,  status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'DIVG500',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(divg),zle,log(50000.)  ,  status)
+         call VertInterp(temp2d,dble(divg),logpe,log(50000.)  ,  status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'DIVG700',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(divg),zle,log(70000.)  ,  status)
+         call VertInterp(temp2d,dble(divg),logpe,log(70000.)  ,  status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'DIVG850',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(divg),zle,log(85000.)  ,  status)
+         call VertInterp(temp2d,dble(divg),logpe,log(85000.)  ,  status)
          VERIFY_(STATUS)
        end if
 
@@ -5178,28 +5168,28 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'VORT200',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(vort),zle,log(20000.)  ,  status)
+         call VertInterp(temp2d,dble(vort),logpe,log(20000.)  ,  status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'VORT500',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(vort),zle,log(50000.)  ,  status)
+         call VertInterp(temp2d,dble(vort),logpe,log(50000.)  ,  status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'VORT700',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(vort),zle,log(70000.)  ,  status)
+         call VertInterp(temp2d,dble(vort),logpe,log(70000.)  ,  status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'VORT850',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,dble(vort),zle,log(85000.)  ,  status)
+         call VertInterp(temp2d,dble(vort),logpe,log(85000.)  ,  status)
          VERIFY_(STATUS)
        end if
 
@@ -5211,35 +5201,35 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'OMEGA850', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,omaxyz,zle,log(85000.)  , status)
+         call VertInterp(temp2d,omaxyz,logpe,log(85000.)  , status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'OMEGA700', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,omaxyz,zle,log(70000.)  , status)
+         call VertInterp(temp2d,omaxyz,logpe,log(70000.)  , status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'OMEGA500', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,omaxyz,zle,log(50000.)  , status)
+         call VertInterp(temp2d,omaxyz,logpe,log(50000.)  , status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'OMEGA200', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,omaxyz,zle,log(20000.)  , status)
+         call VertInterp(temp2d,omaxyz,logpe,log(20000.)  , status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'OMEGA10', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,omaxyz,zle,log(1000.)  , status)
+         call VertInterp(temp2d,omaxyz,logpe,log(1000.)  , status)
          VERIFY_(STATUS)
       end if
 
@@ -5254,28 +5244,28 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'W850', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(85000.)  , status)
+         call VertInterp(temp2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),logpe,log(85000.)  , status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'W500', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(50000.)  , status)
+         call VertInterp(temp2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),logpe,log(50000.)  , status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'W200', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(20000.)  , status)
+         call VertInterp(temp2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),logpe,log(20000.)  , status)
          VERIFY_(STATUS)
       end if
 
       call MAPL_GetPointer(export,temp2d,'W10', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(temp2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(1000.)  , status)
+         call VertInterp(temp2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),logpe,log(1000.)  , status)
          VERIFY_(STATUS)
       end if
       endif
@@ -5304,6 +5294,7 @@ subroutine Run(gc, import, export, clock, rc)
 
       DEALLOCATE( zl     )
       DEALLOCATE( zle    )
+      DEALLOCATE( logpe  )
       DEALLOCATE( plk    )
       DEALLOCATE( pkxy   )
       DEALLOCATE( vort   )
@@ -6621,82 +6612,72 @@ end subroutine RUN
     VERIFY_(STATUS)
     if(associated(temp3d)) temp3d = 0.5*( zle(:,:,2:) + zle(:,:,:km) )
 
+
+! Fill Single Level Variables
+! ---------------------------
+
     call MAPL_GetPointer(export,temp2d,'Z700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle*grav,pke,log(70000.)  , status)
+       call VertInterp(temp2d,zle*grav,logpe,log(70000.)  , status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'Z500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle*grav,pke,log(50000.)  , status)
+       call VertInterp(temp2d,zle*grav,logpe,log(50000.)  , status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'Z300',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle*grav,pke,log(30000.)  , status)
+       call VertInterp(temp2d,zle*grav,logpe,log(30000.)  , status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'H250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle,pke,log(25000.)  , status)
+       call VertInterp(temp2d,zle,logpe,log(25000.)  , status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'H300',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle,pke,log(30000.)  , status)
+       call VertInterp(temp2d,zle,logpe,log(30000.)  , status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'H500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle,pke,log(50000.)  , status)
+       call VertInterp(temp2d,zle,logpe,log(50000.)  , status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'H700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle,pke,log(70000.)  , status)
+       call VertInterp(temp2d,zle,logpe,log(70000.)  , status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'H850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle,pke,log(85000.)  , status)
+       call VertInterp(temp2d,zle,logpe,log(85000.)  , status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'H1000',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,zle,pke,log(100000.)  , status)
+       call VertInterp(temp2d,zle,logpe,log(100000.)  , status)
        VERIFY_(STATUS)
     end if
-
-! Get the height above the surface
-! --------------------------------
-    do k=1,km+1
-       zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
-    enddo
-
-    call MAPL_GetPointer(export,temp3d,'ZLE0',rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp3d)) temp3d = zle
-
-    call MAPL_GetPointer(export,temp3d,'ZL0' ,rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp3d)) temp3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
 
     call MAPL_GetPointer(export,temp2d,'U50M',  rc=status)
     VERIFY_(STATUS)
@@ -6712,134 +6693,129 @@ end subroutine RUN
        VERIFY_(STATUS)
     end if
 
-! Fill Single Level Variables
-! ---------------------------
-
-    pke = log(vars%pe)
-
     call MAPL_GetPointer(export,temp2d,'U200',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ur,pke,log(20000.)  ,  status)
+       call VertInterp(temp2d,ur,logpe,log(20000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'U250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ur,pke,log(25000.)  ,  status)
+       call VertInterp(temp2d,ur,logpe,log(25000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'U500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ur,pke,log(50000.)  ,  status)
+       call VertInterp(temp2d,ur,logpe,log(50000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'U700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ur,pke,log(70000.)  ,  status)
+       call VertInterp(temp2d,ur,logpe,log(70000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'U850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,ur,pke,log(85000.)  ,  status)
+       call VertInterp(temp2d,ur,logpe,log(85000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V200',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,vr,pke,log(20000.)  ,  status)
+       call VertInterp(temp2d,vr,logpe,log(20000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,vr,pke,log(25000.)  ,  status)
+       call VertInterp(temp2d,vr,logpe,log(25000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,vr,pke,log(50000.)  ,  status)
+       call VertInterp(temp2d,vr,logpe,log(50000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,vr,pke,log(70000.)  ,  status)
+       call VertInterp(temp2d,vr,logpe,log(70000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'V850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,vr,pke,log(85000.)  ,  status)
+       call VertInterp(temp2d,vr,logpe,log(85000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'T250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,tempxy,pke,log(25000.)  , status)
+       call VertInterp(temp2d,tempxy,logpe,log(25000.)  , status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'T300',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,tempxy,pke,log(30000.)  , status)
+       call VertInterp(temp2d,tempxy,logpe,log(30000.)  , status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'T500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,tempxy,pke,log(50000.)  ,  status)
+       call VertInterp(temp2d,tempxy,logpe,log(50000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'T700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,tempxy,pke,log(70000.)  ,  status)
+       call VertInterp(temp2d,tempxy,logpe,log(70000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'T850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,tempxy,pke,log(85000.)  ,  status)
+       call VertInterp(temp2d,tempxy,logpe,log(85000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'Q250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,qv,pke,log(25000.)  ,  status)
+       call VertInterp(temp2d,qv,logpe,log(25000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'Q500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,qv,pke,log(50000.)  ,  status)
+       call VertInterp(temp2d,qv,logpe,log(50000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
     call MAPL_GetPointer(export,temp2d,'Q850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(temp2d,qv,pke,log(85000.)  ,  status)
+       call VertInterp(temp2d,qv,logpe,log(85000.)  ,  status)
        VERIFY_(STATUS)
     end if
 
@@ -6867,6 +6843,20 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) temp2d=vars%pe(:,:,km+1)
+
+! Get the height above the surface
+! --------------------------------
+    do k=1,km+1
+       zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
+    enddo
+
+    call MAPL_GetPointer(export,temp3d,'ZLE0',rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp3d)) temp3d = zle
+
+    call MAPL_GetPointer(export,temp3d,'ZL0' ,rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp3d)) temp3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
 
 ! Compute Vertically Averaged T,U
 ! -------------------------------
