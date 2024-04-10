@@ -1959,7 +1959,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
          ! Fix Dry Mass after increments have been applied
          ! -----------------------------------------------
          FV_Atm(1)%pe = FV_Atm(1)%pe*massD0/massD
-         if (present(PLE0)) PLE0 = FV_Atm(1)%pe(isc:iec,jsc:jec,:)
+         if (present(PLE0)) then
+            do k=1,npz
+               PLE0(:,:,k) = FV_Atm(1)%pe(isc:iec,k,jsc:jec)
+            enddo
+         endif
 
          if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
             if (mpp_pe()==mpp_root_pe()) then
