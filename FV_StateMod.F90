@@ -438,8 +438,8 @@ contains
   call MAPL_GetResource( MAPL, INT_FV_OFF,      label='FV_OFF:'      , default=INT_FV_OFF, rc=status )
   VERIFY_(STATUS)
 
-  ! option to enable MERRA-2 configurations for FV3
-  call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='STOCK', rc=status )
+  ! option to enable different configurations for FV3
+  call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='HWT', rc=status )
   VERIFY_(STATUS)
 
   ! MAT The Fortran Standard, and thus gfortran, *does not allow* the use

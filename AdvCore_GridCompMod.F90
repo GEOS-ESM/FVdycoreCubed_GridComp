@@ -257,11 +257,19 @@ contains
       VERIFY_(STATUS)
       call MAPL_GetResource(MAPL, DYCORE, 'DYCORE:', default="", RC=STATUS )
       VERIFY_(STATUS)
+
+      if(adjustl(DYCORE)=="FV3") then
+         FV3_DynCoreIsRunning = .true.
+         AdvCore_Advection = 0
+      endif
+      if(adjustl(DYCORE)=="FV3+ADV") then
+         FV3_DynCoreIsRunning = .true.
+         AdvCore_Advection = 1
+      endif
+
       call MAPL_GetResource(MAPL, AdvCore_Advection , label='AdvCore_Advection:', &
                                   default=AdvCore_Advection, RC=STATUS )
       VERIFY_(STATUS)
-      if(adjustl(DYCORE)=="FV3") FV3_DynCoreIsRunning = .true.
-      if(adjustl(DYCORE)=="FV3+ADV") FV3_DynCoreIsRunning = .true.
 
       ! Start up FMS/MPP
       !-------------------------------------------
