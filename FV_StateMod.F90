@@ -438,8 +438,8 @@ contains
   call MAPL_GetResource( MAPL, INT_FV_OFF,      label='FV_OFF:'      , default=INT_FV_OFF, rc=status )
   VERIFY_(STATUS)
 
-  ! option to enable MERRA-2 configurations for FV3
-  call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='STOCK', rc=status )
+  ! option to enable different configurations for FV3
+  call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='HWT', rc=status )
   VERIFY_(STATUS)
 
   ! MAT The Fortran Standard, and thus gfortran, *does not allow* the use
@@ -1959,7 +1959,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
          ! Fix Dry Mass after increments have been applied
          ! -----------------------------------------------
          FV_Atm(1)%pe = FV_Atm(1)%pe*massD0/massD
-         if (present(PLE0)) PLE0 = FV_Atm(1)%pe(isc:iec,jsc:jec,:)
+         if (present(PLE0)) then
+            do k=1,npz
+               PLE0(:,:,k) = FV_Atm(1)%pe(isc:iec,k,jsc:jec)
+            enddo
+         endif
 
          if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
             if (mpp_pe()==mpp_root_pe()) then
