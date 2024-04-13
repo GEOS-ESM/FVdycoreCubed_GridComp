@@ -16,7 +16,7 @@ module geos_gtfv3_interface_mod
    ! Shadow C interoperable config struct for FV. See `fv_arrays.f90` for
    ! the original structure, docs and default values
    !-----------------------------------------------------------------------
-   type, bind(C) :: fv_flags_interface_type
+   type, bind(c) :: fv_flags_interface_type
 
       ! Fortran flagstruct
       ! Skipped: character(len=80) :: grid_name = 'Gnomonic'
@@ -70,9 +70,9 @@ module geos_gtfv3_interface_mod
       logical(kind=c_bool) :: adiabatic
       real(kind=c_float) :: shift_fac
       logical(kind=c_bool) :: do_schmidt
-      real(kind=c_double) :: stretch_fac
-      real(kind=c_double) :: target_lat
-      real(kind=c_double) :: target_lon
+      real(kind=c_float) :: stretch_fac
+      real(kind=c_float) :: target_lat
+      real(kind=c_float) :: target_lon
       logical(kind=c_bool) :: reset_eta
       real(kind=c_float) :: p_fac
       real(kind=c_float) :: a_imp
@@ -159,18 +159,16 @@ module geos_gtfv3_interface_mod
       real(kind=c_float) :: add_noise
       integer(kind=c_int) :: a2b_ord
       integer(kind=c_int) :: c2l_ord
-      real(kind=c_double) :: dx_const
-      real(kind=c_double) :: dy_const
-      real(kind=c_double) :: deglat
+      real(kind=c_float) :: dx_const
+      real(kind=c_float) :: dy_const
+      real(kind=c_float) :: deglat
       real(kind=c_double) :: deglon_start
       logical(kind=c_bool)  :: adj_mass_vmr
       logical(kind=c_bool) :: compute_coords_locally
       ! Grid information
       integer(kind=c_int) :: layout_x
       integer(kind=c_int) :: layout_y
-
-
-   end type fv_flags_interface_type
+   end type
 
 
    interface

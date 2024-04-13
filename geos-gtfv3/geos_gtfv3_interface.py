@@ -16,6 +16,7 @@ from {} import ffi
 from datetime import datetime
 from mpi4py import MPI
 from geos_gtfv3 import geos_gtfv3_init, geos_gtfv3, geos_gtfv3_finalize
+import traceback
 
 @ffi.def_extern()
 def geos_gtfv3_interface_py_init(
@@ -24,7 +25,7 @@ def geos_gtfv3_interface_py_init(
     npx, npy, npz, ntiles,
     is_, ie, js, je, isd, ied, jsd, jed,
     bdt, nq_tot,
-    ):
+    ) -> int:
 
     # comm_c -> comm_py
     comm_py = MPI.Intracomm() # new comm, internal MPI_Comm handle is MPI_COMM_NULL
@@ -32,13 +33,19 @@ def geos_gtfv3_interface_py_init(
     comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
     comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
     
-    geos_gtfv3_init(
-        fv_flags,
-        comm_py,
-        npx, npy, npz, ntiles,
-        is_, ie, js, je, isd, ied, jsd, jed,
-        bdt, nq_tot,
-        )
+    try:
+        geos_gtfv3_init(
+            fv_flags,
+            comm_py,
+            npx, npy, npz, ntiles,
+            is_, ie, js, je, isd, ied, jsd, jed,
+            bdt, nq_tot,
+            )
+    except Exception as err:
+        print("Error in Python:")
+        print(traceback.format_exc())
+        return -1
+    return 0
 
 @ffi.def_extern()
 def geos_gtfv3_interface_py(

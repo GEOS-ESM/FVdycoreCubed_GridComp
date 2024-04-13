@@ -12,11 +12,15 @@ void geos_gtfv3_interface_c_init(
     float bdt, int nq_tot)
 {
     MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
-    geos_gtfv3_interface_py_init(
+    int return_code = geos_gtfv3_interface_py_init(
         fv_flags,
         comm_c,
         npx, npy, npz, ntiles,
         is, ie, js, je, isd, ied, jsd, jed, bdt, nq_tot);
+    if (return_code < 0)
+    {
+        exit(return_code);
+    }
 }
 
 void geos_gtfv3_interface_c(

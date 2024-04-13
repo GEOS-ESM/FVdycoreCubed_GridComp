@@ -172,12 +172,8 @@ def _generic_config_bridge(
     fv_config: FVFlags,
 ):
     keys = list(filter(lambda k: not k.startswith("__"), dir(type(py_config))))
-    print(type(fv_config))
-    print(dir(fv_config))
     for k in keys:
-        print(f"Checking {k}")
         if hasattr(fv_config, k):
-            print(f"Setting {k}")
             setattr(py_config, k, getattr(fv_config, k))
 
 
@@ -186,8 +182,7 @@ def FVFlags_to_DycoreConfig(
     py_config: DynamicalCoreConfig,
 ):
     _generic_config_bridge(py_config, fv_config)
-    _generic_config_bridge(py_config.acoustic_dynamics, fv_config)
-    _generic_config_bridge(py_config.riemann, fv_config)
-    _generic_config_bridge(py_config.d_grid_shallow_water, fv_config)
-    _generic_config_bridge(py_config.sat_adjust, fv_config)
-    _generic_config_bridge(py_config.remapping, fv_config)
+    py_config.layout = (
+        getattr(fv_config, "layout_x"),
+        getattr(fv_config, "layout_y"),
+    )

@@ -26,6 +26,7 @@ from ndsl import (
     TilePartitioner,
     orchestrate,
 )
+import ndsl.constants
 from ndsl.comm.comm_abc import Comm
 from ndsl.dsl.dace.build import set_distributed_caches
 from ndsl.dsl.gt4py_utils import is_gpu_backend
@@ -119,17 +120,7 @@ class GeosDycoreWrapper:
         self.backend = backend
         self.namelist = namelist
         self.dycore_config = pyFV3.DynamicalCoreConfig.from_f90nml(self.namelist)
-
-        print("Pre-config")
-        # TODO get layout in via parameters (probably move the entire grid)
         FVFlags_to_DycoreConfig(fv_flags, self.dycore_config)
-        print(fv_flags.a_imp)
-        print("Setting layout")
-        self.dycore_config.layout = (
-            getattr(fv_flags, "layout_x"),
-            getattr(fv_flags, "layout_y"),
-        )
-        print("Post-config")
 
         self.dycore_config.dt_atmos = bdt
         assert self.dycore_config.dt_atmos != 0
@@ -141,9 +132,15 @@ class GeosDycoreWrapper:
             partitioner,
             timer=self.perf_collector.timestep_timer,
         )
-
-        sizer = SubtileGridSizer.from_namelist(
-            self.namelist, partitioner.tile, self.communicator.tile.rank
+        sizer = SubtileGridSizer.from_tile_params(
+            nx_tile=self.dycore_config.npx - 1,  # NX/NY from config are cell-centers
+            ny_tile=self.dycore_config.npy - 1,  # NX/NY from config are cell-centers
+            nz=self.dycore_config.npz,
+            n_halo=ndsl.constants.N_HALO_DEFAULT,
+            extra_dim_lengths={},
+            layout=self.dycore_config.layout,
+            tile_partitioner=partitioner.tile,
+            tile_rank=self.communicator.tile.rank,
         )
         quantity_factory = QuantityFactory.from_backend(sizer=sizer, backend=backend)
 

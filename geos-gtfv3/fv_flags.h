@@ -5,10 +5,11 @@
  ***/
 
 #include <stdbool.h>
+#include <stdlib.h>
 
+// Fortran FlagStruct
 typedef struct
 {
-    // Fortran FlagStruct
     int grid_type;
     int hord_mt;
     int kord_mt;
@@ -145,9 +146,9 @@ typedef struct
     float add_noise;
     int a2b_ord;
     int c2l_ord;
-    double dx_const; // Fortran original type is real(kind=R_GRID) we maximize comp by using double.
-    double dy_const; // Fortran original type is real(kind=R_GRID) we maximize comp by using double.
-    double deglat;   // Fortran original type is real(kind=R_GRID) we maximize comp by using double.
+    float dx_const;
+    float dy_const;
+    float deglat;
     double deglon_start;
     bool adj_mass_vmr;
     bool compute_coords_locally;
@@ -162,7 +163,7 @@ typedef union
     void *comm_ptr;
 } MPI_Comm_t;
 
-extern void geos_gtfv3_interface_py_init(
+extern int geos_gtfv3_interface_py_init(
     fv_flags_t *fv_flags,
     void *comm_c,
     int npx, int npy, int npz, int ntiles,
