@@ -9,14 +9,16 @@ void geos_gtfv3_interface_c_init(
     int npx, int npy, int npz, int ntiles,
     int is, int ie, int js, int je,
     int isd, int ied, int jsd, int jed,
-    float bdt, int nq_tot)
+    float bdt, int nq_tot,
+    const float *ak, const float *bk)
 {
     MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
     int return_code = geos_gtfv3_interface_py_init(
         fv_flags,
         comm_c,
         npx, npy, npz, ntiles,
-        is, ie, js, je, isd, ied, jsd, jed, bdt, nq_tot);
+        is, ie, js, je, isd, ied, jsd, jed, bdt, nq_tot,
+        ak, bk);
     if (return_code < 0)
     {
         exit(return_code);
@@ -37,9 +39,6 @@ void geos_gtfv3_interface_c(
     float *pt, float *delp, float *q,
     float *ps, float *pe, float *pk, float *peln, float *pkz,
     float *phis, float *q_con, float *omga, float *ua, float *va, float *uc, float *vc,
-
-    // input
-    const float *ak, const float *bk,
 
     // input/output
     float *mfx, float *mfy, float *cx, float *cy, float *diss_est)
@@ -69,8 +68,6 @@ void geos_gtfv3_interface_c(
         ps, pe, pk, peln, pkz,
         phis, q_con, omga,
         ua, va, uc, vc,
-
-        ak, bk,
 
         mfx, mfy, cx, cy, diss_est);
 }

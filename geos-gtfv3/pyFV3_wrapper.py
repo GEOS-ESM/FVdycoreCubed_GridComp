@@ -102,9 +102,10 @@ class GeosDycoreWrapper:
 
     def __init__(
         self,
-        namelist: f90nml.Namelist,
         fv_flags: FVFlags,
-        bdt: int,
+        ak: np.ndarray,
+        bk: np.ndarray,
+        bdt: float,
         comm: Comm,
         backend: str,
         fortran_mem_space: MemorySpace = MemorySpace.HOST,
@@ -118,11 +119,10 @@ class GeosDycoreWrapper:
         self.perf_collector = PerformanceCollector("GEOS wrapper", comm)
 
         self.backend = backend
-        self.namelist = namelist
-        self.dycore_config = pyFV3.DynamicalCoreConfig.from_f90nml(self.namelist)
+        self.dycore_config = pyFV3._config.DynamicalCoreConfig()
         FVFlags_to_DycoreConfig(fv_flags, self.dycore_config)
 
-        self.dycore_config.dt_atmos = bdt
+        self.dycore_config.dt_atmos = int(bdt)
         assert self.dycore_config.dt_atmos != 0
 
         self.layout = self.dycore_config.layout
@@ -148,7 +148,8 @@ class GeosDycoreWrapper:
         metric_terms = MetricTerms(
             quantity_factory=quantity_factory,
             communicator=self.communicator,
-            eta_file=namelist["grid_config"]["config"]["eta_file"],
+            ak=ak,
+            bk=bk,
         )
         grid_data = GridData.new_from_metric_terms(metric_terms)
 

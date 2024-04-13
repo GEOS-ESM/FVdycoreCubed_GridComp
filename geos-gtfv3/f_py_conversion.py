@@ -69,7 +69,7 @@ class FortranPythonConversion:
         self,
         fptr: "cffi.FFI.CData",
         dim: List[int],
-    ):
+    ) -> np.ndarray:
         """
         Input: Fortran data pointed to by fptr and of shape dim = (i, j, k)
         Output: C-ordered double precision NumPy data of shape (i, j, k)

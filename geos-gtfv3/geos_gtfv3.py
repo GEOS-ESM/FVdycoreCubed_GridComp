@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 class GEOSGTFV3:
     def __init__(
         self,
-        namelist_path: str,
         fv_flags: FVFlags,
         bdt: float,
         comm: MPI.Intercomm,
@@ -34,9 +33,10 @@ class GEOSGTFV3:
         jsd: int,
         jed: int,
         nq_tot: int,
+        ak_cdata: "cffi.FFI.CData",
+        bk_cdata: "cffi.FFI.CData",
         backend: str = "dace:gpu",
     ) -> None:
-        self.namelist = f90nml.read(namelist_path)
         self.rank = comm.Get_rank()
         self.backend = backend
         # For Fortran<->NumPy conversion
@@ -61,14 +61,20 @@ class GEOSGTFV3:
             nq_tot,
             numpy_module,
         )
+
+        # Input pressure levels
+        ak = self.f_py._fortran_to_numpy(ak_cdata, [npz + 1])
+        bk = self.f_py._fortran_to_numpy(bk_cdata, [npz + 1])
+
         # Setup pyFV3's dynamical core
         self.dycore = GeosDycoreWrapper(
-            namelist=self.namelist,
             fv_flags=fv_flags,
             bdt=bdt,
             comm=comm,
             backend=self.backend,
             fortran_mem_space=fortran_mem_space,
+            ak=ak,
+            bk=bk,
         )
 
         self._timings = {}
@@ -106,8 +112,6 @@ class GEOSGTFV3:
         va: "cffi.FFI.CData",
         uc: "cffi.FFI.CData",
         vc: "cffi.FFI.CData",
-        ak: "cffi.FFI.CData",
-        bk: "cffi.FFI.CData",
         mfx: "cffi.FFI.CData",
         mfy: "cffi.FFI.CData",
         cx: "cffi.FFI.CData",
@@ -324,18 +328,16 @@ def geos_gtfv3_init(
     jed: int,
     bdt,
     nq_tot: int,
+    ak: "cffi.FFI.CData",
+    bk: "cffi.FFI.CData",
 ):
     # Read in the backend
     BACKEND = os.environ.get("GTFV3_BACKEND", "gt:gpu")
-
-    # Read in the namelist
-    NAMELIST_PATH = os.environ.get("GTFV3_NAMELIST", "input.nml")
 
     global GEOS_DYCORE
     if GEOS_DYCORE is not None:
         raise RuntimeError("[GEOS WRAPPER] Double init")
     GEOS_DYCORE = GEOSGTFV3(
-        namelist_path=NAMELIST_PATH,
         fv_flags=fv_flags,
         bdt=bdt,
         comm=comm,
@@ -352,4 +354,6 @@ def geos_gtfv3_init(
         jed=jed,
         nq_tot=nq_tot,
         backend=BACKEND,
+        ak_cdata=ak,
+        bk_cdata=bk,
     )

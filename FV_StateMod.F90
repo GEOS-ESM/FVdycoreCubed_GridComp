@@ -1163,7 +1163,8 @@ contains
           c_fv_flags, &
           comm, &
           FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
-          IS, IE, JS, JE, ISD, IED, JSD, JED, real(STATE%DT), 7)
+          IS, IE, JS, JE, ISD, IED, JSD, JED, real(STATE%DT), 7, &
+          FV_Atm(1)%ak, FV_Atm(1)%bk)
      call ieee_set_halting_mode(ieee_all, halting_mode)
   end if
 #endif
@@ -2048,8 +2049,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
             FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
-            ! input
-            FV_Atm(1)%ak, FV_Atm(1)%bk, &
             ! input/output
             FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
        call cpu_time(finish)

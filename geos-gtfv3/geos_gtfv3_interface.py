@@ -24,7 +24,7 @@ def geos_gtfv3_interface_py_init(
     comm_c,
     npx, npy, npz, ntiles,
     is_, ie, js, je, isd, ied, jsd, jed,
-    bdt, nq_tot,
+    bdt, nq_tot, ak, bk,
     ) -> int:
 
     # comm_c -> comm_py
@@ -39,7 +39,7 @@ def geos_gtfv3_interface_py_init(
             comm_py,
             npx, npy, npz, ntiles,
             is_, ie, js, je, isd, ied, jsd, jed,
-            bdt, nq_tot,
+            bdt, nq_tot, ak, bk
             )
     except Exception as err:
         print("Error in Python:")
