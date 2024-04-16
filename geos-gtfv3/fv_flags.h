@@ -171,7 +171,7 @@ extern int geos_gtfv3_interface_py_init(
     float bdt, int nq_tot,
     const float *ak, const float *bk);
 
-extern void geos_gtfv3_interface_py(
+extern int geos_gtfv3_interface_py(
     void *comm_c,
     int npx, int npy, int npz, int ntiles,
     int is_, int ie, int js, int je, int isd, int ied, int jsd, int jed,
@@ -185,4 +185,4 @@ extern void geos_gtfv3_interface_py(
     // input/output
     float *mfx, float *mfy, float *cx, float *cy, float *diss_est);
 
-extern void geos_gtfv3_interface_py_finalize();
+extern int geos_gtfv3_interface_py_finalize();

@@ -59,7 +59,7 @@ def geos_gtfv3_interface_py(
     phis, q_con, omga,
     ua, va, uc, vc,
     ak, bk,
-    mfx, mfy, cx, cy, diss_est):
+    mfx, mfy, cx, cy, diss_est) -> int:
 
     # comm_c -> comm_py
     comm_py = MPI.Intracomm() # new comm, internal MPI_Comm handle is MPI_COMM_NULL
@@ -67,26 +67,34 @@ def geos_gtfv3_interface_py(
     comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
     comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
 
-    # if comm_py.Get_rank() == 0:
-    #     print('P:', datetime.now().isoformat(timespec='milliseconds'),
-    #           '--in cffi interface', flush=True)
-
-    geos_gtfv3(
-        comm_py,
-        npx, npy, npz, ntiles,
-        is_, ie, js, je, isd, ied, jsd, jed,
-        bdt, nq_tot, ng, ptop, ks, layout_1, layout_2, adiabatic,
-        u, v, w, delz,
-        pt, delp, q,
-        ps, pe, pk, peln, pkz,
-        phis, q_con, omga,
-        ua, va, uc, vc,
-        ak, bk,
-        mfx, mfy, cx, cy, diss_est)
+    try:
+        geos_gtfv3(
+            comm_py,
+            npx, npy, npz, ntiles,
+            is_, ie, js, je, isd, ied, jsd, jed,
+            bdt, nq_tot, ng, ptop, ks, layout_1, layout_2, adiabatic,
+            u, v, w, delz,
+            pt, delp, q,
+            ps, pe, pk, peln, pkz,
+            phis, q_con, omga,
+            ua, va, uc, vc,
+            ak, bk,
+            mfx, mfy, cx, cy, diss_est)
+    except Exception as err:
+        print("Error in Python:")
+        print(traceback.format_exc())
+        return -1
+    return 0
 
 @ffi.def_extern()
-def geos_gtfv3_interface_py_finalize():
-    geos_gtfv3_finalize()
+def geos_gtfv3_interface_py_finalize() -> int:
+    try:
+        geos_gtfv3_finalize()
+    except Exception as err:
+        print("Error in Python:")
+        print(traceback.format_exc())
+        return -1
+    return 0
 
 """.format(
     TMPFILEBASE, _mpi_comm_t, _mpi_comm_t

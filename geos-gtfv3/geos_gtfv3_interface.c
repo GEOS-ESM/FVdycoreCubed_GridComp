@@ -55,7 +55,7 @@ void geos_gtfv3_interface_c(
     // MPI_Comm_rank(comm_c, &rank);
     // if (rank == 0) printf("C: %s.xxx --calling python interface\n", buf);
 
-    geos_gtfv3_interface_py(
+    int return_code = geos_gtfv3_interface_py(
         comm_c,
         npx, npy, npz, ntiles,
         is, ie, js, je,
@@ -70,9 +70,17 @@ void geos_gtfv3_interface_c(
         ua, va, uc, vc,
 
         mfx, mfy, cx, cy, diss_est);
+    if (return_code < 0)
+    {
+        exit(return_code);
+    }
 }
 
 void geos_gtfv3_interface_c_finalize()
 {
-    geos_gtfv3_interface_py_finalize();
+    int return_code = geos_gtfv3_interface_py_finalize();
+    if (return_code < 0)
+    {
+        exit(return_code);
+    }
 }
