@@ -32,7 +32,7 @@ class GEOSGTFV3:
         ied: int,
         jsd: int,
         jed: int,
-        nq_tot: int,
+        tracer_count: int,
         ak_cdata: "cffi.FFI.CData",
         bk_cdata: "cffi.FFI.CData",
         backend: str = "dace:gpu",
@@ -58,7 +58,7 @@ class GEOSGTFV3:
             ied,
             jsd,
             jed,
-            nq_tot,
+            tracer_count,
             numpy_module,
         )
 
@@ -71,10 +71,11 @@ class GEOSGTFV3:
             fv_flags=fv_flags,
             bdt=bdt,
             comm=comm,
-            backend=self.backend,
-            fortran_mem_space=fortran_mem_space,
             ak=ak,
             bk=bk,
+            backend=self.backend,
+            tracer_count=tracer_count,
+            fortran_mem_space=fortran_mem_space,
         )
 
         self._timings = {}
@@ -352,7 +353,7 @@ def geos_gtfv3_init(
         ied=ied,
         jsd=jsd,
         jed=jed,
-        nq_tot=nq_tot,
+        tracer_count=nq_tot,
         backend=BACKEND,
         ak_cdata=ak,
         bk_cdata=bk,

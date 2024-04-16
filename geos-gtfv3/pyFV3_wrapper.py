@@ -108,8 +108,16 @@ class GeosDycoreWrapper:
         bdt: float,
         comm: Comm,
         backend: str,
+        tracer_count: int,
         fortran_mem_space: MemorySpace = MemorySpace.HOST,
     ):
+        # pyFV3 does not support any tracers
+        if tracer_count != 7:
+            raise NotImplementedError(
+                "pyFV3 requires exactly 7 tracers to be advected,"
+                f" {tracer_count} given. Abort."
+            )
+
         # Look for an override to run on a single node
         gtfv3_single_rank_override = int(os.getenv("GTFV3_SINGLE_RANK_OVERRIDE", -1))
         if gtfv3_single_rank_override >= 0:

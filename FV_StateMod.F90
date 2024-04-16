@@ -820,12 +820,6 @@ contains
   integer    :: tile_in
   integer    :: gid, masterproc
 
-#ifdef RUN_GTFV3
-  logical :: halting_mode(5)
-  integer :: comm
-  type(fv_flags_interface_type) :: c_fv_flags
-#endif
-
 ! BEGIN
 
 ! Retrieve the pointer to the state
@@ -1150,25 +1144,6 @@ contains
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV Initialize', RC=STATUS )
   VERIFY_(STATUS)
 
-#ifdef RUN_GTFV3
-  if (run_gtfv3 /= 0) then
-     ! call ESMF_VMGetCurrent(VM, _RC)
-     call ESMF_VMGet(VM, mpiCommunicator=comm, _RC)
-     ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
-     ! disable trapping of FPEs temporarily, call the Python interface and resume trapping
-     call ieee_get_halting_mode(ieee_all, halting_mode)
-     call ieee_set_halting_mode(ieee_all, .false.)
-     call make_fv_flags_C_interop(FV_Atm(1)%flagstruct, FV_Atm(1)%layout, c_fv_flags)
-     call geos_gtfv3_interface_f_init( &
-          c_fv_flags, &
-          comm, &
-          FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
-          IS, IE, JS, JE, ISD, IED, JSD, JED, real(STATE%DT), 7, &
-          FV_Atm(1)%ak, FV_Atm(1)%bk)
-     call ieee_set_halting_mode(ieee_all, halting_mode)
-  end if
-#endif
-
   RETURN_(ESMF_SUCCESS)
 
 end subroutine FV_InitState
@@ -1268,6 +1243,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   type(ESMF_VM) :: vm
   integer :: comm, rank, mpierr
   real :: start, finish
+  logical :: halting_mode(5)
+  type(fv_flags_interface_type) :: c_fv_flags
 #endif
 
 ! Begin
@@ -1396,9 +1373,30 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
      _ASSERT( NWAT_TEST , 'NWAT must be either 0, 1, 3 or 6')
      FV_Atm(1)%ncnst = STATE%GRID%NQ
      deallocate( FV_Atm(1)%q )
-     allocate  ( FV_Atm(1)%q(isd:ied  ,jsd:jed  ,npz, FV_Atm(1)%ncnst) )
-    ! Echo FV3 setup
+     allocate  ( FV_Atm(1)%q(isd:ied  ,jsd:jed  ,npz, FV_Atm(1)%ncnst) )  
+     ! Echo FV3 setup
      call echo_fv3_setup()
+     ! Setup pyFV3 here since we need to know the exact nwat
+     ! We can do this because this is trigger _only once_.
+#ifdef RUN_GTFV3
+     if (run_gtfv3 /= 0) then
+      ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
+      ! disable trapping of FPEs temporarily, call the Python interface and resume trapping
+      call ieee_get_halting_mode(ieee_all, halting_mode)
+      call ieee_set_halting_mode(ieee_all, .false.)
+      call make_fv_flags_C_interop(FV_Atm(1)%flagstruct, FV_Atm(1)%layout, c_fv_flags)
+      call geos_gtfv3_interface_f_init( &
+            c_fv_flags, &
+            comm, &
+            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
+            FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, &
+            FV_Atm(1)%bd%isd, FV_Atm(1)%bd%ied, FV_Atm(1)%bd%jsd, FV_Atm(1)%bd%jed, &
+            real(STATE%DT), STATE%GRID%NQ, &
+            FV_Atm(1)%ak, FV_Atm(1)%bk)
+      call ieee_set_halting_mode(ieee_all, halting_mode)
+      end if
+#endif
+
    endif
 
    select case ( FV_Atm(1)%flagstruct%nwat )
