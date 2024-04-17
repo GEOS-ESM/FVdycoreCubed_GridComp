@@ -155,6 +155,8 @@ typedef struct
     // Grid information
     int layout_x;
     int layout_y;
+    // Magic number needs to be last item
+    int mn_123456789;
 } fv_flags_t;
 
 typedef union

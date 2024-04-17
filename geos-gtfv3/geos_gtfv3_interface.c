@@ -12,6 +12,13 @@ void geos_gtfv3_interface_c_init(
     float bdt, int nq_tot,
     const float *ak, const float *bk)
 {
+    // Check magic number
+    if (fv_flags->mn_123456789 != 123456789)
+    {
+        printf("Magic number failed, pyFV3 interface is broken on the C side\n");
+        exit(-1);
+    }
+
     MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
     int return_code = geos_gtfv3_interface_py_init(
         fv_flags,
@@ -19,6 +26,7 @@ void geos_gtfv3_interface_c_init(
         npx, npy, npz, ntiles,
         is, ie, js, je, isd, ied, jsd, jed, bdt, nq_tot,
         ak, bk);
+
     if (return_code < 0)
     {
         exit(return_code);

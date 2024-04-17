@@ -158,6 +158,8 @@ class FVFlags:
     # Grid
     layout_x: int
     layout_y: int
+    # Magic number needs to be last item
+    mn_123456789: int
 
 
 def _generic_config_bridge(
@@ -181,6 +183,11 @@ def FVFlags_to_DycoreConfig(
     fv_config: FVFlags,
     py_config: DynamicalCoreConfig,
 ):
+    if fv_config.mn_123456789 != 123456789:
+        raise RuntimeError(
+            "Magic number failed, pyFV3 interface is broken on the python side"
+        )
+
     _generic_config_bridge(py_config, fv_config)
     py_config.layout = (
         getattr(fv_config, "layout_x"),

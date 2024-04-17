@@ -168,6 +168,8 @@ module geos_gtfv3_interface_mod
       ! Grid information
       integer(kind=c_int) :: layout_x
       integer(kind=c_int) :: layout_y
+      ! Magic number
+      integer(kind=c_int) :: make_fv_flags_C_interop = 123456789
    end type
 
 
