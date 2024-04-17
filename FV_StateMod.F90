@@ -1391,7 +1391,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
             FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, &
             FV_Atm(1)%bd%isd, FV_Atm(1)%bd%ied, FV_Atm(1)%bd%jsd, FV_Atm(1)%bd%jed, &
-            real(STATE%DT), STATE%GRID%NQ, &
+            real(STATE%DT), 7, &
             FV_Atm(1)%ak, FV_Atm(1)%bk)
       call ieee_set_halting_mode(ieee_all, halting_mode)
       end if
