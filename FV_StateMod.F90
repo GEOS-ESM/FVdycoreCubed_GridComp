@@ -330,6 +330,7 @@ contains
 ! Local
    character(len=ESMF_MAXSTR)       :: IAm='FV_StateMod:FV_Setup'
 ! Local variables
+   character(len=ESMF_MAXSTR)       :: DYCORE
 
   type (ESMF_Config)           :: cf
   type (ESMF_VM)               :: VM
@@ -421,6 +422,16 @@ contains
   call MAPL_GetResource( MAPL, ndt, 'RUN_DT:', default=0, RC=STATUS )
   VERIFY_(STATUS)
   DT = ndt
+
+  call MAPL_GetResource(MAPL, DYCORE, 'DYCORE:', default="", RC=STATUS )
+  VERIFY_(STATUS)
+
+  if(adjustl(DYCORE)=="FV3") then
+       AdvCore_Advection = 0
+  endif
+  if(adjustl(DYCORE)=="FV3+ADV") then
+       AdvCore_Advection = 1
+  endif
 
 ! Advect tracers within DynCore(AdvCore_Advection=.false.)
 !             or within AdvCore(AdvCore_Advection=.true.)
