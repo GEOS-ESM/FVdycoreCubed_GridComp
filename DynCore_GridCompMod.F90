@@ -2671,7 +2671,7 @@ subroutine Run(gc, import, export, clock, rc)
       call FILLOUT3 (export, 'DPLEDTDYN' ,dpedt, STATE, _RC)
 
       ! fill pressure exports (PLE0: Before) & (PLE1: After) from FV3
-      call FILLOUT3r8 (export, 'PLE0', pe0, rc=status); VERIFY_(STATUS)
+      call FILLOUT3r8 (export, 'PLE0', pe0, STATE, _RC)
       pe1=vars%pe
       call FILLOUT3r8 (export, 'PLE1', pe1    , STATE, _RC)
 
@@ -3575,11 +3575,9 @@ subroutine Run(gc, import, export, clock, rc)
 
       if (.not. HYDROSTATIC) then
 
-      call FILLOUT3 (export, 'DELZ'  , vars%dz(ifirstxy:ilastxy,jfirstxy:jlastxy,:)     , rc=status)
-      VERIFY_(STATUS) 
+      call FILLOUT3 (export, 'DELZ'  , vars%dz(ifirstxy:ilastxy,jfirstxy:jlastxy,:)     , STATE, _RC)
 
-      call FILLOUT3 (export, 'W'  , vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:)     , rc=status)
-      VERIFY_(STATUS)
+      call FILLOUT3 (export, 'W'  , vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:)     , STATE, _RC)
 
       call MAPL_GetPointer(export,temp2d,'W850', rc=status)
       VERIFY_(STATUS)
