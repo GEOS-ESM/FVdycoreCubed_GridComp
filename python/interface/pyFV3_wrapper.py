@@ -119,9 +119,9 @@ class GeosDycoreWrapper:
             )
 
         # Look for an override to run on a single node
-        gtfv3_single_rank_override = int(os.getenv("GTFV3_SINGLE_RANK_OVERRIDE", -1))
-        if gtfv3_single_rank_override >= 0:
-            comm = NullComm(gtfv3_single_rank_override, 6, 42)
+        single_rank_override = int(os.getenv("GEOS_PYFV3_SINGLE_RANK_OVERRIDE", -1))
+        if single_rank_override >= 0:
+            comm = NullComm(single_rank_override, 6, 42)
 
         # Make a custom performance collector for the GEOS wrapper
         self.perf_collector = PerformanceCollector("GEOS wrapper", comm)

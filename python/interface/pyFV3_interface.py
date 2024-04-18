@@ -82,7 +82,7 @@ class PYFV3_WRAPPER:
     def finalize(self):
         import json
 
-        with open("gtfv3_timings.json", "w") as f:
+        with open("pyfv3_timings.json", "w") as f:
             json.dump(self._timings, f, indent=4)
 
     def __call__(
@@ -149,7 +149,7 @@ class PYFV3_WRAPPER:
                 diss_est,
             )
 
-        # Run gtFV3
+        # Run pyFV3
         with TimedCUDAProfiler("Numerics", self._timings):
             state_out, self._timings = self.dycore(
                 self._timings,
@@ -214,7 +214,8 @@ class PYFV3_WRAPPER:
 
 # Below is the entry point to the interface
 # ToDo: we should build the object outside of the sim loop from fortran
-# potentially by writing a geos_gtfv3_setup_interface and caching the ptr Fortran side
+# potentially by writing a pyfv3_interface_setup and caching the ptr Fortran side
+# or by having a central python interpreter object handled by CFFI to register against
 WRAPPER = None
 
 

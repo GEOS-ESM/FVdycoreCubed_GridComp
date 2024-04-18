@@ -23,6 +23,7 @@ The configuration of the dycore is passed via the `FV_Flags` structure/user type
 Input control to pyFV3 via environement variables
 
 - `GEOS_PYFV3_BACKEND`: `NDSL` backend for `pyFV3`, defaults to `gt:gpu`
+- `GEOS_PYFV3_SINGLE_RANK_OVERRIDE`: boolean to control a single rank override for debug
 
 ## Contact
 
