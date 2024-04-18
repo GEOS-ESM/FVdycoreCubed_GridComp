@@ -883,6 +883,22 @@ contains
      VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                  &
+         SHORT_NAME = 'ZLE0',                                      &
+         LONG_NAME  = 'edge_heights_above_surface',                &
+         UNITS      = 'm',                                         &
+         DIMS       = MAPL_DimsHorzVert,                           &
+         VLOCATION  = MAPL_VLocationEdge,               RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+         SHORT_NAME = 'ZL0',                                       &
+         LONG_NAME  = 'mid_layer_heights_above_surface',           &
+         UNITS      = 'm',                                         &
+         DIMS       = MAPL_DimsHorzVert,                           &
+         VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'ZL',                                        &
          LONG_NAME  = 'mid_layer_heights',                         &
          UNITS      = 'm',                                         &
