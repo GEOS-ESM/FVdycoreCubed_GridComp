@@ -5,9 +5,9 @@ module fv_regridding_utils
    use ESMF 
    use fv_arrays_mod,     only: fv_atmos_type, fv_grid_type, fv_grid_bounds_type, FVPRC, REAL4, REAL8
    use fv_diagnostics_mod,only: prt_maxmin
-   use fv_mp_mod,         only: is_master, ng
-   use fv_mapz_mod,       only: mappm
-   use mpp_mod,            only: mpp_error, FATAL, NOTE, mpp_broadcast,mpp_npes
+   use fv_mapz_mod,       only: map_scalar
+   use fv_fill_mod,       only: fillz
+   use mpp_mod,           only: mpp_error, FATAL, NOTE, mpp_broadcast,mpp_npes
    use MAPL
 
    implicit none
@@ -26,6 +26,13 @@ module fv_regridding_utils
    real(FVPRC), parameter :: RVGAS        = MAPL_RVAP
    real(FVPRC), parameter :: CP_AIR       = MAPL_CP
    real(FVPRC), parameter:: zvir = rvgas/rdgas - 1.
+
+   integer, parameter :: kord_tm = 9
+   integer, parameter :: kord_mt = 9
+   integer, parameter :: kord_wz = 9
+   integer, parameter :: kord_tr = 9
+
+   real, parameter:: t_min= 184. !< temperature below which applies stricter remapping constraint
 
    type fv_var
       character(len=128)   :: name
@@ -120,12 +127,12 @@ contains
    
  end subroutine copy_fv_rst
 
- subroutine remap_scalar(im, jm, km, npz, nq, ncnst, ak0, bk0, psc, gzc, ta, qa, Atm, in_fv_rst,out_fv_rst)
+ subroutine remap_scalar(im, jm, km, npz, nq, ncnst, ak0, bk0, psc, gzc, ta, wa, dza, qa, Atm, in_fv_rst, out_fv_rst)
   type(fv_atmos_type), intent(inout) :: Atm
   integer, intent(in):: im, jm, km, npz, nq, ncnst
   real(FVPRC),    intent(in):: ak0(km+1), bk0(km+1)
   real(FVPRC),    intent(in), dimension(Atm%bd%is:Atm%bd%ie,Atm%bd%js:Atm%bd%je):: psc, gzc
-  real(FVPRC),    intent(in), dimension(Atm%bd%is:Atm%bd%ie,Atm%bd%js:Atm%bd%je,km):: ta
+  real(FVPRC),    intent(in), dimension(Atm%bd%is:Atm%bd%ie,Atm%bd%js:Atm%bd%je,km):: ta, wa, dza
   real(FVPRC),    intent(in), dimension(Atm%bd%is:Atm%bd%ie,Atm%bd%js:Atm%bd%je,km,ncnst):: qa
   type(fv_rst), pointer,   intent(inout) :: in_fv_rst(:)
   type(fv_rst), pointer,   intent(inout) :: out_fv_rst(:)
@@ -135,7 +142,7 @@ contains
   real(FVPRC), dimension(Atm%bd%is:Atm%bd%ie,npz):: qn1
   real(FVPRC), dimension(Atm%bd%is:Atm%bd%ie,npz+1):: pe1, pn1
   real(FVPRC), dimension(Atm%bd%is:Atm%bd%ie,npz+1):: q_edge_old,q_edge_new
-  real(FVPRC) pt0(km), gz(km+1), pk0(km+1)
+  real(FVPRC) pt0(km), gz(km+1), pk0(km+1), pk1(Atm%bd%is:Atm%bd%ie,npz+1)
   real(FVPRC) qp( Atm%bd%is:Atm%bd%ie,km,ncnst)
   real(FVPRC) qp1(Atm%bd%is:Atm%bd%ie,km)
   real(FVPRC) pst, p1, p2, alpha, rdg
@@ -167,10 +174,8 @@ contains
           enddo
        enddo
        do k=1,km
-          tp(i,k) = ta(i,j,k)*(1.+zvir*qp(i,k,sphum))
+          tp(i,k) = ta(i,j,k)*(1.+zvir*qp(i,k,sphum)) ! fill tp with Virtual T
        enddo
-
-! Tracers:
 
        do k=1,km+1
           pe0(i,k) = ak0(k) + bk0(k)*psc(i,j)
@@ -184,7 +189,7 @@ contains
            gz(k) = gz(k+1) + rdgas*tp(i,k)*(pn0(i,k+1)-pn0(i,k))
        enddo
 ! Only lowest layer potential temp is needed
-          pt0(km) = tp(i,km)/(pk0(km+1)-pk0(km))*(kappa*(pn0(i,km+1)-pn0(i,km)))
+       pt0(km) = tp(i,km)/(pk0(km+1)-pk0(km))*(kappa*(pn0(i,km+1)-pn0(i,km)))
        if( Atm%phis(i,j)>gzc(i,j) ) then
            do k=km,1,-1
               if( Atm%phis(i,j) <  gz(k)  .and.    &
@@ -197,7 +202,6 @@ contains
 ! Extrapolation into the ground
            pst = pk0(km+1) + (gzc(i,j)-Atm%phis(i,j))/(cp_air*pt0(km))
        endif
-
 123    Atm%ps(i,j) = pst**(1./kappa)
 
      enddo   !i-loop
@@ -205,11 +209,13 @@ contains
      do i=is,ie
         pe1(i,1) = Atm%ak(1)
         pn1(i,1) = log(pe1(i,1))
+        pk1(i,1) = pe1(i,1)**kappa
      enddo
      do k=2,npz+1
        do i=is,ie
           pe1(i,k) = Atm%ak(k) + Atm%bk(k)*Atm%ps(i,j)
           pn1(i,k) = log(pe1(i,k))
+          pk1(i,k) = pe1(i,k)**kappa
        enddo
      enddo
 
@@ -220,11 +226,48 @@ contains
         enddo
      enddo
 
+! Remap vertical wind:
+     if ( .not. Atm%flagstruct%hydrostatic ) then
+        do k=1,km
+           do i=is,ie
+              qp1(i,k) = wa(i,j,k)
+           enddo
+        enddo
+        call map_scalar( km, pe0, qp1,                    &
+                        npz, pe1, qn1,                    &
+                        is, ie, j, is, ie, j, j, -1, kord_wz, -1.e25 )
+        do k=1,npz
+           do i=is,ie
+              Atm%w(i,j,k) = qn1(i,k)
+           enddo
+        enddo
+     endif
+
+! Remap delz for hybrid sigma-p coordinate
+     if ( .not. Atm%flagstruct%hydrostatic ) then
+        do k=1,km
+           do i=is,ie
+              qp1(i,k) = -dza(i,j,k) / (pe0(i,k+1) - pe0(i,k))
+           enddo
+        enddo
+        call map_scalar( km, pe0, qp1,                    &
+                        npz, pe1, qn1,                    &
+                        is, ie, j, is, ie, j, j, 1, kord_wz, -1.e25 )
+        do k=1,npz
+           do i=is,ie
+              Atm%delz(i,j,k) = -qn1(i,k) * Atm%delp(i,j,k) 
+           enddo
+        enddo
+     endif
+
 !---------------
 ! map tracers
 !----------------
      do iq=1,ncnst
-        call mappm(km, pe0, qp(is,1,iq), npz, pe1,  qn1, is,ie, 0, 11, Atm%ptop)
+        call map_scalar( km, pe0, qp(is,1,iq),         &
+                        npz, pe1, qn1,   is, ie,       &
+                        j,  is, ie, j, j, 0, kord_tr, -1.e25 )
+        call fillz(ie-is+1, npz, 1, qn1, Atm%delp(is:ie,j,1:npz))
         do k=1,npz
            do i=is,ie
               Atm%q(i,j,k,iq) = qn1(i,k)
@@ -247,7 +290,10 @@ contains
                     do k=1,in_fv_rst(ifile)%vars(ivar)%nLev
                        qp1(is:ie,k)=in_fv_rst(ifile)%vars(ivar)%ptr3d(is:ie,j,k)
                     enddo
-                    call mappm(km, pe0, qp1, npz, pe1,  qn1, is,ie, 0, 11, Atm%ptop)
+                    call map_scalar( km, pe0, qp1,                 &       
+                                    npz, pe1, qn1,   is, ie,       &
+                                    j,  is, ie, j, j, 0, kord_tr, -1.e25 )
+                    call fillz(ie-is+1, npz, 1, qn1, Atm%delp(is:ie,j,1:npz))
                     do k=1,npz
                        do i=is,ie
                           out_fv_rst(ifile)%vars(ivar)%ptr3d(i,j,k) = qn1(i,k)
@@ -270,7 +316,10 @@ contains
                        do k=1,in_fv_rst(ifile)%vars(ivar)%nLev
                           qp1(is:ie,k)=in_fv_rst(ifile)%vars(ivar)%ptr4d(is:ie,j,k,n_ungrid)
                        enddo
-                       call mappm(km, pe0, qp1, npz, pe1,  qn1, is,ie, 0, 11, Atm%ptop)
+                       call map_scalar( km, pe0, qp1,                 &         
+                                       npz, pe1, qn1,   is, ie,       &        
+                                       j,  is, ie, j, j, 0, kord_tr, -1.e25 )        
+                       call fillz(ie-is+1, npz, 1, qn1, Atm%delp(is:ie,j,1:npz))     
                        do k=1,npz
                           do i=is,ie
                              out_fv_rst(ifile)%vars(ivar)%ptr4d(i,j,k,n_ungrid) = qn1(i,k)
@@ -298,20 +347,18 @@ contains
      enddo
 
 !-------------------------------------------------------------
-! map virtual temperature using geopotential conserving scheme.
+! map virtual temperature using cubic scheme.
 !-------------------------------------------------------------
-     call mappm(km, pn0, tp, npz, pn1, qn1, is,ie, 1, 9, Atm%ptop)
+     call map_scalar( km,  pn0,  tp,                 &
+                      npz, pn1, qn1,   is, ie,       &
+                      j,  is, ie, j, j, 1, kord_tm, t_min )
      do k=1,npz
         do i=is,ie
-           Atm%pt(i,j,k) = qn1(i,k)/(1.+zvir*Atm%q(i,j,k,sphum))
+           Atm%pt(i,j,k) = qn1(i,k)/(1.+zvir*Atm%q(i,j,k,sphum)) ! Convert back to dry T
         enddo
      enddo
 
   enddo
-
-  call prt_maxmin('PS_model', Atm%ps, is, ie, js, je, ng, 1, 0.01_FVPRC)
-
-  if (is_master()) write(*,*) 'done remap_scalar'
 
 end subroutine remap_scalar
 

@@ -474,8 +474,8 @@ contains
   call MAPL_GetResource( MAPL, INT_FV_OFF,      label='FV_OFF:'      , default=INT_FV_OFF, rc=status )
   VERIFY_(STATUS)
 
-  ! option to enable MERRA-2 configurations for FV3
-  call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='STOCK', rc=status )
+  ! option to enable different configurations for FV3
+  call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='HWT', rc=status )
   VERIFY_(STATUS)
 
   ! MAT The Fortran Standard, and thus gfortran, *does not allow* the use
@@ -577,6 +577,7 @@ contains
    FV_Atm(1)%flagstruct%ke_bg = 0.0
   ! Rayleigh & Divergence Damping
    if (index(FV3_CONFIG,"HWT") > 0) then
+     FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
      FV_Atm(1)%flagstruct%fv_sg_adj = -1
      FV_Atm(1)%flagstruct%n_zfilter = -1
      FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
@@ -587,7 +588,7 @@ contains
      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
        ! 6th order default damping options
         FV_Atm(1)%flagstruct%nord = 3
-        FV_Atm(1)%flagstruct%dddmp = 0.2
+        FV_Atm(1)%flagstruct%dddmp = 0.0
         FV_Atm(1)%flagstruct%d4_bg = 0.12
         FV_Atm(1)%flagstruct%d2_bg = 0.0
         FV_Atm(1)%flagstruct%d_ext = 0.0
@@ -666,7 +667,11 @@ contains
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )
+      endif
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 10800) then
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375)
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  7.5 )
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       ! Monotonic Hydrostatic defaults
@@ -707,19 +712,19 @@ contains
            FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.02
+           FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.03
+           FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.04
+           FV_Atm(1)%flagstruct%vtdm4 = 0.02
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.05
+           FV_Atm(1)%flagstruct%vtdm4 = 0.03
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.06
+           FV_Atm(1)%flagstruct%vtdm4 = 0.04
          endif
       endif
       if (index(FV3_CONFIG,"MERRA-2") > 0) then
@@ -806,8 +811,9 @@ contains
     format='("                 stretch_fac       =",F10.4)'  )
 
   FV_HYDROSTATIC = FV_Atm(1)%flagstruct%hydrostatic
-  DEBUG          = FV_Atm(1)%flagstruct%fv_debug
   prt_minmax     = FV_Atm(1)%flagstruct%fv_debug
+  DEBUG          = FV_Atm(1)%flagstruct%fv_debug
+  call MAPL_GetResource(MAPL, DEBUG, 'DEBUG_STATE:', default=DEBUG, RC=STATUS)
 
   call MAPL_MemUtilsWrite(VM, trim(Iam), RC=STATUS )
   VERIFY_(STATUS)
@@ -1282,7 +1288,7 @@ contains
 
 end subroutine FV_InitState
 
-subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
+subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, PLE0, RC)
 
   type (ESMF_GridComp)         , intent(INOUT) :: GC
   type (T_FVDYCORE_STATE),pointer              :: STATE
@@ -1290,6 +1296,7 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
   type (ESMF_Clock), target,     intent(IN   ) :: CLOCK
   type (ESMF_State)         , intent(INOUT) :: internal
   type (ESMF_State)         , intent(IN   ) :: import
+  real(REAL8), optional        , intent(INOUT) :: PLE0(:,:,:)
   integer, optional            , intent(OUT  ) :: RC
 
 ! Local variables
@@ -2050,7 +2057,7 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
       endif
 
       massD = g_sum(FV_Atm(1)%domain, mass-tqtot, isc, iec, jsc, jec, state%grid%ng, &
-                    fv_atm(1)%gridstruct%area_64, 1, reproduce=.true.)
+                    fv_atm(1)%gridstruct%area_64, 1, reproduce=FV_Atm(1)%flagstruct%exact_sum)
 
       ! If PSDRY is negative, set to use the incoming drymass.
       ! NOTE: THIS WILL NOT TIME REGRESS
@@ -2090,6 +2097,11 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
          ! Fix Dry Mass after increments have been applied
          ! -----------------------------------------------
          FV_Atm(1)%pe = FV_Atm(1)%pe*massD0/massD
+         if (present(PLE0)) then
+            do k=1,npz
+               PLE0(:,:,k) = FV_Atm(1)%pe(isc:iec,k,jsc:jec)
+            enddo
+         endif
 
          if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
             if (mpp_pe()==mpp_root_pe()) then
@@ -2150,7 +2162,7 @@ subroutine FV_Run (GC, STATE, EXPORT, CLOCK, internal, import, RC)
 
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
-            FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             state%ksplit, state%nsplit, FV_Atm(1)%flagstruct%q_split, &
@@ -4835,7 +4847,7 @@ end subroutine fv_getAllWinds_2D
   JSC    = FV_Atm(1)%bd%jsc
   JEC    = FV_Atm(1)%bd%jec
   NPZ    = FV_Atm(1)%npz
-  prt_minmax     = FV_Atm(1)%flagstruct%fv_debug
+  prt_minmax     = DEBUG
   allocate( DEBUG_ARRAY(ISC:IEC,JSC:JEC,NPZ+1) )
   if (mpp_pe()==0) print*,''
   if (mpp_pe()==0) print*,'--------------', TRIM(debug_txt), '--------------'
@@ -5143,7 +5155,7 @@ subroutine echo_fv3_setup()
 !   logical :: do_Held_Suarez = .false.
 !   logical :: do_reed_physics = .false.
 !   logical :: reed_cond_only = .false.
-   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%reproduce_sum ,format='("FV3 reproduce_sum: ",(A))' )
+   call WRITE_PARALLEL   ( FV_Atm(1)%flagstruct%exact_sum ,format='("FV3 exact_sum: ",(I1))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%adjust_dry_mass ,format='("FV3 adjust_dry_mass: ",(A))' )
 !   logical :: fv_debug  = .false.
 !   logical :: srf_init  = .false.
@@ -5190,13 +5202,7 @@ end subroutine echo_fv3_setup
 !***********
 ! Haloe Data
 !***********
-   real(FVPRC), parameter::    q1_h2o = 2.2E-6
-   real(FVPRC), parameter::    q7_h2o = 3.8E-6
-   real(FVPRC), parameter::  q100_h2o = 3.8E-6
-   real(FVPRC), parameter:: q1000_h2o = 3.1E-6
-   real(FVPRC), parameter:: q2000_h2o = 2.8E-6
-   real(FVPRC), parameter:: q3000_h2o = 3.0E-6
-   real(FVPRC):: xt, p00, q00
+   real(FVPRC):: xt
    integer:: isc, iec, jsc, jec, npz
    integer:: m, n, i,j,k
    integer :: sphum=1
@@ -5207,6 +5213,23 @@ end subroutine echo_fv3_setup
    real(FVPRC), allocatable :: v_dt(:,:,:)
    real(FVPRC), allocatable :: t_dt(:,:,:)
    real(FVPRC), allocatable :: w_dt(:,:,:)
+
+   integer :: nord
+   real(FVPRC):: dddmp, d4_bg, d2_bg, d_ext
+
+! Save input damping state
+   nord  = FV_Atm(1)%flagstruct%nord
+   dddmp = FV_Atm(1)%flagstruct%dddmp
+   d4_bg = FV_Atm(1)%flagstruct%d4_bg
+   d2_bg = FV_Atm(1)%flagstruct%d2_bg
+   d_ext = FV_Atm(1)%flagstruct%d_ext
+
+! Use 2nd order damping for spinup
+   FV_Atm(1)%flagstruct%nord = 0
+   FV_Atm(1)%flagstruct%dddmp = 0.2
+   FV_Atm(1)%flagstruct%d4_bg = 0.0
+   FV_Atm(1)%flagstruct%d2_bg = 0.0075
+   FV_Atm(1)%flagstruct%d_ext = 0.02
 
     xt = 1./(1.+wt)
 
@@ -5260,7 +5283,7 @@ end subroutine echo_fv3_setup
 ! Forward call
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
@@ -5279,7 +5302,7 @@ end subroutine echo_fv3_setup
 ! Backward
        call fv_dynamics( & 
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, -myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
@@ -5298,7 +5321,7 @@ end subroutine echo_fv3_setup
 !Nudging back to IC
 !$omp parallel do default (none) &
 !$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) & 
-!$omp private (i, j, k, p00, q00)
+!$omp private (i, j, k)
        do k=1,npz
           do j=jsc,jec+1
              do i=isc,iec
@@ -5321,7 +5344,7 @@ end subroutine echo_fv3_setup
 ! Backward
        call fv_dynamics( & 
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, -myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
@@ -5340,7 +5363,7 @@ end subroutine echo_fv3_setup
 ! Forward call
        call fv_dynamics( & 
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
@@ -5395,6 +5418,13 @@ end subroutine echo_fv3_setup
      deallocate ( w_dt )
 
      do_adiabatic_init = .false.
+
+! Reset input damping parameters
+     FV_Atm(1)%flagstruct%nord  = nord
+     FV_Atm(1)%flagstruct%dddmp = dddmp
+     FV_Atm(1)%flagstruct%d4_bg = d4_bg
+     FV_Atm(1)%flagstruct%d2_bg = d2_bg
+     FV_Atm(1)%flagstruct%d_ext = d_ext
 
  end subroutine adiabatic_init
 

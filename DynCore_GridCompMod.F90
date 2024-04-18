@@ -839,7 +839,8 @@ subroutine Run(gc, import, export, clock, rc)
     real(r8), allocatable ::delpold(:,:,:) ! temporary array
     real(r8), allocatable ::     ox(:,:,:) ! temporary array
     real(r8), allocatable ::     zl(:,:,:) ! temporary array
-    real(r8), allocatable ::    zle(:,:,:) ! temporary array
+    real(r8), allocatable ::    zle(:,:,:) ! temporary array 
+    real(r8), allocatable ::  logpe(:,:,:) ! temporary array
     real(r8), allocatable ::   delp(:,:,:) ! temporary array
     real(r8), allocatable ::   dudt(:,:,:) ! temporary array
     real(r8), allocatable ::   dvdt(:,:,:) ! temporary array
@@ -1144,6 +1145,7 @@ subroutine Run(gc, import, export, clock, rc)
       ALLOCATE(   pkxy   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
       ALLOCATE(     zl   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE(    zle   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
+      ALLOCATE(  logpe   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
       ALLOCATE( omaxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE( epvxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
       ALLOCATE(  cxxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
@@ -2401,10 +2403,10 @@ subroutine Run(gc, import, export, clock, rc)
       LCONSV = CONSV.eq.1
       LFILL  =  FILL.eq.1
 
-! Fill pressures before dynamics export
+! Get pressures before dynamics
 !-------------------------------------------------------
       pe0=vars%pe
-      call FILLOUT3r8 (export, 'PLE0', pe0, STATE, _RC)
+!      call FILLOUT3r8 (export, 'PLE0', pe0, STATE, _RC)
 
       !call MAPL_TimerOff(MAPL,"-DYN_PROLOGUE")
 
@@ -2412,8 +2414,7 @@ subroutine Run(gc, import, export, clock, rc)
 
       !call MAPL_TimerOn(MAPL,"-DYN_CORE")
       t1 = MPI_Wtime(status)
-      call DynRun (GC, STATE, EXPORT, CLOCK, internal, import, RC=STATUS)
-      VERIFY_(STATUS)
+      call DynRun (GC, STATE, EXPORT, CLOCK, internal, import, PLE0=pe0, _RC)
       t2 = MPI_Wtime(status)
       dyn_run_timer = t2-t1
       !call MAPL_TimerOff(MAPL,"-DYN_CORE")
@@ -2669,6 +2670,8 @@ subroutine Run(gc, import, export, clock, rc)
       call FILLOUT3 (export, 'DDELPDTDYN',ddpdt, STATE, _RC)
       call FILLOUT3 (export, 'DPLEDTDYN' ,dpedt, STATE, _RC)
 
+      ! fill pressure exports (PLE0: Before) & (PLE1: After) from FV3
+      call FILLOUT3r8 (export, 'PLE0', pe0, rc=status); VERIFY_(STATUS)
       pe1=vars%pe
       call FILLOUT3r8 (export, 'PLE1', pe1    , STATE, _RC)
 
@@ -3018,11 +3021,6 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Compute/Get Omega
 ! --------------------------
-      zle(:,:,km+1) = phisxy(:,:)
-      do k=km,1,-1
-        zle(:,:,k) = zle(:,:,k+1) + cp*tempxy(:,:,k)*( pkxy(:,:,k+1)-pkxy(:,:,k) )
-      enddo
-      zle = zle/grav
       call getOmega ( omaxyz )
 
 ! Fluxes: UKE & VKE
@@ -3230,11 +3228,10 @@ subroutine Run(gc, import, export, clock, rc)
          VERIFY_(STATUS)
       end if
 
-      call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT= 50.0, RC=STATUS)
-      VERIFY_(STATUS)
-
 ! Fill Surface and Near-Surface Variables
 ! ----------------------------------------------
+   call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT= 50.0, RC=STATUS)
+   VERIFY_(STATUS)
    if ( (KM .ne. 72) .and. (HGT_SURFACE .gt. 0.0) ) then
      ! Near surface height for surface
      ! -------------------------------
@@ -3434,7 +3431,7 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Divergence Exports
 
-      zle = log(vars%pe)
+      logpe = log(vars%pe)
 
       call MAPL_GetPointer(export,temp3d,'DIVG',  rc=status)
       VERIFY_(STATUS)
@@ -3577,13 +3574,17 @@ subroutine Run(gc, import, export, clock, rc)
       end if
 
       if (.not. HYDROSTATIC) then
-      call FILLOUT3 (export, 'W'  , vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:)     , STATE, rc=status)
+
+      call FILLOUT3 (export, 'DELZ'  , vars%dz(ifirstxy:ilastxy,jfirstxy:jlastxy,:)     , rc=status)
+      VERIFY_(STATUS) 
+
+      call FILLOUT3 (export, 'W'  , vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:)     , rc=status)
       VERIFY_(STATUS)
 
       call MAPL_GetPointer(export,temp2d,'W850', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(85000.)  , status)
+         call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),logpe,log(85000.)  , status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'W850', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3592,7 +3593,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'W500', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(50000.)  , status)
+         call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),logpe,log(50000.)  , status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'W500', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3601,7 +3602,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'W200', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(20000.)  , status)
+         call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),logpe,log(20000.)  , status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'W200', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3610,7 +3611,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'W10', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),zle,log(1000.)  , status)
+         call VertInterp(dummy2d,vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:),logpe,log(1000.)  , status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'W10', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3651,6 +3652,7 @@ subroutine Run(gc, import, export, clock, rc)
 
       DEALLOCATE( zl     )
       DEALLOCATE( zle    )
+      DEALLOCATE( logpe  )
       DEALLOCATE( plk    )
       DEALLOCATE( pkxy   )
       DEALLOCATE( vort   )
@@ -5076,7 +5078,7 @@ end subroutine RUN
     do k=km,1,-1
        zle(:,:,k) = zle(:,:,k+1) + cp*thv(:,:,k)*( pke(:,:,k+1)-pke(:,:,k) )
     enddo
-       zle(:,:,:) = zle(:,:,:)/grav
+    zle(:,:,:) = zle(:,:,:)/grav
 
     call FILLOUT3 (export, 'ZLE', zle, STATE, rc=status); VERIFY_(STATUS)
 
@@ -5090,7 +5092,6 @@ end subroutine RUN
        call SSI_CopyCoarseToFine(export, dummy3d, 'ZL', STATE%f2c_SSI_arr_map, _RC)
     endif
 
-    pke = log(vars%pe)
 
 
 ! Fill Single Level Variables
@@ -5261,7 +5262,7 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'Z700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(dummy2d,zle*grav,pke,log(70000.)  , status)
+       call VertInterp(dummy2d,zle*grav,logpe,log(70000.)  , status)
        VERIFY_(STATUS)
        call SSI_CopyCoarseToFine(export, dummy2d, 'Z700', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
@@ -5270,7 +5271,7 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'Z500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(dummy2d,zle*grav,pke,log(50000.)  , status)
+       call VertInterp(dummy2d,zle*grav,logpe,log(50000.)  , status)
        VERIFY_(STATUS)
        call SSI_CopyCoarseToFine(export, dummy2d, 'Z500', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
@@ -5279,7 +5280,7 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'Z300',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(dummy2d,zle*grav,pke,log(30000.)  , status)
+       call VertInterp(dummy2d,zle*grav,logpe,log(30000.)  , status)
        VERIFY_(STATUS)
        call SSI_CopyCoarseToFine(export, dummy2d, 'Z300', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
@@ -5288,7 +5289,7 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'H250',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(dummy2d,zle,pke,log(25000.)  , status)
+       call VertInterp(dummy2d,zle,logpe,log(25000.)  , status)
        VERIFY_(STATUS)
        call SSI_CopyCoarseToFine(export, dummy2d, 'H250', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
@@ -5297,7 +5298,7 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'H300',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(dummy2d,zle,pke,log(30000.)  , status)
+       call VertInterp(dummy2d,zle,logpe,log(30000.)  , status)
        VERIFY_(STATUS)
        call SSI_CopyCoarseToFine(export, dummy2d, 'H300', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
@@ -5306,7 +5307,7 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'H500',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(dummy2d,zle,pke,log(50000.)  , status)
+       call VertInterp(dummy2d,zle,logpe,log(50000.)  , status)
        VERIFY_(STATUS)
        call SSI_CopyCoarseToFine(export, dummy2d, 'H500', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
@@ -5315,7 +5316,7 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'H700',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(dummy2d,zle,pke,log(70000.)  , status)
+       call VertInterp(dummy2d,zle,logpe,log(70000.)  , status)
        VERIFY_(STATUS)
        call SSI_CopyCoarseToFine(export, dummy2d, 'H700', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
@@ -5324,7 +5325,7 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'H850',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(dummy2d,zle,pke,log(85000.)  , status)
+       call VertInterp(dummy2d,zle,logpe,log(85000.)  , status)
        VERIFY_(STATUS)
        call SSI_CopyCoarseToFine(export, dummy2d, 'H850', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
@@ -5333,7 +5334,7 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp2d,'H1000',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) then
-       call VertInterp(dummy2d,zle,pke,log(100000.)  , status)
+       call VertInterp(dummy2d,zle,logpe,log(100000.)  , status)
        VERIFY_(STATUS)
        call SSI_CopyCoarseToFine(export, dummy2d, 'H1000', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
@@ -5373,29 +5374,29 @@ end subroutine RUN
        VERIFY_(STATUS)
     endif
 
-! Compute Heights Above Surface
-! -----------------------------
-    do k=1,km+1
-    zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
-    enddo
-    
-    call MAPL_GetPointer(export,temp2d,'U50M',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,ur,-zle,-50., status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'U50M', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'V50M',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,vr,-zle,-50., status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'V50M', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
+!! Compute Heights Above Surface
+!! -----------------------------
+!    do k=1,km+1
+!    zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
+!    enddo
+!    
+!    call MAPL_GetPointer(export,temp2d,'U50M',  rc=status)
+!    VERIFY_(STATUS)
+!    if(associated(temp2d)) then
+!       call VertInterp(dummy2d,ur,-zle,-50., status)
+!       VERIFY_(STATUS)
+!       call SSI_CopyCoarseToFine(export, dummy2d, 'U50M', STATE%f2c_SSI_arr_map, rc=status)
+!       VERIFY_(STATUS)
+!    end if
+!
+!    call MAPL_GetPointer(export,temp2d,'V50M',  rc=status)
+!    VERIFY_(STATUS)
+!    if(associated(temp2d)) then
+!       call VertInterp(dummy2d,vr,-zle,-50., status)
+!       VERIFY_(STATUS)
+!       call SSI_CopyCoarseToFine(export, dummy2d, 'V50M', STATE%f2c_SSI_arr_map, rc=status)
+!       VERIFY_(STATUS)
+!    end if
 
 ! Compute Surface Pressure
 ! ------------------------
@@ -5407,6 +5408,20 @@ end subroutine RUN
        call SSI_CopyCoarseToFine(export, dummy2d, 'PS', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     endif
+
+! Get the height above the surface
+! --------------------------------
+    do k=1,km+1
+       zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
+    enddo
+
+    call MAPL_GetPointer(export,temp3d,'ZLE0',rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp3d)) temp3d = zle
+
+    call MAPL_GetPointer(export,temp3d,'ZL0' ,rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp3d)) temp3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
 
 ! Compute Vertically Averaged T,U
 ! -------------------------------
