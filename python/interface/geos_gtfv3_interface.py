@@ -15,7 +15,7 @@ source = """
 from {} import ffi
 from datetime import datetime
 from mpi4py import MPI
-from geos_gtfv3 import geos_gtfv3_init, geos_gtfv3, geos_gtfv3_finalize
+from pyFV3_interface import geos_gtfv3_init, geos_gtfv3, geos_gtfv3_finalize
 import traceback
 
 @ffi.def_extern()

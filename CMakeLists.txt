@@ -24,8 +24,8 @@ set (srcs
   )
 if (BUILD_GEOS_GTFV3_INTERFACE)
   list (APPEND srcs
-  geos-gtfv3/geos_gtfv3_interface.f90
-  geos-gtfv3/geos_gtfv3_interface.c)
+  python/interface/geos_gtfv3_interface.f90
+  python/interface/geos_gtfv3_interface.c)
 endif ()
 
 if (BUILD_GEOS_GTFV3_INTERFACE)
@@ -42,8 +42,8 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
   # Set up some variables in case names change
   set(GEOS_GTFV3_INTERFACE_LIBRARY     ${CMAKE_CURRENT_BINARY_DIR}/libgeos_gtfv3_interface_py.so)
   set(GEOS_GTFV3_INTERFACE_HEADER_FILE ${CMAKE_CURRENT_BINARY_DIR}/geos_gtfv3_interface_py.h)
-  set(GEOS_GTFV3_INTERFACE_FLAG_HEADER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/geos-gtfv3/fv_flags.h)
-  set(GEOS_GTFV3_INTERFACE_SRCS        ${CMAKE_CURRENT_SOURCE_DIR}/geos-gtfv3/geos_gtfv3_interface.py)
+  set(GEOS_GTFV3_INTERFACE_FLAG_HEADER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/python/interface/fv_flags.h)
+  set(GEOS_GTFV3_INTERFACE_SRCS        ${CMAKE_CURRENT_SOURCE_DIR}/python/interface/geos_gtfv3_interface.py)
 
   # This command creates the shared object library from Python
   add_custom_command(
