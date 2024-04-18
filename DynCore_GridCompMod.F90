@@ -5413,13 +5413,23 @@ end subroutine RUN
        zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
     enddo
 
-    call MAPL_GetPointer(export,temp3d,'ZLE0',rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp3d)) temp3d = zle
+    !call MAPL_GetPointer(export,temp3d,'ZLE0',rc=status)
+    !VERIFY_(STATUS)
+    !if(associated(temp3d)) temp3d = zle
+    call MAPL_GetPointer(export,temp3d,'ZLE0',  _RC)
+    if(associated(temp3d)) then
+       dummy3d = zle
+       call SSI_CopyCoarseToFine(export, dummy3d, 'ZLE0', STATE%f2c_SSI_arr_map, _RC)
+    endif
 
-    call MAPL_GetPointer(export,temp3d,'ZL0' ,rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp3d)) temp3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
+    !call MAPL_GetPointer(export,temp3d,'ZL0' ,rc=status)
+    !VERIFY_(STATUS)
+    !if(associated(temp3d)) temp3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
+    call MAPL_GetPointer(export,temp3d,'ZL0',  _RC)
+    if(associated(temp3d)) then
+       dummy3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
+       call SSI_CopyCoarseToFine(export, dummy3d, 'ZL0', STATE%f2c_SSI_arr_map, _RC)
+    endif
 
 ! Compute Vertically Averaged T,U
 ! -------------------------------
