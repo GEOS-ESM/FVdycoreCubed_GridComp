@@ -4777,6 +4777,7 @@ end subroutine RUN
     real(r4), pointer     :: QOLD(:,:,:)
     real(r4), pointer     :: temp3d(:,:,:)
     real(r4), pointer     :: dummy3d(:,:,:) => Null()
+    real(kind=4), pointer ::       dummy3d_kmplus1(:,:,:) => Null()
     real(r4), pointer     :: temp2d(:,:  )
     real(r4), pointer     :: dummy2d(:,:  ) => Null()
 
@@ -4895,6 +4896,9 @@ end subroutine RUN
     if(.not.associated(dummy3d)) then
        ALLOCATE(dummy3d(ifirstxy:ilastxy,jfirstxy:jlastxy,km),stat=status)
        VERIFY_(STATUS)
+    endif
+    if(.not.associated(dummy3d_kmplus1)) then
+       allocate(dummy3d_kmplus1(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1), _STAT)
     endif
     if(.not.associated(dummy2d)) then
        ALLOCATE(dummy2d(ifirstxy:ilastxy,jfirstxy:jlastxy),stat=status)
@@ -5418,8 +5422,8 @@ end subroutine RUN
     !if(associated(temp3d)) temp3d = zle
     call MAPL_GetPointer(export,temp3d,'ZLE0',  _RC)
     if(associated(temp3d)) then
-       dummy3d = zle
-       call SSI_CopyCoarseToFine(export, dummy3d, 'ZLE0', STATE%f2c_SSI_arr_map, _RC)
+       dummy3d_kmplus1 = zle
+       call SSI_CopyCoarseToFine(export, dummy3d_kmplus1, 'ZLE0', STATE%f2c_SSI_arr_map, _RC)
     endif
 
     !call MAPL_GetPointer(export,temp3d,'ZL0' ,rc=status)
