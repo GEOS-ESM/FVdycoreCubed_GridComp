@@ -1,28 +1,23 @@
-import f90nml
+import os
 from f_py_conversion import FortranPythonConversion
 from cuda_profiler import CUDAProfiler, TimedCUDAProfiler
 from mpi4py import MPI
-from pace.util._optional_imports import cupy as cp
+from ndsl.optional_imports import cupy as cp
 import numpy as np
-from pace.dsl.gt4py_utils import is_gpu_backend
+from ndsl.dsl.gt4py_utils import is_gpu_backend
 from typing import TYPE_CHECKING
-import os
-
-# Backward compatibility (Nov 2023)
-try:
-    from pace.fv3core.initialization.geos_wrapper import GeosDycoreWrapper, MemorySpace
-except ModuleNotFoundError:
-    from pace.fv3core.wrappers.geos_wrapper import GeosDycoreWrapper, MemorySpace
+from pyFV3_wrapper import GeosDycoreWrapper, MemorySpace
+from fv_flags import FVFlags
 
 
 if TYPE_CHECKING:
     import cffi
 
 
-class GEOSGTFV3:
+class PYFV3_WRAPPER:
     def __init__(
         self,
-        namelist_path: str,
+        fv_flags: FVFlags,
         bdt: float,
         comm: MPI.Intercomm,
         npx: int,
@@ -36,10 +31,11 @@ class GEOSGTFV3:
         ied: int,
         jsd: int,
         jed: int,
-        nq_tot: int,
+        tracer_count: int,
+        ak_cdata: "cffi.FFI.CData",
+        bk_cdata: "cffi.FFI.CData",
         backend: str = "dace:gpu",
     ) -> None:
-        self.namelist = f90nml.read(namelist_path)
         self.rank = comm.Get_rank()
         self.backend = backend
         # For Fortran<->NumPy conversion
@@ -61,12 +57,24 @@ class GEOSGTFV3:
             ied,
             jsd,
             jed,
-            nq_tot,
+            tracer_count,
             numpy_module,
         )
-        # Setup Pace's dynamical core
+
+        # Input pressure levels
+        ak = self.f_py._fortran_to_numpy(ak_cdata, [npz + 1])
+        bk = self.f_py._fortran_to_numpy(bk_cdata, [npz + 1])
+
+        # Setup pyFV3's dynamical core
         self.dycore = GeosDycoreWrapper(
-            self.namelist, bdt, comm, self.backend, fortran_mem_space
+            fv_flags=fv_flags,
+            bdt=bdt,
+            comm=comm,
+            ak=ak,
+            bk=bk,
+            backend=self.backend,
+            tracer_count=tracer_count,
+            fortran_mem_space=fortran_mem_space,
         )
 
         self._timings = {}
@@ -74,7 +82,7 @@ class GEOSGTFV3:
     def finalize(self):
         import json
 
-        with open("gtfv3_timings.json", "w") as f:
+        with open("pyfv3_timings.json", "w") as f:
             json.dump(self._timings, f, indent=4)
 
     def __call__(
@@ -104,8 +112,6 @@ class GEOSGTFV3:
         va: "cffi.FFI.CData",
         uc: "cffi.FFI.CData",
         vc: "cffi.FFI.CData",
-        ak: "cffi.FFI.CData",
-        bk: "cffi.FFI.CData",
         mfx: "cffi.FFI.CData",
         mfy: "cffi.FFI.CData",
         cx: "cffi.FFI.CData",
@@ -143,7 +149,7 @@ class GEOSGTFV3:
                 diss_est,
             )
 
-        # Run gtFV3
+        # Run pyFV3
         with TimedCUDAProfiler("Numerics", self._timings):
             state_out, self._timings = self.dycore(
                 self._timings,
@@ -208,11 +214,12 @@ class GEOSGTFV3:
 
 # Below is the entry point to the interface
 # ToDo: we should build the object outside of the sim loop from fortran
-# potentially by writing a geos_gtfv3_setup_interface and caching the ptr Fortran side
-GEOS_DYCORE = None
+# potentially by writing a pyfv3_interface_setup and caching the ptr Fortran side
+# or by having a central python interpreter object handled by CFFI to register against
+WRAPPER = None
 
 
-def geos_gtfv3(
+def pyfv3_run(
     comm: MPI.Intercomm,
     npx: int,
     npy: int,
@@ -261,12 +268,10 @@ def geos_gtfv3(
     cy: "cffi.FFI.CData",
     diss_est: "cffi.FFI.CData",
 ):
-    global GEOS_DYCORE
-    if not GEOS_DYCORE:
-        raise RuntimeError(
-            "[GEOS WRAPPER] Bad init, did you call init?"
-        )
-    GEOS_DYCORE(
+    global WRAPPER
+    if not WRAPPER:
+        raise RuntimeError("[GEOS WRAPPER] Bad init, did you call init?")
+    WRAPPER(
         ng,
         ptop,
         ks,
@@ -302,12 +307,13 @@ def geos_gtfv3(
     )
 
 
-def geos_gtfv3_finalize():
-    if GEOS_DYCORE is not None:
-        GEOS_DYCORE.finalize()
+def pyfv3_finalize():
+    if WRAPPER is not None:
+        WRAPPER.finalize()
 
 
-def geos_gtfv3_init(
+def pyfv3_init(
+    fv_flags: FVFlags,
     comm: MPI.Intercomm,
     npx: int,
     npy: int,
@@ -323,18 +329,17 @@ def geos_gtfv3_init(
     jed: int,
     bdt,
     nq_tot: int,
+    ak: "cffi.FFI.CData",
+    bk: "cffi.FFI.CData",
 ):
     # Read in the backend
-    BACKEND = os.environ.get("GTFV3_BACKEND", "gt:gpu")
+    BACKEND = os.environ.get("GEOS_PYFV3_BACKEND", "gt:gpu")
 
-    # Read in the namelist
-    NAMELIST_PATH = os.environ.get("GTFV3_NAMELIST", "input.nml")
-
-    global GEOS_DYCORE
-    if GEOS_DYCORE is not None:
+    global WRAPPER
+    if WRAPPER is not None:
         raise RuntimeError("[GEOS WRAPPER] Double init")
-    GEOS_DYCORE = GEOSGTFV3(
-        namelist_path=NAMELIST_PATH,
+    WRAPPER = PYFV3_WRAPPER(
+        fv_flags=fv_flags,
         bdt=bdt,
         comm=comm,
         npx=npx,
@@ -348,6 +353,8 @@ def geos_gtfv3_init(
         ied=ied,
         jsd=jsd,
         jed=jed,
-        nq_tot=nq_tot,
+        tracer_count=nq_tot,
         backend=BACKEND,
+        ak_cdata=ak,
+        bk_cdata=bk,
     )

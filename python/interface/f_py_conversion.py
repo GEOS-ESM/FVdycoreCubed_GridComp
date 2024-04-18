@@ -2,10 +2,10 @@ import cffi
 import numpy as np
 from math import prod
 from cuda_profiler import CUDAProfiler
-from pace.dsl.typing import Float
+from ndsl.dsl.typing import Float
 from typing import Tuple, Optional, List, Dict, Union
 from types import ModuleType
-from pace.util._optional_imports import cupy as cp
+from ndsl.optional_imports import cupy as cp
 
 DeviceArray = cp.ndarray if cp else None
 PythonArray = Union[np.ndarray, (cp.ndarray if cp else None)]
@@ -29,7 +29,7 @@ class FortranPythonConversion:
         ied: int,
         jsd: int,
         jed: int,
-        num_tracers: int,
+        tracer_count: int,
         numpy_module: ModuleType,
     ):
         # Python numpy-like module is given by the caller leaving
@@ -49,8 +49,7 @@ class FortranPythonConversion:
         self._npx, self._npy, self._npz = npx, npy, npz
         self._is, self._ie, self._js, self._je = is_, ie, js, je
         self._isd, self._ied, self._jsd, self._jed = isd, ied, jsd, jed
-        assert num_tracers == 7, f"Expected 7 tracers, received: {num_tracers}"
-        self._num_tracers = num_tracers
+        self._num_tracers = tracer_count
 
         # cffi init
         self._ffi = cffi.FFI()
@@ -69,7 +68,7 @@ class FortranPythonConversion:
         self,
         fptr: "cffi.FFI.CData",
         dim: List[int],
-    ):
+    ) -> np.ndarray:
         """
         Input: Fortran data pointed to by fptr and of shape dim = (i, j, k)
         Output: C-ordered double precision NumPy data of shape (i, j, k)
@@ -171,12 +170,12 @@ class FortranPythonConversion:
         # Shorthands
         is_, ie, js, je = self._is, self._ie, self._js, self._je
         isd, ied, jsd, jed = self._isd, self._ied, self._jsd, self._jed
-        npz, num_tracers = self._npz, self._num_tracers
+        npz, tracer_count = self._npz, self._num_tracers
 
         # q/pe/peln require special handling
         # pe/peln need to be have their axes swapped - (i, k, j) -> (i, j, k)
         q = self._fortran_to_python_trf(
-            q_ptr, (ied - isd + 1, jed - jsd + 1, npz, num_tracers)
+            q_ptr, (ied - isd + 1, jed - jsd + 1, npz, tracer_count)
         )
         pe = self._fortran_to_python_trf(
             pe_ptr,

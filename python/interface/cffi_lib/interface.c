@@ -1,23 +1,39 @@
 #include <stdio.h>
 #include <time.h>
 #include "mpi.h"
-#include "geos_gtfv3_interface_py.h"
+#include "fv_flags.h"
 
-void geos_gtfv3_interface_c_init(
+void pyfv3_interface_c_init(
+    fv_flags_t *fv_flags,
     MPI_Fint comm_f,
     int npx, int npy, int npz, int ntiles,
     int is, int ie, int js, int je,
     int isd, int ied, int jsd, int jed,
-    float bdt, int nq_tot)
+    float bdt, int nq_tot,
+    const float *ak, const float *bk)
 {
+    // Check magic number
+    if (fv_flags->mn_123456789 != 123456789)
+    {
+        printf("Magic number failed, pyFV3 interface is broken on the C side\n");
+        exit(-1);
+    }
+
     MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
-    geos_gtfv3_interface_py_init(
+    int return_code = pyfv3_interface_py_init(
+        fv_flags,
         comm_c,
         npx, npy, npz, ntiles,
-        is, ie, js, je, isd, ied, jsd, jed, bdt, nq_tot);
+        is, ie, js, je, isd, ied, jsd, jed, bdt, nq_tot,
+        ak, bk);
+
+    if (return_code < 0)
+    {
+        exit(return_code);
+    }
 }
 
-void geos_gtfv3_interface_c(
+void pyfv3_interface_c_run(
     // input
     MPI_Fint comm_f,
     int npx, int npy, int npz, int ntiles,
@@ -31,9 +47,6 @@ void geos_gtfv3_interface_c(
     float *pt, float *delp, float *q,
     float *ps, float *pe, float *pk, float *peln, float *pkz,
     float *phis, float *q_con, float *omga, float *ua, float *va, float *uc, float *vc,
-
-    // input
-    const float *ak, const float *bk,
 
     // input/output
     float *mfx, float *mfy, float *cx, float *cy, float *diss_est)
@@ -50,7 +63,7 @@ void geos_gtfv3_interface_c(
     // MPI_Comm_rank(comm_c, &rank);
     // if (rank == 0) printf("C: %s.xxx --calling python interface\n", buf);
 
-    geos_gtfv3_interface_py(
+    int return_code = pyfv3_interface_py_run(
         comm_c,
         npx, npy, npz, ntiles,
         is, ie, js, je,
@@ -64,12 +77,18 @@ void geos_gtfv3_interface_c(
         phis, q_con, omga,
         ua, va, uc, vc,
 
-        ak, bk,
-
         mfx, mfy, cx, cy, diss_est);
+    if (return_code < 0)
+    {
+        exit(return_code);
+    }
 }
 
-void geos_gtfv3_interface_c_finalize()
+void pyfv3_interface_c_finalize()
 {
-    geos_gtfv3_interface_py_finalize();
+    int return_code = pyfv3_interface_py_finalize();
+    if (return_code < 0)
+    {
+        exit(return_code);
+    }
 }
