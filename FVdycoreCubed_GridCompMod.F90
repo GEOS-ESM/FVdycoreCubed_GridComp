@@ -883,6 +883,14 @@ contains
      VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                  &
+         SHORT_NAME = 'DELZ',                                      &
+         LONG_NAME  = 'nonhydrostatic_layer_thickness',            &
+         UNITS      = 'm s-1',                                   &
+         DIMS       = MAPL_DimsHorzVert,                           &
+         VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'ZLE0',                                      &
          LONG_NAME  = 'edge_heights_above_surface',                &
          UNITS      = 'm',                                         &
