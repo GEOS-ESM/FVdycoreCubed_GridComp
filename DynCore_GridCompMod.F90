@@ -927,11 +927,11 @@ subroutine Run(gc, import, export, clock, rc)
     real(kind=4), allocatable ::   cubetemp3d(:,:,:)
     real(kind=4), allocatable ::   cubevtmp3d(:,:,:)
 
-    real(kind=4), pointer :: uh25(:,:)
-    real(kind=4), pointer :: uh03(:,:)
-    real(kind=4), pointer :: srh01(:,:)
-    real(kind=4), pointer :: srh03(:,:)
-    real(kind=4), pointer :: srh25(:,:)
+    real(kind=4), allocatable :: uh25(:,:)
+    real(kind=4), allocatable :: uh03(:,:)
+    real(kind=4), allocatable :: srh01(:,:)
+    real(kind=4), allocatable :: srh03(:,:)
+    real(kind=4), allocatable :: srh25(:,:)
 
     real(r8),     allocatable ::   uatmp(:,:,:)
     real(r8),     allocatable ::   vatmp(:,:,:)
@@ -3406,28 +3406,25 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Updraft Helicty Exports
 
-      call MAPL_GetPointer(export,  uh25, 'UH25', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export,  uh03, 'UH03', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export, srh01,'SRH01', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export, srh03,'SRH03', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
-      call MAPL_GetPointer(export, srh25,'SRH25', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      allocate(uh25(ifirstxy:ilastxy,jfirstxy:jlastxy), _STAT)
+      allocate(uh03(ifirstxy:ilastxy,jfirstxy:jlastxy), _STAT)
+      allocate(srh01(ifirstxy:ilastxy,jfirstxy:jlastxy), _STAT)
+      allocate(srh03(ifirstxy:ilastxy,jfirstxy:jlastxy), _STAT)
+      allocate(srh25(ifirstxy:ilastxy,jfirstxy:jlastxy), _STAT)
       ! Per WMP, this calculation is not useful if running hydrostatic
       if (.not. HYDROSTATIC) then
-         if( associated( uh25) .or. associated( uh03) .or. &
-            associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
-            call fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
-            dummy2d = uh25
-            call SSI_CopyCoarseToFine(export, dummy2d, 'UH25', STATE%f2c_SSI_arr_map, _RC)
-            dummy2d = uh03
-            call SSI_CopyCoarseToFine(export, dummy2d, 'UH03', STATE%f2c_SSI_arr_map, _RC)
-            dummy2d = srh01
-            call SSI_CopyCoarseToFine(export, dummy2d, 'SRH01', STATE%f2c_SSI_arr_map, _RC)
-            dummy2d = srh03
-            call SSI_CopyCoarseToFine(export, dummy2d, 'SRH03', STATE%f2c_SSI_arr_map, _RC)
-            dummy2d = srh25
-            call SSI_CopyCoarseToFine(export, dummy2d, 'SRH25', STATE%f2c_SSI_arr_map, _RC)
-         endif
+        call fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
+        call SSI_CopyCoarseToFine(export, uh25, 'UH25', STATE%f2c_SSI_arr_map, _RC)
+        call SSI_CopyCoarseToFine(export, uh03, 'UH03', STATE%f2c_SSI_arr_map, _RC)
+        call SSI_CopyCoarseToFine(export, srh01, 'SRH01', STATE%f2c_SSI_arr_map, _RC)
+        call SSI_CopyCoarseToFine(export, srh03, 'SRH03', STATE%f2c_SSI_arr_map, _RC)
+        call SSI_CopyCoarseToFine(export, srh25, 'SRH25', STATE%f2c_SSI_arr_map, _RC)
       endif
+      deallocate(uh25, _STAT)
+      deallocate(uh03, _STAT)
+      deallocate(srh01, _STAT)
+      deallocate(srh03, _STAT)
+      deallocate(srh25, _STAT)
 
 ! Divergence Exports
 

@@ -2562,6 +2562,12 @@ contains
   real(r4), pointer                  :: LATS(:,:), LONS(:,:)
   real(r4), pointer                  :: LATS_MAPL(:,:), LONS_MAPL(:,:)
 ! End Coarse GC stuff
+! moved this to init  for CoarseGC
+  real(kind=4), pointer :: uh25(:,:)
+  real(kind=4), pointer :: uh03(:,:)
+  real(kind=4), pointer :: srh01(:,:)
+  real(kind=4), pointer :: srh03(:,:)
+  real(kind=4), pointer :: srh25(:,:)
 
   character(len=ESMF_MAXSTR)         :: ReplayMode
   real                               :: DNS_INTERVAL
@@ -2626,6 +2632,13 @@ contains
     VERIFY_(STATUS)
 
 ! All fine PETs allocate EXPORT
+! Updraft Helicty Exports
+
+    call MAPL_GetPointer(export,  uh25, 'UH25', ALLOC=.TRUE., _RC)
+    call MAPL_GetPointer(export,  uh03, 'UH03', ALLOC=.TRUE., _RC)
+    call MAPL_GetPointer(export, srh01,'SRH01', ALLOC=.TRUE., _RC)
+    call MAPL_GetPointer(export, srh03,'SRH03', ALLOC=.TRUE., _RC)
+    call MAPL_GetPointer(export, srh25,'SRH25', ALLOC=.TRUE., _RC)
 
     call MAPL_GetPointer(export, temp2d, 'DXC', ALLOC=.true., rc=status)
     VERIFY_(STATUS)
