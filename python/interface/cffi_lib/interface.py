@@ -1,7 +1,7 @@
 import cffi
 from mpi4py import MPI
 
-TMPFILEBASE = "geos_gtfv3_interface_py"
+TMPFILEBASE = "pyFV3_interface_py"
 
 ffi = cffi.FFI()
 
@@ -15,11 +15,11 @@ source = """
 from {} import ffi
 from datetime import datetime
 from mpi4py import MPI
-from pyFV3_interface import geos_gtfv3_init, geos_gtfv3, geos_gtfv3_finalize
+from pyFV3_interface import pyfv3_init, pyfv3_run, pyfv3_finalize
 import traceback
 
 @ffi.def_extern()
-def geos_gtfv3_interface_py_init(
+def pyfv3_interface_py_init(
     fv_flags,
     comm_c,
     npx, npy, npz, ntiles,
@@ -34,7 +34,7 @@ def geos_gtfv3_interface_py_init(
     comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
     
     try:
-        geos_gtfv3_init(
+        pyfv3_init(
             fv_flags,
             comm_py,
             npx, npy, npz, ntiles,
@@ -48,7 +48,7 @@ def geos_gtfv3_interface_py_init(
     return 0
 
 @ffi.def_extern()
-def geos_gtfv3_interface_py(
+def pyfv3_interface_py_run(
     comm_c,
     npx, npy, npz, ntiles,
     is_, ie, js, je, isd, ied, jsd, jed,
@@ -68,7 +68,7 @@ def geos_gtfv3_interface_py(
     comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
 
     try:
-        geos_gtfv3(
+        pyfv3_run(
             comm_py,
             npx, npy, npz, ntiles,
             is_, ie, js, je, isd, ied, jsd, jed,
@@ -87,9 +87,9 @@ def geos_gtfv3_interface_py(
     return 0
 
 @ffi.def_extern()
-def geos_gtfv3_interface_py_finalize() -> int:
+def pyfv3_interface_py_finalize() -> int:
     try:
-        geos_gtfv3_finalize()
+        pyfv3_finalize()
     except Exception as err:
         print("Error in Python:")
         print(traceback.format_exc())

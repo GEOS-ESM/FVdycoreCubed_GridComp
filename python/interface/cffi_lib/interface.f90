@@ -1,4 +1,4 @@
-module geos_gtfv3_interface_mod
+module pyfv3_interface_mod
 
    use iso_c_binding, only: c_int, c_float, c_double, c_bool
    use fv_arrays_mod, only: fv_flags_type
@@ -6,9 +6,9 @@ module geos_gtfv3_interface_mod
    implicit none
 
    private
-   public :: geos_gtfv3_interface_f_init
-   public :: geos_gtfv3_interface_f
-   public :: geos_gtfv3_interface_f_finalize
+   public :: pyfv3_interface_f_init
+   public :: pyfv3_interface_f_run
+   public :: pyfv3_interface_f_finalize
    public :: fv_flags_interface_type
    public :: make_fv_flags_C_interop
 
@@ -175,13 +175,13 @@ module geos_gtfv3_interface_mod
 
    interface
 
-      subroutine geos_gtfv3_interface_f_init( &
+      subroutine pyfv3_interface_f_init( &
          fv_flags, &
          comm, &
          npx, npy, npz, ntiles, &
          is, ie, js, je, isd, ied, jsd, jed, &
          bdt, nq_tot, ak, bk &
-         ) bind(c, name='geos_gtfv3_interface_c_init')
+         ) bind(c, name='pyfv3_interface_c_init')
 
          import c_int, c_float, c_double, fv_flags_interface_type
 
@@ -195,9 +195,9 @@ module geos_gtfv3_interface_mod
          integer(kind=c_int), value, intent(in) :: nq_tot ! transported tracers
          real(kind=c_float), dimension(*), intent(in) :: ak, bk
 
-      end subroutine geos_gtfv3_interface_f_init
+      end subroutine pyfv3_interface_f_init
 
-      subroutine geos_gtfv3_interface_f( &
+      subroutine pyfv3_interface_f_run( &
       ! Input
          comm, &
          npx, npy, npz, ntiles, &
@@ -214,7 +214,7 @@ module geos_gtfv3_interface_mod
 
       ! Input/Output
          mfx, mfy, cx, cy, diss_est &
-         ) bind(c, name='geos_gtfv3_interface_c')
+         ) bind(c, name='pyfv3_interface_c_run')
 
          import c_int, c_float, c_double
 
@@ -243,10 +243,10 @@ module geos_gtfv3_interface_mod
          ! Input/Output
          real(kind=c_float), dimension(*), intent(inout) :: mfx, mfy, cx, cy, diss_est
 
-      end subroutine geos_gtfv3_interface_f
+      end subroutine pyfv3_interface_f_run
 
-      subroutine geos_gtfv3_interface_f_finalize() bind(c, name='geos_gtfv3_interface_c_finalize')
-      end subroutine geos_gtfv3_interface_f_finalize
+      subroutine pyfv3_interface_f_finalize() bind(c, name='pyfv3_interface_c_finalize')
+      end subroutine pyfv3_interface_f_finalize
 
    end interface
 
@@ -403,4 +403,4 @@ contains
       c_fv_flags%layout_y = layout(2)
    end subroutine make_fv_flags_C_interop
 
-end module geos_gtfv3_interface_mod
+end module pyfv3_interface_mod

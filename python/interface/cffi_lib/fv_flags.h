@@ -165,7 +165,7 @@ typedef union
     void *comm_ptr;
 } MPI_Comm_t;
 
-extern int geos_gtfv3_interface_py_init(
+extern int pyfv3_interface_py_init(
     fv_flags_t *fv_flags,
     void *comm_c,
     int npx, int npy, int npz, int ntiles,
@@ -173,7 +173,7 @@ extern int geos_gtfv3_interface_py_init(
     float bdt, int nq_tot,
     const float *ak, const float *bk);
 
-extern int geos_gtfv3_interface_py(
+extern int pyfv3_interface_py_run(
     void *comm_c,
     int npx, int npy, int npz, int ntiles,
     int is_, int ie, int js, int je, int isd, int ied, int jsd, int jed,
@@ -187,4 +187,4 @@ extern int geos_gtfv3_interface_py(
     // input/output
     float *mfx, float *mfy, float *cx, float *cy, float *diss_est);
 
-extern int geos_gtfv3_interface_py_finalize();
+extern int pyfv3_interface_py_finalize();

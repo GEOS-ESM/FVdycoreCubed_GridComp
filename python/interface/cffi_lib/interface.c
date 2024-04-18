@@ -3,7 +3,7 @@
 #include "mpi.h"
 #include "fv_flags.h"
 
-void geos_gtfv3_interface_c_init(
+void pyfv3_interface_c_init(
     fv_flags_t *fv_flags,
     MPI_Fint comm_f,
     int npx, int npy, int npz, int ntiles,
@@ -20,7 +20,7 @@ void geos_gtfv3_interface_c_init(
     }
 
     MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
-    int return_code = geos_gtfv3_interface_py_init(
+    int return_code = pyfv3_interface_py_init(
         fv_flags,
         comm_c,
         npx, npy, npz, ntiles,
@@ -33,7 +33,7 @@ void geos_gtfv3_interface_c_init(
     }
 }
 
-void geos_gtfv3_interface_c(
+void pyfv3_interface_c_run(
     // input
     MPI_Fint comm_f,
     int npx, int npy, int npz, int ntiles,
@@ -63,7 +63,7 @@ void geos_gtfv3_interface_c(
     // MPI_Comm_rank(comm_c, &rank);
     // if (rank == 0) printf("C: %s.xxx --calling python interface\n", buf);
 
-    int return_code = geos_gtfv3_interface_py(
+    int return_code = pyfv3_interface_py_run(
         comm_c,
         npx, npy, npz, ntiles,
         is, ie, js, je,
@@ -84,9 +84,9 @@ void geos_gtfv3_interface_c(
     }
 }
 
-void geos_gtfv3_interface_c_finalize()
+void pyfv3_interface_c_finalize()
 {
-    int return_code = geos_gtfv3_interface_py_finalize();
+    int return_code = pyfv3_interface_py_finalize();
     if (return_code < 0)
     {
         exit(return_code);

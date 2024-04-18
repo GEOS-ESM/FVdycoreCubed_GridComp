@@ -38,11 +38,11 @@ module FV_StateMod
 
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check, &
                                  get_vorticity, updraft_helicity, bunkers_vector, helicity_relative_CAPS
-#ifdef RUN_GTFV3
+#ifdef RUN_PYFV3
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
-   use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
-   use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f_init, geos_gtfv3_interface_f_finalize, &
-                                       fv_flags_interface_type, make_fv_flags_C_interop
+   use pyfv3_interface_mod, only: pyfv3_interface_f_run
+   use pyfv3_interface_mod, only: pyfv3_interface_f_init, pyfv3_interface_f_finalize, &
+                                  fv_flags_interface_type, make_fv_flags_C_interop
 #endif
 
 implicit none
@@ -265,8 +265,8 @@ private
    real(REAL8), parameter ::  D180_0                  = 180.0
    real(REAL8), parameter ::  ratmax                  =  0.81
 
-#ifdef RUN_GTFV3
-   integer :: run_gtfv3 = 0
+#ifdef RUN_PYFV3
+   integer :: run_pyfv3 = 0
 #endif
 
 contains
@@ -750,8 +750,8 @@ contains
   call MAPL_MemUtilsWrite(VM, trim(Iam), RC=STATUS )
   VERIFY_(STATUS)
 
-#ifdef RUN_GTFV3
-  call MAPL_GetResource(MAPL, run_gtfv3, 'RUN_GTFV3:', default=0, RC=STATUS)
+#ifdef RUN_PYFV3
+  call MAPL_GetResource(MAPL, run_pyfv3, 'RUN_PYFV3:', default=0, RC=STATUS)
   VERIFY_(STATUS)
 #endif
 
@@ -1239,7 +1239,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   logical :: NWAT_TEST
 
-#ifdef RUN_GTFV3
+#ifdef RUN_PYFV3
   type(ESMF_VM) :: vm
   integer :: comm, rank, mpierr
   real :: start, finish
@@ -1249,7 +1249,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
 ! Begin
 
-#ifdef RUN_GTFV3
+#ifdef RUN_PYFV3
   call ESMF_VMGetCurrent(vm, rc=status) ! pchakrab: replace with ESMF_GridCompGet(gc, VM=VM, _RC)
   call ESMF_VMGet(vm, mpiCommunicator=comm)
   call MPI_Comm_rank(comm, rank, mpierr)
@@ -1378,14 +1378,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
      call echo_fv3_setup()
      ! Setup pyFV3 here since we need to know the exact nwat
      ! We can do this because this is trigger _only once_.
-#ifdef RUN_GTFV3
-     if (run_gtfv3 /= 0) then
+#ifdef RUN_PYFV3
+     if (run_pyfv3 /= 0) then
       ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
       ! disable trapping of FPEs temporarily, call the Python interface and resume trapping
       call ieee_get_halting_mode(ieee_all, halting_mode)
       call ieee_set_halting_mode(ieee_all, .false.)
       call make_fv_flags_C_interop(FV_Atm(1)%flagstruct, FV_Atm(1)%layout, c_fv_flags)
-      call geos_gtfv3_interface_f_init( &
+      call pyfv3_interface_f_init( &
             c_fv_flags, &
             comm, &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
@@ -2006,8 +2006,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     t_dt(:,:,:) = 0.0
     w_dt(:,:,:) = 0.0
 
-#ifdef RUN_GTFV3
-    if (run_gtfv3 == 0) then
+#ifdef RUN_PYFV3
+    if (run_pyfv3 == 0) then
        call cpu_time(start)
 #endif
 
@@ -2029,12 +2029,12 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
             FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
             time_total)
-#ifdef RUN_GTFV3
+#ifdef RUN_PYFV3
        call cpu_time(finish)
        if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
     else
        call cpu_time(start)
-       call geos_gtfv3_interface_f( &
+       call pyfv3_interface_f_run( &
             comm, &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
             FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
@@ -2050,7 +2050,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             ! input/output
             FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
        call cpu_time(finish)
-       print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
+       print *, rank, ', pyfv3_interface_f_run: time taken = ', finish - start, 's'
     end if
 #endif
 
@@ -2448,8 +2448,8 @@ end subroutine FV_Run
    !    call ESMF_GridDestroy  (STATE%GRID%GRID)
 #endif
 
-#ifdef RUN_GTFV3
-   if (run_gtfv3 /= 0) call geos_gtfv3_interface_f_finalize()
+#ifdef RUN_PYFV3
+   if (run_pyfv3 /= 0) call pyfv3_interface_f_finalize()
 #endif
 
  end subroutine FV_Finalize
