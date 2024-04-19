@@ -3441,7 +3441,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'DIVG200',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,dble(divg),zle,log(20000.)  ,  status)
+         call VertInterp(dummy2d,dble(divg),logpe,log(20000.)  ,  status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'DIVG200', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3450,7 +3450,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'DIVG500',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,dble(divg),zle,log(50000.)  ,  status)
+         call VertInterp(dummy2d,dble(divg),logpe,log(50000.)  ,  status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'DIVG500', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3459,7 +3459,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'DIVG700',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,dble(divg),zle,log(70000.)  ,  status)
+         call VertInterp(dummy2d,dble(divg),logpe,log(70000.)  ,  status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'DIVG700', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3468,7 +3468,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'DIVG850',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,dble(divg),zle,log(85000.)  ,  status)
+         call VertInterp(dummy2d,dble(divg),logpe,log(85000.)  ,  status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'DIVG850', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3487,7 +3487,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'VORT200',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,dble(vort),zle,log(20000.)  ,  status)
+         call VertInterp(dummy2d,dble(vort),logpe,log(20000.)  ,  status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'VORT200', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3496,7 +3496,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'VORT500',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,dble(vort),zle,log(50000.)  ,  status)
+         call VertInterp(dummy2d,dble(vort),logpe,log(50000.)  ,  status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'VORT500', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3505,7 +3505,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'VORT700',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,dble(vort),zle,log(70000.)  ,  status)
+         call VertInterp(dummy2d,dble(vort),logpe,log(70000.)  ,  status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'VORT700', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3514,7 +3514,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'VORT850',  rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,dble(vort),zle,log(85000.)  ,  status)
+         call VertInterp(dummy2d,dble(vort),logpe,log(85000.)  ,  status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'VORT850', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3528,7 +3528,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'OMEGA850', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,omaxyz,zle,log(85000.)  , status)
+         call VertInterp(dummy2d,omaxyz,logpe,log(85000.)  , status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA850', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3537,7 +3537,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'OMEGA700', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,omaxyz,zle,log(70000.)  , status)
+         call VertInterp(dummy2d,omaxyz,logpe,log(70000.)  , status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA700', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3546,7 +3546,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'OMEGA500', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,omaxyz,zle,log(50000.)  , status)
+         call VertInterp(dummy2d,omaxyz,logpe,log(50000.)  , status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA500', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3555,7 +3555,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'OMEGA200', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,omaxyz,zle,log(20000.)  , status)
+         call VertInterp(dummy2d,omaxyz,logpe,log(20000.)  , status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA200', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -3564,7 +3564,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'OMEGA10', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) then
-         call VertInterp(dummy2d,omaxyz,zle,log(1000.)  , status)
+         call VertInterp(dummy2d,omaxyz,logpe,log(1000.)  , status)
          VERIFY_(STATUS)
          call SSI_CopyCoarseToFine(export, dummy2d, 'OMEGA10', STATE%f2c_SSI_arr_map, rc=status)
          VERIFY_(STATUS)
@@ -5095,168 +5095,6 @@ end subroutine RUN
 
 ! Fill Single Level Variables
 ! ---------------------------
- 
-    call MAPL_GetPointer(export,temp2d,'U200',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,ur,pke,log(20000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'U200', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
- 
-    call MAPL_GetPointer(export,temp2d,'U250',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,ur,pke,log(25000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'U250', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'U500',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,ur,pke,log(50000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'U500', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'U700',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,ur,pke,log(70000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'U700', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'U850',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,ur,pke,log(85000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'U850', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'V200',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,vr,pke,log(20000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'V200', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'V250',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,vr,pke,log(25000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'V250', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'V500',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,vr,pke,log(50000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'V500', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'V700',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,vr,pke,log(70000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'V700', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'V850',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,vr,pke,log(85000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'V850', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'T250',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,tempxy,pke,log(25000.)  , status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'T250', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'T300',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,tempxy,pke,log(30000.)  , status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'T300', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'T500',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,tempxy,pke,log(50000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'T500', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'T700',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,tempxy,pke,log(70000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'T700', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'T850',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,tempxy,pke,log(85000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'T850', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'Q250',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,qv,pke,log(25000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'Q250', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'Q500',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,qv,pke,log(50000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'Q500', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
-
-    call MAPL_GetPointer(export,temp2d,'Q850',  rc=status)
-    VERIFY_(STATUS)
-    if(associated(temp2d)) then
-       call VertInterp(dummy2d,qv,pke,log(85000.)  ,  status)
-       VERIFY_(STATUS)
-       call SSI_CopyCoarseToFine(export, dummy2d, 'Q850', STATE%f2c_SSI_arr_map, rc=status)
-       VERIFY_(STATUS)
-    end if
 
     call MAPL_GetPointer(export,temp2d,'Z700',  rc=status)
     VERIFY_(STATUS)
@@ -5338,6 +5176,186 @@ end subroutine RUN
        call SSI_CopyCoarseToFine(export, dummy2d, 'H1000', STATE%f2c_SSI_arr_map, rc=status)
        VERIFY_(STATUS)
     end if
+ 
+    call MAPL_GetPointer(export,temp2d,'U50M',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,ur,-zle,-50., status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'U50M', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'V50M',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,vr,-zle,-50., status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'V50M', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'U200',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,ur,logpe,log(20000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'U200', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+ 
+    call MAPL_GetPointer(export,temp2d,'U250',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,ur,logpe,log(25000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'U250', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'U500',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,ur,logpe,log(50000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'U500', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'U700',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,ur,logpe,log(70000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'U700', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'U850',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,ur,logpe,log(85000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'U850', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'V200',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,vr,logpe,log(20000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'V200', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'V250',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,vr,logpe,log(25000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'V250', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'V500',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,vr,logpe,log(50000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'V500', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'V700',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,vr,logpe,log(70000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'V700', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'V850',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,vr,logpe,log(85000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'V850', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'T250',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,tempxy,logpe,log(25000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'T250', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'T300',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,tempxy,logpe,log(30000.)  , status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'T300', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'T500',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,tempxy,logpe,log(50000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'T500', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'T700',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,tempxy,logpe,log(70000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'T700', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'T850',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,tempxy,logpe,log(85000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'T850', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'Q250',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,qv,logpe,log(25000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'Q250', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'Q500',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,qv,logpe,log(50000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'Q500', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
+
+    call MAPL_GetPointer(export,temp2d,'Q850',  rc=status)
+    VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       call VertInterp(dummy2d,qv,logpe,log(85000.)  ,  status)
+       VERIFY_(STATUS)
+       call SSI_CopyCoarseToFine(export, dummy2d, 'Q850', STATE%f2c_SSI_arr_map, rc=status)
+       VERIFY_(STATUS)
+    end if
 
 ! Fill Model Top Level Variables
 ! ---------------------------------------
@@ -5373,30 +5391,6 @@ end subroutine RUN
        VERIFY_(STATUS)
     endif
 
-!! Compute Heights Above Surface
-!! -----------------------------
-!    do k=1,km+1
-!    zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
-!    enddo
-!    
-!    call MAPL_GetPointer(export,temp2d,'U50M',  rc=status)
-!    VERIFY_(STATUS)
-!    if(associated(temp2d)) then
-!       call VertInterp(dummy2d,ur,-zle,-50., status)
-!       VERIFY_(STATUS)
-!       call SSI_CopyCoarseToFine(export, dummy2d, 'U50M', STATE%f2c_SSI_arr_map, rc=status)
-!       VERIFY_(STATUS)
-!    end if
-!
-!    call MAPL_GetPointer(export,temp2d,'V50M',  rc=status)
-!    VERIFY_(STATUS)
-!    if(associated(temp2d)) then
-!       call VertInterp(dummy2d,vr,-zle,-50., status)
-!       VERIFY_(STATUS)
-!       call SSI_CopyCoarseToFine(export, dummy2d, 'V50M', STATE%f2c_SSI_arr_map, rc=status)
-!       VERIFY_(STATUS)
-!    end if
-
 ! Compute Surface Pressure
 ! ------------------------
 
@@ -5414,18 +5408,12 @@ end subroutine RUN
        zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
     enddo
 
-    !call MAPL_GetPointer(export,temp3d,'ZLE0',rc=status)
-    !VERIFY_(STATUS)
-    !if(associated(temp3d)) temp3d = zle
     call MAPL_GetPointer(export,temp3d,'ZLE0',  _RC)
     if(associated(temp3d)) then
        dummy3d_kmplus1 = zle
        call SSI_CopyCoarseToFine(export, dummy3d_kmplus1, 'ZLE0', STATE%f2c_SSI_arr_map, _RC)
     endif
 
-    !call MAPL_GetPointer(export,temp3d,'ZL0' ,rc=status)
-    !VERIFY_(STATUS)
-    !if(associated(temp3d)) temp3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
     call MAPL_GetPointer(export,temp3d,'ZL0',  _RC)
     if(associated(temp3d)) then
        dummy3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
