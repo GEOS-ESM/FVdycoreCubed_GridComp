@@ -9,7 +9,7 @@ set (srcs
   CubeHalo.F90
   Cube2LatLon.F90 LatLon2Cube.F90 AppGridCreate.F90 FV_StateMod.F90
   AdvCore_GridCompMod.F90
-  DynCore_GridCompMod.F90 CreateInterpWeights_GridCompMod.F90
+  FVdycoreCubed_GridCompMod.F90 CreateInterpWeights_GridCompMod.F90
   StandAlone_DynAdvCore_GridCompMod.F90
   CubeToLatLonRegridder.F90
   LatLonToCubeRegridder.F90
@@ -21,6 +21,12 @@ set (srcs
   fv_regrid_c2c_bin.F90
   fv_regridding_utils.F90
   rs_scaleMod.F90
+  # Begin Coarse GC files
+  SSI_FineToCoarseMod.F90
+  SSI_CoarseToFineMod.F90
+  SSI_TypeMod.F90
+  DynCore_GridCompMod.F90
+  # End Coarse GC files
   )
 if (BUILD_GEOS_GTFV3_INTERFACE)
   list (APPEND srcs
