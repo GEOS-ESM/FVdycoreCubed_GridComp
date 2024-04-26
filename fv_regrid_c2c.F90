@@ -15,8 +15,8 @@ module fv_regrid_c2c
    use field_manager_mod,  only: MODEL_ATMOS
 
    use MAPL
-   use gFTL_StringVector
-   use gFTL_StringIntegerMap
+   use gFTL2_StringVector
+   use gFTL2_StringIntegerMap
    use, intrinsic :: iso_fortran_env, only: REAL64, REAL32
 
    use fv_arrays_mod,     only: fv_atmos_type, fv_grid_type, fv_grid_bounds_type, FVPRC, REAL4, REAL8
@@ -447,7 +447,7 @@ contains
             siter = all_moist_vars%begin()
             Variables => cfg(1)%get_variables()
             do while(siter /= all_moist_vars%end())
-               var_name => siter%get()
+               var_name => siter%of()
                myVariable => variables%at(var_name)
                var_dimensions => myVariable%get_dimensions()
                ndims = var_dimensions%size()
@@ -584,8 +584,8 @@ contains
   
       iter = moist_tracers%begin()
       do while (iter /= moist_tracers%end())
-         iptr => iter%value()
-         cptr => iter%key()
+         iptr => iter%second()
+         cptr => iter%first()
          if (.not.match(cptr)) then 
             do k=1,npz
                do j=js,je
