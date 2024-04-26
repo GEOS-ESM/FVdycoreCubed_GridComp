@@ -23,8 +23,8 @@ program interp_restarts
    use memutils_mod, only: print_memuse_stats
    use MAPL
    use pflogger, only: pfl_initialize => initialize
-   use gFTL_StringVector
-   use gFTL_StringIntegerMap
+   use gFTL2_StringVector
+   use gFTL2_StringIntegerMap
    use rs_scaleMod
 
    implicit none
@@ -244,7 +244,7 @@ program interp_restarts
       variables => InCfg(1)%get_variables()
       lcnt_var=2
       do while (siter /= all_moist_vars%end())
-         var_name => siter%get()
+         var_name => siter%of()
          myVariable => variables%at(var_name)
          var_dimensions => myVariable%get_dimensions()
          ndims = var_dimensions%size()
@@ -565,7 +565,7 @@ program interp_restarts
       ivar=0
       do while (siter /= all_moist_vars%end())
          ivar=ivar+1
-         var_name => siter%get()
+         var_name => siter%of()
          myVariable => variables%at(var_name)
          var_dimensions => myVariable%get_dimensions()
          ndims = var_dimensions%size()

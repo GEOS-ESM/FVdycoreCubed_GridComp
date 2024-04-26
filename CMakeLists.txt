@@ -104,7 +104,7 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
 
 endif ()
 
-set(dependencies MAPL GFTL_SHARED::gftl-shared GMAO_hermes GEOS_Shared esmf OpenMP::OpenMP_Fortran)
+set(dependencies MAPL GFTL_SHARED::gftl-shared-v2 GMAO_hermes GEOS_Shared esmf OpenMP::OpenMP_Fortran)
 
 if (BUILD_GEOS_GTFV3_INTERFACE)
   esma_add_library (${this}

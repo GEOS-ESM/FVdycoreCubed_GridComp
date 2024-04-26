@@ -23,8 +23,7 @@ program interp_restarts
    use memutils_mod, only: print_memuse_stats
    use MAPL
    use pflogger, only: pfl_initialize => initialize
-   use gFTL_StringVector
-   use gFTL_StringIntegerMap
+   use gFTL2_StringIntegerMap
    use rs_scaleMod
 
    implicit none
