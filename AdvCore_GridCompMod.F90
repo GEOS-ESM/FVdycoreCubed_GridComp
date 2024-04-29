@@ -96,6 +96,18 @@ module AdvCore_GridCompMod
       public SetServices
       logical, allocatable, save :: grids_on_my_pe(:)
 
+!! internal state
+
+     type T_ETA_STATE
+       real(REAL8) :: ptop_r8
+       real(REAL8) :: pint_r8
+       real(REAL8), allocatable :: ak_r8(:)
+       real(REAL8), allocatable :: bk_r8(:)
+     end type T_ETA_STATE
+
+     type ETA_WRAP
+       type (T_ETA_STATE), pointer :: eta_state
+     end type ETA_WRAP
 !EOP
 
 !------------------------------------------------------------------------------
@@ -130,6 +142,9 @@ contains
       integer                                 :: comm, ndt
       integer                                 :: p_split=1
 
+      type(T_ETA_STATE), pointer              :: eta_state
+      type(ETA_wrap)                          :: EtaWrap
+
 !=============================================================================
 
 ! Begin...
@@ -137,12 +152,23 @@ contains
       ! Get my name and set-up traceback handle
       ! ---------------------------------------
     
-      call ESMF_GridCompGet( GC, NAME=COMP_NAME, vm=vm, RC=STATUS )
-      VERIFY_(STATUS)
-      Iam = trim(COMP_NAME) // 'SetServices'
+    call ESMF_GridCompGet( GC, NAME=COMP_NAME, vm=vm, RC=STATUS )
+    VERIFY_(STATUS)
+    Iam = trim(COMP_NAME) // 'SetServices'
+
+! Allocate this instance of the internal state and put it in wrapper.
+! -------------------------------------------------------------------
+    allocate(eta_state, stat=status)
+    VERIFY_(STATUS)
+    EtaWrap%eta_state => eta_state
+
+! Save pointer to the wrapped internal state in the GC
+! ----------------------------------------------------
+
+    call ESMF_UserCompSetInternalState ( GC,'ETAstate',EtaWrap,status )
+    VERIFY_(STATUS)
 
 !BOS
-
 ! !IMPORT STATE:
 !
     call MAPL_AddImportSpec ( gc,                                  &
@@ -367,7 +393,11 @@ contains
       integer                            :: IS, IE, JS, JE
       logical                            :: gridCreated
       type(ESMF_Grid)                    :: grid
-
+      
+      character(len=ESMF_MAXSTR)          :: eta_rc_file
+      type(T_ETA_STATE), pointer         :: eta_state
+      type(ETA_wrap)                     :: EtaWrap
+      integer                            :: LM, ks                         
 ! Begin... 
 
 ! Get the target components name and set-up traceback handle.
@@ -412,6 +442,19 @@ contains
          call MAPL_GetPointer(EXPORT, temp2d, 'AREA', ALLOC=.TRUE., rc=status)
          VERIFY_(STATUS)
          temp2d = FV_Atm(1)%gridstruct%area(IS:IE,JS:JE)
+      endif
+
+      call ESMF_UserCompGetInternalState(gc, 'ETAstate', EtaWrap, status)
+      VERIFY_(STATUS)
+      eta_state => EtaWrap%eta_state
+
+      call MAPL_Get( MAPL, LM=LM, RC = STATUS )
+      allocate(eta_state%ak_r8(LM+1), eta_state%bk_r8(LM+1))
+      call MAPL_GetResource(MAPL, eta_rc_file, label='ETA_RC_FILE:', default = 'None', rc = status)
+      if( trim(eta_rc_file) == 'None' ) then
+         call set_eta(LM,ks,eta_state%ptop_r8,eta_state%pint_r8,eta_state%ak_r8,eta_state%bk_r8)
+      else
+         call get_eta(trim(eta_rc_file), eta_state%ptop_r8,eta_state%pint_r8,eta_state%ak_r8,eta_state%bk_r8)
       endif
 
       call MAPL_TimerOff(MAPL,"INITIALIZE")
@@ -473,7 +516,6 @@ contains
       REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: PLE1
       REAL(FVPRC), POINTER, DIMENSION(:)       :: AK
       REAL(FVPRC), POINTER, DIMENSION(:)       :: BK
-      REAL(REAL8), allocatable :: ak_r8(:),bk_r8(:)
       REAL(FVPRC), POINTER, DIMENSION(:,:,:,:) :: TRACERS
       REAL(FVPRC) :: MASS1, TMASS1(ntracers)
       TYPE(AdvCoreTracers), POINTER :: advTracers(:)
@@ -482,7 +524,8 @@ contains
       type(ESMF_Array)       :: array
       INTEGER :: IM, JM, LM, N, NQ, LS
       REAL(FVPRC) :: PTOP, PINT
-      REAL(REAL8) :: ptop_r8,pint_r8
+      type(T_ETA_STATE), pointer     :: eta_state
+      type(ETA_wrap)                 :: EtaWrap
 ! Temporaries for exports/tracers
       REAL, POINTER :: temp3D(:,:,:)
       real(REAL4),        pointer     :: tracer_r4 (:,:,:)
@@ -535,15 +578,15 @@ contains
       VERIFY_(STATUS)
       AllOCATE( BK(LM+1) ,stat=STATUS )
       VERIFY_(STATUS)
-      AllOCATE( AK_r8(LM+1) ,stat=STATUS )
+
+      call ESMF_UserCompGetInternalState(gc, 'ETAstate', EtaWrap, status)
       VERIFY_(STATUS)
-      AllOCATE( BK_r8(LM+1) ,stat=STATUS )
-      VERIFY_(STATUS)
-      call set_eta(LM,LS,ptop_r8,pint_r8,ak_r8,bk_r8)
-      ptop=ptop_r8
-      pint=pint_r8
-      ak=ak_r8
-      bk=bk_r8
+      eta_state => EtaWrap%eta_state
+
+      ptop = eta_state%ptop_r8
+      pint = eta_state%pint_r8
+      ak = eta_state%ak_r8
+      bk = eta_state%bk_r8
 
       CALL MAPL_GetPointer(IMPORT, iPLE0, 'PLE0', ALLOC = .TRUE., RC=STATUS)
       VERIFY_(STATUS)
