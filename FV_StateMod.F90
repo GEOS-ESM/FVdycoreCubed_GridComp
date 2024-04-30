@@ -341,6 +341,7 @@ contains
 ! Local
    character(len=ESMF_MAXSTR)       :: IAm='FV_StateMod:FV_Setup'
 ! Local variables
+   character(len=ESMF_MAXSTR)       :: DYCORE
 
   type (ESMF_VM)               :: VM
   integer              :: status
