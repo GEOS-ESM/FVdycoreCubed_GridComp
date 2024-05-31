@@ -1,31 +1,6 @@
-#define ACC_PREFIX !$acc
 #include "MAPL_Generic.h"
 
 module FV_StateMod
-
-#ifdef SERIALIZE
-USE m_serialize, ONLY: &
-  fs_write_field, &
-  fs_read_field, &
-  fs_add_savepoint_metainfo, &
-  fs_enable_serialization, &
-  fs_disable_serialization, &
-  fs_create_savepoint
-USE utils_ppser, ONLY:  &
-  ppser_get_mode, &
-  ppser_finalize, &
-  ppser_set_mode, &
-  ppser_initialize, &
-  ppser_savepoint, &
-  ppser_serializer, &
-  ppser_serializer_ref, &
-  ppser_intlength, &
-  ppser_reallength, &
-  ppser_realtype, &
-  ppser_zrperturb, &
-  ppser_get_mode
-#endif
-
 !BOP
 !
 ! !MODULE: FV_StateMod --- GEOS5/CAM Cubed-Sphere fvcore state variables/init/run/finalize
@@ -296,10 +271,8 @@ private
 
 !#######################################################################
 ! SERIALBOX BLOCK
-#ifdef SERIALIZE
-integer :: mpi_rank,ier, timestep_len, timestep_status, save_timestep
-character(len=256) :: ser_env, save_timestep_str
-#endif
+!$ser verbatim integer :: mpi_rank,ier, timestep_len, timestep_status, save_timestep
+!$ser verbatim character(len=256) :: ser_env, save_timestep_str
 !#######################################################################
 
 contains
@@ -789,31 +762,17 @@ contains
 #endif
 
   !#######################################################################
-#ifdef SERIALIZE
-call get_environment_variable("SER_ENV", ser_env)
-call get_environment_variable("SAVE_TIMESTEP", save_timestep_str, timestep_len, timestep_status)
-if (timestep_status .eq. 0 .and. timestep_len .gt. 0) then
-read (save_timestep_str,*) save_timestep
-else
-save_timestep = 1
-endif
-call mpi_comm_rank(MPI_COMM_WORLD, mpi_rank,ier)
-! file: ../..//FV_StateMod.F90.SER lineno: #773
-PRINT *, '>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<'
-PRINT *, '>>> WARNING: SERIALIZATION IS ON <<<'
-PRINT *, '>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<'
-
-! setup serialization environment
-call ppser_initialize( &
-           directory='./serialized_data/', &
-           prefix='Generator', &
-           mpi_rank=mpi_rank, &
-           unique_id=.true.)
-! file: ../..//FV_StateMod.F90.SER lineno: #774
-call ppser_set_mode(0)
-! file: ../..//FV_StateMod.F90.SER lineno: #775
-call fs_disable_serialization()
-#endif
+  !$ser verbatim call get_environment_variable("SER_ENV", ser_env)
+  !$ser verbatim call get_environment_variable("SAVE_TIMESTEP", save_timestep_str, timestep_len, timestep_status)
+  !$ser verbatim if (timestep_status .eq. 0 .and. timestep_len .gt. 0) then
+  !$ser verbatim read (save_timestep_str,*) save_timestep
+  !$ser verbatim else
+  !$ser verbatim save_timestep = 1
+  !$ser verbatim endif
+  !$ser verbatim call mpi_comm_rank(MPI_COMM_WORLD, mpi_rank,ier)
+  !$ser init directory='./serialized_data/' prefix='Generator' mpi_rank=mpi_rank unique_id=.true.
+  !$ser mode write
+  !$ser off
   !#######################################################################
 
   RETURN_(ESMF_SUCCESS)
@@ -2072,370 +2031,48 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        call cpu_time(start)
 #endif
 
-#ifdef SERIALIZE
-! file: ../..//FV_StateMod.F90.SER lineno: #2034
-call fs_enable_serialization()
-! file: ../..//FV_StateMod.F90.SER lineno: #2035
-call fs_create_savepoint('FVDynamics-In', ppser_savepoint)
-! file: ../..//FV_StateMod.F90.SER lineno: #2036
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'bdt', myDT)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'bdt', myDT)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'bdt', myDT, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2037
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'nq_tot', FV_Atm(1)%flagstruct%nwat+1)
-  CASE(1)
-  CASE(2)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2038
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'zvir', zvir)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'zvir', zvir)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'zvir', zvir, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2039
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'ptop', FV_Atm(n)%ptop)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ptop', FV_Atm(n)%ptop)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ptop', FV_Atm(n)%ptop, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2040
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'ks', FV_Atm(1)%ptop)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ks', FV_Atm(1)%ptop)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ks', FV_Atm(1)%ptop, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2041
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'ncnst', FV_Atm(1)%ncnst)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ncnst', FV_Atm(1)%ncnst)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ncnst', FV_Atm(1)%ncnst, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2042
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'n_split', state%nsplit)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'n_split', state%nsplit)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'n_split', state%nsplit, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2043
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'u', FV_Atm(1)%u)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'u', FV_Atm(1)%u)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'u', FV_Atm(1)%u, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2044
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'v', FV_Atm(1)%v)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'v', FV_Atm(1)%v)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'v', FV_Atm(1)%v, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2045
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'w', FV_Atm(1)%w)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'w', FV_Atm(1)%w)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'w', FV_Atm(1)%w, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2046
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'delz', FV_Atm(1)%delz)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'delz', FV_Atm(1)%delz)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'delz', FV_Atm(1)%delz, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2047
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'pt', FV_Atm(1)%pt)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pt', FV_Atm(1)%pt)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pt', FV_Atm(1)%pt, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2048
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'delp', FV_Atm(1)%delp)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'delp', FV_Atm(1)%delp)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'delp', FV_Atm(1)%delp, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2049
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2050
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2051
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2052
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2053
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2054
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2055
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2056
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'ps', FV_Atm(1)%ps)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ps', FV_Atm(1)%ps)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ps', FV_Atm(1)%ps, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2057
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'pe', FV_Atm(1)%pe)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pe', FV_Atm(1)%pe)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pe', FV_Atm(1)%pe, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2058
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'pk', FV_Atm(1)%pk)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pk', FV_Atm(1)%pk)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pk', FV_Atm(1)%pk, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2059
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'peln', FV_Atm(1)%peln)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'peln', FV_Atm(1)%peln)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'peln', FV_Atm(1)%peln, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2060
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'pkz', FV_Atm(1)%pkz)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pkz', FV_Atm(1)%pkz)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pkz', FV_Atm(1)%pkz, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2061
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'phis', FV_Atm(1)%phis)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'phis', FV_Atm(1)%phis)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'phis', FV_Atm(1)%phis, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2062
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'q_con', FV_Atm(1)%q_con)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'q_con', FV_Atm(1)%q_con)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'q_con', FV_Atm(1)%q_con, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2063
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'omga', FV_Atm(1)%omga)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'omga', FV_Atm(1)%omga)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'omga', FV_Atm(1)%omga, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2064
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'ua', FV_Atm(1)%ua)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ua', FV_Atm(1)%ua)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ua', FV_Atm(1)%ua, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2065
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'va', FV_Atm(1)%va)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'va', FV_Atm(1)%va)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'va', FV_Atm(1)%va, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2066
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'uc', FV_Atm(1)%uc)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'uc', FV_Atm(1)%uc)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'uc', FV_Atm(1)%uc, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2067
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'vc', FV_Atm(1)%vc)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'vc', FV_Atm(1)%vc)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'vc', FV_Atm(1)%vc, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2068
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'ak', FV_Atm(1)%ak)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ak', FV_Atm(1)%ak)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ak', FV_Atm(1)%ak, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2069
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'bk', FV_Atm(1)%bk)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'bk', FV_Atm(1)%bk)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'bk', FV_Atm(1)%bk, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2070
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'mfxd', FV_Atm(1)%mfx)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfxd', FV_Atm(1)%mfx)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfxd', FV_Atm(1)%mfx, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2071
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'mfyd', FV_Atm(1)%mfy)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfyd', FV_Atm(1)%mfy)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfyd', FV_Atm(1)%mfy, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2072
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'cxd', FV_Atm(1)%cx)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cxd', FV_Atm(1)%cx)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cxd', FV_Atm(1)%cx, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2073
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'cyd', FV_Atm(1)%cy)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cyd', FV_Atm(1)%cy)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cyd', FV_Atm(1)%cy, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2074
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'diss_estd', FV_Atm(1)%diss_est)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'diss_estd', FV_Atm(1)%diss_est)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'diss_estd', FV_Atm(1)%diss_est, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2075
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'consv_te', FV_Atm(1)%flagstruct%consv_te)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'consv_te', FV_Atm(1)%flagstruct%consv_te)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'consv_te', FV_Atm(1)%flagstruct%consv_te, ppser_zrperturb)
-END SELECT
-#endif
+       !$ser on
+       !$ser savepoint FVDynamics-In
+       !$ser data bdt=myDT
+       !$ser data nq_tot=FV_Atm(1)%flagstruct%nwat+1
+       !$ser data zvir=zvir
+       !$ser data ptop=FV_Atm(n)%ptop
+       !$ser data ks=FV_Atm(1)%ptop
+       !$ser data ncnst=FV_Atm(1)%ncnst
+       !$ser data n_split=state%nsplit
+       !$ser data u=FV_Atm(1)%u
+       !$ser data v=FV_Atm(1)%v
+       !$ser data w=FV_Atm(1)%w
+       !$ser data delz=FV_Atm(1)%delz
+       !$ser data pt=FV_Atm(1)%pt
+       !$ser data delp=FV_Atm(1)%delp
+       !$ser data qvapor=FV_Atm(1)%q(:,:,:,sphu)
+       !$ser data qliquid=FV_Atm(1)%q(:,:,:,qliq)
+       !$ser data qice=FV_Atm(1)%q(:,:,:,qice)
+       !$ser data qrain=FV_Atm(1)%q(:,:,:,rain)
+       !$ser data qsnow=FV_Atm(1)%q(:,:,:,snow)
+       !$ser data qgraupel=FV_Atm(1)%q(:,:,:,grpl)
+       !$ser data qcld=FV_Atm(1)%q(:,:,:,qcld)
+       !$ser data ps=FV_Atm(1)%ps
+       !$ser data pe=FV_Atm(1)%pe
+       !$ser data pk=FV_Atm(1)%pk
+       !$ser data peln=FV_Atm(1)%peln
+       !$ser data pkz=FV_Atm(1)%pkz
+       !$ser data phis=FV_Atm(1)%phis
+       !$ser data q_con=FV_Atm(1)%q_con
+       !$ser data omga=FV_Atm(1)%omga
+       !$ser data ua=FV_Atm(1)%ua
+       !$ser data va=FV_Atm(1)%va
+       !$ser data uc=FV_Atm(1)%uc
+       !$ser data vc=FV_Atm(1)%vc
+       !$ser data ak=FV_Atm(1)%ak
+       !$ser data bk=FV_Atm(1)%bk
+       !$ser data mfxd=FV_Atm(1)%mfx
+       !$ser data mfyd=FV_Atm(1)%mfy
+       !$ser data cxd=FV_Atm(1)%cx
+       !$ser data cyd=FV_Atm(1)%cy
+       !$ser data diss_estd=FV_Atm(1)%diss_est
+       !$ser data consv_te=FV_Atm(1)%flagstruct%consv_te
 
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
@@ -2456,282 +2093,38 @@ END SELECT
             FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
             time_total)
        
-#ifdef SERIALIZE
-! file: ../..//FV_StateMod.F90.SER lineno: #2096
-call fs_create_savepoint('FVDynamics-Out', ppser_savepoint)
-! file: ../..//FV_StateMod.F90.SER lineno: #2097
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'u', FV_Atm(1)%u)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'u', FV_Atm(1)%u)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'u', FV_Atm(1)%u, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2098
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'v', FV_Atm(1)%v)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'v', FV_Atm(1)%v)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'v', FV_Atm(1)%v, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2099
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'w', FV_Atm(1)%w)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'w', FV_Atm(1)%w)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'w', FV_Atm(1)%w, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2100
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'delz', FV_Atm(1)%delz)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'delz', FV_Atm(1)%delz)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'delz', FV_Atm(1)%delz, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2101
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'pt', FV_Atm(1)%pt)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pt', FV_Atm(1)%pt)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pt', FV_Atm(1)%pt, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2102
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'delp', FV_Atm(1)%delp)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'delp', FV_Atm(1)%delp)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'delp', FV_Atm(1)%delp, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2103
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2104
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2105
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2106
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2107
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2108
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2109
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld), ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2110
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'ps', FV_Atm(1)%ps)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ps', FV_Atm(1)%ps)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ps', FV_Atm(1)%ps, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2111
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'pe', FV_Atm(1)%pe)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pe', FV_Atm(1)%pe)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pe', FV_Atm(1)%pe, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2112
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'pk', FV_Atm(1)%pk)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pk', FV_Atm(1)%pk)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pk', FV_Atm(1)%pk, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2113
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'peln', FV_Atm(1)%peln)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'peln', FV_Atm(1)%peln)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'peln', FV_Atm(1)%peln, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2114
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'pkz', FV_Atm(1)%pkz)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pkz', FV_Atm(1)%pkz)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pkz', FV_Atm(1)%pkz, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2115
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'phis', FV_Atm(1)%phis)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'phis', FV_Atm(1)%phis)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'phis', FV_Atm(1)%phis, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2116
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'q_con', FV_Atm(1)%q_con)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'q_con', FV_Atm(1)%q_con)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'q_con', FV_Atm(1)%q_con, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2117
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'omga', FV_Atm(1)%omga)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'omga', FV_Atm(1)%omga)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'omga', FV_Atm(1)%omga, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2118
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'ua', FV_Atm(1)%ua)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ua', FV_Atm(1)%ua)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ua', FV_Atm(1)%ua, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2119
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'va', FV_Atm(1)%va)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'va', FV_Atm(1)%va)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'va', FV_Atm(1)%va, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2120
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'uc', FV_Atm(1)%uc)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'uc', FV_Atm(1)%uc)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'uc', FV_Atm(1)%uc, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2121
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'vc', FV_Atm(1)%vc)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'vc', FV_Atm(1)%vc)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'vc', FV_Atm(1)%vc, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2122
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'mfxd', FV_Atm(1)%mfx)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfxd', FV_Atm(1)%mfx)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfxd', FV_Atm(1)%mfx, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2123
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'mfyd', FV_Atm(1)%mfy)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfyd', FV_Atm(1)%mfy)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfyd', FV_Atm(1)%mfy, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2124
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'cxd', FV_Atm(1)%cx)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cxd', FV_Atm(1)%cx)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cxd', FV_Atm(1)%cx, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2125
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'cyd', FV_Atm(1)%cy)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cyd', FV_Atm(1)%cy)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cyd', FV_Atm(1)%cy, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2126
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'diss_estd', FV_Atm(1)%diss_est)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'diss_estd', FV_Atm(1)%diss_est)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'diss_estd', FV_Atm(1)%diss_est, ppser_zrperturb)
-END SELECT
-! file: ../..//FV_StateMod.F90.SER lineno: #2127
-call fs_disable_serialization()
-#endif
+       !$ser savepoint FVDynamics-Out
+       !$ser data u=FV_Atm(1)%u
+       !$ser data v=FV_Atm(1)%v
+       !$ser data w=FV_Atm(1)%w
+       !$ser data delz=FV_Atm(1)%delz
+       !$ser data pt=FV_Atm(1)%pt
+       !$ser data delp=FV_Atm(1)%delp
+       !$ser data qvapor=FV_Atm(1)%q(:,:,:,sphu)
+       !$ser data qliquid=FV_Atm(1)%q(:,:,:,qliq)
+       !$ser data qice=FV_Atm(1)%q(:,:,:,qice)
+       !$ser data qrain=FV_Atm(1)%q(:,:,:,rain)
+       !$ser data qsnow=FV_Atm(1)%q(:,:,:,snow)
+       !$ser data qgraupel=FV_Atm(1)%q(:,:,:,grpl)
+       !$ser data qcld=FV_Atm(1)%q(:,:,:,qcld)
+       !$ser data ps=FV_Atm(1)%ps
+       !$ser data pe=FV_Atm(1)%pe
+       !$ser data pk=FV_Atm(1)%pk
+       !$ser data peln=FV_Atm(1)%peln
+       !$ser data pkz=FV_Atm(1)%pkz
+       !$ser data phis=FV_Atm(1)%phis
+       !$ser data q_con=FV_Atm(1)%q_con
+       !$ser data omga=FV_Atm(1)%omga
+       !$ser data ua=FV_Atm(1)%ua
+       !$ser data va=FV_Atm(1)%va
+       !$ser data uc=FV_Atm(1)%uc
+       !$ser data vc=FV_Atm(1)%vc
+       !$ser data mfxd=FV_Atm(1)%mfx
+       !$ser data mfyd=FV_Atm(1)%mfy
+       !$ser data cxd=FV_Atm(1)%cx
+       !$ser data cyd=FV_Atm(1)%cy
+       !$ser data diss_estd=FV_Atm(1)%diss_est
+       !$ser off
 
 #ifdef RUN_PYFV3
        call cpu_time(finish)
@@ -3156,11 +2549,7 @@ end subroutine FV_Run
    if (run_pyfv3 /= 0) call pyfv3_interface_f_finalize()
 #endif
 
-#ifdef SERIALIZE
-! file: ../..//FV_StateMod.F90.SER lineno: #2552
-! cleanup serialization environment
-call ppser_finalize()
-#endif
+   !$ser cleanup
 
  end subroutine FV_Finalize
 
@@ -5937,5 +5326,4 @@ subroutine WRITE_PARALLEL_L ( field, format )
 end subroutine WRITE_PARALLEL_L
 
 end module FV_StateMod
-
 
