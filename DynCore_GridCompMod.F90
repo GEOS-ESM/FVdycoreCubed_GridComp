@@ -68,6 +68,8 @@
   integer :: NXQ = 0
   logical :: overwrite_Q = .true.
 
+  real (kind=8), allocatable :: my_omega(:,:,:)
+
   public  SetServices      ! Register component methods
 
 ! !DESCRIPTION: This module implements the Dynamical Core as
@@ -2629,6 +2631,9 @@ contains
 
 !========End intermittent replay========================
 
+! MANYIN alloc space to save OMEGA between Run1 and Run2:
+    ALLOCATE( my_omega( DycoreGrid%is:DycoreGrid%ie, DycoreGrid%js:DycoreGrid%je, DycoreGrid%npz) )
+
     call MAPL_TimerOff(MAPL,"INITIALIZE")
     call MAPL_TimerOff(MAPL,"TOTAL")
 
@@ -4603,6 +4608,8 @@ subroutine Run(gc, import, export, clock, rc)
       zle = zle/grav
       call getOmega ( omaxyz )
 
+      my_omega = omaxyz
+
 ! Fluxes: UKE & VKE
 ! -----------------
       call MAPL_GetPointer(export,tempu,'UKE',rc=status); VERIFY_(STATUS)
@@ -6393,6 +6400,21 @@ end subroutine RUN
 
     call FILLOUT3 (export, 'ZLE', zle, rc=status); VERIFY_(STATUS)
 
+! MANYIN - Watkins webpage
+    if (HYDROSTATIC) then
+      call MAPL_GetPointer(export,temp3d,'W', rc=status)
+      VERIFY_(STATUS)
+      if(associated(temp3d)) temp3d = -1.0 * my_omega * (zle(:,:,1:km)-zle(:,:,2:km+1)) / dp
+
+!     call MAPL_GetPointer(export,temp2d,'W50', rc=status)
+!     VERIFY_(STATUS)
+!     if(associated(temp2d)) then
+!        call VertInterp(temp2d, -1.0 * my_omega * (zle(:,:,1:km)-zle(:,:,2:km+1)) / dp, zle, log(5000.)  , status)
+!        VERIFY_(STATUS)
+!     end if
+
+    end if
+
 ! Compute Mid-Layer Heights
 ! -------------------------
 
@@ -7343,6 +7365,9 @@ subroutine Finalize(gc, import, export, clock, rc)
 
     call DynFinalize( STATE )
 
+! MANYIN
+    DEALLOCATE( my_omega )
+ 
 ! Call Generic Finalize
 !----------------------
 
