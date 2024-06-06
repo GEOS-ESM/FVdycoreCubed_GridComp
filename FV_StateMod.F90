@@ -553,8 +553,7 @@ contains
   ! Rayleigh & Divergence Damping
    if (index(FV3_CONFIG,"HWT") > 0) then
      FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
-     FV_Atm(1)%flagstruct%fv_sg_adj = -1
-     FV_Atm(1)%flagstruct%n_zfilter = -1
+     FV_Atm(1)%flagstruct%fv_sg_adj = DT*5
      FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
      FV_Atm(1)%flagstruct%dz_min = 6.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
@@ -801,6 +800,8 @@ contains
   type (T_FVDYCORE_GRID) , pointer :: GRID
   integer              :: status
   real(REAL8) :: DT
+  real        :: rPRS
+  character(len=1) :: sCODE, rCODE, zCODE
 
   integer   :: is ,ie , js ,je    !  Local dims
   integer   :: isc,iec, jsc,jec   !  Local dims
@@ -1113,53 +1114,33 @@ contains
 !
   if( gid.eq.0 .and. .not. SW_DYNAMICS) then
         print *
-        write(6,*) ' + denotes a layer within the "dz-filter" of the dynamics'
-        write(6,*) ' * denotes a layer within the "sponge-layer" of the dynamics'
+        write(6,*) ' x denotes a layer within the "Sponge layer"                of the dynamics'
+        write(6,*) ' + denotes a layer within the "Rayleigh Damping"            of the dynamics'
+        write(6,*) ' o denotes a layer within the "Richardson Number dz-filter" of the dynamics'
         write(6,100)
-100     format(2x,' k ','      A(k)    ',2x,' B(k)   ',2x,'  Pref    ',2x,'  DelP',/, &
-               1x,'----',3x,'----------',2x,'--------',2x,'----------',2x,'---------' )
-          k=0
-          if ( (FV_Atm(1)%flagstruct%fv_sg_adj > 0) .AND. (k<=FV_Atm(1)%flagstruct%n_zfilter) ) then
-            if (k<=FV_Atm(1)%flagstruct%n_sponge) then
-              write(6,101) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+100     format(5x,'  k  ',2x,'   A(k)   ',2x,'   B(k)   ',2x,'   Pref   ',2x,'   DelP   ',/, &
+               5x,'-----',2x,'----------',2x,'----------',2x,'----------',2x,'----------' )
+          do k=0,ubound(ak,1)
+            rPRS=ak(k)*0.01 + 1000.0*bk(k)
+            zCODE = ' '
+            if ((FV_Atm(1)%flagstruct%fv_sg_adj > 0.0) .AND. (k   <=FV_Atm(1)%flagstruct%n_zfilter))  &
+               zCODE = 'o'
+            rCODE = ' '
+            if ((FV_Atm(1)%flagstruct%tau       > 0.0) .AND. (rPRS<=0.01*FV_Atm(1)%flagstruct%rf_cutoff))  &
+               rCODE = '+'
+            sCODE = ' '
+            if (k<=FV_Atm(1)%flagstruct%n_sponge) &
+               sCODE = 'x'
+            if (k == 0) then
+              write(6,200) sCODE,rCODE,zCODE,k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
             else
-              write(6,102) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
-            endif
-          else
-            if (k<=FV_Atm(1)%flagstruct%n_sponge) then
-              write(6,105) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
-            else
-              write(6,106) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
-            endif
-          endif
-          do k=1,ubound(ak,1)
-            if ( (FV_Atm(1)%flagstruct%fv_sg_adj > 0) .AND. (k<=FV_Atm(1)%flagstruct%n_zfilter) ) then
-              if (k<=FV_Atm(1)%flagstruct%n_sponge) then
-                 write(6,103) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
+              write(6,300) sCODE,rCODE,zCODE,k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
                               (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
-              else
-                 write(6,104) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
-                              (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
-              endif
-            else
-              if (k<=FV_Atm(1)%flagstruct%n_sponge) then
-                 write(6,107) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
-                              (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
-              else
-                 write(6,108) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
-                              (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
-              endif
             endif
           enddo
         print *
-101     format('*+',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4)
-102     format(' +',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4)
-103     format('*+',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
-104     format(' +',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
-105     format('* ',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4)
-106     format('  ',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4)
-107     format('* ',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
-108     format('  ',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
+200     format(A1,A1,A1,2x,i5,2x,f10.6,2x,f8.4,2x,f10.4)
+300     format(A1,A1,A1,2x,i5,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
   endif
 
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV Initialize', RC=STATUS )
