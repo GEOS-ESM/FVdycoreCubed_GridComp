@@ -2171,6 +2171,39 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
          v_dt(:,:,:) = 0.0
          t_dt(:,:,:) = 0.0
          w_dt(:,:,:) = 0.0
+
+         !$ser on
+         !$ser savepoint FV_SUBGRID_Z-In
+         !$ser data isd=isd 
+         !$ser data ied=ied
+         !$ser data jsd=jsd 
+         !$ser data jed=jed 
+         !$ser data isc=isc 
+         !$ser data iec=iec 
+         !$ser data jsc=jsc 
+         !$ser data jec=jec 
+         !$ser data npz=FV_Atm(1)%npz
+         !$ser data ncnst=FV_Atm(1)%ncnst 
+         !$ser data myDT=myDT 
+         !$ser data fv_sg_adj=FV_Atm(1)%flagstruct%fv_sg_adj
+         !$ser data nwat=FV_Atm(1)%flagstruct%nwat 
+         !$ser data delp=FV_Atm(1)%delp 
+         !$ser data pe=FV_Atm(1)%pe
+         !$ser data peln=FV_Atm(1)%peln 
+         !$ser data pkz=FV_Atm(1)%pkz 
+         !$ser data pt=FV_Atm(1)%pt 
+         !$ser data q=FV_Atm(1)%q
+         !$ser data ua=FV_Atm(1)%ua
+         !$ser data va=FV_Atm(1)%va 
+         !$ser data hydrostatic=FV_Atm(1)%flagstruct%hydrostatic
+         !$ser data w=FV_Atm(1)%w 
+         !$ser data delz=FV_Atm(1)%delz 
+         !$ser data u_dt=u_dt 
+         !$ser data v_dt=v_dt 
+         !$ser data t_dt=t_dt 
+         !$ser data w_dt=w_dt
+         !$ser data n_zfilter=FV_Atm(1)%flagstruct%n_zfilter
+
          call fv_subgrid_z(isd, ied, jsd, jed, isc, iec, jsc, jec, FV_Atm(1)%npz, &
                            FV_Atm(1)%ncnst, myDT, FV_Atm(1)%flagstruct%fv_sg_adj,      &
                            FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%delp, FV_Atm(1)%pe,     &
@@ -2178,6 +2211,18 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
                            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%flagstruct%hydrostatic,&
                            FV_Atm(1)%w, FV_Atm(1)%delz, u_dt, v_dt, t_dt, w_dt,          &
                            FV_Atm(1)%flagstruct%n_zfilter)
+
+         !$ser savepoint FV_SUBGRID_Z-Out
+         !$ser data ua=FV_Atm(1)%ua 
+         !$ser data va=FV_Atm(1)%va 
+         !$ser data w=FV_Atm(1)%w 
+         !$ser data pt=FV_Atm(1)%pt 
+         !$ser data q=FV_Atm(1)%q
+         !$ser data u_dt=u_dt 
+         !$ser data v_dt=v_dt 
+         !$ser data t_dt=t_dt 
+         !$ser data w_dt=w_dt
+         !$ser off
         call MAPL_GetPointer ( export, PTR3D, 'DUDTSUBZ', rc=status ); VERIFY_(STATUS)
         if( associated(PTR3D) ) PTR3D = u_dt
         call MAPL_GetPointer ( export, PTR3D, 'DVDTSUBZ', rc=status ); VERIFY_(STATUS)
