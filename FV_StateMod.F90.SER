@@ -44,6 +44,7 @@ module FV_StateMod
    use pyfv3_interface_mod, only: pyfv3_interface_f_init, pyfv3_interface_f_finalize, &
                                   fv_flags_interface_type, make_fv_flags_C_interop
 #endif
+!$ser verbatim use k_checkpoint, only: set_nz
 
 implicit none
 private
@@ -2032,12 +2033,13 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 #endif
 
        !$ser on
+       !$ser verbatim call set_nz(FV_Atm(1)%npz)
        !$ser savepoint FVDynamics-In
        !$ser data bdt=myDT
        !$ser data nq_tot=FV_Atm(1)%flagstruct%nwat+1
        !$ser data zvir=zvir
        !$ser data ptop=FV_Atm(n)%ptop
-       !$ser data ks=FV_Atm(1)%ptop
+       !$ser data ks=FV_Atm(1)%ks
        !$ser data ncnst=FV_Atm(1)%ncnst
        !$ser data n_split=state%nsplit
        !$ser data u=FV_Atm(1)%u
