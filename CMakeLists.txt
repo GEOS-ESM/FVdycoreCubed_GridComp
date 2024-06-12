@@ -33,7 +33,7 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
   message(STATUS "Building GEOS-gtFV3 interface")
 
   add_definitions(-DRUN_GTFV3)
-  
+
   # The Python library creation requires mpiexec/mpirun to run on a
   # compute node. Probably a weird SLURM thing?
   find_package(MPI REQUIRED)
@@ -122,19 +122,19 @@ else ()
 endif ()
 
 if (FV_PRECISION STREQUAL R4)
-   set (GFDL fms_r4)
+  set (GFDL FMS::fms_r4)
 elseif (FV_PRECISION STREQUAL R4R8) # FV is R4 but FMS is R8
-   get_target_property (extra_incs fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
-   target_include_directories(${this} PRIVATE
-   $<BUILD_INTERFACE:${extra_incs}>
-   )
-   set (GFDL fms_r8)
+  get_target_property (extra_incs FMS::fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
+  target_include_directories(${this} PRIVATE
+    $<BUILD_INTERFACE:${extra_incs}>
+  )
+  set (GFDL FMS::fms_r8)
 elseif (FV_PRECISION STREQUAL R8)
-   set (GFDL fms_r8)
-   string(REPLACE " " ";" tmp ${FREAL8})
-   foreach(flag ${tmp})
-     target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
-   endforeach()
+  set (GFDL FMS::fms_r8)
+  string(REPLACE " " ";" tmp ${FREAL8})
+  foreach(flag ${tmp})
+    target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
+  endforeach()
 endif ()
 
 if (FV_PRECISION MATCHES R4)
