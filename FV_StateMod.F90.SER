@@ -774,6 +774,7 @@ contains
   !$ser init directory='./serialized_data/' prefix='Generator' mpi_rank=mpi_rank unique_id=.true.
   !$ser mode write
   !$ser off
+  !$ser verbatim call set_nz(FV_Atm(1)%flagstruct%npz)
   !#######################################################################
 
   RETURN_(ESMF_SUCCESS)
@@ -2033,7 +2034,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 #endif
 
        !$ser on
-       !$ser verbatim call set_nz(FV_Atm(1)%npz)
        !$ser savepoint FVDynamics-In
        !$ser data bdt=myDT
        !$ser data nq_tot=FV_Atm(1)%flagstruct%nwat+1

@@ -28,3 +28,11 @@ tail -n +2 $FILE > $FILE.swp && mv $FILE.swp $FILE
 FILE=$FV_COMP/@fvdycore/model/nh_utils.F90
 python3 $PPSER_VERB $FILE.SER > $FILE
 tail -n +2 $FILE > $FILE.swp && mv $FILE.swp $FILE
+
+FILE=$FV_COMP/@fvdycore/model/tp_core.F90
+python3 $PPSER_VERB $FILE.SER > $FILE
+tail -n +2 $FILE > $FILE.swp && mv $FILE.swp $FILE
+
+FILE=$FV_COMP/@fvdycore/model/fv_mapz.F90
+python3 $PPSER_VERB $FILE.SER > $FILE
+tail -n +2 $FILE > $FILE.swp && mv $FILE.swp $FILE

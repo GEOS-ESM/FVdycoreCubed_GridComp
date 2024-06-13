@@ -6,16 +6,16 @@ module FV_StateMod
 #ifdef SERIALIZE
 USE m_serialize, ONLY: &
   fs_read_field, &
-  fs_add_savepoint_metainfo, &
+  fs_disable_serialization, &
+  fs_create_savepoint, &
   fs_enable_serialization, &
   fs_write_field, &
-  fs_create_savepoint, &
-  fs_disable_serialization
+  fs_add_savepoint_metainfo
 USE utils_ppser, ONLY:  &
-  ppser_set_mode, &
   ppser_finalize, &
   ppser_initialize, &
   ppser_get_mode, &
+  ppser_set_mode, &
   ppser_savepoint, &
   ppser_serializer, &
   ppser_serializer_ref, &
@@ -817,6 +817,7 @@ call ppser_initialize( &
 call ppser_set_mode(0)
 ! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #776
 call fs_disable_serialization()
+call set_nz(FV_Atm(1)%flagstruct%npz)
 #endif
   !#######################################################################
 
@@ -2077,9 +2078,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 #endif
 
 #ifdef SERIALIZE
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2035
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2036
 call fs_enable_serialization()
-call set_nz(FV_Atm(1)%npz)
 ! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2037
 call fs_create_savepoint('FVDynamics-In', ppser_savepoint)
 ! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2038
