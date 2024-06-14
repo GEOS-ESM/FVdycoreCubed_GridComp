@@ -5,17 +5,17 @@ module FV_StateMod
 
 #ifdef SERIALIZE
 USE m_serialize, ONLY: &
-  fs_read_field, &
-  fs_disable_serialization, &
   fs_create_savepoint, &
   fs_enable_serialization, &
   fs_write_field, &
-  fs_add_savepoint_metainfo
+  fs_disable_serialization, &
+  fs_add_savepoint_metainfo, &
+  fs_read_field
 USE utils_ppser, ONLY:  &
+  ppser_set_mode, &
   ppser_finalize, &
   ppser_initialize, &
   ppser_get_mode, &
-  ppser_set_mode, &
   ppser_savepoint, &
   ppser_serializer, &
   ppser_serializer_ref, &
@@ -2954,13 +2954,76 @@ END SELECT
 ! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2197
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'q', FV_Atm(1)%q)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu))
   CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'q', FV_Atm(1)%q)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu))
   CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'q', FV_Atm(1)%q, ppser_zrperturb)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu), ppser_zrperturb)
 END SELECT
 ! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2198
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2199
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2200
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2201
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2202
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2203
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2204
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qo3mr', FV_Atm(1)%q(:,:,:,8))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qo3mr', FV_Atm(1)%q(:,:,:,8))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qo3mr', FV_Atm(1)%q(:,:,:,8), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2205
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'ua', FV_Atm(1)%ua)
@@ -2969,7 +3032,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ua', FV_Atm(1)%ua, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2199
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2206
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'va', FV_Atm(1)%va)
@@ -2978,7 +3041,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'va', FV_Atm(1)%va, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2200
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2207
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'hydrostatic', FV_Atm(1)%flagstruct%hydrostatic)
@@ -2987,7 +3050,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'hydrostatic', FV_Atm(1)%flagstruct%hydrostatic, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2201
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2208
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'w', FV_Atm(1)%w)
@@ -2996,7 +3059,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'w', FV_Atm(1)%w, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2202
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2209
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'delz', FV_Atm(1)%delz)
@@ -3005,7 +3068,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'delz', FV_Atm(1)%delz, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2203
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2210
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'u_dt', u_dt)
@@ -3014,7 +3077,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'u_dt', u_dt, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2204
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2211
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'v_dt', v_dt)
@@ -3023,7 +3086,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'v_dt', v_dt, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2205
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2212
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 't_dt', t_dt)
@@ -3032,7 +3095,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 't_dt', t_dt, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2206
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2213
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'w_dt', w_dt)
@@ -3041,7 +3104,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'w_dt', w_dt, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2207
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2214
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'n_zfilter', FV_Atm(1)%flagstruct%n_zfilter)
@@ -3061,9 +3124,9 @@ END SELECT
                            FV_Atm(1)%flagstruct%n_zfilter)
 
 #ifdef SERIALIZE
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2217
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2224
 call fs_create_savepoint('FV_SUBGRID_Z-Out', ppser_savepoint)
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2218
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2225
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'ua', FV_Atm(1)%ua)
@@ -3072,7 +3135,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ua', FV_Atm(1)%ua, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2219
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2226
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'va', FV_Atm(1)%va)
@@ -3081,7 +3144,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'va', FV_Atm(1)%va, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2220
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2227
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'w', FV_Atm(1)%w)
@@ -3090,7 +3153,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'w', FV_Atm(1)%w, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2221
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2228
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'pt', FV_Atm(1)%pt)
@@ -3099,16 +3162,79 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'pt', FV_Atm(1)%pt, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2222
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2229
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'q', FV_Atm(1)%q)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu))
   CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'q', FV_Atm(1)%q)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu))
   CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'q', FV_Atm(1)%q, ppser_zrperturb)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu), ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2223
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2230
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2231
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2232
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2233
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2234
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2235
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2236
+SELECT CASE ( ppser_get_mode() )
+  CASE(0)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'qo3mr', FV_Atm(1)%q(:,:,:,8))
+  CASE(1)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qo3mr', FV_Atm(1)%q(:,:,:,8))
+  CASE(2)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qo3mr', FV_Atm(1)%q(:,:,:,8), ppser_zrperturb)
+END SELECT
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2237
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'u_dt', u_dt)
@@ -3117,7 +3243,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'u_dt', u_dt, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2224
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2238
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'v_dt', v_dt)
@@ -3126,7 +3252,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'v_dt', v_dt, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2225
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2239
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 't_dt', t_dt)
@@ -3135,7 +3261,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 't_dt', t_dt, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2226
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2240
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
     call fs_write_field(ppser_serializer, ppser_savepoint, 'w_dt', w_dt)
@@ -3144,7 +3270,7 @@ SELECT CASE ( ppser_get_mode() )
   CASE(2)
     call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'w_dt', w_dt, ppser_zrperturb)
 END SELECT
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2227
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2241
 call fs_disable_serialization()
 #endif
         call MAPL_GetPointer ( export, PTR3D, 'DUDTSUBZ', rc=status ); VERIFY_(STATUS)
@@ -3519,7 +3645,7 @@ end subroutine FV_Run
 #endif
 
 #ifdef SERIALIZE
-! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2599
+! file: /home/mad/work/fp/geos/src/Components/@GEOSgcm_GridComp/GEOSagcm_GridComp/GEOSsuperdyn_GridComp/@FVdycoreCubed_GridComp/FV_StateMod.F90.SER lineno: #2613
 ! cleanup serialization environment
 call ppser_finalize()
 #endif
