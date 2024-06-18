@@ -5,17 +5,17 @@ module FV_StateMod
 
 #ifdef SERIALIZE
 USE m_serialize, ONLY: &
+  fs_disable_serialization, &
   fs_create_savepoint, &
+  fs_add_savepoint_metainfo, &
   fs_enable_serialization, &
   fs_write_field, &
-  fs_disable_serialization, &
-  fs_add_savepoint_metainfo, &
   fs_read_field
 USE utils_ppser, ONLY:  &
   ppser_set_mode, &
+  ppser_get_mode, &
   ppser_finalize, &
   ppser_initialize, &
-  ppser_get_mode, &
   ppser_savepoint, &
   ppser_serializer, &
   ppser_serializer_ref, &
@@ -54,7 +54,7 @@ USE utils_ppser_kbuff
                            ptop_min, g_sum
    use fv_grid_tools_mod,  only: get_unit_vector
    use fv_control_mod, only: fv_init1, fv_init2
-   use fv_arrays_mod , only: fv_atmos_type, FVPRC, REAL4, REAL8
+   use fv_arrays_mod , only: fv_atmos_type, FVPRC, REAL4, REAL8, fv_flags_type
    use init_hydro_mod, only: p_var
    use fv_dynamics_mod, only: fv_dynamics
    use fv_update_phys_mod, only: fv_update_phys
@@ -6044,7 +6044,7 @@ end subroutine fv_getAllWinds_2D
 !-----------------------------------------------------------------------
 
 subroutine echo_fv3_setup()
-
+   call WRITE_PARALLEL ( '$SERIALBOX START FV NML ')
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%grid_name ,format='("FV3 grid_name: ",(A))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%grid_file ,format='("FV3 grid_file: ",(A))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%grid_type ,format='("FV3 grid_type: ",(I2))' )
@@ -6191,6 +6191,7 @@ subroutine echo_fv3_setup()
 !                       deglat_start = -30., deglat_stop = 30.
 !! Convenience pointers
 !  integer, pointer :: grid_number
+   call WRITE_PARALLEL ( '$SERIALBOX STOP FV NML ')
 
 end subroutine echo_fv3_setup
 

@@ -5007,6 +5007,7 @@ end subroutine fv_getAllWinds_2D
 
 subroutine echo_fv3_setup()
 
+   !$ser verbatim call WRITE_PARALLEL ( '$SERIALBOX START FV NML ')
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%grid_name ,format='("FV3 grid_name: ",(A))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%grid_file ,format='("FV3 grid_file: ",(A))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%grid_type ,format='("FV3 grid_type: ",(I2))' )
@@ -5153,6 +5154,7 @@ subroutine echo_fv3_setup()
 !                       deglat_start = -30., deglat_stop = 30.
 !! Convenience pointers
 !  integer, pointer :: grid_number
+   !$ser verbatim call WRITE_PARALLEL ( '$SERIALBOX STOP FV NML ')
 
 end subroutine echo_fv3_setup
 
