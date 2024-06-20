@@ -384,6 +384,7 @@ contains
       VERIFY_(STATUS)
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'AGCM_LM:', default= 72, RC=STATUS )
       VERIFY_(STATUS)
+      if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
       ! stretch_fac is kind(R_GRID) in FV, so to prevent a MAPL failure on RC check, we pull
       ! AGCM.STRETCH_FACTOR: as a REAL32 and then cast it to REAL64. This is because
       ! FV_Atm(1)%flagstruct%stretch_fac is R_GRID => REAL64, and the MAPL_GetResource call
@@ -553,7 +554,7 @@ contains
   ! Rayleigh & Divergence Damping
    if (index(FV3_CONFIG,"HWT") > 0) then
      FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
-     FV_Atm(1)%flagstruct%fv_sg_adj = DT*5
+     FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
      FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
      FV_Atm(1)%flagstruct%dz_min = 6.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
@@ -606,16 +607,16 @@ contains
      ! Cubed-sphere grid resolution and DT dependence
      !              based on ideal remapping DT
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 12) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 24) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
@@ -625,29 +626,37 @@ contains
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 120.0 )
+      endif
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1120) then
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 100.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  90.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.5 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 10800) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  7.5 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  3.25)
       endif
-      FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
+         FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,2)
+      else
+         FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
+      endif
       ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%hydrostatic = .false.
       FV_Atm(1)%flagstruct%make_nh = .false.
