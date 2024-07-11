@@ -276,6 +276,8 @@ private
 !$ser verbatim character(len=256) :: ser_env, save_timestep_str
 !#######################################################################
 
+integer, save :: initial_ts = 0
+
 contains
 
 !-----------------------------------------------------------------------
@@ -2028,6 +2030,91 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     t_dt(:,:,:) = 0.0
     w_dt(:,:,:) = 0.0
 
+   !$ser verbatim if(initial_ts == 0) then
+   !$ser verbatim initial_ts = initial_ts + 1
+   !$ser on
+   !$ser savepoint Grid-Info
+   !$ser data is_=FV_Atm(1)%bd%is 
+   !$ser data ie=FV_Atm(1)%bd%ie 
+   !$ser data isd=FV_Atm(1)%bd%isd 
+   !$ser data ied=FV_Atm(1)%bd%ied 
+   !$ser data js=FV_Atm(1)%bd%js 
+   !$ser data je=FV_Atm(1)%bd%je 
+   !$ser data jsd=FV_Atm(1)%bd%jsd 
+   !$ser data jed=FV_Atm(1)%bd%jed
+   !$ser data npx=npx 
+   !$ser data npy=npy 
+   !$ser data npz=npz 
+   !$ser data nested=FV_Atm(1)%gridstruct%nested 
+   !$ser data grid_type=FV_Atm(1)%gridstruct%grid_type 
+   !$ser data dya=FV_Atm(1)%gridstruct%dya 
+   !$ser data dxa=FV_Atm(1)%gridstruct%dxa 
+   !$ser data dxc=FV_Atm(1)%gridstruct%dxc 
+   !$ser data dyc=FV_Atm(1)%gridstruct%dyc 
+   !$ser data rdxc=FV_Atm(1)%gridstruct%rdxc 
+   !$ser data rdx=FV_Atm(1)%gridstruct%rdx
+   !$ser data rdyc=FV_Atm(1)%gridstruct%rdyc 
+   !$ser data rdxa=FV_Atm(1)%gridstruct%rdxa 
+   !$ser data rdya=FV_Atm(1)%gridstruct%rdya 
+   !$ser data rdy=FV_Atm(1)%gridstruct%rdy
+   !$ser data cosa_u=FV_Atm(1)%gridstruct%cosa_u 
+   !$ser data cosa_v=FV_Atm(1)%gridstruct%cosa_v 
+   !$ser data cosa_s=FV_Atm(1)%gridstruct%cosa_s 
+   !$ser data sina_v=FV_Atm(1)%gridstruct%sina_v
+   !$ser data sina_u=FV_Atm(1)%gridstruct%sina_u 
+   !$ser data rsin_u=FV_Atm(1)%gridstruct%rsin_u 
+   !$ser data rsin_v=FV_Atm(1)%gridstruct%rsin_v 
+   !$ser data rsin2=FV_Atm(1)%gridstruct%rsin2
+   !$ser data sin_sg=FV_Atm(1)%gridstruct%sin_sg 
+   !$ser data cos_sg=FV_Atm(1)%gridstruct%cos_sg 
+   !$ser data area=FV_Atm(1)%gridstruct%area 
+   !$ser data dy=FV_Atm(1)%gridstruct%dy
+   !$ser data rarea=FV_Atm(1)%gridstruct%rarea 
+   !$ser data rarea_c=FV_Atm(1)%gridstruct%rarea_c 
+   !$ser data area_64=FV_Atm(1)%gridstruct%area_64 
+   !$ser data rsina=FV_Atm(1)%gridstruct%rsina
+   !$ser data cosa=FV_Atm(1)%gridstruct%cosa 
+   !$ser data dx=FV_Atm(1)%gridstruct%dx 
+   !$ser data fC=FV_Atm(1)%gridstruct%fC 
+   !$ser data da_min=FV_Atm(1)%gridstruct%da_min
+   !$ser data da_min_c=FV_Atm(1)%gridstruct%da_min_c 
+   !$ser data del6_u=FV_Atm(1)%gridstruct%del6_u 
+   !$ser data del6_v=FV_Atm(1)%gridstruct%del6_v 
+   !$ser data f0=FV_Atm(1)%gridstruct%f0
+   !$ser data divg_u=FV_Atm(1)%gridstruct%divg_u 
+   !$ser data divg_v=FV_Atm(1)%gridstruct%divg_v 
+   !$ser data stretched_grid=FV_Atm(1)%gridstruct%stretched_grid
+   !$ser data agrid1=FV_Atm(1)%gridstruct%agrid(:,:,1) 
+   !$ser data agrid2=FV_Atm(1)%gridstruct%agrid(:,:,2) 
+   !$ser data bgrid1=FV_Atm(1)%gridstruct%grid(:,:,1)
+   !$ser data bgrid2=FV_Atm(1)%gridstruct%grid(:,:,2) 
+   !$ser data edge_w=FV_Atm(1)%gridstruct%edge_w(jsc:jec+1) 
+   !$ser data edge_e=FV_Atm(1)%gridstruct%edge_e(jsc:jec+1)
+   !$ser data edge_s=FV_Atm(1)%gridstruct%edge_s(isc:iec+1) 
+   !$ser data edge_n=FV_Atm(1)%gridstruct%edge_n(isc:iec+1) 
+   !$ser data a11=FV_Atm(1)%gridstruct%a11
+   !$ser data a12=FV_Atm(1)%gridstruct%a12 
+   !$ser data a21=FV_Atm(1)%gridstruct%a21 
+   !$ser data a22=FV_Atm(1)%gridstruct%a22 
+   !$ser data ak=FV_Atm(1)%ak 
+   !$ser data bk=FV_Atm(1)%bk 
+   !$ser data ptop=FV_Atm(1)%ptop 
+   !$ser data ks=FV_Atm(1)%ks
+   !$ser data ee1=FV_Atm(1)%gridstruct%ee1 
+   !$ser data ee2=FV_Atm(1)%gridstruct%ee2 
+   !$ser data ew1=FV_Atm(1)%gridstruct%ew(:,:,:,1) 
+   !$ser data ew2=FV_Atm(1)%gridstruct%ew(:,:,:,2)
+   !$ser data es1=FV_Atm(1)%gridstruct%es(:,:,:,1) 
+   !$ser data es2=FV_Atm(1)%gridstruct%es(:,:,:,2)
+   !$ser data vlon=FV_Atm(1)%gridstruct%vlon 
+   !$ser data vlat=FV_Atm(1)%gridstruct%vlat
+   !$ser data edge_vect_w=FV_Atm(1)%gridstruct%edge_vect_w 
+   !$ser data edge_vect_e=FV_Atm(1)%gridstruct%edge_vect_e 
+   !$ser data edge_vect_s=FV_Atm(1)%gridstruct%edge_vect_s 
+   !$ser data edge_vect_n=FV_Atm(1)%gridstruct%edge_vect_n
+   !$ser off
+   !$ser verbatim endif
+
 #ifdef RUN_PYFV3
     if (run_pyfv3 == 0) then
        call cpu_time(start)
@@ -2175,7 +2262,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
          w_dt(:,:,:) = 0.0
 
          !$ser on
-         !$ser savepoint FV_SUBGRID_Z-In
+         !$ser savepoint FVSubgridZ-In
          !$ser data isd=isd 
          !$ser data ied=ied
          !$ser data jsd=jsd 
@@ -2185,8 +2272,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
          !$ser data jsc=jsc 
          !$ser data jec=jec 
          !$ser data npz=FV_Atm(1)%npz
-         !$ser data ncnst=FV_Atm(1)%ncnst 
-         !$ser data myDT=myDT 
+         !$ser data nq=FV_Atm(1)%ncnst
+         !$ser data dt=myDT 
          !$ser data fv_sg_adj=FV_Atm(1)%flagstruct%fv_sg_adj
          !$ser data nwat=FV_Atm(1)%flagstruct%nwat 
          !$ser data delp=FV_Atm(1)%delp 
@@ -2212,6 +2299,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
          !$ser data t_dt=t_dt 
          !$ser data w_dt=w_dt
          !$ser data n_zfilter=FV_Atm(1)%flagstruct%n_zfilter
+         !$ser off
 
          call fv_subgrid_z(isd, ied, jsd, jed, isc, iec, jsc, jec, FV_Atm(1)%npz, &
                            FV_Atm(1)%ncnst, myDT, FV_Atm(1)%flagstruct%fv_sg_adj,      &
@@ -2220,8 +2308,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
                            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%flagstruct%hydrostatic,&
                            FV_Atm(1)%w, FV_Atm(1)%delz, u_dt, v_dt, t_dt, w_dt,          &
                            FV_Atm(1)%flagstruct%n_zfilter)
-
-         !$ser savepoint FV_SUBGRID_Z-Out
+         !$ser on
+         !$ser savepoint FVSubgridZ-Out
          !$ser data ua=FV_Atm(1)%ua 
          !$ser data va=FV_Atm(1)%va 
          !$ser data w=FV_Atm(1)%w 
@@ -5007,7 +5095,6 @@ end subroutine fv_getAllWinds_2D
 
 subroutine echo_fv3_setup()
 
-   !$ser verbatim call WRITE_PARALLEL ( '$SERIALBOX START FV NML ')
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%grid_name ,format='("FV3 grid_name: ",(A))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%grid_file ,format='("FV3 grid_file: ",(A))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%grid_type ,format='("FV3 grid_type: ",(I2))' )
@@ -5154,7 +5241,6 @@ subroutine echo_fv3_setup()
 !                       deglat_start = -30., deglat_stop = 30.
 !! Convenience pointers
 !  integer, pointer :: grid_number
-   !$ser verbatim call WRITE_PARALLEL ( '$SERIALBOX STOP FV NML ')
 
 end subroutine echo_fv3_setup
 
