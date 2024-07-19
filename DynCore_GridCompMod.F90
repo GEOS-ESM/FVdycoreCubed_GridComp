@@ -987,7 +987,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'OMEGA',                                     &
-         LONG_NAME  = 'vertical_pressure_velocity',                &
+         LONG_NAME  = 'hydrostatic_vertical_pressure_velocity',    &
          UNITS      = 'Pa s-1',                                  &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )

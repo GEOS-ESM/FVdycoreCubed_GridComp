@@ -562,17 +562,17 @@ contains
      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
        ! 6th order default damping options
         FV_Atm(1)%flagstruct%nord = 3
-        FV_Atm(1)%flagstruct%dddmp = 0.0
+        FV_Atm(1)%flagstruct%dddmp = 0.2
         FV_Atm(1)%flagstruct%d4_bg = 0.12
         FV_Atm(1)%flagstruct%d2_bg = 0.0
-        FV_Atm(1)%flagstruct%d_ext = 0.0
+        FV_Atm(1)%flagstruct%d_ext = 0.01
      else
        ! 4th order default damping options
         FV_Atm(1)%flagstruct%nord = 2
         FV_Atm(1)%flagstruct%dddmp = 0.2
         FV_Atm(1)%flagstruct%d4_bg = 0.12
         FV_Atm(1)%flagstruct%d2_bg = 0.0
-        FV_Atm(1)%flagstruct%d_ext = 0.0
+        FV_Atm(1)%flagstruct%d_ext = 0.01
      endif
     ! Sponge damping and TE conservation
      FV_Atm(1)%flagstruct%n_sponge = 0
@@ -606,16 +606,16 @@ contains
      ! Cubed-sphere grid resolution and DT dependence
      !              based on ideal remapping DT
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 12) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 24) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
@@ -625,29 +625,37 @@ contains
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 120.0 )
+      endif
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1120) then
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 100.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  90.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.5 )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 10800) then
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  7.5 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  3.25)
       endif
-      FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
+         FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,2)
+      else
+         FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
+      endif
       ! Monotonic Hydrostatic defaults
       FV_Atm(1)%flagstruct%hydrostatic = .false.
       FV_Atm(1)%flagstruct%make_nh = .false.
@@ -2615,7 +2623,7 @@ subroutine State_To_FV ( STATE )
 
        if ( FV_Atm(1)%flagstruct%range_warn ) then
           call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            100., 335., bad_range=bad_range_T)
+                            100., 375., bad_range=bad_range_T)
        endif
 
 !------------
@@ -2682,7 +2690,7 @@ subroutine FV_To_State ( STATE )
 !-----------------------------------
       !if ( FV_Atm(1)%flagstruct%range_warn ) then
       !   call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-      !                     100., 335., bad_range)
+      !                     100., 375., bad_range)
       !endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 
