@@ -542,7 +542,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                                &
        SHORT_NAME         = 'KEANA',                                             &
-       LONG_NAME          = 'total_kinetic_energy_tendency_due_to_analysis',     &
+       LONG_NAME          = 'vertically_integrated_kinetic_energy_tendency_due_to_analysis',     &
        UNITS              = 'W m-2',                                             &
        DIMS               = MAPL_DimsHorzOnly,                                   &
        VLOCATION          = MAPL_VLocationNone,                        RC=STATUS )
@@ -550,7 +550,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                                &
        SHORT_NAME         = 'PEANA',                                             &
-       LONG_NAME          = 'total_potential_energy_tendency_due_to_analysis',   &
+       LONG_NAME          = 'vertically_integrated_potential_energy_tendency_due_to_analysis',   &
        UNITS              = 'W m-2',                                             &
        DIMS               = MAPL_DimsHorzOnly,                                   &
        VLOCATION          = MAPL_VLocationNone,                        RC=STATUS )
@@ -888,7 +888,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'ZLE',                                       &
-         LONG_NAME  = 'edge_heights',                              &
+         LONG_NAME  = 'height',                                    &
          UNITS      = 'm',                                         &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationEdge,               RC=STATUS  )
@@ -1045,7 +1045,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'EPV',                                       &
-         LONG_NAME  = 'ertels_potential_vorticity',                &
+         LONG_NAME  = 'Ertels_potential_vorticity',                &
          UNITS      = 'K m+2 kg-1 s-1',                          &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
@@ -1070,7 +1070,7 @@ contains
     call MAPL_AddExportSpec ( gc,                                       &
          SHORT_NAME = 'DUDTPHY',                                        &
          LONG_NAME  = 'tendency_of_eastward_wind_due_to_physics',       &
-         UNITS      = 'm/s/s',                                      &
+         UNITS      = 'm s-2',                                      &
          DIMS       = MAPL_DimsHorzVert,                                &
          FIELD_TYPE = MAPL_VectorField,                                 &
          VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
@@ -1079,7 +1079,7 @@ contains
     call MAPL_AddExportSpec ( gc,                                       &
          SHORT_NAME = 'DVDTPHY',                                        &
          LONG_NAME  = 'tendency_of_northward_wind_due_to_physics',      &
-         UNITS      = 'm/s/s',                                      &
+         UNITS      = 'm s-2',                                      &
          DIMS       = MAPL_DimsHorzVert,                                &
          FIELD_TYPE = MAPL_VectorField,                                 &
          VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
@@ -1088,7 +1088,7 @@ contains
     call MAPL_AddExportSpec ( gc,                                       &
          SHORT_NAME = 'DUDTANA',                                        &
          LONG_NAME  = 'tendency_of_eastward_wind_due_to_analysis',      &
-         UNITS      = 'm/s/s',                                      &
+         UNITS      = 'm s-2',                                      &
          DIMS       = MAPL_DimsHorzVert,                                &
          FIELD_TYPE = MAPL_VectorField,                                 &
          VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
@@ -1097,7 +1097,7 @@ contains
     call MAPL_AddExportSpec ( gc,                                       &
          SHORT_NAME = 'DVDTANA',                                        &
          LONG_NAME  = 'tendency_of_northward_wind_due_to_analysis',     &
-         UNITS      = 'm/s/s',                                      &
+         UNITS      = 'm s-2',                                      &
          DIMS       = MAPL_DimsHorzVert,                                &
          FIELD_TYPE = MAPL_VectorField,                                 &
          VLOCATION  = MAPL_VLocationCenter,                  RC=STATUS  )
@@ -1122,7 +1122,7 @@ contains
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'DUDTDYN',                                   &
          LONG_NAME  = 'tendency_of_eastward_wind_due_to_dynamics', &
-         UNITS      = 'm/s/s',                                 &
+         UNITS      = 'm s-2',                                 &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
      VERIFY_(STATUS)
@@ -1130,7 +1130,7 @@ contains
     call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'DVDTDYN',                                   &
          LONG_NAME  = 'tendency_of_northward_wind_due_to_dynamics',&
-         UNITS      = 'm/s/s',                                 &
+         UNITS      = 'm s-2',                                 &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
      VERIFY_(STATUS)
@@ -1146,7 +1146,7 @@ contains
     call MAPL_AddExportSpec ( gc,                                      &
          SHORT_NAME = 'DQVDTDYN',                                      &
          LONG_NAME  = 'tendency_of_specific_humidity_due_to_dynamics', &
-         UNITS      = 'kg/kg/s',                                     &
+         UNITS      = 'kg kg-1 s-1',                                     &
          DIMS       = MAPL_DimsHorzVert,                               &
          VLOCATION  = MAPL_VLocationCenter,                 RC=STATUS  )
      VERIFY_(STATUS)
@@ -1154,7 +1154,7 @@ contains
     call MAPL_AddExportSpec ( gc,                                      &
          SHORT_NAME = 'DQIDTDYN',                                      &
          LONG_NAME  = 'tendency_of_ice_water_due_to_dynamics',         &
-         UNITS      = 'kg/kg/s',                                     &
+         UNITS      = 'kg kg-1 s-1',                                     &
          DIMS       = MAPL_DimsHorzVert,                               &
          VLOCATION  = MAPL_VLocationCenter,                 RC=STATUS  )
      VERIFY_(STATUS)
@@ -1162,7 +1162,7 @@ contains
     call MAPL_AddExportSpec ( gc,                                      &
          SHORT_NAME = 'DQLDTDYN',                                      &
          LONG_NAME  = 'tendency_of_liquid_water_due_to_dynamics',      &
-         UNITS      = 'kg/kg/s',                                     &
+         UNITS      = 'kg kg-1 s-1',                                     &
          DIMS       = MAPL_DimsHorzVert,                               &
          VLOCATION  = MAPL_VLocationCenter,                 RC=STATUS  )
      VERIFY_(STATUS)
@@ -1217,7 +1217,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'TA',                                  &
-       LONG_NAME          = 'surface_air_temperature',             &
+       LONG_NAME          = 'lowest_model_level_air_temperature',  &
        UNITS              = 'K',                                   &
        DIMS               = MAPL_DimsHorzOnly,                     &
        VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
@@ -1225,7 +1225,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'QA',                                  &
-       LONG_NAME          = 'surface_specific_humidity',           &
+       LONG_NAME          = 'lowest_model_level_specific_humidity',  &
        UNITS              = '1',                                   &
        DIMS               = MAPL_DimsHorzOnly,                     &
        VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
@@ -1233,7 +1233,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'US',                                  &
-       LONG_NAME          = 'surface_eastward_wind',               &
+       LONG_NAME          = 'lowest_model_level_eastward_wind',    &
        UNITS              = 'm s-1',                               &
        DIMS               = MAPL_DimsHorzOnly,                     &
        FIELD_TYPE         = MAPL_VectorField,                      &
@@ -1242,7 +1242,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'VS',                                  &
-       LONG_NAME          = 'surface_northward_wind',              &
+       LONG_NAME          = 'lowest_model_level_northward_wind',   &
        UNITS              = 'm s-1',                               &
        DIMS               = MAPL_DimsHorzOnly,                     &
        FIELD_TYPE         = MAPL_VectorField,                      &
@@ -1251,7 +1251,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'SPEED',                               &
-       LONG_NAME          = 'surface_wind_speed',                  &
+       LONG_NAME          = 'lowest_model_level_wind_speed',                  &
        UNITS              = 'm s-1',                               &
        DIMS               = MAPL_DimsHorzOnly,                     &
        VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
@@ -1259,7 +1259,7 @@ contains
 
     call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'DZ',                                  &
-       LONG_NAME          = 'surface_layer_height',                &
+       LONG_NAME          = 'lowest_model_level_height',                &
        UNITS              = 'm',                                   &
        DIMS               = MAPL_DimsHorzOnly,                     &
        VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
