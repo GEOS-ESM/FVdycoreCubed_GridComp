@@ -2273,7 +2273,7 @@ contains
      VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                  &
-       SHORT_NAME         = 'DYNTIMER',                            &
+       SHORT_NAME         = 'TIME_IN_DYN',                            &
        LONG_NAME          = 'timer_for_main_dynamics_run',         &
        UNITS              = 'seconds',                             &
        DIMS               = MAPL_DimsHorzOnly,                     &
@@ -4325,7 +4325,7 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_TimerOn(MAPL,"-DYN_EPILOGUE")
 ! Computational diagnostics
 ! --------------------------
-    call MAPL_GetPointer(export,temp2d,'DYNTIMER',rc=status)
+    call MAPL_GetPointer(export,temp2d,'TIME_IN_DYN',rc=status)
     VERIFY_(STATUS)
     if(associated(temp2d)) temp2d = dyn_run_timer
     call MAPL_GetPointer(export,temp2d,'PID',rc=status)

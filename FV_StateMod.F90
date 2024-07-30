@@ -2553,7 +2553,7 @@ subroutine State_To_FV ( STATE )
     if ((bad_range_U .or. bad_range_V) .and. (ADJUST_DT)) then
        STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
        STATE%NSPLIT = MIN(2*FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT*1.25))
-    else
+    elseif (ADJUST_DT) then
        STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
        STATE%NSPLIT = MAX(  FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT/1.25))
     endif
@@ -2624,7 +2624,7 @@ subroutine State_To_FV ( STATE )
 
        if ( FV_Atm(1)%flagstruct%range_warn ) then
           call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            100., 375., bad_range=bad_range_T)
+                            130., 333., bad_range=bad_range_T)
        endif
 
 !------------
@@ -2664,12 +2664,12 @@ subroutine FV_To_State ( STATE )
     KM  = state%grid%npz
     NG  = state%grid%ng
 
-   !if ( FV_Atm(1)%flagstruct%range_warn ) then
-   !  call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-   !                    -280., 280., bad_range)
-   !  call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-   !                    -280., 280., bad_range)
-   !endif
+    if ( FV_Atm(1)%flagstruct%range_warn ) then
+      call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                        -280., 280., bad_range)
+      call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                        -280., 280., bad_range)
+    endif
 
 ! Copy updated FV data to internal state
     STATE%VARS%U(:,:,:) = FV_Atm(1)%u(isc:iec,jsc:jec,:)
@@ -2689,10 +2689,10 @@ subroutine FV_To_State ( STATE )
 !-----------------------------------
 ! Fill Dry Temperature to PT
 !-----------------------------------
-      !if ( FV_Atm(1)%flagstruct%range_warn ) then
-      !   call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-      !                     100., 375., bad_range)
-      !endif
+       if ( FV_Atm(1)%flagstruct%range_warn ) then
+          call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+                            130., 333., bad_range)
+       endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 
 !------------------------------
@@ -2773,12 +2773,13 @@ subroutine fv_getPKZ_NH(pkz,temp,qv,pe,delz)
 !-------------------------------------------------------------------------
 ! Re-compute the full (nonhydrostatic) pressure due to temperature changes
 !-------------------------------------------------------------------------
-!$omp parallel do default(shared)
+!$omp parallel do default (none) & 
+!$omp shared (npz, jsc, jec, isc, iec, pkz, kappa, rdg, delp, temp, zvir, qv, delz) &
+!$omp private (k, j, i) 
       do k=1,npz
          do j=jsc,jec
             do i=isc,iec
 ! perfect gas law: p = density * rdgas * virtual_temperature
-!              pkz(i,j,k) = ( rdg*delp(i,j,k)*pt(i,j,k)/delz(i,j,k) )**kappa
                pkz(i,j,k) = exp( kappa*log(rdg*delp(i,j,k)*temp(i,j,k)*    &
                                       (1.d0+zvir*qv(i,j,k))/delz(i,j,k)) )
             enddo
@@ -2807,7 +2808,9 @@ subroutine fv_getPKZ(pkz,pe)
   peln = log(pe)
   pk   = exp( kappa*peln )
 
-!$omp parallel do default(shared)
+!$omp parallel do default (none) & 
+!$omp shared (npz, jsc, jec, isc, iec, pkz, pk, kappa, peln) &
+!$omp private (k, j, i) 
       do k=1,npz
          do j=jsc,jec
             do i=isc,iec
@@ -5073,8 +5076,8 @@ end subroutine echo_fv3_setup
      allocate (dp0(isc:iec,jsc:jec, npz) )
 
 !$omp parallel do default (none) & 
-!$omp              shared (npz, jsc, jec, isc, iec, n, sphum, u0, v0, t0, dp0, FV_Atm, zvir) &
-!$omp             private (k, j, i) 
+!$omp shared (npz, jsc, jec, isc, iec, n, sphum, u0, v0, t0, dp0, FV_Atm, zvir) &
+!$omp private (k, j, i) 
        do k=1,npz
           do j=jsc,jec+1
              do i=isc,iec
@@ -5197,8 +5200,8 @@ end subroutine echo_fv3_setup
             time_total)
 ! Nudging back to IC
 !$omp parallel do default (none) &
-!$omp             shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) &
-!$omp            private (i, j, k)
+!$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) &
+!$omp private (i, j, k)
        do k=1,npz
           do j=jsc,jec+1
              do i=isc,iec
