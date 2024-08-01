@@ -2654,6 +2654,7 @@ subroutine FV_To_State ( STATE )
     logical :: bad_range = .false.
     integer               :: ISC,IEC, JSC,JEC, KM, NG
     integer               :: I,J,K
+    real                  :: courant_range
     character(len=ESMF_MAXSTR)          :: ERRSTR
     integer :: rc
 
@@ -2665,10 +2666,17 @@ subroutine FV_To_State ( STATE )
     NG  = state%grid%ng
 
     if ( FV_Atm(1)%flagstruct%range_warn ) then
+     ! D-Grid winds
       call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
                         -280., 280., bad_range)
       call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
                         -280., 280., bad_range)
+     ! C-Grid accumlated courant numbers
+      courant_range =  FV_Atm(1)%flagstruct%n_split * FV_Atm(1)%flagstruct%k_split
+      call range_check('CX_F2S', real(FV_Atm(1)%cx(isc:iec+1,jsc:jec,:)/courant_range), isc, iec+1, jsc, jec, 0, km, FV_Atm(1)%gridstruct%agrid,   &
+                        -0.5, 0.5, bad_range)
+      call range_check('CY_F2S', real(FV_Atm(1)%cy(isc:iec,jsc:jec+1,:)/courant_range), isc, iec, jsc, jec+1, 0, km, FV_Atm(1)%gridstruct%agrid,   &
+                        -0.5, 0.5, bad_range)
     endif
 
 ! Copy updated FV data to internal state
