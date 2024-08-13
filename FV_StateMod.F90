@@ -2545,7 +2545,7 @@ subroutine State_To_FV ( STATE )
     enddo
   endif
 
-  if ( FV_Atm(1)%flagstruct%range_warn ) then
+  if ( DEBUG .OR. ADJUST_DT ) then
     call range_check('U_S2F', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
                       -280., 280., bad_range=bad_range_U)
     call range_check('V_S2F', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
@@ -2622,7 +2622,7 @@ subroutine State_To_FV ( STATE )
        FV_Atm(1)%pt(:,:,:) = tiny_number
        FV_Atm(1)%pt(isc:iec,jsc:jec,:) = STATE%VARS%PT*STATE%VARS%PKZ
 
-       if ( FV_Atm(1)%flagstruct%range_warn ) then
+       if ( DEBUG ) then
           call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
                             130., 333., bad_range=bad_range_T)
        endif
@@ -2665,7 +2665,7 @@ subroutine FV_To_State ( STATE )
     KM  = state%grid%npz
     NG  = state%grid%ng
 
-    if ( FV_Atm(1)%flagstruct%range_warn ) then
+    if ( DEBUG ) then
      ! D-Grid winds
       call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
                         -280., 280., bad_range)
@@ -2697,7 +2697,7 @@ subroutine FV_To_State ( STATE )
 !-----------------------------------
 ! Fill Dry Temperature to PT
 !-----------------------------------
-       if ( FV_Atm(1)%flagstruct%range_warn ) then
+       if ( DEBUG ) then
           call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
                             130., 333., bad_range)
        endif
@@ -2888,7 +2888,7 @@ subroutine a2d3d(ua, va, ud, vd, wind_increment_limiter)
        call mpp_update_domains(vatemp, FV_Atm(1)%domain, complete=.true.)
     endif
 
-  ! if ( FV_Atm(1)%flagstruct%range_warn ) then
+  ! if ( DEBUG ) then
   !    call range_check('DUDT_A2D', 86400.0*uatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
   !                      -1000., 1000., bad_range)
   !    call range_check('DVDT_A2D', 86400.0*vatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
