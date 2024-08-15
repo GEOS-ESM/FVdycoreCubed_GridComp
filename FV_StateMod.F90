@@ -34,7 +34,6 @@ module FV_StateMod
    use fv_update_phys_mod, only: fv_update_phys
    use sw_core_mod, only: d2a2c_vect
    use fv_sg_mod, only: fv_subgrid_z
-   use gfdl_lin_cloud_microphys_mod, only: gfdl_cloud_microphys_init
 
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check, &
                                  get_vorticity, updraft_helicity, bunkers_vector, helicity_relative_CAPS
@@ -750,12 +749,7 @@ contains
         FV_Atm(1)%flagstruct%n_zfilter = 0
     endif
 
-!! Setup GFDL microphysics module
-    if (FV_Atm(1)%flagstruct%do_sat_adj) then
-       call gfdl_cloud_microphys_init()
-    endif
-
- _ASSERT(DT > 0.0, 'DT must be greater than zero')
+  _ASSERT(DT > 0.0, 'DT must be greater than zero')
 
   call WRITE_PARALLEL("Dynamics PE Layout ")
   call WRITE_PARALLEL(FV_Atm(1)%layout(1)    ,format='("NPES_X  : ",(   I3))')
