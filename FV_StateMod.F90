@@ -34,7 +34,6 @@ module FV_StateMod
    use fv_update_phys_mod, only: fv_update_phys
    use sw_core_mod, only: d2a2c_vect
    use fv_sg_mod, only: fv_subgrid_z
-   use gfdl_lin_cloud_microphys_mod, only: gfdl_cloud_microphys_init
 
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check, &
                                  get_vorticity, updraft_helicity, bunkers_vector, helicity_relative_CAPS
@@ -559,21 +558,21 @@ contains
      FV_Atm(1)%flagstruct%RF_fast = .true.
      FV_Atm(1)%flagstruct%tau = 2.0
      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
-     if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-       ! 6th order default damping options
-        FV_Atm(1)%flagstruct%nord = 3
-        FV_Atm(1)%flagstruct%dddmp = 0.2
-        FV_Atm(1)%flagstruct%d4_bg = 0.12
-        FV_Atm(1)%flagstruct%d2_bg = 0.0
-        FV_Atm(1)%flagstruct%d_ext = 0.01
-     else
+    !if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
+    !  ! 6th order default damping options
+    !   FV_Atm(1)%flagstruct%nord = 3
+    !   FV_Atm(1)%flagstruct%dddmp = 0.0
+    !   FV_Atm(1)%flagstruct%d4_bg = 0.12
+    !   FV_Atm(1)%flagstruct%d2_bg = 0.0
+    !   FV_Atm(1)%flagstruct%d_ext = 0.0
+    !else
        ! 4th order default damping options
         FV_Atm(1)%flagstruct%nord = 2
-        FV_Atm(1)%flagstruct%dddmp = 0.2
+        FV_Atm(1)%flagstruct%dddmp = 0.0
         FV_Atm(1)%flagstruct%d4_bg = 0.12
         FV_Atm(1)%flagstruct%d2_bg = 0.0
-        FV_Atm(1)%flagstruct%d_ext = 0.01
-     endif
+        FV_Atm(1)%flagstruct%d_ext = 0.0
+    !endif
     ! Sponge damping and TE conservation
      FV_Atm(1)%flagstruct%n_sponge = 0
      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
@@ -749,12 +748,7 @@ contains
         FV_Atm(1)%flagstruct%n_zfilter = 0
     endif
 
-!! Setup GFDL microphysics module
-    if (FV_Atm(1)%flagstruct%do_sat_adj) then
-       call gfdl_cloud_microphys_init()
-    endif
-
- _ASSERT(DT > 0.0, 'DT must be greater than zero')
+  _ASSERT(DT > 0.0, 'DT must be greater than zero')
 
   call WRITE_PARALLEL("Dynamics PE Layout ")
   call WRITE_PARALLEL(FV_Atm(1)%layout(1)    ,format='("NPES_X  : ",(   I3))')
@@ -2129,6 +2123,13 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   nn = 0
   if (.not. ADIABATIC) then
 
+  if (DEBUG) then
+    prt_minmax     = DEBUG
+    if (mpp_pe()==0) print*,''
+    if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
+    allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
+  endif                 
+
      do n=1,STATE%GRID%NQ
 
        if ((sphu /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'Q')) then
@@ -2139,6 +2140,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
           else
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
           endif
+          if (DEBUG) then
+            DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
+            call prt_maxmin("SPHU ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+          endif                 
        endif
     ! QLIQ
        if (qliq /= -1) then
@@ -2152,6 +2157,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * &
                                         MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf)))
             endif
+            if (DEBUG) then
+              DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * &
+                                       MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf)))
+              call prt_maxmin("QLCN ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+            endif
          endif
          if ((qlcnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLLS')) then
             QLLS_FILLED = .TRUE.
@@ -2163,6 +2173,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * &
                                    MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf))))
             endif
+            if (DEBUG) then
+              DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * &
+                                       MIN(1.0,MAX(0.0,1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf)))
+              call prt_maxmin("QLLS ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+            endif
          endif
        else
          if ((qlcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLCN')) then
@@ -2173,6 +2188,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
             else
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
             endif
+            if (DEBUG) then
+              DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
+              call prt_maxmin("QLCN ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+            endif
          endif
          if ((qlls /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLLS')) then
             QLLS_FILLED = .TRUE.
@@ -2181,6 +2200,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
             else
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
+            endif
+            if (DEBUG) then
+              DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
+              call prt_maxmin("QLLS ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
             endif
           endif
        endif
@@ -2196,7 +2219,12 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * &
                                         MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf)))
             endif
-         endif
+            if (DEBUG) then
+              DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * &
+                                       MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf)))
+              call prt_maxmin("QICN ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+            endif
+       endif
          if ((qicnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QILS')) then
             QILS_FILLED = .TRUE.
             nn = nn+1
@@ -2206,6 +2234,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
             else
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * &
                                    MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf))))
+            endif
+            if (DEBUG) then
+              DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * &
+                                       MIN(1.0,MAX(0.0,1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf)))
+              call prt_maxmin("QILS ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
             endif
          endif
        else
@@ -2217,6 +2250,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
             else
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
             endif
+            if (DEBUG) then
+              DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
+              call prt_maxmin("QICN ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+            endif
          endif
          if ((qils /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QILS')) then
             QILS_FILLED = .TRUE.
@@ -2225,6 +2262,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
             else
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
+            endif
+            if (DEBUG) then
+              DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
+              call prt_maxmin("QILS ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
             endif
          endif
        endif
@@ -2240,6 +2281,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
                                         MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf)))
             endif
+            if (DEBUG) then
+              DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
+                                       MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf)))
+              call prt_maxmin("CLCN ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+            endif
          endif
          if ((clcnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLLS')) then
             CLLS_FILLED = .TRUE.
@@ -2251,6 +2297,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
                                    MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf))))
             endif
+            if (DEBUG) then
+              DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
+                                       MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf))))
+              call prt_maxmin("CLLS ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+            endif
          endif
        else
          if ((clcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLCN')) then
@@ -2261,6 +2312,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
             else
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
             endif
+            if (DEBUG) then
+              DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
+              call prt_maxmin("CLCN ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+            endif
          endif
          if ((clls /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLLS')) then
             CLLS_FILLED = .TRUE.
@@ -2269,6 +2324,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
             else
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
+            endif
+            if (DEBUG) then
+              DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
+              call prt_maxmin("CLLS ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
             endif
          endif
        endif
@@ -2281,6 +2340,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
           else
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain)
           endif
+          if (DEBUG) then
+            DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain)
+            call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+          endif
        endif
     ! SNOW
        if ((snow /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QSNOW')) then
@@ -2291,6 +2354,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
           else
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow)
           endif
+          if (DEBUG) then
+            DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow)
+            call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+          endif
        endif
      ! GRPL
        if ((grpl /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL')) then
@@ -2300,6 +2367,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl)
           else
                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl)
+          endif
+          if (DEBUG) then
+            DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl)
+            call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
           endif
        endif
 
@@ -2346,6 +2417,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
          else
             state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
          endif
+         if (DEBUG) then
+            DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+            call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+         endif
        enddo
       case (1)
        do n=1,STATE%GRID%NQ
@@ -2359,6 +2434,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
          else
             state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+         endif
+         if (DEBUG) then
+            DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+            call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
          endif
         endif
        enddo
@@ -2374,6 +2453,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
          else
             state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+         endif
+         if (DEBUG) then
+            DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+            call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
          endif
         endif
        enddo
@@ -2395,10 +2478,21 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
          else
             state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
          endif
+         if (DEBUG) then
+            DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+            call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+         endif
         endif
        enddo
       end select
       _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
+
+  if (DEBUG) then
+    deallocate ( DEBUG_ARRAY )
+    if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
+    if (mpp_pe()==0) print*,''
+    prt_minmax     = .false.
+  endif
 
   else
 
