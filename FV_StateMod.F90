@@ -2817,11 +2817,11 @@ END SELECT
 ! file: FV_StateMod.F90.SER lineno: #2128
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'ptop', FV_Atm(n)%ptop)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'ptop', FV_Atm(1)%ptop)
   CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ptop', FV_Atm(n)%ptop)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ptop', FV_Atm(1)%ptop)
   CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ptop', FV_Atm(n)%ptop, ppser_zrperturb)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'ptop', FV_Atm(1)%ptop, ppser_zrperturb)
 END SELECT
 ! file: FV_StateMod.F90.SER lineno: #2129
 SELECT CASE ( ppser_get_mode() )
