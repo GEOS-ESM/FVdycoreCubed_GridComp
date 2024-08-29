@@ -373,9 +373,6 @@ contains
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
-  if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
-
-
 ! FV grid dimensions setup from MAPL
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'AGCM_IM:', default= 32, RC=STATUS )
       VERIFY_(STATUS)
