@@ -5083,7 +5083,7 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Fill Surface and Near-Surface Variables
 ! ----------------------------------------------
-   call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT= 50.0, RC=STATUS)
+   call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT=50.0, RC=STATUS)
    VERIFY_(STATUS)
    if ( (KM .ne. 72) .and. (HGT_SURFACE .gt. 0.0) ) then
      ! Near surface height for surface
