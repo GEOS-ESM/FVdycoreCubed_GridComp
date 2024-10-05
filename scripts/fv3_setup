@@ -38,8 +38,16 @@ setenv NODE `uname -n`
 
 if ($ARCH == Darwin) then
    set FINDPATH = realpath
+   set PRELOAD_COMMAND = 'DYLD_INSERT_LIBRARIES'
+   set LD_LIBRARY_PATH_CMD = 'DYLD_LIBRARY_PATH'
+   # On macOS we seem to need to call mpirun directly and not use esma_mpirun
+   # For some reason SIP does not let the libraries be preloaded
+   set RUN_CMD = 'mpirun -np '
 else
    set FINDPATH = 'readlink -f'
+   set PRELOAD_COMMAND = 'LD_PRELOAD'
+   set LD_LIBRARY_PATH_CMD = 'LD_LIBRARY_PATH'
+   set RUN_CMD = '$GEOSBIN/esma_mpirun -np '
 endif
 set FV3SETUP = `$FINDPATH $0`
 set BINDIR   = `dirname $FV3SETUP`
@@ -64,9 +72,11 @@ endif
 # path to the sandbox. If we are not, then we set it to an empty
 # string.
 #
-# We also set the REAL_BIND_PATH environment variable. This is used
-# to set the bind paths for Singularity runs. REAL_BIND_PATH is the
-# physical path to the NOBACKUP directory
+# We also set the REAL_BIND_PATH and BASE_BIND_PATH environment
+# variables. These are used to set the bind paths for Singularity
+# runs. REAL_BIND_PATH is the physical path to the NOBACKUP directory
+# and BASE_BIND_PATH is the physical path to the /gpfsm directory
+# (needed for boundary conditions)
 
 setenv KEYFILE ".singularity.d"
 setenv singstat 0
@@ -85,34 +95,24 @@ while ($singstat == 0)
       endif
    endif
 end
-
 if ($singstat == 1) then
    setenv SINGULARITY_SANDBOX $SINGPATH
    setenv REAL_BIND_PATH `realpath $NOBACKUP`
-
-   set USING_SINGULARITY = TRUE
-   set SINGULARITY_BUILD = ""
-   set NATIVE_BUILD = "#DELETE"
+   setenv BASE_BIND_PATH "/gpfsm"
 else
    setenv SINGULARITY_SANDBOX ""
    setenv REAL_BIND_PATH ""
-
-   set USING_SINGULARITY = FALSE
-   set SINGULARITY_BUILD = "#DELETE"
-   set NATIVE_BUILD = ""
+   setenv BASE_BIND_PATH ""
 endif
 
 cd $ORIGPATH
-
-# Set TMPDIR to /tmp due to issues with heredocs in Singularity sandboxes
-# -----------------------------------------------------------------------
-
-setenv TMPDIR /tmp
 
 #######################################################################
 #                   Test for Command Line Flags
 #######################################################################
 
+# Set default behavior of switches
+set EXE_VERB = "copied"
 set SINGULARITY_RUN_SITE = ""
 if ($singstat == 1) then
    set USING_SINGULARITY = TRUE
@@ -131,6 +131,7 @@ if ($singstat == 1) then
 else
    set USING_SINGULARITY = FALSE
 endif
+
 while ( $#argv > 0 )
    set arg = $argv[1]
    shift argv
@@ -342,6 +343,7 @@ else if ( $SITE == 'NAS' ) then
    echo "   ${C2}sky (Skylake)${CN} (default)"
    echo "   ${C2}cas (Cascade Lake)${CN}"
    echo "   ${C2}rom (AMD Rome)${CN}"
+   echo "   ${C2}mil (AMD Milan)${CN}"
    echo " "
    echo " NOTE Due to how FV3 is compiled by default, Sandy Bridge"
    echo "      and Ivy Bridge are not supported by current GEOS"
@@ -356,7 +358,8 @@ else if ( $SITE == 'NAS' ) then
        $MODEL != 'bro' & \
        $MODEL != 'sky' & \
        $MODEL != 'cas' & \
-       $MODEL != 'rom' ) goto ASKPROC
+       $MODEL != 'rom' & \
+       $MODEL != 'mil' ) goto ASKPROC
 
    # Some processors have weird names at NAS
    # ---------------------------------------
@@ -367,13 +370,11 @@ else if ( $SITE == 'NAS' ) then
       set MODEL = 'cas_ait'
    else if ($MODEL == rom) then
       set MODEL = 'rom_ait'
+   else if ($MODEL == mil) then
+      set MODEL = 'mil_ait'
    endif
 
-   if (     $MODEL == 'san') then
-      set NCPUS_PER_NODE = 16
-   else if ($MODEL == 'ivy') then
-      set NCPUS_PER_NODE = 20
-   else if ($MODEL == 'has') then
+   if ($MODEL == 'has') then
       set NCPUS_PER_NODE = 24
    else if ($MODEL == 'bro') then
       set NCPUS_PER_NODE = 28
@@ -382,6 +383,8 @@ else if ( $SITE == 'NAS' ) then
    else if ($MODEL == 'cas_ait') then
       set NCPUS_PER_NODE = 40
    else if ($MODEL == 'rom_ait') then
+      set NCPUS_PER_NODE = 128
+   else if ($MODEL == 'mil_ait') then
       set NCPUS_PER_NODE = 128
    endif
 
@@ -690,6 +693,21 @@ if( -e $HOME/.GROUProot ) /bin/rm $HOME/.GROUProot
 echo $GROUP > $HOME/.GROUProot
 
 #######################################################################
+#                  Set some singularity variables
+#######################################################################
+
+# Copy or link GEOSgcm.x if USING_SINGULARITY is FALSE
+if ( $USING_SINGULARITY == FALSE ) then
+   # Set a couple variables for sed'ing out bits of the run script
+   set SINGULARITY_BUILD = "#DELETE"
+   set NATIVE_BUILD = ""
+else
+   # Set a couple variables for sed'ing out bits of the run script
+   set SINGULARITY_BUILD = ""
+   set NATIVE_BUILD = "#DELETE"
+endif
+
+#######################################################################
 #               Set Recommended MPI Stack Settings
 #######################################################################
 
@@ -780,7 +798,6 @@ EOF
 else if( $MPI_STACK == intelmpi ) then
 
 cat > $EXPDIR/SETENV.commands << EOF
-#setenv MPS_STAT_LEVEL 4
 setenv I_MPI_ADJUST_ALLREDUCE 12
 setenv I_MPI_ADJUST_GATHERV 3
 
@@ -798,8 +815,8 @@ setenv I_MPI_SHM_HEAP_VSIZE 512
 setenv PSM2_MEMORY large
 EOF
 
-#Testing at NCCS showed these caused crash at higher res
-#Crashed at restart read
+# Testing at NCCS showed these caused a crash at higher resolutions at
+# restart read
 if ( $USING_SINGULARITY == FALSE ) then
 
 cat >> $EXPDIR/SETENV.commands << EOF
@@ -879,6 +896,7 @@ s?@SINGULARITY_BUILD?$SINGULARITY_BUILD?g
 s?@NATIVE_BUILD?$NATIVE_BUILD?g
 s?@SINGULARITY_SANDBOX?$SINGULARITY_SANDBOX?g
 s?@REAL_BIND_PATH?$REAL_BIND_PATH?g
+s?@LD_LIBRARY_PATH_CMD?$LD_LIBRARY_PATH_CMD?g
 
 s^@AGCM_GRIDNAME^$AGCM_GRIDNAME^g
 
