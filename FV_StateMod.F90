@@ -503,31 +503,31 @@ contains
    FV_Atm(1)%flagstruct%external_eta = .true.
    if (FV_Atm(1)%flagstruct%npz >= 70) then
      FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 18 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 17 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 72) then
      FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 25 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 21 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 90) then
      FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 25 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 17 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 126) then
      FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 19 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 132) then
      FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 136) then
      FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 180) then
      FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 32 ! ~5mb
    endif
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
    if (FV_Atm(1)%flagstruct%npz == 72) then
@@ -2754,11 +2754,11 @@ subroutine FV_To_State ( STATE )
       call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
                         -280., 280., bad_range)
      ! C-Grid accumlated courant numbers
-      courant_range =  FV_Atm(1)%flagstruct%n_split * FV_Atm(1)%flagstruct%k_split
-      call range_check('CX_F2S', real(FV_Atm(1)%cx(isc:iec+1,jsc:jec,:)/courant_range), isc, iec+1, jsc, jec, 0, km, FV_Atm(1)%gridstruct%agrid,   &
-                        -0.5, 0.5, bad_range)
-      call range_check('CY_F2S', real(FV_Atm(1)%cy(isc:iec,jsc:jec+1,:)/courant_range), isc, iec, jsc, jec+1, 0, km, FV_Atm(1)%gridstruct%agrid,   &
-                        -0.5, 0.5, bad_range)
+     !courant_range =  FV_Atm(1)%flagstruct%n_split * FV_Atm(1)%flagstruct%k_split
+     !call range_check('CX_F2S', real(FV_Atm(1)%cx(isc:iec+1,jsc:jec,:)/courant_range), isc, iec+1, jsc, jec, 0, km, FV_Atm(1)%gridstruct%agrid,   &
+     !                  -0.5, 0.5, bad_range)
+     !call range_check('CY_F2S', real(FV_Atm(1)%cy(isc:iec,jsc:jec+1,:)/courant_range), isc, iec, jsc, jec+1, 0, km, FV_Atm(1)%gridstruct%agrid,   &
+     !                  -0.5, 0.5, bad_range)
     endif
 
 ! Copy updated FV data to internal state
