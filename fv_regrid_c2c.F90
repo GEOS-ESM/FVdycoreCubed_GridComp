@@ -696,6 +696,7 @@ contains
 
             subroutine remap_winds(is,ie, js, je, isd,ied, jsd,jed, km, npz, ak0, bk0, psc, ud, vd, Atm)
                integer, parameter :: kord_mt = 9
+               integer, parameter :: ikord_mt = 1
                type(fv_atmos_type), intent(inout) :: Atm
                integer, intent(in):: is,ie, js, je, isd,ied, jsd,jed, km, npz
                real(FVPRC),    intent(in):: ak0(km+1), bk0(km+1)
@@ -708,8 +709,13 @@ contains
                real(FVPRC), dimension(isd:ied,jsd:jed,npz+1):: pe1
                real(FVPRC), dimension(is:ie, km+1) :: pe0d
                real(FVPRC), dimension(is:ie,npz+1) :: pe1d
+               real(FVPRC), dimension(is:ie, km  ) :: dpe0
+               real(FVPRC), dimension(is:ie,npz  ) :: dpe1
                real(FVPRC), dimension(is:ie,npz):: qn1
+               integer :: kord(1)
                integer i,j,k
+
+               kord(ikord_mt) = kord_mt
 
                ut = 0.0
                vt = 0.0
@@ -745,14 +751,25 @@ contains
                         pe0d(i,k) = 0.5*(pe0(i,j-1,k)+pe0(i,j,k))
                      enddo
                   enddo
+                  do k=1,km
+                     do i=is,ie
+                        dpe0(i,k) = pe0d(i,k+1)-pe0d(i,k)         
+                     enddo
+                  enddo
                   do k=1,npz+1
                      do i=is,ie
                         pe1d(i,k) = 0.5*(pe1(i,j-1,k)+pe1(i,j,k))                    
                      enddo
                   enddo
+                  do k=1,npz
+                     do i=is,ie
+                        dpe1(i,k) = pe1d(i,k+1)-pe1d(i,k)             
+                     enddo
+                  enddo
                   call map_scalar( km, pe0d, ud(is:ie,j,1:km),    &
-                                  npz, pe1d, qn1,   is, ie,       &
-                                  j,  is, ie, j, j, -1, kord_mt, -1.e25 )
+                                  npz, pe1d, qn1,                 &
+                                  dpe0, dpe1, 1, is, ie,             &
+                                  j,  is, ie, j, j, -1, kord(ikord_mt), -1.e25 )
                   do k=1,npz
                      do i=is,ie
                         ut(i,j,k) = qn1(i,k)
@@ -766,14 +783,25 @@ contains
                         pe0d(i,k) = 0.5*(pe0(i-1,j,k)+pe0(i,j,k))
                      enddo
                   enddo
+                  do k=1,km
+                     do i=is,ie
+                        dpe0(i,k) = pe0d(i,k+1)-pe0d(i,k)
+                     enddo
+                  enddo
                   do k=1,npz+1
                      do i=is,ie
                         pe1d(i,k) = 0.5*(pe1(i-1,j,k)+pe1(i,j,k))                    
                      enddo
                   enddo
+                  do k=1,npz
+                     do i=is,ie
+                        dpe1(i,k) = pe1d(i,k+1)-pe1d(i,k)         
+                     enddo
+                  enddo
                   call map_scalar( km, pe0d, vd(is:ie,j,1:km),    &
-                                  npz, pe1d, qn1,   is, ie,       &
-                                  j,  is, ie, j, j, -1, kord_mt, -1.e25 )
+                                  npz, pe1d, qn1,                 &
+                                  dpe0, dpe1, 1, is, ie,             &
+                                  j,  is, ie, j, j, -1, kord(ikord_mt), -1.e25 )
                   do k=1,npz
                      do i=is,ie
                         vt(i,j,k) = qn1(i,k)
