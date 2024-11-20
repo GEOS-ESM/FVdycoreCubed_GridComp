@@ -768,7 +768,7 @@ contains
                   enddo
                   call map_scalar( km, pe0d, ud(is:ie,j,1:km),    &
                                   npz, pe1d, qn1,                 &
-                                  dpe0, dpe1, 1, is, ie,             &
+                                  dpe0, dpe1, is, ie,             &
                                   j,  is, ie, j, j, -1, kord(ikord_mt), -1.e25 )
                   do k=1,npz
                      do i=is,ie
@@ -800,7 +800,7 @@ contains
                   enddo
                   call map_scalar( km, pe0d, vd(is:ie,j,1:km),    &
                                   npz, pe1d, qn1,                 &
-                                  dpe0, dpe1, 1, is, ie,             &
+                                  dpe0, dpe1, is, ie,             &
                                   j,  is, ie, j, j, -1, kord(ikord_mt), -1.e25 )
                   do k=1,npz
                      do i=is,ie

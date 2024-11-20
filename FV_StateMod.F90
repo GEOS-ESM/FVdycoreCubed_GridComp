@@ -549,6 +549,7 @@ contains
    FV_Atm(1)%flagstruct%ke_bg = 0.0
   ! Rayleigh & Divergence Damping
    if (index(FV3_CONFIG,"HWT") > 0) then
+     FV_Atm(1)%flagstruct%hydrostatic = .false.
      FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
      FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
      FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
@@ -568,6 +569,7 @@ contains
      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.15
      FV_Atm(1)%flagstruct%consv_te = 1.0
    else
+     FV_Atm(1)%flagstruct%hydrostatic = .true.
      FV_Atm(1)%flagstruct%fv_sg_adj = DT
      FV_Atm(1)%flagstruct%RF_fast = .false.
      FV_Atm(1)%flagstruct%tau = 0.0
@@ -644,8 +646,7 @@ contains
       else
          FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
       endif
-      ! Monotonic Hydrostatic defaults
-      FV_Atm(1)%flagstruct%hydrostatic = .false.
+      ! Monotonic defaults
       FV_Atm(1)%flagstruct%make_nh = .false.
      ! This is the best/fastest option for tracers
       FV_Atm(1)%flagstruct%hord_tr =  8
