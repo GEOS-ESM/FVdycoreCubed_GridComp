@@ -146,11 +146,23 @@ contains
   real(FVPRC) qp( Atm%bd%is:Atm%bd%ie,km,ncnst)
   real(FVPRC) qp1(Atm%bd%is:Atm%bd%ie,km)
   real(FVPRC) pst, p1, p2, alpha, rdg
+  real(FVPRC) dp0(Atm%bd%is:Atm%bd%ie,km), dp1(Atm%bd%is:Atm%bd%ie,npz)
+  real(FVPRC) dpn0(Atm%bd%is:Atm%bd%ie,km), dpn1(Atm%bd%is:Atm%bd%ie,npz)
   integer i,j,k, iq
   integer  sphum,ifile,ivar,n_ungrid
   integer :: is,  ie,  js,  je
   integer :: isd, ied, jsd, jed
   logical :: doVert
+  integer:: ikord_tm = 1
+  integer:: ikord_wz = 2
+  integer:: ikord_mt = 3
+  integer:: ikord_tr = 3
+  integer :: kord(4)
+
+  kord(ikord_tm) = kord_tm
+  kord(ikord_wz) = kord_wz
+  kord(ikord_mt) = kord_mt
+  kord(ikord_tr) = kord_tr
 
   is  = Atm%bd%is
   ie  = Atm%bd%ie
@@ -181,6 +193,11 @@ contains
           pe0(i,k) = ak0(k) + bk0(k)*psc(i,j)
           pn0(i,k) = log(pe0(i,k))
             pk0(k) = pe0(i,k)**kappa
+       enddo
+
+       do k=1,km
+          dp0(i,k) =  pe0(i,k+1) - pe0(i,k)
+         dpn0(i,k) =  pn0(i,k+1) - pn0(i,k)
        enddo
 
 ! * Adjust interpolated ps to model terrain
@@ -218,11 +235,17 @@ contains
           pk1(i,k) = pe1(i,k)**kappa
        enddo
      enddo
+     do k=1,npz
+       do i=is,ie
+          dpn1(i,k) =  pn1(i,k+1) - pn1(i,k)
+       enddo
+     enddo
 
 ! * Compute delp
      do k=1,npz
         do i=is,ie
            Atm%delp(i,j,k) = pe1(i,k+1) - pe1(i,k)
+           dp1(i,k) = Atm%delp(i,j,k)
         enddo
      enddo
 
@@ -235,7 +258,8 @@ contains
         enddo
         call map_scalar( km, pe0, qp1,                    &
                         npz, pe1, qn1,                    &
-                        is, ie, j, is, ie, j, j, -1, kord_wz, -1.e25 )
+                        dp0, dp1,                         &
+                        is, ie, j, is, ie, j, j, -1, kord(ikord_wz), -1.e25 )
         do k=1,npz
            do i=is,ie
               Atm%w(i,j,k) = qn1(i,k)
@@ -252,7 +276,8 @@ contains
         enddo
         call map_scalar( km, pe0, qp1,                    &
                         npz, pe1, qn1,                    &
-                        is, ie, j, is, ie, j, j, 1, kord_wz, -1.e25 )
+                        dp0, dp1,                         &
+                        is, ie, j, is, ie, j, j, 1, kord(ikord_wz), -1.e25 )
         do k=1,npz
            do i=is,ie
               Atm%delz(i,j,k) = -qn1(i,k) * Atm%delp(i,j,k) 
@@ -265,8 +290,9 @@ contains
 !----------------
      do iq=1,ncnst
         call map_scalar( km, pe0, qp(is,1,iq),         &
-                        npz, pe1, qn1,   is, ie,       &
-                        j,  is, ie, j, j, 0, kord_tr, -1.e25 )
+                        npz, pe1, qn1,                 &
+                        dp0, dp1, is, ie,              &
+                        j,  is, ie, j, j, 0, kord(ikord_tr), -1.e25 )
         call fillz(ie-is+1, npz, 1, qn1, Atm%delp(is:ie,j,1:npz))
         do k=1,npz
            do i=is,ie
@@ -291,8 +317,9 @@ contains
                        qp1(is:ie,k)=in_fv_rst(ifile)%vars(ivar)%ptr3d(is:ie,j,k)
                     enddo
                     call map_scalar( km, pe0, qp1,                 &       
-                                    npz, pe1, qn1,   is, ie,       &
-                                    j,  is, ie, j, j, 0, kord_tr, -1.e25 )
+                                    npz, pe1, qn1,                 &
+                                    dp0, dp1, is, ie,              &
+                                    j,  is, ie, j, j, 0, kord(ikord_tr), -1.e25 )
                     call fillz(ie-is+1, npz, 1, qn1, Atm%delp(is:ie,j,1:npz))
                     do k=1,npz
                        do i=is,ie
@@ -317,8 +344,9 @@ contains
                           qp1(is:ie,k)=in_fv_rst(ifile)%vars(ivar)%ptr4d(is:ie,j,k,n_ungrid)
                        enddo
                        call map_scalar( km, pe0, qp1,                 &         
-                                       npz, pe1, qn1,   is, ie,       &        
-                                       j,  is, ie, j, j, 0, kord_tr, -1.e25 )        
+                                       npz, pe1, qn1,                 &        
+                                       dp0, dp1, is, ie,              &
+                                       j,  is, ie, j, j, 0, kord(ikord_tr), -1.e25 )        
                        call fillz(ie-is+1, npz, 1, qn1, Atm%delp(is:ie,j,1:npz))     
                        do k=1,npz
                           do i=is,ie
@@ -350,8 +378,9 @@ contains
 ! map virtual temperature using cubic scheme.
 !-------------------------------------------------------------
      call map_scalar( km,  pn0,  tp,                 &
-                      npz, pn1, qn1,   is, ie,       &
-                      j,  is, ie, j, j, 1, kord_tm, t_min )
+                      npz, pn1, qn1,                 &
+                      dpn0, dpn1, is, ie,            &
+                      j,  is, ie, j, j, 1, kord(ikord_tm), t_min )
      do k=1,npz
         do i=is,ie
            Atm%pt(i,j,k) = qn1(i,k)/(1.+zvir*Atm%q(i,j,k,sphum)) ! Convert back to dry T
