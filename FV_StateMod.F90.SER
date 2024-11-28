@@ -2125,7 +2125,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        !$ser data bdt=myDT
        !$ser data nq_tot=FV_Atm(1)%flagstruct%nwat+1
        !$ser data zvir=zvir
-       !$ser data ptop=FV_Atm(n)%ptop
+       !$ser data ptop=FV_Atm(1)%ptop
        !$ser data ks=FV_Atm(1)%ks
        !$ser data ncnst=FV_Atm(1)%ncnst
        !$ser data n_split=state%nsplit
@@ -5095,6 +5095,7 @@ end subroutine fv_getAllWinds_2D
 
 subroutine echo_fv3_setup()
 
+   !$ser verbatim WRITE(*,*) "$SERIALBOX START FV NML"
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%grid_name ,format='("FV3 grid_name: ",(A))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%grid_file ,format='("FV3 grid_file: ",(A))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%grid_type ,format='("FV3 grid_type: ",(I2))' )
@@ -5241,6 +5242,7 @@ subroutine echo_fv3_setup()
 !                       deglat_start = -30., deglat_stop = 30.
 !! Convenience pointers
 !  integer, pointer :: grid_number
+   !$ser verbatim WRITE(*,*) "$SERIALBOX STOP FV NML"
 
 end subroutine echo_fv3_setup
 
