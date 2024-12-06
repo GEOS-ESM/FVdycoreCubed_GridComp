@@ -2049,7 +2049,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (mpp_pe()==0) print*,''
     if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
     allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
-  endif                 
+  endif
 
      do n=1,STATE%GRID%NQ
 
@@ -2064,7 +2064,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
           if (DEBUG) then
             DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
             call prt_maxmin("SPHU ", DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
-          endif                 
+          endif
        endif
     ! QLIQ
        if (qliq /= -1) then
@@ -2780,9 +2780,9 @@ subroutine fv_getPKZ_NH(pkz,temp,qv,pe,delz)
 !-------------------------------------------------------------------------
 ! Re-compute the full (nonhydrostatic) pressure due to temperature changes
 !-------------------------------------------------------------------------
-!$omp parallel do default (none) & 
+!$omp parallel do default (none) &
 !$omp shared (npz, jsc, jec, isc, iec, pkz, kappa, rdg, delp, temp, zvir, qv, delz) &
-!$omp private (k, j, i) 
+!$omp private (k, j, i)
       do k=1,npz
          do j=jsc,jec
             do i=isc,iec
@@ -2815,9 +2815,9 @@ subroutine fv_getPKZ(pkz,pe)
   peln = log(pe)
   pk   = exp( kappa*peln )
 
-!$omp parallel do default (none) & 
+!$omp parallel do default (none) &
 !$omp shared (npz, jsc, jec, isc, iec, pkz, pk, kappa, peln) &
-!$omp private (k, j, i) 
+!$omp private (k, j, i)
       do k=1,npz
          do j=jsc,jec
             do i=isc,iec
@@ -4094,7 +4094,11 @@ subroutine fv_getDivergence(uc, vc, divg)
 end subroutine fv_getDivergence
 
 subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
+#ifdef OVERLOAD_R4
+   use constantsR4_mod, only: fms_grav=>grav
+#else
    use constants_mod, only: fms_grav=>grav
+#endif
 ! made this REAL4
    real(REAL4), intent(OUT) ::  uh25(:,:)
    real(REAL4), intent(OUT) ::  uh03(:,:)
@@ -5082,7 +5086,7 @@ end subroutine echo_fv3_setup
      allocate ( t0(isc:iec,jsc:jec, npz) )
      allocate (dp0(isc:iec,jsc:jec, npz) )
 
-!$omp parallel do default (none) & 
+!$omp parallel do default (none) &
 !$omp shared (npz, jsc, jec, isc, iec, n, sphum, u0, v0, t0, dp0, FV_Atm, zvir) &
 !$omp private (k, j, i)
        do k=1,npz
@@ -5146,7 +5150,7 @@ end subroutine echo_fv3_setup
             time_total)
 !Nudging back to IC
 !$omp parallel do default (none) &
-!$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) & 
+!$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) &
 !$omp private (i, j, k)
        do k=1,npz
           do j=jsc,jec+1

@@ -1,7 +1,11 @@
       PROGRAM CreateTopography
 
       use ESMF
+#ifdef OVERLOAD_R4
+      use constantsR4_mod,  only: pi, grav
+#else
       use constants_mod,  only: pi, grav
+#endif
 
 ! Shared Utilities
       use fms_mod,        only: fms_init, fms_end, file_exist
@@ -39,7 +43,7 @@
       real(REAL8) :: dlon, dlat
       integer :: nlon, nlat
       integer :: c2c_interp_npts
- 
+
       real(REAL8), allocatable :: lat1(:)
       real(REAL8), allocatable :: lon1(:)
       real(REAL8), allocatable :: r8latlon1(:,:)
@@ -115,7 +119,7 @@
       deallocate( phis_m )
     endif
 
-! Get GWD/TRB Variance 
+! Get GWD/TRB Variance
   ! if (npx-1 <= 180) then
       allocate( r8tmp(Atm(1)%isd:Atm(1)%ied,Atm(1)%jsd:Atm(1)%jed) )
       allocate ( gwd_global(im,im,6) )
@@ -467,10 +471,10 @@
   else
     var_out(:,:,:) = 0.0
   endif
-  write(fname2, "('topo_TRB_var_',i4.4,'x',i5.5,'.data')") (npx_out),ntiles*(npx_out) 
+  write(fname2, "('topo_TRB_var_',i4.4,'x',i5.5,'.data')") (npx_out),ntiles*(npx_out)
   open(OUNIT,file=fname2,form='unformatted',status='unknown')
   do l=1,ntiles
-     j1 = (npx_out)*(l-1) + 1 
+     j1 = (npx_out)*(l-1) + 1
      j2 = (npx_out)*(l-1) + npx_out
      varo(:,j1:j2)=var_out(:,:,l)
   enddo
