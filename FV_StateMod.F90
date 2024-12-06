@@ -358,13 +358,27 @@ contains
   if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
 
 
+  call MAPL_GetResource( MAPL, AdvCore_Advection, label='AdvCore_Advection:', default=AdvCore_Advection, rc=status )
+  VERIFY_(STATUS)
+
 ! FV grid dimensions setup from MAPL
+  ! Advect core expects to find IM/JM/LM in the resource file not AGCM_IM/AGCM_JM/AGCM_LM
+  if (AdvCore_Advection == 1) then
+      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'IM:', default= 32, RC=STATUS )
+      VERIFY_(STATUS)
+      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npy, 'JM:', default=192, RC=STATUS )
+      VERIFY_(STATUS)
+      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'LM:', default= 72, RC=STATUS )
+      VERIFY_(STATUS)
+  else
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'AGCM_IM:', default= 32, RC=STATUS )
       VERIFY_(STATUS)
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npy, 'AGCM_JM:', default=192, RC=STATUS )
       VERIFY_(STATUS)
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'AGCM_LM:', default= 72, RC=STATUS )
       VERIFY_(STATUS)
+  endif
+
 ! FV likes npx;npy in terms of cell vertices
       if (FV_Atm(1)%flagstruct%npy == 6*FV_Atm(1)%flagstruct%npx) then
          FV_Atm(1)%flagstruct%ntiles = 6
@@ -397,8 +411,8 @@ contains
   VERIFY_(STATUS)
   DT = ndt
 
-! Advect tracers within DynCore(AdvCore_Advection=.false.)
-!             or within AdvCore(AdvCore_Advection=.true.)
+! Advect tracers within DynCore(AdvCore_Advection=0)
+!             or within AdvCore(AdvCore_Advection=1)
   call MAPL_GetResource( MAPL, AdvCore_Advection, label='AdvCore_Advection:', default=AdvCore_Advection, rc=status )
   VERIFY_(STATUS)
 
