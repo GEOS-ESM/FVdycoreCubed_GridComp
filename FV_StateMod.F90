@@ -553,7 +553,7 @@ contains
      FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
      FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
      FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
-     FV_Atm(1)%flagstruct%dz_min = 6.0
+     FV_Atm(1)%flagstruct%dz_min = 3.0
      FV_Atm(1)%flagstruct%RF_fast = .true.
      FV_Atm(1)%flagstruct%tau = 2.0
      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
@@ -588,9 +588,12 @@ contains
    FV_Atm(1)%flagstruct%n_split = 0
    FV_Atm(1)%flagstruct%k_split = 1
   ! default NonHydrostatic settings (irrelavent to Hydrostatic)
+   ! a_imp > 0.5 for semi-implicit scheme [1 fully backward]
+   ! if (a_imp > 0.5) beta + a_imp must = 1.0
    FV_Atm(1)%flagstruct%beta = 0.0
    FV_Atm(1)%flagstruct%a_imp = 1.0
-   FV_Atm(1)%flagstruct%p_fac = 0.05
+   ! p_fac is a NH pressure fraction limiter near model top (0:0.25) 
+   FV_Atm(1)%flagstruct%p_fac = 0.125
   ! Cubed-Sphere Global Resolution Specific adjustments
    if (FV_Atm(1)%flagstruct%ntiles == 6) then
      ! Cubed-sphere grid resolution and DT dependence
@@ -602,10 +605,10 @@ contains
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
@@ -750,7 +753,6 @@ contains
     format='("                 stretch_fac       =",F10.4)'  )
 
   FV_HYDROSTATIC = FV_Atm(1)%flagstruct%hydrostatic
-  prt_minmax     = FV_Atm(1)%flagstruct%fv_debug
   DEBUG          = FV_Atm(1)%flagstruct%fv_debug
   call MAPL_GetResource(MAPL, DEBUG, 'DEBUG_STATE:', default=DEBUG, RC=STATUS)
 
@@ -2544,7 +2546,7 @@ subroutine State_To_FV ( STATE )
     enddo
   endif
 
-  if ( DEBUG .OR. ADJUST_DT ) then
+  if ( ADJUST_DT ) then
     call range_check('U_S2F', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
                       -280., 280., bad_range=bad_range_U)
     call range_check('V_S2F', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
@@ -2621,10 +2623,10 @@ subroutine State_To_FV ( STATE )
        FV_Atm(1)%pt(:,:,:) = tiny_number
        FV_Atm(1)%pt(isc:iec,jsc:jec,:) = STATE%VARS%PT*STATE%VARS%PKZ
 
-       if ( DEBUG ) then
-          call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            130., 333., bad_range=bad_range_T)
-       endif
+     ! if ( DEBUG ) then
+     !    call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+     !                      130., 333., bad_range=bad_range_T)
+     ! endif
 
 !------------
 ! Get delz
@@ -2664,19 +2666,19 @@ subroutine FV_To_State ( STATE )
     KM  = state%grid%npz
     NG  = state%grid%ng
 
-    if ( DEBUG ) then
+  ! if ( DEBUG ) then
      ! D-Grid winds
-      call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                        -280., 280., bad_range)
-      call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                        -280., 280., bad_range)
+     !call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+     !                  -280., 280., bad_range)
+     !call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+     !                  -280., 280., bad_range)
      ! C-Grid accumlated courant numbers
      !courant_range =  FV_Atm(1)%flagstruct%n_split * FV_Atm(1)%flagstruct%k_split
      !call range_check('CX_F2S', real(FV_Atm(1)%cx(isc:iec+1,jsc:jec,:)/courant_range), isc, iec+1, jsc, jec, 0, km, FV_Atm(1)%gridstruct%agrid,   &
      !                  -0.5, 0.5, bad_range)
      !call range_check('CY_F2S', real(FV_Atm(1)%cy(isc:iec,jsc:jec+1,:)/courant_range), isc, iec, jsc, jec+1, 0, km, FV_Atm(1)%gridstruct%agrid,   &
      !                  -0.5, 0.5, bad_range)
-    endif
+  ! endif
 
 ! Copy updated FV data to internal state
     STATE%VARS%U(:,:,:) = FV_Atm(1)%u(isc:iec,jsc:jec,:)
@@ -2696,10 +2698,10 @@ subroutine FV_To_State ( STATE )
 !-----------------------------------
 ! Fill Dry Temperature to PT
 !-----------------------------------
-       if ( DEBUG ) then
-          call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            130., 333., bad_range)
-       endif
+     ! if ( DEBUG ) then
+        ! call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+        !                   130., 333., bad_range)
+     ! endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 
 !------------------------------
