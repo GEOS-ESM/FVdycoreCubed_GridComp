@@ -50,7 +50,7 @@
                            DYN_CASE        => CASE_ID,               &
                            DYN_DEBUG       => DEBUG,                 &
                            HYDROSTATIC     => FV_HYDROSTATIC,        &
-                           fv_getUpdraftHelicity,                    &
+                           fv_getUpdraftHelicity, DEBUG_DYN,         &
                            ADIABATIC, SW_DYNAMICS, AdvCore_Advection
    use m_topo_remap, only: dyn_topo_remap
    use CubeGridPrototype, only: register_grid_and_regridders
@@ -2598,6 +2598,9 @@ contains
         VERIFY_(STATUS)
     endif
 
+    call MAPL_GetResource ( MAPL, DEBUG_DYN, 'DEBUG_DYN:', default=.FALSE., rc=status )
+    VERIFY_(STATUS)
+
 ! Generic SetServices
 !--------------------
 
@@ -4609,6 +4612,13 @@ subroutine Run(gc, import, export, clock, rc)
       call FILLOUT3 (export, 'U_AGRID', ua      , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'V_AGRID', va      , rc=status); VERIFY_(STATUS)
 
+      if (DEBUG_DYN) then
+         call MAPL_MaxMin('DYN: Q_AF_DYN ', qv)
+         call MAPL_MaxMin('DYN: T_AF_DYN ', tempxy)
+         call MAPL_MaxMin('DYN: U_AF_DYN ', ua)
+         call MAPL_MaxMin('DYN: V_AF_DYN ', va)
+      endif
+
 ! Compute Diagnostic Dynamics Tendencies
 !  (Note: initial values of d(m,u,v,T,q)/dt are progs m,u,v,T,q)
 ! --------------------------------------------------------------
@@ -6438,6 +6448,7 @@ end subroutine RUN
     real(r8), allocatable ::    thv(:,:,:)
     real(r8), allocatable ::    zle(:,:,:)
     real(r8), allocatable :: tempxy(:,:,:)
+    real(r8)              :: TMAX, QMAX
 
     real(r8), allocatable ::  logpl(:,:,:)
     real(r8), allocatable ::  logpe(:,:,:)
@@ -6665,6 +6676,15 @@ end subroutine RUN
 #if defined(DEBUG_T)
   call Write_Profile(grid, tempxy, 'T')
 #endif
+
+    if (DEBUG_DYN) then  
+       call MAPL_MaxMin('DYN: Q_AF_INC ', qv)
+       call MAPL_MaxMin('DYN: T_AF_INC ', tempxy, pmax=TMAX)
+       call MAPL_MaxMin('DYN: U_AF_INC ', ua)
+       call MAPL_MaxMin('DYN: V_AF_INC ', va)
+       if (TMAX >= 350.0_r8) call Write_Profile(grid, tempxy, 'TAFINC')
+       if (TMAX >= 350.0_r8) call Write_Profile(grid,     qv, 'QAFINC')
+    endif
 
     call FILLOUT3 (export, 'DELP'   , dp      , rc=status); VERIFY_(STATUS)
     call FILLOUT3 (export, 'U'      , ur      , rc=status); VERIFY_(STATUS)
@@ -7465,21 +7485,21 @@ end subroutine RunAddIncs
        !   call prt_maxmin('AI PT1', STATE%VARS%PT ,  is, ie, js, je, 0, km, 1.d00, MAPL_AM_I_ROOT())
        !endif
 
-       select case (nwat)
-       case (6:7)
-           CVM = (1.-( Q(:,:,:,  sphum)+Q(:,:,:,liq_wat)+Q(:,:,:,rainwat)+Q(:,:,:,ice_wat)+&
-                       Q(:,:,:,snowwat)+Q(:,:,:,graupel) )               )*c_air + &
-                      (Q(:,:,:,  sphum)                                  )*c_vap + &
-                      (Q(:,:,:,liq_wat)+Q(:,:,:,rainwat)                 )*c_liq + &
-                      (Q(:,:,:,ice_wat)+Q(:,:,:,snowwat)+Q(:,:,:,graupel))*c_ice
-       case (3)
-           CVM = (1.-( Q(:,:,:,  sphum)+Q(:,:,:,liq_wat)+Q(:,:,:,ice_wat) ) )*c_air + &
-                      (Q(:,:,:,  sphum)                                     )*c_vap + &
-                      (Q(:,:,:,liq_wat)                                     )*c_liq + &
-                      (Q(:,:,:,ice_wat)                                     )*c_ice
-       case default
+      !select case (nwat)
+      !case (6:7)
+      !    CVM = (1.-( Q(:,:,:,  sphum)+Q(:,:,:,liq_wat)+Q(:,:,:,rainwat)+Q(:,:,:,ice_wat)+&
+      !                Q(:,:,:,snowwat)+Q(:,:,:,graupel) )               )*c_air + &
+      !               (Q(:,:,:,  sphum)                                  )*c_vap + &
+      !               (Q(:,:,:,liq_wat)+Q(:,:,:,rainwat)                 )*c_liq + &
+      !               (Q(:,:,:,ice_wat)+Q(:,:,:,snowwat)+Q(:,:,:,graupel))*c_ice
+      !case (3)
+      !    CVM = (1.-( Q(:,:,:,  sphum)+Q(:,:,:,liq_wat)+Q(:,:,:,ice_wat) ) )*c_air + &
+      !               (Q(:,:,:,  sphum)                                     )*c_vap + &
+      !               (Q(:,:,:,liq_wat)                                     )*c_liq + &
+      !               (Q(:,:,:,ice_wat)                                     )*c_ice
+      !case default
            CVM = MAPL_CP
-       end select
+      !end select
 
        ! Make previous PT into just T
        STATE%VARS%PT = STATE%VARS%PT*STATE%VARS%PKZ

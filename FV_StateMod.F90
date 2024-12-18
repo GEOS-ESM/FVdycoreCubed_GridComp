@@ -61,6 +61,7 @@ private
   integer :: INT_FV_OFF = 0
   logical :: ADJUST_DT = .false.
   logical :: DEBUG = .false.
+  logical :: DEBUG_DYN = .false.
   logical :: COLDSTART = .false.
   logical :: SW_DYNAMICS = .false.
   integer :: INT_ADIABATIC = 0
@@ -76,7 +77,7 @@ private
 
   public FV_Atm
   public FV_Setup, FV_InitState, FV_Run, FV_Finalize, FV_DA_Incs
-  public FV_HYDROSTATIC, ADIABATIC, DEBUG, COLDSTART, CASE_ID, SW_DYNAMICS, AdvCore_Advection
+  public FV_HYDROSTATIC, ADIABATIC, DEBUG, DEBUG_DYN, COLDSTART, CASE_ID, SW_DYNAMICS, AdvCore_Advection
   public FV_RESET_CONSTANTS
   public FV_To_State, State_To_FV
   public T_TRACERS, T_FVDYCORE_VARS, T_FVDYCORE_GRID, T_FVDYCORE_STATE
@@ -2623,9 +2624,9 @@ subroutine State_To_FV ( STATE )
        FV_Atm(1)%pt(:,:,:) = tiny_number
        FV_Atm(1)%pt(isc:iec,jsc:jec,:) = STATE%VARS%PT*STATE%VARS%PKZ
 
-     ! if ( DEBUG ) then
+     ! if ( DEBUG_DYN ) then
      !    call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-     !                      130., 333., bad_range=bad_range_T)
+     !                      130., 350., bad_range=bad_range_T)
      ! endif
 
 !------------
