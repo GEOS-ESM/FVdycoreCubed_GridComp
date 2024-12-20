@@ -7485,21 +7485,19 @@ end subroutine RunAddIncs
        !   call prt_maxmin('AI PT1', STATE%VARS%PT ,  is, ie, js, je, 0, km, 1.d00, MAPL_AM_I_ROOT())
        !endif
 
-      !select case (nwat)
-      !case (6:7)
-      !    CVM = (1.-( Q(:,:,:,  sphum)+Q(:,:,:,liq_wat)+Q(:,:,:,rainwat)+Q(:,:,:,ice_wat)+&
-      !                Q(:,:,:,snowwat)+Q(:,:,:,graupel) )               )*c_air + &
-      !               (Q(:,:,:,  sphum)                                  )*c_vap + &
-      !               (Q(:,:,:,liq_wat)+Q(:,:,:,rainwat)                 )*c_liq + &
-      !               (Q(:,:,:,ice_wat)+Q(:,:,:,snowwat)+Q(:,:,:,graupel))*c_ice
-      !case (3)
-      !    CVM = (1.-( Q(:,:,:,  sphum)+Q(:,:,:,liq_wat)+Q(:,:,:,ice_wat) ) )*c_air + &
-      !               (Q(:,:,:,  sphum)                                     )*c_vap + &
-      !               (Q(:,:,:,liq_wat)                                     )*c_liq + &
-      !               (Q(:,:,:,ice_wat)                                     )*c_ice
-      !case default
-           CVM = MAPL_CP
-      !end select
+       select case (nwat)
+       case (6:7)
+           CVM = (1.-( Q(:,:,:,  sphum)+Q(:,:,:,liq_wat)+Q(:,:,:,rainwat)+Q(:,:,:,ice_wat)+&
+                       Q(:,:,:,snowwat)+Q(:,:,:,graupel) )               )*c_air + &
+                      (Q(:,:,:,  sphum)                                  )*c_vap + &
+                      (Q(:,:,:,liq_wat)+Q(:,:,:,rainwat)                 )*c_liq + &
+                      (Q(:,:,:,ice_wat)+Q(:,:,:,snowwat)+Q(:,:,:,graupel))*c_ice
+       case default
+           CVM = (1.-( Q(:,:,:,  sphum)+Q(:,:,:,liq_wat)+Q(:,:,:,ice_wat) ) )*c_air + &
+                      (Q(:,:,:,  sphum)                                     )*c_vap + &
+                      (Q(:,:,:,liq_wat)                                     )*c_liq + &
+                      (Q(:,:,:,ice_wat)                                     )*c_ice
+       end select
 
        ! Make previous PT into just T
        STATE%VARS%PT = STATE%VARS%PT*STATE%VARS%PKZ
