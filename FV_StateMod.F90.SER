@@ -2156,10 +2156,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        !$ser data vc=FV_Atm(1)%vc
        !$ser data ak=FV_Atm(1)%ak
        !$ser data bk=FV_Atm(1)%bk
-       !$ser data mfxd=FV_Atm(1)%mfx
-       !$ser data mfyd=FV_Atm(1)%mfy
-       !$ser data cxd=FV_Atm(1)%cx
-       !$ser data cyd=FV_Atm(1)%cy
+       !$ser data mfxd_FV=FV_Atm(1)%mfx mfyd_FV=FV_Atm(1)%mfy cxd_FV=FV_Atm(1)%cx cyd_FV=FV_Atm(1)%cy
        !$ser data diss_estd=FV_Atm(1)%diss_est
        !$ser data consv_te=FV_Atm(1)%flagstruct%consv_te
 
@@ -2208,10 +2205,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        !$ser data va=FV_Atm(1)%va
        !$ser data uc=FV_Atm(1)%uc
        !$ser data vc=FV_Atm(1)%vc
-       !$ser data mfxd=FV_Atm(1)%mfx
-       !$ser data mfyd=FV_Atm(1)%mfy
-       !$ser data cxd=FV_Atm(1)%cx
-       !$ser data cyd=FV_Atm(1)%cy
+       !$ser data mfxd_FV=FV_Atm(1)%mfx mfyd_FV=FV_Atm(1)%mfy cxd_FV=FV_Atm(1)%cx cyd_FV=FV_Atm(1)%cy
        !$ser data diss_estd=FV_Atm(1)%diss_est
        !$ser off
 
@@ -5242,7 +5236,13 @@ subroutine echo_fv3_setup()
 !                       deglat_start = -30., deglat_stop = 30.
 !! Convenience pointers
 !  integer, pointer :: grid_number
+
    !$ser verbatim WRITE(*,*) "$SERIALBOX STOP FV NML"
+#ifdef SINGLE_FV
+   call WRITE_PARALLEL ( "SINGLE_FV: .TRUE." )
+#else
+   call WRITE_PARALLEL ( "SINGLE_FV: .FALSE." )
+#endif
 
 end subroutine echo_fv3_setup
 

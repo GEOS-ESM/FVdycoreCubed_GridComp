@@ -7,10 +7,10 @@ module FV_StateMod
 USE m_serialize, ONLY: &
   fs_add_savepoint_metainfo, &
   fs_create_savepoint, &
-  fs_disable_serialization, &
   fs_enable_serialization, &
+  fs_read_field, &
   fs_write_field, &
-  fs_read_field
+  fs_disable_serialization
 USE utils_ppser, ONLY:  &
   ppser_finalize, &
   ppser_get_mode, &
@@ -2978,35 +2978,20 @@ SELECT CASE ( ppser_get_mode() )
 END SELECT
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'mfxd', FV_Atm(1)%mfx)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'mfxd_FV', FV_Atm(1)%mfx)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'mfyd_FV', FV_Atm(1)%mfy)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'cxd_FV', FV_Atm(1)%cx)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'cyd_FV', FV_Atm(1)%cy)
   CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfxd', FV_Atm(1)%mfx)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfxd_FV', FV_Atm(1)%mfx)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfyd_FV', FV_Atm(1)%mfy)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cxd_FV', FV_Atm(1)%cx)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cyd_FV', FV_Atm(1)%cy)
   CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfxd', FV_Atm(1)%mfx, ppser_zrperturb)
-END SELECT
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'mfyd', FV_Atm(1)%mfy)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfyd', FV_Atm(1)%mfy)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfyd', FV_Atm(1)%mfy, ppser_zrperturb)
-END SELECT
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'cxd', FV_Atm(1)%cx)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cxd', FV_Atm(1)%cx)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cxd', FV_Atm(1)%cx, ppser_zrperturb)
-END SELECT
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'cyd', FV_Atm(1)%cy)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cyd', FV_Atm(1)%cy)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cyd', FV_Atm(1)%cy, ppser_zrperturb)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfxd_FV', FV_Atm(1)%mfx, ppser_zrperturb)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfyd_FV', FV_Atm(1)%mfy, ppser_zrperturb)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cxd_FV', FV_Atm(1)%cx, ppser_zrperturb)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cyd_FV', FV_Atm(1)%cy, ppser_zrperturb)
 END SELECT
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
@@ -3249,35 +3234,20 @@ SELECT CASE ( ppser_get_mode() )
 END SELECT
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'mfxd', FV_Atm(1)%mfx)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'mfxd_FV', FV_Atm(1)%mfx)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'mfyd_FV', FV_Atm(1)%mfy)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'cxd_FV', FV_Atm(1)%cx)
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'cyd_FV', FV_Atm(1)%cy)
   CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfxd', FV_Atm(1)%mfx)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfxd_FV', FV_Atm(1)%mfx)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfyd_FV', FV_Atm(1)%mfy)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cxd_FV', FV_Atm(1)%cx)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cyd_FV', FV_Atm(1)%cy)
   CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfxd', FV_Atm(1)%mfx, ppser_zrperturb)
-END SELECT
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'mfyd', FV_Atm(1)%mfy)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfyd', FV_Atm(1)%mfy)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfyd', FV_Atm(1)%mfy, ppser_zrperturb)
-END SELECT
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'cxd', FV_Atm(1)%cx)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cxd', FV_Atm(1)%cx)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cxd', FV_Atm(1)%cx, ppser_zrperturb)
-END SELECT
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'cyd', FV_Atm(1)%cy)
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cyd', FV_Atm(1)%cy)
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cyd', FV_Atm(1)%cy, ppser_zrperturb)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfxd_FV', FV_Atm(1)%mfx, ppser_zrperturb)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'mfyd_FV', FV_Atm(1)%mfy, ppser_zrperturb)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cxd_FV', FV_Atm(1)%cx, ppser_zrperturb)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'cyd_FV', FV_Atm(1)%cy, ppser_zrperturb)
 END SELECT
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
@@ -6690,8 +6660,14 @@ WRITE(*,*) "$SERIALBOX START FV NML"
 !                       deglat_start = -30., deglat_stop = 30.
 !! Convenience pointers
 !  integer, pointer :: grid_number
+
 #ifdef SERIALIZE
 WRITE(*,*) "$SERIALBOX STOP FV NML"
+#endif
+#ifdef SINGLE_FV
+   call WRITE_PARALLEL ( "SINGLE_FV: .TRUE." )
+#else
+   call WRITE_PARALLEL ( "SINGLE_FV: .FALSE." )
 #endif
 
 end subroutine echo_fv3_setup
@@ -6927,5 +6903,4 @@ subroutine WRITE_PARALLEL_L ( field, format )
 end subroutine WRITE_PARALLEL_L
 
 end module FV_StateMod
-
 
