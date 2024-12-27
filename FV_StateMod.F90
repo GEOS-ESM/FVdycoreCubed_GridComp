@@ -4987,6 +4987,8 @@ subroutine echo_fv3_setup()
 !   logical :: mountain  = .true.
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%remap_option ,format='("FV3 remap_option: ",(I4))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%gmao_remap ,format='("FV3 gmao_remap: ",(I4))' )
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%gmao_top_bc ,format='("FV3 gmao_top_bc: ",(A))' )
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%gmao_bot_bc ,format='("FV3 gmao_bot_bc: ",(A))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%z_tracer ,format='("FV3 z_tracer: ",(A))' )
 !   logical :: old_divg_damp = .false. ! parameter to revert damping parameters back to values
 !   logical :: fv_land = .false.       ! To cold starting the model with USGS terrain
