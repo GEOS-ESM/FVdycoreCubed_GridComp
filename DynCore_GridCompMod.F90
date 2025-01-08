@@ -6448,7 +6448,7 @@ end subroutine RUN
     real(r8), allocatable ::    thv(:,:,:)
     real(r8), allocatable ::    zle(:,:,:)
     real(r8), allocatable :: tempxy(:,:,:)
-    real(r8)              :: TMAX, QMAX
+    real(r8)              :: TMAX, TMIN
 
     real(r8), allocatable ::  logpl(:,:,:)
     real(r8), allocatable ::  logpe(:,:,:)
@@ -6679,11 +6679,11 @@ end subroutine RUN
 
     if (DEBUG_DYN) then  
        call MAPL_MaxMin('DYN: Q_AF_INC ', qv)
-       call MAPL_MaxMin('DYN: T_AF_INC ', tempxy, pmax=TMAX)
+       call MAPL_MaxMin('DYN: T_AF_INC ', tempxy, pmax=TMAX, pmin=TMIN)
        call MAPL_MaxMin('DYN: U_AF_INC ', ua)
        call MAPL_MaxMin('DYN: V_AF_INC ', va)
+       if (TMIN <= 130.0_r8) call Write_Profile(grid, tempxy, 'TAFINC')
        if (TMAX >= 350.0_r8) call Write_Profile(grid, tempxy, 'TAFINC')
-       if (TMAX >= 350.0_r8) call Write_Profile(grid,     qv, 'QAFINC')
     endif
 
     call FILLOUT3 (export, 'DELP'   , dp      , rc=status); VERIFY_(STATUS)

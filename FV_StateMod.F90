@@ -2545,9 +2545,9 @@ subroutine State_To_FV ( STATE )
 
   if ( ADJUST_DT ) then
     call range_check('U_S2F', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                      -280., 280., bad_range=bad_range_U)
+                      -200., 200., bad_range=bad_range_U)
     call range_check('V_S2F', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                      -280., 280., bad_range=bad_range_V)
+                      -200., 200., bad_range=bad_range_V)
     if ((bad_range_U .or. bad_range_V) .and. (ADJUST_DT)) then
        STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
        STATE%NSPLIT = MIN(2*FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT*1.25))
@@ -2622,7 +2622,7 @@ subroutine State_To_FV ( STATE )
 
      ! if ( DEBUG_DYN ) then
      !    call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-     !                      130., 350., bad_range=bad_range_T)
+     !                      150., 333., bad_range=bad_range_T)
      ! endif
 
 !------------
@@ -2666,9 +2666,9 @@ subroutine FV_To_State ( STATE )
   ! if ( DEBUG ) then
      ! D-Grid winds
      !call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-     !                  -280., 280., bad_range)
+     !                  -200., 200., bad_range)
      !call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-     !                  -280., 280., bad_range)
+     !                  -200., 200., bad_range)
      ! C-Grid accumlated courant numbers
      !courant_range =  FV_Atm(1)%flagstruct%n_split * FV_Atm(1)%flagstruct%k_split
      !call range_check('CX_F2S', real(FV_Atm(1)%cx(isc:iec+1,jsc:jec,:)/courant_range), isc, iec+1, jsc, jec, 0, km, FV_Atm(1)%gridstruct%agrid,   &
@@ -2697,7 +2697,7 @@ subroutine FV_To_State ( STATE )
 !-----------------------------------
      ! if ( DEBUG ) then
         ! call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-        !                   130., 333., bad_range)
+        !                   150., 333., bad_range)
      ! endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 
