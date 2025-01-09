@@ -7275,11 +7275,8 @@ end subroutine RunAddIncs
          if (TRIM(state%vars%tracer(n)%tname) == 'QSNOW'   ) nwat_tracers = nwat_tracers + 1
          if (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL') nwat_tracers = nwat_tracers + 1
        enddo
-       if (nwat_tracers >= 5) nwat = 1 ! STATE has QV only
-       if (.not. HYDROSTATIC) then
-          if (nwat_tracers >= 5) nwat = 3 ! STATE has QV, QLIQ, QICE
-          if (nwat_tracers == 8) nwat = 6 ! STATE has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
-       endif
+       if (nwat_tracers >= 5) nwat = 3 ! STATE has QV, QLIQ, QICE
+       if (nwat_tracers == 8) nwat = 6 ! STATE has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
     endif
     if (.not. ADIABATIC) then
        _ASSERT(nwat >= 1, 'expecting water species (nwat) to match')
@@ -7492,11 +7489,13 @@ end subroutine RunAddIncs
                       (Q(:,:,:,  sphum)                                  )*c_vap + &
                       (Q(:,:,:,liq_wat)+Q(:,:,:,rainwat)                 )*c_liq + &
                       (Q(:,:,:,ice_wat)+Q(:,:,:,snowwat)+Q(:,:,:,graupel))*c_ice
-       case default
+       case (3)
            CVM = (1.-( Q(:,:,:,  sphum)+Q(:,:,:,liq_wat)+Q(:,:,:,ice_wat) ) )*c_air + &
                       (Q(:,:,:,  sphum)                                     )*c_vap + &
                       (Q(:,:,:,liq_wat)                                     )*c_liq + &
                       (Q(:,:,:,ice_wat)                                     )*c_ice
+       case default
+           CVM = MAPL_CP
        end select
 
        ! Make previous PT into just T
