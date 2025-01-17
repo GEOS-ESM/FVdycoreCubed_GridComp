@@ -3637,14 +3637,13 @@ subroutine Run(gc, import, export, clock, rc)
              if ( (qqq%is_r4) .and. associated(qqq%content_r4) ) then
                 if (size(qv)==size(qqq%content_r4)) then
                    qv = qqq%content_r4
-                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              elseif (associated(qqq%content)) then
                 if (size(qv)==size(qqq%content)) then
                    qv = qqq%content
-                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              endif
+             _ASSERT(all(qv >= 0.0),'negative water vapor detected')
          endif
 
        enddo
@@ -4031,6 +4030,7 @@ subroutine Run(gc, import, export, clock, rc)
              else
                   qv = qqq%content
              endif
+             _ASSERT(all(qv >= 0.0),'negative water vapor detected')
          endif
       enddo
 
@@ -4203,14 +4203,13 @@ subroutine Run(gc, import, export, clock, rc)
              if ( (qqq%is_r4) .and. associated(qqq%content_r4) ) then
                 if (size(qv)==size(qqq%content_r4)) then
                    qv = qqq%content_r4
-                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              elseif (associated(qqq%content)) then
                 if (size(qv)==size(qqq%content)) then
                    qv = qqq%content
-                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              endif
+             _ASSERT(all(qv >= 0.0),'negative water vapor detected')
          endif
        enddo
       endif
@@ -4481,6 +4480,7 @@ subroutine Run(gc, import, export, clock, rc)
       else
          if (size(qv)==size(qqq%content)   ) qv = qqq%content
       endif
+      _ASSERT(all(qv >= 0.0),'negative water vapor detected')
     else
       qv = 0.0
     endif
@@ -5093,9 +5093,11 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Fill Surface and Near-Surface Variables
 ! ----------------------------------------------
-   call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT=50.0, RC=STATUS)
+                   HGT_SURFACE = 50.0
+   if (km .eq. 72) HGT_SURFACE =  0.0
+   call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT=HGT_SURFACE, RC=STATUS)
    VERIFY_(STATUS)
-   if ( (KM .ne. 72) .and. (HGT_SURFACE .gt. 0.0) ) then
+   if ( HGT_SURFACE .gt. 0.0 ) then
      ! Near surface height for surface
      ! -------------------------------
       call MAPL_GetPointer(export,temp2d,'DZ', rc=status)
@@ -6580,6 +6582,7 @@ end subroutine RUN
       elseif (associated(qqq%content)) then
        if (size(qv)==size(qqq%content)) qv = qqq%content
       endif
+      _ASSERT(all(qv >= 0.0),'negative water vapor detected')
     else
       qv = 0.0
     endif
@@ -6683,7 +6686,7 @@ end subroutine RUN
        call MAPL_MaxMin('DYN: U_AF_INC ', ua)
        call MAPL_MaxMin('DYN: V_AF_INC ', va)
        if (TMIN <= 130.0_r8) call Write_Profile(grid, tempxy, 'TAFINC')
-       if (TMAX >= 350.0_r8) call Write_Profile(grid, tempxy, 'TAFINC')
+       if (TMAX >= 333.0_r8) call Write_Profile(grid, tempxy, 'TAFINC')
     endif
 
     call FILLOUT3 (export, 'DELP'   , dp      , rc=status); VERIFY_(STATUS)
