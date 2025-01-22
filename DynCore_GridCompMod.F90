@@ -3643,7 +3643,7 @@ subroutine Run(gc, import, export, clock, rc)
                    qv = qqq%content
                 endif
              endif
-             _ASSERT(all(qv >= 0.0),'negative water vapor detected')
+             _ASSERT(all(qv >= 0.0),'Before AnaAddIncs: negative or nan water vapor detected')
          endif
 
        enddo
@@ -4030,7 +4030,7 @@ subroutine Run(gc, import, export, clock, rc)
              else
                   qv = qqq%content
              endif
-             _ASSERT(all(qv >= 0.0),'negative water vapor detected')
+             _ASSERT(all(qv >= 0.0),'After AnaAddIncs: negative or nan water vapor detected')
          endif
       enddo
 
@@ -4209,7 +4209,7 @@ subroutine Run(gc, import, export, clock, rc)
                    qv = qqq%content
                 endif
              endif
-             _ASSERT(all(qv >= 0.0),'negative water vapor detected')
+             _ASSERT(all(qv >= 0.0),'DYN_ANA: negative or nan water vapor detected')
          endif
        enddo
       endif
@@ -4480,7 +4480,7 @@ subroutine Run(gc, import, export, clock, rc)
       else
          if (size(qv)==size(qqq%content)   ) qv = qqq%content
       endif
-      _ASSERT(all(qv >= 0.0),'negative water vapor detected')
+      _ASSERT(all(qv >= 0.0),'After DynRun: negative or nan water vapor detected')
     else
       qv = 0.0
     endif
@@ -6582,7 +6582,7 @@ end subroutine RUN
       elseif (associated(qqq%content)) then
        if (size(qv)==size(qqq%content)) qv = qqq%content
       endif
-      _ASSERT(all(qv >= 0.0),'negative water vapor detected')
+      _ASSERT(all(qv >= 0.0),'RunAddIncs: negative or nan water vapor detected')
     else
       qv = 0.0
     endif
