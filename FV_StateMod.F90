@@ -447,10 +447,6 @@ contains
   call MAPL_GetResource( MAPL, INT_FV_OFF,      label='FV_OFF:'      , default=INT_FV_OFF, rc=status )
   VERIFY_(STATUS)
 
-  ! option to enable different configurations for FV3
-  call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='HWT', rc=status )
-  VERIFY_(STATUS)
-
   ! MAT The Fortran Standard, and thus gfortran, *does not allow* the use
   !     of if (integer). So, we must convert integer resources to logicals
 
@@ -491,6 +487,10 @@ contains
     hlv    = MAPL_ALHL     ! latent heat of evaporation
     zvir   = MAPL_RVAP/MAPL_RGAS - 1.   ! RWV/RAIR-1
 
+   ! option to enable different configurations for FV3
+    call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='STOCK', rc=status )
+    VERIFY_(STATUS)
+
 !
 ! Create some resolution dependent defaults for FV3 in GEOS...
 !    These can be overrided in fv_core_nml in fvcore_layout.rc linked to input.nml
@@ -499,7 +499,7 @@ contains
   ! when reading the tracer bundle in fv_first_run
    FV_Atm(1)%flagstruct%nwat = 0
   ! Trigger to enable autoconversion/cloud processes on the fv_mapz step
-   FV_Atm(1)%flagstruct%do_sat_adj = .false.
+   FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
   ! Veritical resolution dependencies
    FV_Atm(1)%flagstruct%external_eta = .true.
    if (FV_Atm(1)%flagstruct%npz >= 70) then
@@ -530,166 +530,168 @@ contains
      FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 32 ! ~5mb
    endif
+  ! Vertical remap options
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
-   if (FV_Atm(1)%flagstruct%npz == 72) then
-     FV_Atm(1)%flagstruct%gmao_remap = 0   ! GFDL Schemes
-   else
-     FV_Atm(1)%flagstruct%gmao_remap = 0   ! (0 for GFDL Schemes) (3 for GMAO Cubic)
-   endif
+   FV_Atm(1)%flagstruct%gmao_remap = 0   ! (0 for GFDL Schemes) (3 for GMAO Cubic)
    FV_Atm(1)%flagstruct%kord_tm =  9
    FV_Atm(1)%flagstruct%kord_mt =  9
    FV_Atm(1)%flagstruct%kord_wz =  9
    FV_Atm(1)%flagstruct%kord_tr =  9
-   FV_Atm(1)%flagstruct%z_tracer = .true.
   ! Some default horizontal flags
+   FV_Atm(1)%flagstruct%z_tracer = .true.
    FV_Atm(1)%flagstruct%adjust_dry_mass = fix_mass
    FV_Atm(1)%flagstruct%consv_am = .false.
    FV_Atm(1)%flagstruct%fill = .true.
    FV_Atm(1)%flagstruct%dwind_2d = .false.
    FV_Atm(1)%flagstruct%delt_max = 0.002
    FV_Atm(1)%flagstruct%ke_bg = 0.0
-  ! Rayleigh & Divergence Damping
-   if (index(FV3_CONFIG,"HWT") > 0) then
-     FV_Atm(1)%flagstruct%hydrostatic = .false.
-     FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
-     FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
-     FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
-     FV_Atm(1)%flagstruct%dz_min = 3.0
-     FV_Atm(1)%flagstruct%RF_fast = .true.
-     FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
-    ! 4th order default damping options
-     FV_Atm(1)%flagstruct%nord = 2
-     FV_Atm(1)%flagstruct%dddmp = 0.2
-     FV_Atm(1)%flagstruct%d4_bg = 0.12
-     FV_Atm(1)%flagstruct%d2_bg = 0.0
-     FV_Atm(1)%flagstruct%d_ext = 0.0
-    ! Sponge damping and TE conservation
-     FV_Atm(1)%flagstruct%n_sponge = 0
-     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.15
-     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.05
-     FV_Atm(1)%flagstruct%consv_te = 1.0
-   else
-     FV_Atm(1)%flagstruct%hydrostatic = .true.
-     FV_Atm(1)%flagstruct%fv_sg_adj = DT
-     FV_Atm(1)%flagstruct%RF_fast = .false.
-     FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
-    ! 4th order default damping options
-     FV_Atm(1)%flagstruct%nord = 2
-     FV_Atm(1)%flagstruct%dddmp = 0.2
-     FV_Atm(1)%flagstruct%d4_bg = 0.12
-     FV_Atm(1)%flagstruct%d2_bg = 0.0
-     FV_Atm(1)%flagstruct%d_ext = 0.0
-     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
-     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
-     FV_Atm(1)%flagstruct%consv_te = 1.0
-   endif
   ! Some default time-splitting options
-   FV_Atm(1)%flagstruct%n_split = 0
    FV_Atm(1)%flagstruct%k_split = 1
-  ! default NonHydrostatic settings (irrelavent to Hydrostatic)
-   ! a_imp > 0.5 for semi-implicit scheme [1 fully backward]
-   ! if (a_imp > 0.5) beta + a_imp must = 1.0
-   FV_Atm(1)%flagstruct%beta = 0.0
-   FV_Atm(1)%flagstruct%a_imp = 1.0
-   ! p_fac is a NH pressure fraction limiter near model top (0:0.25) 
-   FV_Atm(1)%flagstruct%p_fac = 0.125
+   FV_Atm(1)%flagstruct%n_split = 0
   ! Cubed-Sphere Global Resolution Specific adjustments
+   FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
+   FV_Atm(1)%flagstruct%hydrostatic = .true.
+   FV_Atm(1)%flagstruct%tau = 5.0
+   FV_Atm(1)%flagstruct%RF_fast = .false.
    if (FV_Atm(1)%flagstruct%ntiles == 6) then
      ! Cubed-sphere grid resolution and DT dependence
      !              based on ideal remapping DT
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 12) then
+         FV_Atm(1)%flagstruct%hydrostatic = .true.
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
          FV_Atm(1)%flagstruct%tau = 5.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 24) then
+         FV_Atm(1)%flagstruct%hydrostatic = .true.
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
          FV_Atm(1)%flagstruct%tau = 5.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
+         FV_Atm(1)%flagstruct%hydrostatic = .true.
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
          FV_Atm(1)%flagstruct%tau = 5.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
+         FV_Atm(1)%flagstruct%hydrostatic = .true.
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
          FV_Atm(1)%flagstruct%tau = 5.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
+         FV_Atm(1)%flagstruct%hydrostatic = .true.
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
          FV_Atm(1)%flagstruct%tau = 5.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
+         FV_Atm(1)%flagstruct%hydrostatic = .false.
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
          FV_Atm(1)%flagstruct%tau = 4.0
+         FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 120.0 )
           FV_Atm(1)%flagstruct%tau = 3.0
+          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1120) then
+          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 100.0 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  90.0 )
           FV_Atm(1)%flagstruct%tau = 2.5
+          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
+          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
           FV_Atm(1)%flagstruct%tau = 2.0
+          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
+          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )
           FV_Atm(1)%flagstruct%tau = 1.5
+          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
+          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125)
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
           FV_Atm(1)%flagstruct%tau = 1.0
+          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
+          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.5 )
           FV_Atm(1)%flagstruct%tau = 1.0
+          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 10800) then
+          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375)
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  3.25)
           FV_Atm(1)%flagstruct%tau = 1.0
+          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
-      ! Monotonic defaults
+     ! Rayleigh Damping & Divergence Damping
+      FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
+     ! 6th order divergence default damping options
+      FV_Atm(1)%flagstruct%nord = 2
+      FV_Atm(1)%flagstruct%dddmp = 0.2  ! Smagorinsky damping
+      FV_Atm(1)%flagstruct%d4_bg = 0.12
+      FV_Atm(1)%flagstruct%d2_bg = 0.0
+      FV_Atm(1)%flagstruct%d_ext = 0.0  ! External damping
+     ! Local Richardson-number turbulent mixing 
+      FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
+     ! Sponge layer
+      FV_Atm(1)%flagstruct%n_sponge = 0
+      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.175
+      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.050
+      FV_Atm(1)%flagstruct%consv_te = 1.0
+     ! default NonHydrostatic settings (irrelavent to Hydrostatic)
+     ! a_imp > 0.5 for semi-implicit scheme [1 fully backward]
+     ! if (a_imp > 0.5) beta + a_imp must = 1.0
+      FV_Atm(1)%flagstruct%beta = 0.0
+      FV_Atm(1)%flagstruct%a_imp = 1.0
+     ! dz_min is a NH delta-z limiter increasing may improve stability
+      FV_Atm(1)%flagstruct%dz_min = 3.0
+     ! p_fac is a NH pressure fraction limiter near model top (0:0.25) 
+      FV_Atm(1)%flagstruct%p_fac = 0.125
+     ! General defaults
       FV_Atm(1)%flagstruct%make_nh = .false.
      ! This is the best/fastest option for tracers
       FV_Atm(1)%flagstruct%hord_tr =  8
       if (index(FV3_CONFIG,"MONOTONIC") > 0) then
-         ! Monotonic advection schemes
+        ! Monotonic advection schemes
          FV_Atm(1)%flagstruct%hord_mt =  10
          FV_Atm(1)%flagstruct%hord_vt =  10
          FV_Atm(1)%flagstruct%hord_tm =  10
          FV_Atm(1)%flagstruct%hord_dp =  10
-         ! disable vorticity damping
+        ! disable hyperdiffusion (vorticity damping)
          FV_Atm(1)%flagstruct%vtdm4 = 0.0
          FV_Atm(1)%flagstruct%do_vort_damp = .false.
          FV_Atm(1)%flagstruct%d_con = 0.
       else
-      ! Non-Monotonic advection
-         if (index(FV3_CONFIG,"HWT") > 0) then
-           FV_Atm(1)%flagstruct%hord_mt =  6
-           FV_Atm(1)%flagstruct%hord_vt =  6
-           FV_Atm(1)%flagstruct%hord_tm =  6
-           FV_Atm(1)%flagstruct%hord_dp = -6
-         else
-           FV_Atm(1)%flagstruct%hord_mt =  5
-           FV_Atm(1)%flagstruct%hord_vt =  6
-           FV_Atm(1)%flagstruct%hord_tm =  6
-           FV_Atm(1)%flagstruct%hord_dp = -6
-         endif
-       ! Must now include explicit vorticity damping
+       ! Non-Monotonic advection schemes
+         FV_Atm(1)%flagstruct%hord_mt =  6
+         FV_Atm(1)%flagstruct%hord_vt =  6
+         FV_Atm(1)%flagstruct%hord_tm =  6
+         FV_Atm(1)%flagstruct%hord_dp = -6
+       ! Must now include hyperdiffusion (vorticity damping)
          FV_Atm(1)%flagstruct%d_con = 1.
          FV_Atm(1)%flagstruct%do_vort_damp = .true.
          FV_Atm(1)%flagstruct%vtdm4 = 0.01
-     ! continue to adjust vorticity damping with
-     ! increasing resolution
+       ! continue to adjust vorticity damping with
+       ! increasing resolution
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
@@ -2691,7 +2693,11 @@ subroutine FV_To_State ( STATE )
 ! Copy updated FV data to internal state
     STATE%VARS%U(:,:,:) = FV_Atm(1)%u(isc:iec,jsc:jec,:)
     STATE%VARS%V(:,:,:) = FV_Atm(1)%v(isc:iec,jsc:jec,:)
-    if (.not. FV_Atm(1)%flagstruct%hydrostatic) STATE%VARS%W = FV_Atm(1)%w(isc:iec,jsc:jec,:)
+    if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
+       STATE%VARS%W = FV_Atm(1)%w(isc:iec,jsc:jec,:)
+    else
+       STATE%VARS%W = 0.0
+    endif
 
     if (SW_DYNAMICS) then
        STATE%VARS%PE(:,:,1) = FV_Atm(1)%phis(isc:iec,jsc:jec)
@@ -2715,7 +2721,11 @@ subroutine FV_To_State ( STATE )
 !------------------------------
 ! Get delz from FV3
 !------------------------------
-       if (.not. FV_Atm(1)%flagstruct%hydrostatic) STATE%VARS%DZ = FV_Atm(1)%delz(isc:iec,jsc:jec,:)
+       if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
+          STATE%VARS%DZ = FV_Atm(1)%delz(isc:iec,jsc:jec,:)
+       else
+          STATE%VARS%DZ = 0.0
+       endif
 
 !--------------------------------
 ! Get pkz from FV3
