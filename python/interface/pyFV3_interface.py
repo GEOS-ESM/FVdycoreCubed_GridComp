@@ -1,17 +1,15 @@
+from __future__ import annotations
 import os
-from f_py_conversion import FortranPythonConversion
+from f_py_conversion import FortranPythonConversion, PythonArray
 from cuda_profiler import CUDAProfiler, TimedCUDAProfiler
 from mpi4py import MPI
 from ndsl.optional_imports import cupy as cp
 import numpy as np
 from ndsl.dsl.gt4py_utils import is_gpu_backend
-from typing import TYPE_CHECKING
+from typing import Dict
 from pyFV3_wrapper import GeosDycoreWrapper, MemorySpace
 from fv_flags import FVFlags
-
-
-if TYPE_CHECKING:
-    import cffi
+import cffi
 
 
 class PYFV3_WRAPPER:
@@ -32,8 +30,8 @@ class PYFV3_WRAPPER:
         jsd: int,
         jed: int,
         tracer_count: int,
-        ak_cdata: "cffi.FFI.CData",
-        bk_cdata: "cffi.FFI.CData",
+        ak_cdata: cffi.FFI.CData,
+        bk_cdata: cffi.FFI.CData,
         backend: str = "dace:gpu",
     ) -> None:
         self.rank = comm.Get_rank()
@@ -93,35 +91,35 @@ class PYFV3_WRAPPER:
         layout_1,
         layout_2,
         adiabatic,
-        u: "cffi.FFI.CData",
-        v: "cffi.FFI.CData",
-        w: "cffi.FFI.CData",
-        delz: "cffi.FFI.CData",
-        pt: "cffi.FFI.CData",
-        delp: "cffi.FFI.CData",
-        q: "cffi.FFI.CData",
-        ps: "cffi.FFI.CData",
-        pe: "cffi.FFI.CData",
-        pk: "cffi.FFI.CData",
-        peln: "cffi.FFI.CData",
-        pkz: "cffi.FFI.CData",
-        phis: "cffi.FFI.CData",
-        q_con: "cffi.FFI.CData",
-        omga: "cffi.FFI.CData",
-        ua: "cffi.FFI.CData",
-        va: "cffi.FFI.CData",
-        uc: "cffi.FFI.CData",
-        vc: "cffi.FFI.CData",
-        mfx: "cffi.FFI.CData",
-        mfy: "cffi.FFI.CData",
-        cx: "cffi.FFI.CData",
-        cy: "cffi.FFI.CData",
-        diss_est: "cffi.FFI.CData",
+        u: cffi.FFI.CData,
+        v: cffi.FFI.CData,
+        w: cffi.FFI.CData,
+        delz: cffi.FFI.CData,
+        pt: cffi.FFI.CData,
+        delp: cffi.FFI.CData,
+        q: cffi.FFI.CData,
+        ps: cffi.FFI.CData,
+        pe: cffi.FFI.CData,
+        pk: cffi.FFI.CData,
+        peln: cffi.FFI.CData,
+        pkz: cffi.FFI.CData,
+        phis: cffi.FFI.CData,
+        q_con: cffi.FFI.CData,
+        omga: cffi.FFI.CData,
+        ua: cffi.FFI.CData,
+        va: cffi.FFI.CData,
+        uc: cffi.FFI.CData,
+        vc: cffi.FFI.CData,
+        mfx: cffi.FFI.CData,
+        mfy: cffi.FFI.CData,
+        cx: cffi.FFI.CData,
+        cy: cffi.FFI.CData,
+        diss_est: cffi.FFI.CData,
     ):
         CUDAProfiler.start_cuda_profiler()
         with TimedCUDAProfiler("Fortran -> Python", self._timings):
             # Convert Fortran arrays to NumPy
-            state_in = self.f_py.fortran_to_python(
+            state_in: Dict[str, PythonArray] = self.f_py.fortran_to_python(
                 # input
                 u,
                 v,
@@ -241,69 +239,65 @@ def pyfv3_run(
     layout_1,
     layout_2,
     adiabatic,
-    u: "cffi.FFI.CData",
-    v: "cffi.FFI.CData",
-    w: "cffi.FFI.CData",
-    delz: "cffi.FFI.CData",
-    pt: "cffi.FFI.CData",
-    delp: "cffi.FFI.CData",
-    q: "cffi.FFI.CData",
-    ps: "cffi.FFI.CData",
-    pe: "cffi.FFI.CData",
-    pk: "cffi.FFI.CData",
-    peln: "cffi.FFI.CData",
-    pkz: "cffi.FFI.CData",
-    phis: "cffi.FFI.CData",
-    q_con: "cffi.FFI.CData",
-    omga: "cffi.FFI.CData",
-    ua: "cffi.FFI.CData",
-    va: "cffi.FFI.CData",
-    uc: "cffi.FFI.CData",
-    vc: "cffi.FFI.CData",
-    ak: "cffi.FFI.CData",
-    bk: "cffi.FFI.CData",
-    mfx: "cffi.FFI.CData",
-    mfy: "cffi.FFI.CData",
-    cx: "cffi.FFI.CData",
-    cy: "cffi.FFI.CData",
-    diss_est: "cffi.FFI.CData",
+    u: cffi.FFI.CData,
+    v: cffi.FFI.CData,
+    w: cffi.FFI.CData,
+    delz: cffi.FFI.CData,
+    pt: cffi.FFI.CData,
+    delp: cffi.FFI.CData,
+    q: cffi.FFI.CData,
+    ps: cffi.FFI.CData,
+    pe: cffi.FFI.CData,
+    pk: cffi.FFI.CData,
+    peln: cffi.FFI.CData,
+    pkz: cffi.FFI.CData,
+    phis: cffi.FFI.CData,
+    q_con: cffi.FFI.CData,
+    omga: cffi.FFI.CData,
+    ua: cffi.FFI.CData,
+    va: cffi.FFI.CData,
+    uc: cffi.FFI.CData,
+    vc: cffi.FFI.CData,
+    mfx: cffi.FFI.CData,
+    mfy: cffi.FFI.CData,
+    cx: cffi.FFI.CData,
+    cy: cffi.FFI.CData,
+    diss_est: cffi.FFI.CData,
 ):
     global WRAPPER
     if not WRAPPER:
         raise RuntimeError("[GEOS WRAPPER] Bad init, did you call init?")
     WRAPPER(
-        ng,
-        ptop,
-        ks,
-        layout_1,
-        layout_2,
-        adiabatic,
-        u,
-        v,
-        w,
-        delz,
-        pt,
-        delp,
-        q,
-        ps,
-        pe,
-        pk,
-        peln,
-        pkz,
-        phis,
-        q_con,
-        omga,
-        ua,
-        va,
-        uc,
-        vc,
-        ak,
-        bk,
-        mfx,
-        mfy,
-        cx,
-        cy,
-        diss_est,
+        ng=ng,
+        ptop=ptop,
+        ks=ks,
+        layout_1=layout_1,
+        layout_2=layout_2,
+        adiabatic=adiabatic,
+        u=u,
+        v=v,
+        w=w,
+        delz=delz,
+        pt=pt,
+        delp=delp,
+        q=q,
+        ps=ps,
+        pe=pe,
+        pk=pk,
+        peln=peln,
+        pkz=pkz,
+        phis=phis,
+        q_con=q_con,
+        omga=omga,
+        ua=ua,
+        va=va,
+        uc=uc,
+        vc=vc,
+        mfx=mfx,
+        mfy=mfy,
+        cx=cx,
+        cy=cy,
+        diss_est=diss_est,
     )
 
 
@@ -329,8 +323,8 @@ def pyfv3_init(
     jed: int,
     bdt,
     nq_tot: int,
-    ak: "cffi.FFI.CData",
-    bk: "cffi.FFI.CData",
+    ak: cffi.FFI.CData,
+    bk: cffi.FFI.CData,
 ):
     # Read in the backend
     BACKEND = os.environ.get("GEOS_PYFV3_BACKEND", "gt:gpu")
