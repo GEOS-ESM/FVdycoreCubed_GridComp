@@ -1,3 +1,4 @@
+from __future__ import annotations
 import cffi
 import numpy as np
 from math import prod
@@ -9,6 +10,20 @@ from ndsl.optional_imports import cupy as cp
 
 DeviceArray = cp.ndarray if cp else None
 PythonArray = Union[np.ndarray, (cp.ndarray if cp else None)]
+
+
+class NullStream:
+    def __init__(self):
+        pass
+
+    def synchronize(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        pass
 
 
 class FortranPythonConversion:
@@ -43,7 +58,10 @@ class FortranPythonConversion:
         if self._python_targets_gpu:
             self._stream_A = cp.cuda.Stream(non_blocking=True)
             self._stream_B = cp.cuda.Stream(non_blocking=True)
-            self._current_stream = self._stream_A
+        else:
+            self._stream_A = NullStream()
+            self._stream_B = NullStream()
+        self._current_stream = self._stream_A
 
         # Layout & indexing
         self._npx, self._npy, self._npz = npx, npy, npz
@@ -66,7 +84,7 @@ class FortranPythonConversion:
 
     def _fortran_to_numpy(
         self,
-        fptr: "cffi.FFI.CData",
+        fptr: cffi.FFI.CData,
         dim: List[int],
     ) -> np.ndarray:
         """
@@ -137,30 +155,30 @@ class FortranPythonConversion:
     def fortran_to_python(
         self,
         # input
-        u_ptr: "cffi.FFI.CData",
-        v_ptr: "cffi.FFI.CData",
-        w_ptr: "cffi.FFI.CData",
-        delz_ptr: "cffi.FFI.CData",
-        pt_ptr: "cffi.FFI.CData",
-        delp_ptr: "cffi.FFI.CData",
-        q_ptr: "cffi.FFI.CData",
-        ps_ptr: "cffi.FFI.CData",
-        pe_ptr: "cffi.FFI.CData",
-        pk_ptr: "cffi.FFI.CData",
-        peln_ptr: "cffi.FFI.CData",
-        pkz_ptr: "cffi.FFI.CData",
-        phis_ptr: "cffi.FFI.CData",
-        q_con_ptr: "cffi.FFI.CData",
-        omga_ptr: "cffi.FFI.CData",
-        ua_ptr: "cffi.FFI.CData",
-        va_ptr: "cffi.FFI.CData",
-        uc_ptr: "cffi.FFI.CData",
-        vc_ptr: "cffi.FFI.CData",
-        mfxd_ptr: "cffi.FFI.CData",
-        mfyd_ptr: "cffi.FFI.CData",
-        cxd_ptr: "cffi.FFI.CData",
-        cyd_ptr: "cffi.FFI.CData",
-        diss_estd_ptr: "cffi.FFI.CData",
+        u_ptr: cffi.FFI.CData,
+        v_ptr: cffi.FFI.CData,
+        w_ptr: cffi.FFI.CData,
+        delz_ptr: cffi.FFI.CData,
+        pt_ptr: cffi.FFI.CData,
+        delp_ptr: cffi.FFI.CData,
+        q_ptr: cffi.FFI.CData,
+        ps_ptr: cffi.FFI.CData,
+        pe_ptr: cffi.FFI.CData,
+        pk_ptr: cffi.FFI.CData,
+        peln_ptr: cffi.FFI.CData,
+        pkz_ptr: cffi.FFI.CData,
+        phis_ptr: cffi.FFI.CData,
+        q_con_ptr: cffi.FFI.CData,
+        omga_ptr: cffi.FFI.CData,
+        ua_ptr: cffi.FFI.CData,
+        va_ptr: cffi.FFI.CData,
+        uc_ptr: cffi.FFI.CData,
+        vc_ptr: cffi.FFI.CData,
+        mfxd_ptr: cffi.FFI.CData,
+        mfyd_ptr: cffi.FFI.CData,
+        cxd_ptr: cffi.FFI.CData,
+        cyd_ptr: cffi.FFI.CData,
+        diss_estd_ptr: cffi.FFI.CData,
     ):
         """
         Convert Fortran arrays pointed to by *_ptr to NumPy arrays
@@ -305,7 +323,7 @@ class FortranPythonConversion:
     def _python_to_fortran_trf(
         self,
         array: PythonArray,
-        fptr: "cffi.FFI.CData",
+        fptr: cffi.FFI.CData,
         ptr_offset: int = 0,
         swap_axes: Optional[Tuple[int, int]] = None,
     ) -> np.ndarray:
@@ -328,30 +346,30 @@ class FortranPythonConversion:
         # input
         python_state: Dict[str, PythonArray],
         # output
-        u_ptr: "cffi.FFI.CData",
-        v_ptr: "cffi.FFI.CData",
-        w_ptr: "cffi.FFI.CData",
-        delz_ptr: "cffi.FFI.CData",
-        pt_ptr: "cffi.FFI.CData",
-        delp_ptr: "cffi.FFI.CData",
-        q_ptr: "cffi.FFI.CData",
-        ps_ptr: "cffi.FFI.CData",
-        pe_ptr: "cffi.FFI.CData",
-        pk_ptr: "cffi.FFI.CData",
-        peln_ptr: "cffi.FFI.CData",
-        pkz_ptr: "cffi.FFI.CData",
-        phis_ptr: "cffi.FFI.CData",
-        q_con_ptr: "cffi.FFI.CData",
-        omga_ptr: "cffi.FFI.CData",
-        ua_ptr: "cffi.FFI.CData",
-        va_ptr: "cffi.FFI.CData",
-        uc_ptr: "cffi.FFI.CData",
-        vc_ptr: "cffi.FFI.CData",
-        mfxd_ptr: "cffi.FFI.CData",
-        mfyd_ptr: "cffi.FFI.CData",
-        cxd_ptr: "cffi.FFI.CData",
-        cyd_ptr: "cffi.FFI.CData",
-        diss_estd_ptr: "cffi.FFI.CData",
+        u_ptr: cffi.FFI.CData,
+        v_ptr: cffi.FFI.CData,
+        w_ptr: cffi.FFI.CData,
+        delz_ptr: cffi.FFI.CData,
+        pt_ptr: cffi.FFI.CData,
+        delp_ptr: cffi.FFI.CData,
+        q_ptr: cffi.FFI.CData,
+        ps_ptr: cffi.FFI.CData,
+        pe_ptr: cffi.FFI.CData,
+        pk_ptr: cffi.FFI.CData,
+        peln_ptr: cffi.FFI.CData,
+        pkz_ptr: cffi.FFI.CData,
+        phis_ptr: cffi.FFI.CData,
+        q_con_ptr: cffi.FFI.CData,
+        omga_ptr: cffi.FFI.CData,
+        ua_ptr: cffi.FFI.CData,
+        va_ptr: cffi.FFI.CData,
+        uc_ptr: cffi.FFI.CData,
+        vc_ptr: cffi.FFI.CData,
+        mfxd_ptr: cffi.FFI.CData,
+        mfyd_ptr: cffi.FFI.CData,
+        cxd_ptr: cffi.FFI.CData,
+        cyd_ptr: cffi.FFI.CData,
+        diss_estd_ptr: cffi.FFI.CData,
     ) -> None:
         """
         dp->sp, transpose, swap axes, numpy -> fortran

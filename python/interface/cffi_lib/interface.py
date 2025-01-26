@@ -58,7 +58,6 @@ def pyfv3_interface_py_run(
     ps, pe, pk, peln, pkz,
     phis, q_con, omga,
     ua, va, uc, vc,
-    ak, bk,
     mfx, mfy, cx, cy, diss_est) -> int:
 
     # comm_c -> comm_py
@@ -78,7 +77,6 @@ def pyfv3_interface_py_run(
             ps, pe, pk, peln, pkz,
             phis, q_con, omga,
             ua, va, uc, vc,
-            ak, bk,
             mfx, mfy, cx, cy, diss_est)
     except Exception as err:
         print("Error in Python:")
@@ -96,9 +94,7 @@ def pyfv3_interface_py_finalize() -> int:
         return -1
     return 0
 
-""".format(
-    TMPFILEBASE, _mpi_comm_t, _mpi_comm_t
-)
+""".format(TMPFILEBASE, _mpi_comm_t, _mpi_comm_t)
 
 with open("fv_flags.h") as f:
     data = "".join([line for line in f if not line.startswith("#")])

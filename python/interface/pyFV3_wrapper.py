@@ -36,6 +36,18 @@ from ndsl.logging import ndsl_log
 from ndsl.optional_imports import cupy as cp
 from ndsl.utils import safe_assign_array
 from fv_flags import FVFlags, FVFlags_to_DycoreConfig
+from ndsl.comm.mpi import MPIComm
+from pyFV3.tracers import Tracers
+
+TRACERS_IN_FORTRAN = [
+    "vapor",
+    "liquid",
+    "ice",
+    "rain",
+    "snow",
+    "graupel",
+    "cloud",
+]
 
 
 class StencilBackendCompilerOverride:
@@ -112,9 +124,9 @@ class GeosDycoreWrapper:
         fortran_mem_space: MemorySpace = MemorySpace.HOST,
     ):
         # pyFV3 does not support any tracers
-        if tracer_count != 7:
+        if tracer_count < 7:
             raise NotImplementedError(
-                "pyFV3 requires exactly 7 tracers to be advected,"
+                "pyFV3 requires more than 7 tracers to be advected,"
                 f" {tracer_count} given. Abort."
             )
 
@@ -122,6 +134,7 @@ class GeosDycoreWrapper:
         single_rank_override = int(os.getenv("GEOS_PYFV3_SINGLE_RANK_OVERRIDE", -1))
         if single_rank_override >= 0:
             comm = NullComm(single_rank_override, 6, 42)
+        comm = MPIComm()
 
         # Make a custom performance collector for the GEOS wrapper
         self.perf_collector = PerformanceCollector("GEOS wrapper", comm)
@@ -192,8 +205,13 @@ class GeosDycoreWrapper:
             config=stencil_config, grid_indexing=self._grid_indexing
         )
 
+        tracer_names = TRACERS_IN_FORTRAN + [
+            f"Tracer_{idx}" for idx in range(tracer_count - len(TRACERS_IN_FORTRAN))
+        ]
+
         self.dycore_state = pyFV3.DycoreState.init_zeros(
-            quantity_factory=quantity_factory
+            quantity_factory=quantity_factory,
+            tracer_list=tracer_names,
         )
         self.dycore_state.bdt = self.dycore_config.dt_atmos
 
@@ -210,6 +228,7 @@ class GeosDycoreWrapper:
                 timestep=timedelta(seconds=self.dycore_state.bdt),
                 phis=self.dycore_state.phis,
                 state=self.dycore_state,
+                exclude_tracers=[],
             )
 
         self._fortran_mem_space = fortran_mem_space
@@ -390,13 +409,18 @@ class GeosDycoreWrapper:
 
         # tracer quantities should be a 4d array in order:
         # vapor, liquid, ice, rain, snow, graupel, cloud
-        safe_assign_array(state.qvapor.view[:], q[isc:iec, jsc:jec, :, 0])
-        safe_assign_array(state.qliquid.view[:], q[isc:iec, jsc:jec, :, 1])
-        safe_assign_array(state.qice.view[:], q[isc:iec, jsc:jec, :, 2])
-        safe_assign_array(state.qrain.view[:], q[isc:iec, jsc:jec, :, 3])
-        safe_assign_array(state.qsnow.view[:], q[isc:iec, jsc:jec, :, 4])
-        safe_assign_array(state.qgraupel.view[:], q[isc:iec, jsc:jec, :, 5])
-        safe_assign_array(state.qcld.view[:], q[isc:iec, jsc:jec, :, 6])
+        safe_assign_array(state.tracers["vapor"].view[:], q[isc:iec, jsc:jec, :, 0])
+        safe_assign_array(state.tracers["liquid"].view[:], q[isc:iec, jsc:jec, :, 1])
+        safe_assign_array(state.tracers["ice"].view[:], q[isc:iec, jsc:jec, :, 2])
+        safe_assign_array(state.tracers["rain"].view[:], q[isc:iec, jsc:jec, :, 3])
+        safe_assign_array(state.tracers["snow"].view[:], q[isc:iec, jsc:jec, :, 4])
+        safe_assign_array(state.tracers["graupel"].view[:], q[isc:iec, jsc:jec, :, 5])
+        safe_assign_array(state.tracers["cloud"].view[:], q[isc:iec, jsc:jec, :, 6])
+        for q_index in range(7, state.tracers.count):
+            q_index_shift = q_index - 7
+            state.tracers[f"Tracer_{q_index_shift}"] = q[
+                isc:iec, jsc:jec, :, q_index_shift
+            ]
 
         return state
 
@@ -474,25 +498,32 @@ class GeosDycoreWrapper:
             )
 
             safe_assign_array(
-                output_dict["qvapor"], self.dycore_state.qvapor.data[:-1, :-1, :-1]
+                output_dict["qvapor"],
+                self.dycore_state.tracers["vapor"].data[:-1, :-1, :-1],
             )
             safe_assign_array(
-                output_dict["qliquid"], self.dycore_state.qliquid.data[:-1, :-1, :-1]
+                output_dict["qliquid"],
+                self.dycore_state.tracers["liquid"].data[:-1, :-1, :-1],
             )
             safe_assign_array(
-                output_dict["qice"], self.dycore_state.qice.data[:-1, :-1, :-1]
+                output_dict["qice"],
+                self.dycore_state.tracers["ice"].data[:-1, :-1, :-1],
             )
             safe_assign_array(
-                output_dict["qrain"], self.dycore_state.qrain.data[:-1, :-1, :-1]
+                output_dict["qrain"],
+                self.dycore_state.tracers["rain"].data[:-1, :-1, :-1],
             )
             safe_assign_array(
-                output_dict["qsnow"], self.dycore_state.qsnow.data[:-1, :-1, :-1]
+                output_dict["qsnow"],
+                self.dycore_state.tracers["snow"].data[:-1, :-1, :-1],
             )
             safe_assign_array(
-                output_dict["qgraupel"], self.dycore_state.qgraupel.data[:-1, :-1, :-1]
+                output_dict["qgraupel"],
+                self.dycore_state.tracers["graupel"].data[:-1, :-1, :-1],
             )
             safe_assign_array(
-                output_dict["qcld"], self.dycore_state.qcld.data[:-1, :-1, :-1]
+                output_dict["qcld"],
+                self.dycore_state.tracers["cloud"].data[:-1, :-1, :-1],
             )
         else:
             output_dict["u"] = self.dycore_state.u.data[:-1, :, :-1]
