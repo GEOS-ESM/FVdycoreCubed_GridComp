@@ -533,6 +533,8 @@ contains
   ! Vertical remap options
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
    FV_Atm(1)%flagstruct%gmao_remap = 0   ! (0 for GFDL Schemes) (3 for GMAO Cubic)
+   FV_Atm(1)%flagstruct%gmao_top_bc = .true.
+   FV_Atm(1)%flagstruct%gmao_bot_bc = .true.
    FV_Atm(1)%flagstruct%kord_tm =  9
    FV_Atm(1)%flagstruct%kord_mt =  9
    FV_Atm(1)%flagstruct%kord_wz =  9
@@ -663,7 +665,7 @@ contains
       FV_Atm(1)%flagstruct%beta = 0.0
       FV_Atm(1)%flagstruct%a_imp = 1.0
      ! dz_min is a NH delta-z limiter increasing may improve stability
-      FV_Atm(1)%flagstruct%dz_min = 3.0
+      FV_Atm(1)%flagstruct%dz_min = 6.0
      ! p_fac is a NH pressure fraction limiter near model top (0:0.25) 
       FV_Atm(1)%flagstruct%p_fac = 0.125
      ! General defaults
