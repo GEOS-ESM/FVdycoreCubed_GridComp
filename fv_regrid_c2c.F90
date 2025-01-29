@@ -769,7 +769,8 @@ contains
                   call map_scalar( km, pe0d, ud(is:ie,j,1:km),    &
                                   npz, pe1d, qn1,                 &
                                   dpe0, dpe1, is, ie,             &
-                                  j,  is, ie, j, j, -1, kord(ikord_mt), -1.e25 )
+                                  j,  is, ie, j, j, -1, kord(ikord_mt), -1.e25, &
+                        optional_top=.true., optional_bot=.true.)
                   do k=1,npz
                      do i=is,ie
                         ut(i,j,k) = qn1(i,k)
@@ -801,7 +802,8 @@ contains
                   call map_scalar( km, pe0d, vd(is:ie,j,1:km),    &
                                   npz, pe1d, qn1,                 &
                                   dpe0, dpe1, is, ie,             &
-                                  j,  is, ie, j, j, -1, kord(ikord_mt), -1.e25 )
+                                  j,  is, ie, j, j, -1, kord(ikord_mt), -1.e25, &
+                        optional_top=.true., optional_bot=.true.)
                   do k=1,npz
                      do i=is,ie
                         vt(i,j,k) = qn1(i,k)
