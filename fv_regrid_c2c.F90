@@ -55,15 +55,15 @@ module fv_regrid_c2c
       module procedure read_topo_file_r4
       module procedure read_topo_file_r8
    end interface
-                        
+
 contains
-                        
+
    subroutine read_topo_file_r4(fname,output,grid,rc)
       character(len=*), intent(in) :: fname
       type(ESMF_Grid), intent(in) :: grid
       real(REAL32), intent(inout) :: output(:,:)
       integer, intent(out), optional :: rc
-      
+
       integer :: status,dims(3),funit
       integer :: rank
       type(ESMF_VM) :: vm
@@ -89,7 +89,7 @@ contains
       type(ESMF_Grid), intent(in) :: grid
       real(REAL64), intent(inout) :: output(:,:)
       integer, intent(out), optional :: rc
-      
+
       integer :: status,dims(3),funit
       real, allocatable :: input(:,:)
       integer :: rank
@@ -104,7 +104,7 @@ contains
          open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
          _VERIFY(status)
          read(funit)input
-         input_r8 = input      
+         input_r8 = input
       else
          allocate(input(0,0),input_r8(0,0))
       end if
@@ -189,7 +189,7 @@ contains
       character(len=:), pointer :: var_name
       type(StringVariableMap), pointer :: variables
       type(Variable), pointer :: myVariable
-      type(StringVector) :: all_moist_vars 
+      type(StringVector) :: all_moist_vars
       type(StringVector), pointer :: var_dimensions
       type(StringVectorIterator) :: siter
       type(StringVector) :: moist_variables
@@ -211,7 +211,7 @@ contains
       isd_i = Atm_i(1)%bd%isd
       ied_i = Atm_i(1)%bd%ied
       jsd_i = Atm_i(1)%bd%jsd
-      jed_i = Atm_i(1)%bd%jed      
+      jed_i = Atm_i(1)%bd%jed
       is_i  = Atm_i(1)%bd%is
       ie_i  = Atm_i(1)%bd%ie
       js_i  = Atm_i(1)%bd%js
@@ -228,9 +228,9 @@ contains
       jsd = Atm(1)%bd%jsd
       jed = Atm(1)%bd%jed
       is  = Atm(1)%bd%is
-      ie  = Atm(1)%bd%ie 
-      js  = Atm(1)%bd%js 
-      je  = Atm(1)%bd%je 
+      ie  = Atm(1)%bd%ie
+      js  = Atm(1)%bd%js
+      je  = Atm(1)%bd%je
       ng  = Atm(1)%ng
 
 ! Zero out all initial tracer fields:
@@ -265,7 +265,7 @@ contains
 
          if( is_master() ) then
            print *
-           write(*,*) 'Input Vertical Grid'     
+           write(*,*) 'Input Vertical Grid'
            write(*,*) '--------------------'
            write(6,100)
 100           format(2x,' k ','      A(k)    ',2x,' B(k)   ',2x,'  Pref    ',2x,'  DelP',/, &
@@ -283,7 +283,7 @@ contains
 
 ! Read U
          allocate (  u0(isd_i:ied_i,jsd_i:jed_i+1,km) )
-         u0(:,:,:) = 0.0 
+         u0(:,:,:) = 0.0
          do k=1,km
             call MAPL_VarRead(formatter,"U",u0(is_i:ie_i,js_i:je_i,k),arrdes=Arrdes_i,lev=k)
          enddo
@@ -304,7 +304,7 @@ contains
                sbufferx=sbuffer, nbufferx=nbuffer, &
                gridtype=DGRID_NE )
          do k=1,km
-            do i=is_i,ie_i    
+            do i=is_i,ie_i
                u0(i,je_i+1,k) = nbuffer(i,k)
             enddo
             do j=js_i,je_i
@@ -337,9 +337,9 @@ contains
                sbufferx=sbuffer, nbufferx=nbuffer, &
                gridtype=DGRID_NE )
          do k=1,km
-            do i=is,ie    
+            do i=is,ie
                ud(i,je+1,k) = nbuffer(i,k)
-            enddo 
+            enddo
             do j=js,je
                vd(ie+1,j,k) = ebuffer(j,k)
             enddo
@@ -388,7 +388,7 @@ contains
          enddo
          call prt_maxmin('PT_geos', t0, is_i, ie_i, js_i, je_i, 0, km, 1.0_FVPRC)
          call print_memuse_stats('get_geos_cubed_ic: read T')
-! Read PE 
+! Read PE
          allocate ( pe0(is_i:ie_i,js_i:je_i,km+1) )
          do k=1,km+1
            call MAPL_VarRead(formatter,"PE",pe0(is_i:ie_i,js_i:je_i,k),arrdes=Arrdes_i,lev=k)
@@ -433,7 +433,7 @@ contains
          call read_topo_file(fname1,gz0(is_i:ie_i,js_i:je_i),grid_i)
          gz0 = gz0*grav
 
-! Horiz Interp for surface pressure 
+! Horiz Interp for surface pressure
          allocate( psc(is:ie,js:je) )
          call prt_maxmin('PS_geos', ps0, is_i, ie_i, js_i, je_i, 0, 1, 1.0_FVPRC)
          call regridder%regrid(ps0(is_i:ie_i,js_i:je_i),psc(is:ie,js:je),rc=status)
@@ -477,7 +477,7 @@ contains
                if (ndims == 3) call moist_variables%push_back(trim(var_name))
                call siter%next()
             enddo
-            if (moist_variables%size() /= atm(1)%ncnst) call mpp_error(FATAL,'Wrong number of variables in moist file') 
+            if (moist_variables%size() /= atm(1)%ncnst) call mpp_error(FATAL,'Wrong number of variables in moist file')
 
             lvar_cnt=0
             do ivar=1,Atm(1)%ncnst
@@ -545,15 +545,15 @@ contains
         do i=1,size(extra_rst)
            do j=1,size(extra_rst(i)%vars)
               if (extra_rst(i)%vars(j)%nLev/=1) then
-                 if (extra_rst(i)%vars(j)%nLev == npz) then 
+                 if (extra_rst(i)%vars(j)%nLev == npz) then
                     tracer_bundles(i)%vars(j)%nLev=km
                     call tracer_bundles(i)%vars(j)%alloc_var(is,ie,js,je,km)
                  else if (extra_rst(i)%vars(j)%nLev == npz+1) then
                     tracer_bundles(i)%vars(j)%nLev=km+1
                     call tracer_bundles(i)%vars(j)%alloc_var(is,ie,js,je,km+1)
-                 end if    
+                 end if
               else
-                 call tracer_bundles(i)%vars(j)%alloc_Var(is,ie,js,je) 
+                 call tracer_bundles(i)%vars(j)%alloc_Var(is,ie,js,je)
               end if
            enddo
         enddo
@@ -589,7 +589,7 @@ contains
                   do n_ungrid=1,tracer_bundles(ifile)%vars(ivar)%n_ungrid
                      do k=1,nlev
                         call MAPL_VarRead(formatter,vname,qlev(is_i:ie_i,js_i:je_i),arrdes=Arrdes_i,lev=k,offset2=n_ungrid)
-                        q0(is_i:ie_i,js_i:je_i,k) = qlev(is_i:ie_i,js_i:je_i)       
+                        q0(is_i:ie_i,js_i:je_i,k) = qlev(is_i:ie_i,js_i:je_i)
                         call regridder%regrid(qlev(is_i:ie_i,js_i:je_i),tracer_bundles(ifile)%vars(ivar)%ptr4d(is:ie,js:je,k,n_ungrid),rc=status)
                      enddo
                      call prt_maxmin( trim(vname)//'_geos_'//trim(tracer_bundles(ifile)%file_name), q0, is_i, ie_i, js_i, je_i, 0, nlev, 1._FVPRC)
@@ -603,7 +603,7 @@ contains
 
          enddo
          deallocate ( q0 )
-                   
+
          if (is_master()) print*, ''
          if (is_master()) print*, 'Vertical Remapping: '
 ! Vert remap for scalars
@@ -649,12 +649,12 @@ contains
 
 ! Range check the MOIST tracers
 ! Iterate over tracer names
-  
+
       iter = moist_tracers%begin()
       do while (iter /= moist_tracers%end())
          iptr => iter%value()
          cptr => iter%key()
-         if (.not.match(cptr)) then 
+         if (.not.match(cptr)) then
             do k=1,npz
                do j=js,je
                   do i=is,ie
@@ -730,7 +730,7 @@ contains
                      enddo
                   enddo
                enddo
-               call mpp_update_domains(pe0, Atm%domain) 
+               call mpp_update_domains(pe0, Atm%domain)
 
                do k=1,npz+1
                   do j=js,je
@@ -753,17 +753,17 @@ contains
                   enddo
                   do k=1,km
                      do i=is,ie
-                        dpe0(i,k) = pe0d(i,k+1)-pe0d(i,k)         
+                        dpe0(i,k) = pe0d(i,k+1)-pe0d(i,k)
                      enddo
                   enddo
                   do k=1,npz+1
                      do i=is,ie
-                        pe1d(i,k) = 0.5*(pe1(i,j-1,k)+pe1(i,j,k))                    
+                        pe1d(i,k) = 0.5*(pe1(i,j-1,k)+pe1(i,j,k))
                      enddo
                   enddo
                   do k=1,npz
                      do i=is,ie
-                        dpe1(i,k) = pe1d(i,k+1)-pe1d(i,k)             
+                        dpe1(i,k) = pe1d(i,k+1)-pe1d(i,k)
                      enddo
                   enddo
                   call map_scalar( km, pe0d, ud(is:ie,j,1:km),    &
@@ -790,12 +790,12 @@ contains
                   enddo
                   do k=1,npz+1
                      do i=is,ie
-                        pe1d(i,k) = 0.5*(pe1(i-1,j,k)+pe1(i,j,k))                    
+                        pe1d(i,k) = 0.5*(pe1(i-1,j,k)+pe1(i,j,k))
                      enddo
                   enddo
                   do k=1,npz
                      do i=is,ie
-                        dpe1(i,k) = pe1d(i,k+1)-pe1d(i,k)         
+                        dpe1(i,k) = pe1d(i,k+1)-pe1d(i,k)
                      enddo
                   enddo
                   call map_scalar( km, pe0d, vd(is:ie,j,1:km),    &
@@ -824,14 +824,14 @@ contains
 subroutine xyz_to_dgrid(v3, ud, vd, npx, npy, is, ie, js, je, isd, ied, jsd, jed, gridstruct)
 
 ! Move A-Grid xyz winds to the D-grid cubed-sphere orientation
-    
+
 ! !INPUT/OUTPUT PARAMETERS:
       integer, intent(in)        :: npx, npy, is, ie, js, je, isd, ied, jsd, jed
       real(REAL64)               :: v3(3, isd:ied  ,jsd:jed )
       real(FVPRC), intent(inout) :: ud(isd:ied,jsd:jed+1) ! U-Wind
       real(FVPRC), intent(inout) :: vd(isd:ied+1,jsd:jed) ! V-Wind
       type(fv_grid_type), intent(IN), target :: gridstruct
-! !Local Variables 
+! !Local Variables
       integer :: i,j, im2,jm2
 
       real(REAL64) :: ue(is-1:ie+1,js  :je+1,3)    ! 3D winds at edges
@@ -941,14 +941,14 @@ subroutine xyz_to_dgrid(v3, ud, vd, npx, npy, is, ie, js, je, isd, ied, jsd, jed
           do i=is,ie
              ud(i,j) = ue(i,j,1)*gridstruct%es(1,i,j,1) +  &
                        ue(i,j,2)*gridstruct%es(2,i,j,1) +  &
-                       ue(i,j,3)*gridstruct%es(3,i,j,1) 
+                       ue(i,j,3)*gridstruct%es(3,i,j,1)
           enddo
        enddo
        do j=js,je
           do i=is,ie+1
              vd(i,j) = ve(i,j,1)*gridstruct%ew(1,i,j,2) +  &
                        ve(i,j,2)*gridstruct%ew(2,i,j,2) +  &
-                       ve(i,j,3)*gridstruct%ew(3,i,j,2) 
+                       ve(i,j,3)*gridstruct%ew(3,i,j,2)
           enddo
        enddo
 
@@ -961,11 +961,11 @@ end subroutine xyz_to_dgrid
 
     class(AbstractRegridder), pointer :: regridder
 
-    real(REAL32), dimension(Atm_i%bd%isd:Atm_i%bd%ied  ,Atm_i%bd%jsd:Atm_i%bd%jed+1), intent(in) :: ui
-    real(REAL32), dimension(Atm_i%bd%isd:Atm_i%bd%ied+1,Atm_i%bd%jsd:Atm_i%bd%jed  ), intent(in) :: vi
+    real(FVPRC), dimension(Atm_i%bd%isd:Atm_i%bd%ied  ,Atm_i%bd%jsd:Atm_i%bd%jed+1), intent(in) :: ui
+    real(FVPRC), dimension(Atm_i%bd%isd:Atm_i%bd%ied+1,Atm_i%bd%jsd:Atm_i%bd%jed  ), intent(in) :: vi
 
-    real(REAL32), dimension(Atm%bd%isd:Atm%bd%ied  ,Atm%bd%jsd:Atm%bd%jed+1), intent(inout) :: uo
-    real(REAL32), dimension(Atm%bd%isd:Atm%bd%ied+1,Atm%bd%jsd:Atm%bd%jed  ), intent(inout) :: vo
+    real(FVPRC), dimension(Atm%bd%isd:Atm%bd%ied  ,Atm%bd%jsd:Atm%bd%jed+1), intent(inout) :: uo
+    real(FVPRC), dimension(Atm%bd%isd:Atm%bd%ied+1,Atm%bd%jsd:Atm%bd%jed  ), intent(inout) :: vo
 
     !------------------------------------------------------------------!
     ! local variables                                                  !
@@ -1034,7 +1034,7 @@ end subroutine xyz_to_dgrid
           tmp_i = va_xyz_i(n,:,:)
           call regridder%regrid(tmp_i(       is:       ie,       js:       je), &
                                 tmp_o(Atm%bd%is:Atm%bd%ie,Atm%bd%js:Atm%bd%je), rc=status)
-          call mpp_update_domains(tmp_o, Atm%domain) 
+          call mpp_update_domains(tmp_o, Atm%domain)
           va_xyz_o(n,:,:) = tmp_o
        enddo
 !------------------------------------------------------------!
@@ -1046,6 +1046,6 @@ end subroutine xyz_to_dgrid
                          Atm%gridstruct)
 
   end subroutine d2a2d
-                        
+
                   end module fv_regrid_c2c
 

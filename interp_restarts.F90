@@ -7,7 +7,7 @@ program interp_restarts
 !          to the cubed-sphere grid with optional vertical levels    !
 !--------------------------------------------------------------------!
    use ESMF
-   use MAPL   
+   use MAPL
    use mpp_mod,        only: mpp_error, FATAL, NOTE, mpp_root_pe, mpp_broadcast
    use fms_mod,        only: print_memory_usage, fms_init, fms_end, file_exist
    use fv_control_mod, only: fv_init1, fv_init2, fv_end
@@ -308,7 +308,7 @@ program interp_restarts
    if( is_master() ) then
       print *
       write(*,*) 'Output Vertical Grid'
-      write(*,*) '--------------------'     
+      write(*,*) '--------------------'
       write(6,100)
 100      format(2x,' k ','      A(k)    ',2x,' B(k)   ',2x,'  Pref    ',2x,'  DelP',/, &
             1x,'----',3x,'----------',2x,'--------',2x,'----------',2x,'---------' )
@@ -528,7 +528,7 @@ program interp_restarts
 ! PT
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PT'
       r4_local(is:ie,js:je,1:npz) = pt_local
-      call prt_mxm('PT', r4_local, is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+      call prt_mxm('PT', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
       call MAPL_VarWrite(OutFmt,"PT",pt_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
        VERIFY_(status)
 
@@ -537,7 +537,7 @@ program interp_restarts
       do k=1,npz+1
          r4_local(is:ie,js:je,k)= Atm(1)%pe(is:ie,k,js:je)
       enddo
-      call prt_mxm('PE', r4_local, is, ie, js, je, 0, npz+1, 1.0, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+      call prt_mxm('PE', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz+1, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
       do k=1,npz+1
          r8_local(is:ie,js:je,k) = Atm(1)%pe(is:ie,k,js:je)
       enddo
@@ -546,7 +546,7 @@ program interp_restarts
 ! PKZ
       if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PKZ'
       r4_local(is:ie,js:je,1:npz) = Atm(1)%pkz(is:ie,js:je,1:npz)
-      call prt_mxm('PKZ', r4_local, is, ie, js, je, 0, npz, 1.0, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+      call prt_mxm('PKZ', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
       r8_local(is:ie,js:je,1:npz) = Atm(1)%pkz(is:ie,js:je,1:npz)
       call MAPL_VarWrite(OutFmt,"PKZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
       VERIFY_(status)
@@ -555,7 +555,7 @@ program interp_restarts
 ! DZ
          if (is_master()) print*, 'Writing : ', TRIM(fname1), ' DZ'
          r4_local(is:ie,js:je,1:npz) = Atm(1)%delz(is:ie,js:je,1:npz)
-         call prt_mxm('DZ', r4_local, is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+         call prt_mxm('DZ', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
          r8_local(is:ie,js:je,1:npz) = Atm(1)%delz(is:ie,js:je,1:npz)
          call MAPL_VarWrite(OutFmt,"DZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
          VERIFY_(status)
@@ -563,7 +563,7 @@ program interp_restarts
 ! W
          if (is_master()) print*, 'Writing : ', TRIM(fname1), ' W'
          r4_local(is:ie,js:je,1:npz) = Atm(1)%w(is:ie,js:je,1:npz)
-         call prt_mxm('W', r4_local, is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+         call prt_mxm('W', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
          r8_local(is:ie,js:je,1:npz) = Atm(1)%w(is:ie,js:je,1:npz)
          call MAPL_VarWrite(OutFmt,"W",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
          VERIFY_(status)
@@ -649,7 +649,7 @@ program interp_restarts
                lcnt_var=lcnt_var+1
             end if
             r4_local(is:ie,js:je,1:npz) = Atm(1)%q(is:ie,js:je,:,iq0)
-            call prt_mxm(trim(var_name), r4_local, is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+            call prt_mxm(trim(var_name), real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
             call MAPL_VarWrite(OutFmt,triM(var_name),r4_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
             VERIFY_(status)
          end if
@@ -708,11 +708,11 @@ program interp_restarts
             allocate(r4_local(is:ie,js:je,nlev))
             if (rst_files(ifile)%vars(iq)%rank ==2) then
                r4_local2d(is:ie,js:je)=rst_files(ifile)%vars(iq)%ptr2d(is:ie,js:je)
-               call prt_mxm(trim(vname), r4_local2d, is, ie, js, je, 0, 1, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+               call prt_mxm(trim(vname), real(r4_local2d, kind=FVPRC), is, ie, js, je, 0, 1, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
                call MAPL_VarWrite(OutFmt,vname,r4_local2d(is:ie,js:je),arrdes=arrdes)
             else if (rst_files(ifile)%vars(iq)%rank ==3) then
                r4_local(is:ie,js:je,1:nlev)=rst_files(ifile)%vars(iq)%ptr3d(is:ie,js:je,1:nlev)
-               call prt_mxm(trim(vname), r4_local, is, ie, js, je, 0, nlev, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+               call prt_mxm(trim(vname), real(r4_local, kind=FVPRC), is, ie, js, je, 0, nlev, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
                call MAPL_VarWrite(OutFmt,vname,r4_local(is:ie,js:je,1:nlev),arrdes)
             else if (rst_files(ifile)%vars(iq)%rank ==4) then
                do n=1,size(rst_files(ifile)%vars(iq)%ptr4d,4)
@@ -722,7 +722,7 @@ program interp_restarts
                      call MAPL_VarWrite(OutFmt,vname,r4_local2d(is:ie,js:je),arrdes=arrdes,lev=k,offset2=n)
                      if (k<=npz) r4_local(is:ie,js:je,k) = r4_local2d(is:ie,js:je)
                   enddo
-                  call prt_mxm(trim(vname), r4_local, is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+                  call prt_mxm(trim(vname), real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
                enddo
             end if
          end do
