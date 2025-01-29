@@ -1,12 +1,11 @@
 version: 2.1
 
 # Anchors in case we need to override the defaults from the orb
-#baselibs_version: &baselibs_version v7.17.0
-#bcs_version: &bcs_version v11.3.0
-
+#baselibs_version: &baselibs_version v8.9.0
+#bcs_version: &bcs_version v12.0.0
 
 orbs:
-  ci: geos-esm/circleci-tools@2
+  ci: geos-esm/circleci-tools@5
 
 workflows:
   build-test:
@@ -17,11 +16,14 @@ workflows:
             - docker-hub-creds
           matrix:
             parameters:
-              compiler: [ifort, gfortran]
+              compiler: [gfortran, ifort]
           #baselibs_version: *baselibs_version
           repo: GEOSgcm
           checkout_fixture: true
-          mepodevelop: true
+          # V12 code uses a special branch for now.
+          fixture_branch: feature/sdrabenh/gcm_v12
+          # We comment out this as it will "undo" the fixture_branch
+          #mepodevelop: false
           persist_workspace: true # Needs to be true to run fv3/gcm experiment, costs extra
       - ci/run_fv3:
           name: run-FV3-on-<< matrix.compiler >>-with-GEOSgcm
@@ -58,6 +60,8 @@ workflows:
           #baselibs_version: *baselibs_version
           repo: GEOSfvdycore
           checkout_fixture: true
+          # V12 code uses a special branch for now.
+          fixture_branch: feature/sdrabenh/gcm_v12
           mepodevelop: false
           persist_workspace: true # Needs to be true to run fv3/gcm experiment, costs extra
       - ci/run_fv3:
