@@ -60,6 +60,8 @@ workflows:
           #baselibs_version: *baselibs_version
           repo: GEOSfvdycore
           checkout_fixture: true
+          # V12 code uses a special branch for now.
+          fixture_branch: feature/sdrabenh/gcm_v12
           mepodevelop: false
           persist_workspace: true # Needs to be true to run fv3/gcm experiment, costs extra
       - ci/run_fv3:
