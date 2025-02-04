@@ -656,15 +656,7 @@ echo $EXPDIRroot > $HOME/.EXPDIRroot
 #######################################################################
 
 set     GEOSDIR  = $GEOSDEF
-
-#
-# GEOSBIN does point to the bin/ directory in each
-#
 setenv GEOSSRC  ${GEOSDIR}
-setenv GEOSBIN  ${GEOSDIR}/bin
-setenv GEOSETC  ${GEOSDIR}/etc
-
-setenv GEOSUTIL ${GEOSSRC}
 
 #######################################################################
 #                    Check for Group ID Sponsor Code
@@ -888,10 +880,6 @@ s?@BATCH_OUTPUTNAME?$BATCH_OUTPUTNAME?g
 s?@BATCH_JOINOUTERR?$BATCH_JOINOUTERR?g
 s?@SITE?$SITE?g
 s?@GEOSDIR?$GEOSDIR?g
-s?@GEOSSRC?$GEOSSRC?g
-s?@GEOSBIN?$GEOSBIN?g
-s?@GEOSETC?$GEOSETC?g
-s?@GEOSUTIL?$GEOSUTIL?g
 s?@SINGULARITY_BUILD?$SINGULARITY_BUILD?g
 s?@NATIVE_BUILD?$NATIVE_BUILD?g
 s?@SINGULARITY_SANDBOX?$SINGULARITY_SANDBOX?g
