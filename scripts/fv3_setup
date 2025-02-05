@@ -657,6 +657,7 @@ echo $EXPDIRroot > $HOME/.EXPDIRroot
 
 set     GEOSDIR  = $GEOSDEF
 setenv GEOSSRC  ${GEOSDIR}
+setenv GEOSBIN  ${GEOSDIR}/bin
 
 #######################################################################
 #                    Check for Group ID Sponsor Code
