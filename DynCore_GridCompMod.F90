@@ -8983,13 +8983,12 @@ end subroutine freeTracers
 
     integer  :: istrt,iend, jstrt,jend, kstrt,kend
     integer  :: im, jm, km, k
-    real(r8) :: arr_global(grid%npx,grid%ntiles*grid%npy,grid%npz)
+    real(r8), allocatable :: arr_global(:,:,:)
     real(r8) :: rng(3,grid%npz)
     real(r8) :: GSUM
+    logical :: amIRoot
 
     real(kind=ESMF_KIND_R8)     :: locArr(grid%is:grid%ie,grid%js:grid%je)
-    real(kind=ESMF_KIND_R8)     :: glbArr(grid%npx,grid%ntiles*grid%npy)
-
     istrt = grid%is
     iend  = grid%ie
     jstrt = grid%js
@@ -9000,14 +8999,20 @@ end subroutine freeTracers
     jm    = grid%npy*grid%ntiles
     km    = grid%npz
 
+    amIRoot = MAPL_AM_I_ROOT()
+    if (amIRoot) then
+       allocate(arr_global(grid%npx,grid%ntiles*grid%npy,km))
+    else
+       allocate(arr_global(1,1,km))
+    end if
+
   ! call write_parallel('GlobalSUm')
     do k=kstrt,kend
        locArr(:,:) = arr(:,:,k)
-       call ArrayGather(locArr, glbArr, grid%grid)
-       arr_global(:,:,k) = glbArr
+       call ArrayGather(locArr, arr_global(:,:,k), grid%grid)
     enddo
 
-    IF (MAPL_AM_I_ROOT()) Then
+    IF (amIRoot) Then
        rng(1,:) = MINVAL(MINVAL(arr_global,DIM=1),DIM=1)
        rng(2,:) = MAXVAL(MAXVAL(arr_global,DIM=1),DIM=1)
        rng(3,:) = SUM(SUM(arr_global,DIM=1),DIM=1)/(IM*JM)
@@ -9024,6 +9029,8 @@ end subroutine freeTracers
        print*,' '
     End IF
 
+    deallocate(arr_global)
+
   End Subroutine Write_Profile_R8
 
   Subroutine Write_Profile_R4(grid, arr, name, delp)
@@ -9034,13 +9041,14 @@ end subroutine freeTracers
 
     integer  :: istrt,iend, jstrt,jend, kstrt,kend
     integer  :: im, jm, km, k
-    real(r4) :: arr_global(grid%npx,grid%ntiles*grid%npy,grid%npz)
+    real(r4), allocatable :: arr_global(:,:,:)
     real(r4) :: rng(3,grid%npz)
     real(r8) :: gsum_p
     real(r4) :: GSUM
+    logical :: amIRoot
 
     real(kind=ESMF_KIND_R8)     :: locArr(grid%is:grid%ie,grid%js:grid%je)
-    real(kind=ESMF_KIND_R8)     :: glbArr(grid%npx,grid%ntiles*grid%npy)
+    real(kind=ESMF_KIND_R8), allocatable :: glbArr(:,:)
 
     istrt = grid%is
     iend  = grid%ie
@@ -9052,12 +9060,23 @@ end subroutine freeTracers
     jm    = grid%npy*grid%ntiles
     km    = grid%npz
 
+    amIRoot = MAPL_AM_I_ROOT()
+    if (amIRoot) then
+       allocate(arr_global(grid%npx,grid%ntiles*grid%npy,km))
+       allocate(glbArr(grid%npx,grid%ntiles*grid%npy))
+    else
+       allocate(arr_global(1,1,km))
+       allocate(glbArr(1,1))
+    end if
+
     do k=kstrt,kend
        locArr(:,:) = arr(:,:,k)
        call ArrayGather(locArr, glbArr, grid%grid)
-       arr_global(:,:,k) = glbArr
+       if (amIRoot) then
+          arr_global(:,:,k) = glbArr
+       end if
     enddo
-    IF (MAPL_AM_I_ROOT()) Then
+    IF (amIRoot) Then
        rng(1,:) = MINVAL(MINVAL(arr_global,DIM=1),DIM=1)
        rng(2,:) = MAXVAL(MAXVAL(arr_global,DIM=1),DIM=1)
        rng(3,:) = SUM(SUM(arr_global,DIM=1),DIM=1)/(IM*JM)
@@ -9075,12 +9094,16 @@ end subroutine freeTracers
     do k=kstrt,kend
        locArr(:,:) = arr(:,:,k)*grid%area(:,:)*delp(:,:,k)
        call ArrayGather(locArr, glbArr, grid%grid)
-       arr_global(:,:,k) = glbArr
+       if (amIRoot) then
+          arr_global(:,:,k) = glbArr
+       end if
        locArr(:,:) = delp(:,:,k)
        call ArrayGather(locArr, glbArr, grid%grid)
-       gsum_p = gsum_p + SUM(SUM(glbArr,DIM=1),DIM=1)
+       if (amIRoot) then
+          gsum_p = gsum_p + SUM(SUM(glbArr,DIM=1),DIM=1)
+       end if
     enddo
-    IF (MAPL_AM_I_ROOT()) Then
+    IF (amIRoot) Then
        GSUM     = SUM(SUM(SUM(arr_global,DIM=1),DIM=1),DIM=1)
        print*,'***********'
        Write(*,"('GlobalSum: ',e21.9)") GSUM/(grid%globalarea*gsum_p)
@@ -9089,6 +9112,8 @@ end subroutine freeTracers
     End IF
     endif
 
+    deallocate(arr_global, glbArr)
+    
   End Subroutine Write_Profile_R4
 
   function R8_TO_R4(dbl_var)
