@@ -503,31 +503,24 @@ contains
   ! Veritical resolution dependencies
    FV_Atm(1)%flagstruct%external_eta = .true.
    if (FV_Atm(1)%flagstruct%npz >= 70) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 17 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 72) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 21 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 90) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 17 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 126) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 19 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 132) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 136) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 180) then
-     FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
      FV_Atm(1)%flagstruct%n_zfilter = 32 ! ~5mb
    endif
   ! Vertical remap options
@@ -655,9 +648,9 @@ contains
      ! Local Richardson-number turbulent mixing 
       FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
      ! Sponge layer
-      FV_Atm(1)%flagstruct%n_sponge = 0
-      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.175
-      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.050
+      FV_Atm(1)%flagstruct%n_sponge = 9
+      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.2
+      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.1
       FV_Atm(1)%flagstruct%consv_te = 1.0
      ! default NonHydrostatic settings (irrelavent to Hydrostatic)
      ! a_imp > 0.5 for semi-implicit scheme [1 fully backward]
@@ -667,7 +660,7 @@ contains
      ! dz_min is a NH delta-z limiter increasing may improve stability
       FV_Atm(1)%flagstruct%dz_min = 6.0
      ! p_fac is a NH pressure fraction limiter near model top (0:0.25) 
-      FV_Atm(1)%flagstruct%p_fac = 0.125
+      FV_Atm(1)%flagstruct%p_fac = 0.05
      ! General defaults
       FV_Atm(1)%flagstruct%make_nh = .false.
      ! This is the best/fastest option for tracers
