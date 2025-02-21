@@ -50,7 +50,7 @@
                            DYN_CASE        => CASE_ID,               &
                            DYN_DEBUG       => DEBUG,                 &
                            HYDROSTATIC     => FV_HYDROSTATIC,        &
-                           fv_getUpdraftHelicity, DEBUG_DYN,         &
+                           fv_getUpdraftHelicity, DEBUG_DYN,  DEBUG_ADV, &
                            ADIABATIC, SW_DYNAMICS, AdvCore_Advection
    use m_topo_remap, only: dyn_topo_remap
    use CubeGridPrototype, only: register_grid_and_regridders
@@ -2601,6 +2601,9 @@ contains
     call MAPL_GetResource ( MAPL, DEBUG_DYN, 'DEBUG_DYN:', default=.FALSE., rc=status )
     VERIFY_(STATUS)
 
+    call MAPL_GetResource ( MAPL, DEBUG_ADV, 'DEBUG_ADV:', default=.FALSE., rc=status )
+    VERIFY_(STATUS)        
+
 ! Generic SetServices
 !--------------------
 
@@ -3320,12 +3323,12 @@ subroutine Run(gc, import, export, clock, rc)
             n = 0
             call ESMF_ConfigFindLabel ( CF,'EXCLUDE_ADVECTION_TRACERS_LIST:',isPresent=isPresent,rc=STATUS )
             VERIFY_(STATUS)
-            if(isPresent) then
-
+            if(isPresent .or. (AdvCore_Advection >= 1)) then
                tend  = .false.
                allocate(xlist(XLIST_MAX), stat=status)
                VERIFY_(STATUS)
-               do while (.not.tend)
+               if (isPresent) then
+                do while (.not.tend)
                   call ESMF_ConfigGetAttribute (CF,value=tmpstring,default='',rc=STATUS) !ALT: we don't check return status!!!
                   if (tmpstring /= '')  then
                      n = n + 1
@@ -3339,7 +3342,8 @@ subroutine Run(gc, import, export, clock, rc)
                   end if
                   call ESMF_ConfigNextLine(CF,tableEnd=tend,rc=STATUS )
                   VERIFY_(STATUS)
-               enddo
+                enddo
+               endif
             end if
 
             ! Count the number of tracers
