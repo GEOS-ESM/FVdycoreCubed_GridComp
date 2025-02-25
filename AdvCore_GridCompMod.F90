@@ -942,8 +942,7 @@ subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
       do k=1,KM
          qsum1(:,:) = qsum1(:,:) + dp(:,:,k)
       enddo
-      mass = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, &
-                      reproduce=FV_Atm(1)%flagstruct%exact_sum)
+      mass = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1)
 
 ! Loop over Tracers
 ! -----------------
@@ -952,8 +951,7 @@ subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
         do k=1,KM
            qsum1(:,:) = qsum1(:,:) + Q(:,:,k,n)*dp(:,:,k)
         enddo
-        qg(n) = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, &
-                      reproduce=FV_Atm(1)%flagstruct%exact_sum)
+        qg(n) = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1)
         if (mass > 0.0) qg(n) = qg(n)/mass
      enddo
 
