@@ -20,7 +20,6 @@ limit coredumpsize 0
 #                     Set Model Run Parameters
 #######################################################################
 
-set NH    = @USE_NONHYDRO
 set FV_NX = @FV_NX
 set FV_NY = @FV_NY
 set NX = $FV_NX
@@ -124,8 +123,8 @@ endif
 #######################################################################
 
 setenv GEOSDIR @GEOSDIR
-setenv GEOSBIN @GEOSBIN
-setenv GEOSETC @GEOSETC
+setenv GEOSBIN ${GEOSDIR}/bin
+setenv GEOSETC ${GEOSDIR}/etc
 
 set TAG = `cat $GEOSETC/.FV3_VERSION`
 set RUN_CMD = "$GEOSBIN/esma_mpirun -np "
@@ -151,7 +150,6 @@ module list
          setenv EXPDSC  "c${AGCM_IM}_L${AGCM_LM}_T${N_TRACERS}_${NX}x${NY}_${N_OMP}threads"
          setenv EXPDIR  @EXPDIR
          setenv SCRDIR  $EXPDIR/scratch_${EXPID}_${EXETAG}-${FV3PRC}
-if ($NH) setenv SCRDIR  ${SCRDIR}_NH.$$
 
 #######################################################################
 #                 Create Experiment Scratch-Directory
@@ -314,9 +312,6 @@ PC@HIST_IMx@HIST_JM-DC.LM: @AGCM_LM
                             ::
 EOF
 
-         set hydrostatic='.true.'
-if ($NH) set hydrostatic='.false.'
-
 set GRID_INPUT = "'INLINE'"
 
 /bin/rm -f input.nml
@@ -326,8 +321,6 @@ cat >      input.nml << EOF
        npy = ${FV3_NPX}
        npz = ${FV3_NPZ}
        adiabatic = .true.
-       hydrostatic = ${hydrostatic}
-       make_nh = .T.
        fv_debug = .F.
        fv_sg_adj = -1
        n_sponge = -1
