@@ -317,20 +317,20 @@ set GRID_INPUT = "'INLINE'"
 /bin/rm -f input.nml
 cat >      input.nml << EOF
 &fv_core_nml
-       npx = ${FV3_NPX}
-       npy = ${FV3_NPX}
-       npz = ${FV3_NPZ}
-       adiabatic = .true.
-       fv_debug = .F.
-       fv_sg_adj = -1
-       n_sponge = -1
-       n_zfilter = 0
-       compute_coords_locally = .false.
+  npx = ${FV3_NPX}
+  npy = ${FV3_NPX}
+  npz = ${FV3_NPZ}
+  adiabatic = .true.
+  fv_debug = .F.
+  range_warn = .F.
+  fv_sg_adj = -1
+  n_sponge = -1
+  n_zfilter = 0
+  compute_coords_locally = .false.
 /
 
 &fv_grid_nml
 /
-#       grid_file = $GRID_INPUT
 
 &main_nml
 /
@@ -343,8 +343,10 @@ cat >      input.nml << EOF
 /
 
 &fms_nml
-        print_memory_usage=.false.
-        domains_stack_size = 24000000
+  print_memory_usage=.true.
+  domains_stack_size = 12000000
+  clock_grain='MODULE',
+  clock_flags='DETAILED',
 /
 EOF
 
