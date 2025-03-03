@@ -466,9 +466,9 @@ else
    set DEF_IOS_NDS = 5
 endif
 
-# On desktop, we default to 6 processes
+# On SITE == GMAO.desktop, we default to 6 processes
 # Must be set here due to MODEL_NPES calc below
-if( $SITE != 'NAS' && $SITE != 'NCCS' && $SITE != 'AWS' && $SITE != 'Azure' ) then
+if( $SITE == 'GMAO.desktop' ) then
    set FV_NX = 1
 endif
 
