@@ -642,9 +642,10 @@ contains
       FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
      ! 6th order divergence default damping options
       FV_Atm(1)%flagstruct%nord = 2
-      FV_Atm(1)%flagstruct%dddmp = 0.2  ! Smagorinsky damping
-      FV_Atm(1)%flagstruct%d4_bg = 0.12
-      FV_Atm(1)%flagstruct%d2_bg = 0.0
+      FV_Atm(1)%flagstruct%dddmp = 0.2  ! Smagorinsky damping coef
+      FV_Atm(1)%flagstruct%d4_bg_top = 0.12 ! High-order Divg Damping coef
+      FV_Atm(1)%flagstruct%d4_bg_bot = 0.12 ! High-order Divg Damping coef
+      FV_Atm(1)%flagstruct%d2_bg = 0.0  ! 2nd order Divg Damping coef
       FV_Atm(1)%flagstruct%d_ext = 0.0  ! External damping
      ! Local Richardson-number turbulent mixing 
       FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
@@ -720,7 +721,8 @@ contains
        ! 2nd order damping
         FV_Atm(1)%flagstruct%nord = 0
         FV_Atm(1)%flagstruct%dddmp = 0.2
-        FV_Atm(1)%flagstruct%d4_bg = 0.0
+        FV_Atm(1)%flagstruct%d4_bg_top = 0.0
+        FV_Atm(1)%flagstruct%d4_bg_bot = 0.0
         FV_Atm(1)%flagstruct%d2_bg = 0.0075
         FV_Atm(1)%flagstruct%d_ext = 0.02
        ! disable vorticity damping
@@ -4832,7 +4834,8 @@ subroutine echo_fv3_setup()
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%nord ,format='("FV3 nord: ",(I3))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%dddmp ,format='("FV3 dddmp: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d2_bg ,format='("FV3 d2_bg: ",(F7.5))' )
-   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d4_bg ,format='("FV3 d4_bg: ",(F7.5))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d4_bg_top ,format='("FV3 d4_bg_top: ",(F7.5))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d4_bg_bot ,format='("FV3 d4_bg_bot: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%vtdm4 ,format='("FV3 vtdm4: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d2_bg_k1 ,format='("FV3 d2_bg_k1: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d2_bg_k2 ,format='("FV3 d2_bg_k2: ",(F7.5))' )
@@ -4981,19 +4984,21 @@ end subroutine echo_fv3_setup
    real(FVPRC), allocatable :: w_dt(:,:,:)
 
    integer :: nord
-   real(FVPRC):: dddmp, d4_bg, d2_bg, d_ext
+   real(FVPRC):: dddmp, d4_bg_top, d4_bg_bot, d2_bg, d_ext
 
 ! Save input damping state
    nord  = FV_Atm(1)%flagstruct%nord
    dddmp = FV_Atm(1)%flagstruct%dddmp
-   d4_bg = FV_Atm(1)%flagstruct%d4_bg
+   d4_bg_top = FV_Atm(1)%flagstruct%d4_bg_top
+   d4_bg_bot = FV_Atm(1)%flagstruct%d4_bg_bot
    d2_bg = FV_Atm(1)%flagstruct%d2_bg
    d_ext = FV_Atm(1)%flagstruct%d_ext
 
 ! Use 2nd order damping for spinup
    FV_Atm(1)%flagstruct%nord = 0
    FV_Atm(1)%flagstruct%dddmp = 0.2
-   FV_Atm(1)%flagstruct%d4_bg = 0.0
+   FV_Atm(1)%flagstruct%d4_bg_top = 0.0
+   FV_Atm(1)%flagstruct%d4_bg_bot = 0.0
    FV_Atm(1)%flagstruct%d2_bg = 0.0075
    FV_Atm(1)%flagstruct%d_ext = 0.02
 
@@ -5188,7 +5193,8 @@ end subroutine echo_fv3_setup
 ! Reset input damping parameters
      FV_Atm(1)%flagstruct%nord  = nord
      FV_Atm(1)%flagstruct%dddmp = dddmp
-     FV_Atm(1)%flagstruct%d4_bg = d4_bg
+     FV_Atm(1)%flagstruct%d4_bg_top = d4_bg_top
+     FV_Atm(1)%flagstruct%d4_bg_bot = d4_bg_bot
      FV_Atm(1)%flagstruct%d2_bg = d2_bg
      FV_Atm(1)%flagstruct%d_ext = d_ext
 

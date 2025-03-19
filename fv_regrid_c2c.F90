@@ -963,11 +963,11 @@ end subroutine xyz_to_dgrid
 
     class(AbstractRegridder), pointer :: regridder
 
-    real(REAL32), dimension(Atm_i%bd%isd:Atm_i%bd%ied  ,Atm_i%bd%jsd:Atm_i%bd%jed+1), intent(in) :: ui
-    real(REAL32), dimension(Atm_i%bd%isd:Atm_i%bd%ied+1,Atm_i%bd%jsd:Atm_i%bd%jed  ), intent(in) :: vi
+    real(FVPRC), dimension(Atm_i%bd%isd:Atm_i%bd%ied  ,Atm_i%bd%jsd:Atm_i%bd%jed+1), intent(in) :: ui
+    real(FVPRC), dimension(Atm_i%bd%isd:Atm_i%bd%ied+1,Atm_i%bd%jsd:Atm_i%bd%jed  ), intent(in) :: vi
 
-    real(REAL32), dimension(Atm%bd%isd:Atm%bd%ied  ,Atm%bd%jsd:Atm%bd%jed+1), intent(inout) :: uo
-    real(REAL32), dimension(Atm%bd%isd:Atm%bd%ied+1,Atm%bd%jsd:Atm%bd%jed  ), intent(inout) :: vo
+    real(FVPRC), dimension(Atm%bd%isd:Atm%bd%ied  ,Atm%bd%jsd:Atm%bd%jed+1), intent(inout) :: uo
+    real(FVPRC), dimension(Atm%bd%isd:Atm%bd%ied+1,Atm%bd%jsd:Atm%bd%jed  ), intent(inout) :: vo
 
     !------------------------------------------------------------------!
     ! local variables                                                  !
