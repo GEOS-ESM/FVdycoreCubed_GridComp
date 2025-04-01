@@ -160,6 +160,12 @@ ecbuild_add_executable (
   SOURCES StandAlone_FV3_Dycore.F90
   LIBS ${this} OpenMP::OpenMP_Fortran)
 
+find_package (JeMalloc)
+if(JeMalloc_FOUND)
+  message(STATUS "JeMalloc found, using for StandAlone_FV3_Dycore.x")
+  target_link_libraries (StandAlone_FV3_Dycore.x JeMalloc::JeMalloc)
+endif()
+
 ecbuild_add_executable (
   TARGET rs_scale.x
   SOURCES rs_scale.F90
