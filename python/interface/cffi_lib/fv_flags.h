@@ -40,7 +40,7 @@ typedef struct
     int n_zs_filter;
     int nord_zs_filter;
     bool full_zs_filter;
-    bool RF_fast;
+    bool rf_fast;
     bool Beljaars_TOFD;
     bool consv_am;
     bool do_sat_adj;
