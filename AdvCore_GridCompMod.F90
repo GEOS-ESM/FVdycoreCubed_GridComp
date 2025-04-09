@@ -77,7 +77,7 @@ module AdvCore_GridCompMod
       real(FVPRC) :: dt
       logical     :: FV3_DynCoreIsRunning=.false.
       integer     :: AdvCore_Advection=1
-      logical     :: chk_mass=.true.
+      logical     :: chk_mass=.false.
 
       integer,  parameter :: ntiles_per_pe = 1
 
