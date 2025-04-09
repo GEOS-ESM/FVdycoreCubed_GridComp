@@ -66,7 +66,7 @@ module AdvCore_GridCompMod
       use fv_grid_utils_mod, only: g_sum
 
       USE FV_StateMod,     only: AdvCoreTracers => T_TRACERS
-      USE FV_StateMod,     only: FV_Atm
+      USE FV_StateMod,     only: FV_Atm, FV_setup
       use CubeGridPrototype, only: register_grid_and_regridders
 
       implicit none
@@ -77,7 +77,7 @@ module AdvCore_GridCompMod
       real(FVPRC) :: dt
       logical     :: FV3_DynCoreIsRunning=.false.
       integer     :: AdvCore_Advection=1
-      logical     :: chk_mass=.false.
+      logical     :: chk_mass=.true.
 
       integer,  parameter :: ntiles_per_pe = 1
 
@@ -129,6 +129,7 @@ contains
       type(ESMF_VM)                           :: VM
       integer                                 :: comm, ndt
       integer                                 :: p_split=1
+      character(len=ESMF_MAXSTR)              :: LAYOUT_FILE
 
 !=============================================================================
 
@@ -212,6 +213,7 @@ contains
           SHORT_NAME = 'AREA',                                      &
           LONG_NAME  = 'agrid_cell_area',                           &
           UNITS      = 'm+2'  ,                                     &
+          PRECISION  = ESMF_KIND_R4,                                &
           DIMS       = MAPL_DimsHorzOnly,                           &
           VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
      VERIFY_(STATUS)
@@ -224,6 +226,7 @@ contains
              SHORT_NAME = TRIM(myTracer),                         &
              LONG_NAME  = TRIM(myTracer),                         &
              UNITS      = '1',                                    &
+             PRECISION  = ESMF_KIND_R4,                           &
              DIMS       = MAPL_DimsHorzVert,                      &
              VLOCATION  = MAPL_VLocationCenter,               RC=STATUS  )
         VERIFY_(STATUS)
@@ -253,8 +256,8 @@ contains
       call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_FINALIZE,     Finalize,  RC=status)
       VERIFY_(STATUS)
 
-      ! Check if AdvCore is running without FV3_DynCoreIsRunning, if yes then setup the MAPL Grid 
-      ! ----------------------------------------------------------------------------
+! Check if AdvCore is running without FV3_DynCoreIsRunning, if yes then setup the MAPL Grid 
+! ----------------------------------------------------------------------------
       call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
       VERIFY_(STATUS)
       call MAPL_GetResource(MAPL, DYCORE, 'DYCORE:', default="", RC=STATUS )
@@ -262,66 +265,25 @@ contains
       call MAPL_GetResource(MAPL, AdvCore_Advection , label='AdvCore_Advection:', &
                                   default=AdvCore_Advection, RC=STATUS )
       VERIFY_(STATUS)
-      if(adjustl(DYCORE)=="FV3") FV3_DynCoreIsRunning = .true.
-      if(adjustl(DYCORE)=="FV3+ADV") FV3_DynCoreIsRunning = .true.
 
-      ! Start up FMS/MPP
-      !-------------------------------------------
-      call ESMF_VMGet(VM,mpiCommunicator=comm,rc=STATUS)
+! Setup FMS/FV3
+!--------------
+      call MAPL_GetResource ( MAPL, LAYOUT_FILE, 'LAYOUT:', default='fvcore_layout.rc', rc=status )
       VERIFY_(STATUS)
-      call fms_init(comm)
-      VERIFY_(STATUS)
+      call FV_Setup(GC, LAYOUT_FILE)
 
-      if (.NOT. FV3_DynCoreIsRunning) then
-      ! Make sure FV3 is setup
-      ! -----------------------
-         call register_grid_and_regridders()
-         call fv_init1(FV_Atm, dt, grids_on_my_pe, p_split)
-      ! Get Domain decomposition
-      !-------------------------
-         call MAPL_GetResource( MAPL, nx, 'NX:', default=0, RC=STATUS )
-         VERIFY_(STATUS)
-         FV_Atm(1)%layout(1) = nx
-         call MAPL_GetResource( MAPL, ny, 'NY:', default=0, RC=STATUS )
-         VERIFY_(STATUS)
-         if (FV_Atm(1)%flagstruct%grid_type == 4) then
-            FV_Atm(1)%layout(2) = ny
-         else
-            FV_Atm(1)%layout(2) = ny / 6
-         end if
-      ! Get Resolution Information
-      !---------------------------
-      ! FV grid dimensions setup from MAPL
-         call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'IM:', default= 32, RC=STATUS )
-         VERIFY_(STATUS)
-         call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npy, 'JM:', default=192, RC=STATUS )
-         VERIFY_(STATUS)
-         call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'LM:', default= 72, RC=STATUS )
-         VERIFY_(STATUS)
-      ! FV likes npx;npy in terms of cell vertices
-         if (FV_Atm(1)%flagstruct%npy == 6*FV_Atm(1)%flagstruct%npx) then
-            FV_Atm(1)%flagstruct%ntiles = 6
-            FV_Atm(1)%flagstruct%npy    = FV_Atm(1)%flagstruct%npx+1
-            FV_Atm(1)%flagstruct%npx    = FV_Atm(1)%flagstruct%npx+1
-         else
-            FV_Atm(1)%flagstruct%ntiles = 1
-            FV_Atm(1)%flagstruct%npy    = FV_Atm(1)%flagstruct%npy+1
-            FV_Atm(1)%flagstruct%npx    = FV_Atm(1)%flagstruct%npx+1
-         endif
-      endif
+! Register prototype of cubed sphere grid and associated regridders
+!------------------------------------------------------------------
+      call register_grid_and_regridders()
 
+! Read DT in case it is ever used by offline_tracer_advection
+!------------------------------------------------------------
       call MAPL_GetResource( MAPL, ndt, 'RUN_DT:', default=0, RC=STATUS )
       VERIFY_(STATUS)
       DT = ndt
 
-      ! Start up FV if AdvCore is running without FV3_DynCoreIsRunning
-      !--------------------------------------------------
-      if (.NOT. FV3_DynCoreIsRunning) then
-         call fv_init2(FV_Atm, dt, grids_on_my_pe, p_split)
-      end if
-
-      ! Ending with a Generic SetServices call is a MAPL requirement 
-      !-------------------------------------------------------------
+! Ending with a Generic SetServices call is a MAPL requirement 
+!-------------------------------------------------------------
       call MAPL_GenericSetServices    ( GC, rc=STATUS)
       VERIFY_(STATUS)
 
@@ -363,7 +325,7 @@ contains
       type(ESMF_Config)                  :: CF
       type (MAPL_MetaComp),      pointer :: MAPL
       type (ESMF_VM)                     :: VM
-      real, pointer                      :: temp2d(:,:)
+      real(REAL4), pointer               :: temp2d(:,:)
       integer                            :: IS, IE, JS, JE
       logical                            :: gridCreated
       type(ESMF_Grid)                    :: grid
@@ -484,7 +446,7 @@ contains
       REAL(FVPRC) :: PTOP, PINT
       REAL(REAL8) :: ptop_r8,pint_r8
 ! Temporaries for exports/tracers
-      REAL, POINTER :: temp3D(:,:,:)
+      real(REAL4),        pointer     ::    temp3D (:,:,:)
       real(REAL4),        pointer     :: tracer_r4 (:,:,:)
       real(REAL8),        pointer     :: tracer_r8 (:,:,:)
       character(len=ESMF_MAXSTR)    :: fieldName
