@@ -254,7 +254,7 @@ class FortranPythonConversion:
                 uc_ptr, (ied + 1 - isd + 1, jed - jsd + 1, npz)
             ),
             "vc": self._fortran_to_python_trf(
-                va_ptr, (ied - isd + 1, jed + 1 - jsd + 1, npz)
+                vc_ptr, (ied - isd + 1, jed + 1 - jsd + 1, npz)
             ),
             "mfxd": self._fortran_to_python_trf(
                 mfxd_ptr, (ie + 1 - is_ + 1, je - js + 1, npz)
