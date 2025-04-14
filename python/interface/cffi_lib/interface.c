@@ -10,7 +10,7 @@ void pyfv3_interface_c_init(
     int is, int ie, int js, int je,
     int isd, int ied, int jsd, int jed,
     float bdt, int nq_tot,
-    const float *ak, const float *bk)
+    const float *ak, const float *bk, const float *phis)
 {
     // Check magic number
     if (fv_flags->mn_123456789 != 123456789)
@@ -25,7 +25,7 @@ void pyfv3_interface_c_init(
         comm_c,
         npx, npy, npz, ntiles,
         is, ie, js, je, isd, ied, jsd, jed, bdt, nq_tot,
-        ak, bk);
+        ak, bk, phis);
 
     if (return_code < 0)
     {

@@ -32,6 +32,7 @@ class PYFV3_WRAPPER:
         tracer_count: int,
         ak_cdata: cffi.FFI.CData,
         bk_cdata: cffi.FFI.CData,
+        phis_cdata: cffi.FFI.CData,
         backend: str = "dace:gpu",
     ) -> None:
         self.rank = comm.Get_rank()
@@ -62,6 +63,11 @@ class PYFV3_WRAPPER:
         # Input pressure levels
         ak = self.f_py._fortran_to_numpy(ak_cdata, [npz + 1])
         bk = self.f_py._fortran_to_numpy(bk_cdata, [npz + 1])
+        # phis = self.f_py._fortran_to_numpy(phis_cdata, [npx, npy])
+        phis = self.f_py._fortran_to_python_trf(
+            phis_cdata,
+            [ied - isd + 1, jed - jsd + 1],
+        )
 
         # Setup pyFV3's dynamical core
         self.dycore = GeosDycoreWrapper(
@@ -70,6 +76,7 @@ class PYFV3_WRAPPER:
             comm=comm,
             ak=ak,
             bk=bk,
+            phis=phis,
             backend=self.backend,
             tracer_count=tracer_count,
             fortran_mem_space=fortran_mem_space,
@@ -325,6 +332,7 @@ def pyfv3_init(
     nq_tot: int,
     ak: cffi.FFI.CData,
     bk: cffi.FFI.CData,
+    phis: cffi.FFI.CData,
 ):
     # Read in the backend
     BACKEND = os.environ.get("GEOS_PYFV3_BACKEND", "gt:gpu")
@@ -351,4 +359,5 @@ def pyfv3_init(
         backend=BACKEND,
         ak_cdata=ak,
         bk_cdata=bk,
+        phis_cdata=phis,
     )

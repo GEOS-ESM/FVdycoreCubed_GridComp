@@ -180,7 +180,7 @@ module pyfv3_interface_mod
          comm, &
          npx, npy, npz, ntiles, &
          is, ie, js, je, isd, ied, jsd, jed, &
-         bdt, nq_tot, ak, bk &
+         bdt, nq_tot, ak, bk, phis &
          ) bind(c, name='pyfv3_interface_c_init')
 
          import c_int, c_float, c_double, fv_flags_interface_type
@@ -193,7 +193,7 @@ module pyfv3_interface_mod
          integer(kind=c_int), value, intent(in) :: isd, ied, jsd, jed
          real(kind=c_float), value, intent(in) :: bdt ! large time step
          integer(kind=c_int), value, intent(in) :: nq_tot ! transported tracers
-         real(kind=c_float), dimension(*), intent(in) :: ak, bk
+         real(kind=c_float), dimension(*), intent(in) :: ak, bk, phis
 
       end subroutine pyfv3_interface_f_init
 

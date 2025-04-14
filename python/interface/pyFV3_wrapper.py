@@ -12,6 +12,7 @@ from mpi4py import MPI
 import pyFV3
 from ndsl import (
     CompilationConfig,
+    Quantity,
     CubedSphereCommunicator,
     CubedSpherePartitioner,
     DaceConfig,
@@ -117,6 +118,7 @@ class GeosDycoreWrapper:
         fv_flags: FVFlags,
         ak: np.ndarray,
         bk: np.ndarray,
+        phis: np.ndarray,
         bdt: float,
         comm: Comm,
         backend: str,
@@ -176,7 +178,9 @@ class GeosDycoreWrapper:
 
         stencil_config = StencilConfig(
             compilation_config=CompilationConfig(
-                backend=backend, rebuild=False, validate_args=False
+                backend=backend,
+                rebuild=False,
+                validate_args=False,
             ),
         )
 
@@ -214,6 +218,7 @@ class GeosDycoreWrapper:
             tracer_list=tracer_names,
         )
         self.dycore_state.bdt = self.dycore_config.dt_atmos
+        self.dycore_state.phis.data[:-1, :-1] = phis[:]
 
         damping_coefficients = DampingCoefficients.new_from_metric_terms(metric_terms)
 

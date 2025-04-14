@@ -171,7 +171,7 @@ extern int pyfv3_interface_py_init(
     int npx, int npy, int npz, int ntiles,
     int is_, int ie, int js, int je, int isd, int ied, int jsd, int jed,
     float bdt, int nq_tot,
-    const float *ak, const float *bk);
+    const float *ak, const float *bk, const float *phis);
 
 extern int pyfv3_interface_py_run(
     void *comm_c,
