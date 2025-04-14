@@ -304,20 +304,20 @@ class FortranPythonConversion:
         self,
         array: PythonArray,
         dtype: type,
-        swap_axes: Optional[Tuple[int, int]] = None,
+        swap_axes: Tuple[int, int] | None = None,
     ) -> np.ndarray:
         """Copy back a numpy array in python layout to Fortran"""
 
         if self._python_targets_gpu:
             numpy_array = self._transform_and_download(array, dtype, swap_axes)
         else:
-            numpy_array = array.astype(dtype).flatten(order="F")
-            if swap_axes:
-                numpy_array = np.swapaxes(
-                    numpy_array,
+            if swap_axes is not None:
+                array = np.swapaxes(
+                    array,
                     swap_axes[0],
                     swap_axes[1],
                 )
+            numpy_array = array.astype(dtype).flatten(order="F")
         return numpy_array
 
     def _python_to_fortran_trf(

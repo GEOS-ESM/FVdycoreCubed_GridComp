@@ -560,13 +560,25 @@ class GeosDycoreWrapper:
             output_dict["q_con"] = self.dycore_state.q_con.data[:-1, :-1, :-1]
             output_dict["omga"] = self.dycore_state.omga.data[:-1, :-1, :-1]
             output_dict["diss_estd"] = self.dycore_state.diss_estd.data[:-1, :-1, :-1]
-            output_dict["qvapor"] = self.dycore_state.qvapor.data[:-1, :-1, :-1]
-            output_dict["qliquid"] = self.dycore_state.qliquid.data[:-1, :-1, :-1]
-            output_dict["qice"] = self.dycore_state.qice.data[:-1, :-1, :-1]
-            output_dict["qrain"] = self.dycore_state.qrain.data[:-1, :-1, :-1]
-            output_dict["qsnow"] = self.dycore_state.qsnow.data[:-1, :-1, :-1]
-            output_dict["qgraupel"] = self.dycore_state.qgraupel.data[:-1, :-1, :-1]
-            output_dict["qcld"] = self.dycore_state.qcld.data[:-1, :-1, :-1]
+            output_dict["qvapor"] = self.dycore_state.tracers["vapor"].data[
+                :-1, :-1, :-1
+            ]
+            output_dict["qliquid"] = self.dycore_state.tracers["liquid"].data[
+                :-1, :-1, :-1
+            ]
+            output_dict["qice"] = self.dycore_state.tracers["ice"].data[:-1, :-1, :-1]
+            output_dict["qrain"] = self.dycore_state.tracers["rain"].data[:-1, :-1, :-1]
+            output_dict["qsnow"] = self.dycore_state.tracers["snow"].data[:-1, :-1, :-1]
+            output_dict["qgraupel"] = self.dycore_state.tracers["graupel"].data[
+                :-1, :-1, :-1
+            ]
+            output_dict["qcld"] = self.dycore_state.tracers["cloud"].data[:-1, :-1, :-1]
+            # ????
+            # for q_index in range(7, self.dycore_state.tracers.count):
+            #     q_index_shift = q_index - 7
+            #     q[
+            #         isc:iec, jsc:jec, :, q_index_shift
+            #     ] = self.dycore_state.tracers[f"Tracer_{q_index_shift}"].data[:-1, :-1, :-1]
 
         return output_dict
 
