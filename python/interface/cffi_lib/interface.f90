@@ -51,7 +51,7 @@ module pyfv3_interface_mod
       integer(kind=c_int) :: n_zs_filter
       integer(kind=c_int) :: nord_zs_filter
       logical(kind=c_bool) :: full_zs_filter
-      logical(kind=c_bool) :: RF_fast
+      logical(kind=c_bool) :: rf_fast
       logical(kind=c_bool) :: Beljaars_TOFD
       logical(kind=c_bool) :: consv_am
       logical(kind=c_bool) :: do_sat_adj
@@ -287,7 +287,7 @@ contains
       c_fv_flags%n_zs_filter = fv_flags%n_zs_filter
       c_fv_flags%nord_zs_filter = fv_flags%nord_zs_filter
       c_fv_flags%full_zs_filter = fv_flags%full_zs_filter
-      c_fv_flags%RF_fast = fv_flags%RF_fast
+      c_fv_flags%rf_fast = fv_flags%RF_fast
       c_fv_flags%Beljaars_TOFD = fv_flags%Beljaars_TOFD
       c_fv_flags%consv_am = fv_flags%consv_am
       c_fv_flags%do_sat_adj = fv_flags%do_sat_adj
