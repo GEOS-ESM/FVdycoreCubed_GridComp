@@ -7,10 +7,10 @@ module FV_StateMod
 USE m_serialize, ONLY: &
   fs_add_savepoint_metainfo, &
   fs_create_savepoint, &
+  fs_disable_serialization, &
   fs_enable_serialization, &
-  fs_read_field, &
   fs_write_field, &
-  fs_disable_serialization
+  fs_read_field
 USE utils_ppser, ONLY:  &
   ppser_finalize, &
   ppser_get_mode, &
@@ -1459,7 +1459,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, &
             FV_Atm(1)%bd%isd, FV_Atm(1)%bd%ied, FV_Atm(1)%bd%jsd, FV_Atm(1)%bd%jed, &
             real(STATE%DT), 7, &
-            FV_Atm(1)%ak, FV_Atm(1)%bk)
+            FV_Atm(1)%ak, FV_Atm(1)%bk, FV_Atm(1)%phis)
       call ieee_set_halting_mode(ieee_all, halting_mode)
       end if
 #endif
