@@ -388,56 +388,7 @@ class FortranPythonConversion:
             self._python_to_fortran_trf(python_state["delp"], delp_ptr)
 
         with CUDAProfiler("q"):
-            # Dev Note: you should be able to unroll the below code in ptr + offset
-            # since we are using Fortran layout (column-first)
-            # q needs special handling
-            # self.q = np.empty(list(python_state["qvapor"].shape) + [self._num_tracers])
-            # self.q[:, :, :, 0] = python_state["qvapor"]
-            # self.q[:, :, :, 1] = python_state["qliquid"]
-            # self.q[:, :, :, 2] = python_state["qice"]
-            # self.q[:, :, :, 3] = python_state["qrain"]
-            # self.q[:, :, :, 4] = python_state["qsnow"]
-            # self.q[:, :, :, 5] = python_state["qgraupel"]
-            # self.q[:, :, :, 6] = python_state["qcld"]
-            # self._python_to_fortran_trf(self.q, q_ptr)
-
-            self._python_to_fortran_trf(python_state["qvapor"], q_ptr)
-            offset = python_state["qvapor"].size
-            self._python_to_fortran_trf(
-                python_state["qliquid"],
-                q_ptr,
-                ptr_offset=offset,
-            )
-            offset += python_state["qliquid"].size
-            self._python_to_fortran_trf(
-                python_state["qice"],
-                q_ptr,
-                ptr_offset=offset,
-            )
-            offset += python_state["qice"].size
-            self._python_to_fortran_trf(
-                python_state["qrain"],
-                q_ptr,
-                ptr_offset=offset,
-            )
-            offset += python_state["qrain"].size
-            self._python_to_fortran_trf(
-                python_state["qsnow"],
-                q_ptr,
-                ptr_offset=offset,
-            )
-            offset += python_state["qsnow"].size
-            self._python_to_fortran_trf(
-                python_state["qgraupel"],
-                q_ptr,
-                ptr_offset=offset,
-            )
-            offset += python_state["qgraupel"].size
-            self._python_to_fortran_trf(
-                python_state["qcld"],
-                q_ptr,
-                ptr_offset=offset,
-            )
+            self._python_to_fortran_trf(python_state["tracers"], q_ptr)
 
         with CUDAProfiler("ps/pe/pk/peln/pkz"):
             # ps/pe/pk/peln/pkz

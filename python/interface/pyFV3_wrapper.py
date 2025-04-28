@@ -209,6 +209,7 @@ class GeosDycoreWrapper:
             config=stencil_config, grid_indexing=self._grid_indexing
         )
 
+        self.tracer_count = tracer_count
         tracer_names = TRACERS_IN_FORTRAN + [
             f"Tracer_{idx}" for idx in range(tracer_count - len(TRACERS_IN_FORTRAN))
         ]
@@ -502,33 +503,10 @@ class GeosDycoreWrapper:
                 self.dycore_state.diss_estd.data[:-1, :-1, :-1],
             )
 
+            # Tracers
             safe_assign_array(
-                output_dict["qvapor"],
-                self.dycore_state.tracers["vapor"].data[:-1, :-1, :-1],
-            )
-            safe_assign_array(
-                output_dict["qliquid"],
-                self.dycore_state.tracers["liquid"].data[:-1, :-1, :-1],
-            )
-            safe_assign_array(
-                output_dict["qice"],
-                self.dycore_state.tracers["ice"].data[:-1, :-1, :-1],
-            )
-            safe_assign_array(
-                output_dict["qrain"],
-                self.dycore_state.tracers["rain"].data[:-1, :-1, :-1],
-            )
-            safe_assign_array(
-                output_dict["qsnow"],
-                self.dycore_state.tracers["snow"].data[:-1, :-1, :-1],
-            )
-            safe_assign_array(
-                output_dict["qgraupel"],
-                self.dycore_state.tracers["graupel"].data[:-1, :-1, :-1],
-            )
-            safe_assign_array(
-                output_dict["qcld"],
-                self.dycore_state.tracers["cloud"].data[:-1, :-1, :-1],
+                output_dict["tracers"],
+                self.dycore_state.tracers.as_4D_array()[:-1, :-1, :-1, :],
             )
         else:
             output_dict["u"] = self.dycore_state.u.data[:-1, :, :-1]
@@ -560,25 +538,11 @@ class GeosDycoreWrapper:
             output_dict["q_con"] = self.dycore_state.q_con.data[:-1, :-1, :-1]
             output_dict["omga"] = self.dycore_state.omga.data[:-1, :-1, :-1]
             output_dict["diss_estd"] = self.dycore_state.diss_estd.data[:-1, :-1, :-1]
-            output_dict["qvapor"] = self.dycore_state.tracers["vapor"].data[
-                :-1, :-1, :-1
+
+            # Tracers
+            output_dict["tracers"] = self.dycore_state.tracers.as_4D_array()[
+                :-1, :-1, :-1, :
             ]
-            output_dict["qliquid"] = self.dycore_state.tracers["liquid"].data[
-                :-1, :-1, :-1
-            ]
-            output_dict["qice"] = self.dycore_state.tracers["ice"].data[:-1, :-1, :-1]
-            output_dict["qrain"] = self.dycore_state.tracers["rain"].data[:-1, :-1, :-1]
-            output_dict["qsnow"] = self.dycore_state.tracers["snow"].data[:-1, :-1, :-1]
-            output_dict["qgraupel"] = self.dycore_state.tracers["graupel"].data[
-                :-1, :-1, :-1
-            ]
-            output_dict["qcld"] = self.dycore_state.tracers["cloud"].data[:-1, :-1, :-1]
-            # ????
-            # for q_index in range(7, self.dycore_state.tracers.count):
-            #     q_index_shift = q_index - 7
-            #     q[
-            #         isc:iec, jsc:jec, :, q_index_shift
-            #     ] = self.dycore_state.tracers[f"Tracer_{q_index_shift}"].data[:-1, :-1, :-1]
 
         return output_dict
 
@@ -634,13 +598,14 @@ class GeosDycoreWrapper:
             self.output_dict["omga"] = np.empty((shape_centered))
             self.output_dict["diss_estd"] = np.empty((shape_centered))
 
-            self.output_dict["qvapor"] = np.empty((shape_centered))
-            self.output_dict["qliquid"] = np.empty((shape_centered))
-            self.output_dict["qice"] = np.empty((shape_centered))
-            self.output_dict["qrain"] = np.empty((shape_centered))
-            self.output_dict["qsnow"] = np.empty((shape_centered))
-            self.output_dict["qgraupel"] = np.empty((shape_centered))
-            self.output_dict["qcld"] = np.empty((shape_centered))
+            self.output_dict["tracers"] = np.empty(
+                (
+                    shape_centered[0],
+                    shape_centered[1],
+                    shape_centered[2],
+                    self.tracer_count,
+                )
+            )
         else:
             self.output_dict["u"] = None
             self.output_dict["v"] = None
@@ -665,10 +630,4 @@ class GeosDycoreWrapper:
             self.output_dict["q_con"] = None
             self.output_dict["omga"] = None
             self.output_dict["diss_estd"] = None
-            self.output_dict["qvapor"] = None
-            self.output_dict["qliquid"] = None
-            self.output_dict["qice"] = None
-            self.output_dict["qrain"] = None
-            self.output_dict["qsnow"] = None
-            self.output_dict["qgraupel"] = None
-            self.output_dict["qcld"] = None
+            self.output_dict["tracers"] = None
