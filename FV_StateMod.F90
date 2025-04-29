@@ -2340,24 +2340,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (mpp_pe()==0) print*,''
     if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
     allocate( DEBUG_ARRAY(isc:iec,jsc:jec,npz) )
-  endif     
-  do n=1,STATE%GRID%NQ
-     if (state%vars%tracer(n)%is_r4) then
-        where (state%vars%tracer(n)%content_r4 < tiny(0.0))
-               state%vars%tracer(n)%content_r4 = 0.0
-        end where
-        if (DEBUG_ADV) DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content_r4
-     else
-        where (state%vars%tracer(n)%content < tiny(0.0))
-               state%vars%tracer(n)%content = 0.0
-        end where
-        if (DEBUG_ADV) DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content
-     endif
-     if (DEBUG_ADV) then
-        call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
-     endif
-  enddo
-  if (DEBUG_ADV) then
+    do n=1,STATE%GRID%NQ
+       if (state%vars%tracer(n)%is_r4) then
+          DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content_r4
+       else
+          DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content
+       endif
+       call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+    enddo
     deallocate ( DEBUG_ARRAY )
     if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
     if (mpp_pe()==0) print*,''
