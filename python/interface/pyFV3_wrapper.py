@@ -4,7 +4,6 @@ import os
 from datetime import timedelta
 from typing import Dict, List, Tuple
 
-import f90nml
 import numpy as np
 from gt4py.cartesian.config import build_settings as gt_build_settings
 from mpi4py import MPI
@@ -12,7 +11,6 @@ from mpi4py import MPI
 import pyFV3
 from ndsl import (
     CompilationConfig,
-    Quantity,
     CubedSphereCommunicator,
     CubedSpherePartitioner,
     DaceConfig,
@@ -38,17 +36,16 @@ from ndsl.optional_imports import cupy as cp
 from ndsl.utils import safe_assign_array
 from fv_flags import FVFlags, FVFlags_to_DycoreConfig
 from ndsl.comm.mpi import MPIComm
-from pyFV3.tracers import Tracers
 
-TRACERS_IN_FORTRAN = [
-    "vapor",
-    "liquid",
-    "ice",
-    "rain",
-    "snow",
-    "graupel",
-    "cloud",
-]
+TRACERS_IN_FORTRAN = {
+    "vapor": 0,
+    "liquid": 1,
+    "ice": 2,
+    "rain": 3,
+    "snow": 4,
+    "graupel": 5,
+    "cloud": 6,
+}
 
 
 class StencilBackendCompilerOverride:
@@ -210,7 +207,8 @@ class GeosDycoreWrapper:
         )
 
         self.tracer_count = tracer_count
-        tracer_names = TRACERS_IN_FORTRAN + [
+        tracer_names = [name for name in TRACERS_IN_FORTRAN.keys()]
+        tracer_names += [
             f"Tracer_{idx}" for idx in range(tracer_count - len(TRACERS_IN_FORTRAN))
         ]
 
@@ -415,18 +413,19 @@ class GeosDycoreWrapper:
 
         # tracer quantities should be a 4d array in order:
         # vapor, liquid, ice, rain, snow, graupel, cloud
-        safe_assign_array(state.tracers["vapor"].view[:], q[isc:iec, jsc:jec, :, 0])
-        safe_assign_array(state.tracers["liquid"].view[:], q[isc:iec, jsc:jec, :, 1])
-        safe_assign_array(state.tracers["ice"].view[:], q[isc:iec, jsc:jec, :, 2])
-        safe_assign_array(state.tracers["rain"].view[:], q[isc:iec, jsc:jec, :, 3])
-        safe_assign_array(state.tracers["snow"].view[:], q[isc:iec, jsc:jec, :, 4])
-        safe_assign_array(state.tracers["graupel"].view[:], q[isc:iec, jsc:jec, :, 5])
-        safe_assign_array(state.tracers["cloud"].view[:], q[isc:iec, jsc:jec, :, 6])
-        for q_index in range(7, state.tracers.count):
+        # This codes works because Fortran as moved all those tracers at the top of the list
+        # it will fail if they are not contiguous (second loop)
+        for name, index in TRACERS_IN_FORTRAN.items():
+            safe_assign_array(
+                state.tracers[name].view[:],
+                q[isc:iec, jsc:jec, :, index],
+            )
+        for q_index in range(len(TRACERS_IN_FORTRAN), state.tracers.count):
             q_index_shift = q_index - 7
-            state.tracers[f"Tracer_{q_index_shift}"] = q[
-                isc:iec, jsc:jec, :, q_index_shift
-            ]
+            safe_assign_array(
+                state.tracers[f"Tracer_{q_index_shift}"].view[:],
+                q[isc:iec, jsc:jec, :, q_index_shift],
+            )
 
         return state
 
@@ -506,7 +505,7 @@ class GeosDycoreWrapper:
             # Tracers
             safe_assign_array(
                 output_dict["tracers"],
-                self.dycore_state.tracers.as_4D_array()[:-1, :-1, :-1, :],
+                self.dycore_state.tracers.as_4D_array(),
             )
         else:
             output_dict["u"] = self.dycore_state.u.data[:-1, :, :-1]
@@ -540,9 +539,7 @@ class GeosDycoreWrapper:
             output_dict["diss_estd"] = self.dycore_state.diss_estd.data[:-1, :-1, :-1]
 
             # Tracers
-            output_dict["tracers"] = self.dycore_state.tracers.as_4D_array()[
-                :-1, :-1, :-1, :
-            ]
+            output_dict["tracers"] = self.dycore_state.tracers.as_4D_array()
 
         return output_dict
 

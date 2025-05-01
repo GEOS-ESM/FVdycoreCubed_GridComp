@@ -1391,7 +1391,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
             FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, &
             FV_Atm(1)%bd%isd, FV_Atm(1)%bd%ied, FV_Atm(1)%bd%jsd, FV_Atm(1)%bd%jed, &
-            real(STATE%DT), 7, &
+            real(STATE%DT), FV_Atm(1)%ncnst, &
             FV_Atm(1)%ak, FV_Atm(1)%bk, FV_Atm(1)%phis)
       call ieee_set_halting_mode(ieee_all, halting_mode)
       end if
@@ -2033,7 +2033,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        call cpu_time(finish)
        if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
     else
-       call cpu_time(start)
        call pyfv3_interface_f_run( &
             comm, &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &

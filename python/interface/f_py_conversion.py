@@ -382,8 +382,8 @@ class FortranPythonConversion:
             self._python_to_fortran_trf(python_state["w"], w_ptr)
             self._python_to_fortran_trf(python_state["delz"], delz_ptr)
 
-        with CUDAProfiler("pt/delp/q"):
-            # pt/delp/q
+        with CUDAProfiler("pt/delp"):
+            # pt/delp
             self._python_to_fortran_trf(python_state["pt"], pt_ptr)
             self._python_to_fortran_trf(python_state["delp"], delp_ptr)
 
