@@ -74,6 +74,7 @@ private
   logical :: fix_mass = .true.
   integer :: CASE_ID = 11
   integer :: AdvCore_Advection = 0
+  integer :: FV3_QSPLIT = 0
   character(LEN=ESMF_MAXSTR) :: FV3_CONFIG
 
   public FV_Atm
@@ -437,6 +438,8 @@ contains
   call MAPL_GetResource( MAPL, AdvCore_Advection, label='AdvCore_Advection:', default=AdvCore_Advection, rc=status )
   VERIFY_(STATUS)
 
+  call MAPL_GetResource( MAPL, FV3_QSPLIT, label='FV3_QSPLIT:', default=FV3_QSPLIT, rc=status )
+  VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, ADJUST_DT,       label='ADJUST_DT:'   , default=ADJUST_DT, rc=status )
   VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, INT_fix_mass,    label='fix_mass:'    , default=INT_fix_mass, rc=status )
@@ -1944,13 +1947,13 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (run_gtfv3 == 0) then
        call cpu_time(start)
 #endif
-
+       if (FV3_QSPLIT == 0) FV3_QSPLIT = FV_Atm(1)%flagstruct%q_split
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
             FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
-            state%ksplit, state%nsplit, FV_Atm(1)%flagstruct%q_split, &
+            state%ksplit, state%nsplit, FV3_QSPLIT, &
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
             FV_Atm(1)%flagstruct%hydrostatic, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
@@ -2337,24 +2340,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (mpp_pe()==0) print*,''
     if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
     allocate( DEBUG_ARRAY(isc:iec,jsc:jec,npz) )
-  endif     
-  do n=1,STATE%GRID%NQ
-     if (state%vars%tracer(n)%is_r4) then
-        where (state%vars%tracer(n)%content_r4 < tiny(0.0))
-               state%vars%tracer(n)%content_r4 = 0.0
-        end where
-        if (DEBUG_ADV) DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content_r4
-     else
-        where (state%vars%tracer(n)%content < tiny(0.0))
-               state%vars%tracer(n)%content = 0.0
-        end where
-        if (DEBUG_ADV) DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content
-     endif
-     if (DEBUG_ADV) then
-        call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
-     endif
-  enddo
-  if (DEBUG_ADV) then
+    do n=1,STATE%GRID%NQ
+       if (state%vars%tracer(n)%is_r4) then
+          DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content_r4
+       else
+          DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content
+       endif
+       call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+    enddo
     deallocate ( DEBUG_ARRAY )
     if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
     if (mpp_pe()==0) print*,''

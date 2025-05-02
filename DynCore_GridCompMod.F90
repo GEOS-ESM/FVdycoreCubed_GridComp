@@ -6617,7 +6617,10 @@ end subroutine RUN
 
 ! Add Diabatic Forcing to State Variables
 ! ---------------------------------------
+    call MAPL_TimerOn (GENSTATE,"PHYS_ADD_INCS")
     call ADD_INCS ( STATE,IMPORT,DT )
+    call MAPL_TimerOff(GENSTATE,"PHYS_ADD_INCS")
+
 
     if (DYN_DEBUG) call DEBUG_FV_STATE('PHYSICS ADD_INCS',STATE)
 

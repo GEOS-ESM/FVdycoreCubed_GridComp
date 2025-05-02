@@ -75,6 +75,7 @@ module AdvCore_GridCompMod
       implicit none
       private
 
+      integer     :: QSPLIT
       integer     :: nx, ny
       integer     :: npes_x, npes_y
       real(FVPRC) :: dt
@@ -329,6 +330,10 @@ contains
 
       call MAPL_GetResource( MAPL, rpt_mass, 'ADV_CORE_REPORT_TRACER_MASS:', default=rpt_mass, RC=STATUS )
       VERIFY_(STATUS)
+
+      call MAPL_GetResource( MAPL, QSPLIT, 'ADV_QSPLIT:', default=0, RC=STATUS )
+      VERIFY_(STATUS)
+
 
       ! Start up FV if AdvCore is running without FV3_DynCoreIsRunning
       !--------------------------------------------------
@@ -758,7 +763,7 @@ contains
          call offline_tracer_advection(TRACERS, PLE0, PLE1, MFX, MFY, CX, CY, &
                                        FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, FV_Atm(1)%bd, &
                                        FV_Atm(1)%domain, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz,   &
-                                       NQ, dt)
+                                       NQ, dt, QSPLIT)
 
          ! Get Tracer Mass after advection
          !--------------------------------
