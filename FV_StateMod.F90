@@ -74,6 +74,7 @@ private
   logical :: fix_mass = .true.
   integer :: CASE_ID = 11
   integer :: AdvCore_Advection = 0
+  integer :: FV3_QSPLIT = 0
   character(LEN=ESMF_MAXSTR) :: FV3_CONFIG
 
   public FV_Atm
@@ -437,6 +438,8 @@ contains
   call MAPL_GetResource( MAPL, AdvCore_Advection, label='AdvCore_Advection:', default=AdvCore_Advection, rc=status )
   VERIFY_(STATUS)
 
+  call MAPL_GetResource( MAPL, FV3_QSPLIT, label='FV3_QSPLIT:', default=FV3_QSPLIT, rc=status )
+  VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, ADJUST_DT,       label='ADJUST_DT:'   , default=ADJUST_DT, rc=status )
   VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, INT_fix_mass,    label='fix_mass:'    , default=INT_fix_mass, rc=status )
@@ -642,9 +645,10 @@ contains
       FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
      ! 6th order divergence default damping options
       FV_Atm(1)%flagstruct%nord = 2
-      FV_Atm(1)%flagstruct%dddmp = 0.2  ! Smagorinsky damping
-      FV_Atm(1)%flagstruct%d4_bg = 0.12
-      FV_Atm(1)%flagstruct%d2_bg = 0.0
+      FV_Atm(1)%flagstruct%dddmp = 0.2  ! Smagorinsky damping coef
+      FV_Atm(1)%flagstruct%d4_bg_top = 0.12 ! High-order Divg Damping coef
+      FV_Atm(1)%flagstruct%d4_bg_bot = 0.12 ! High-order Divg Damping coef
+      FV_Atm(1)%flagstruct%d2_bg = 0.0  ! 2nd order Divg Damping coef
       FV_Atm(1)%flagstruct%d_ext = 0.0  ! External damping
      ! Local Richardson-number turbulent mixing 
       FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
@@ -720,7 +724,8 @@ contains
        ! 2nd order damping
         FV_Atm(1)%flagstruct%nord = 0
         FV_Atm(1)%flagstruct%dddmp = 0.2
-        FV_Atm(1)%flagstruct%d4_bg = 0.0
+        FV_Atm(1)%flagstruct%d4_bg_top = 0.0
+        FV_Atm(1)%flagstruct%d4_bg_bot = 0.0
         FV_Atm(1)%flagstruct%d2_bg = 0.0075
         FV_Atm(1)%flagstruct%d_ext = 0.02
        ! disable vorticity damping
@@ -1942,13 +1947,13 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (run_gtfv3 == 0) then
        call cpu_time(start)
 #endif
-
+       if (FV3_QSPLIT == 0) FV3_QSPLIT = FV_Atm(1)%flagstruct%q_split
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
             FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
-            state%ksplit, state%nsplit, FV_Atm(1)%flagstruct%q_split, &
+            state%ksplit, state%nsplit, FV3_QSPLIT, &
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
             FV_Atm(1)%flagstruct%hydrostatic, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
@@ -2335,24 +2340,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (mpp_pe()==0) print*,''
     if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
     allocate( DEBUG_ARRAY(isc:iec,jsc:jec,npz) )
-  endif     
-  do n=1,STATE%GRID%NQ
-     if (state%vars%tracer(n)%is_r4) then
-        where (state%vars%tracer(n)%content_r4 < tiny(0.0))
-               state%vars%tracer(n)%content_r4 = 0.0
-        end where
-        if (DEBUG_ADV) DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content_r4
-     else
-        where (state%vars%tracer(n)%content < tiny(0.0))
-               state%vars%tracer(n)%content = 0.0
-        end where
-        if (DEBUG_ADV) DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content
-     endif
-     if (DEBUG_ADV) then
-        call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
-     endif
-  enddo
-  if (DEBUG_ADV) then
+    do n=1,STATE%GRID%NQ
+       if (state%vars%tracer(n)%is_r4) then
+          DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content_r4
+       else
+          DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content
+       endif
+       call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+    enddo
     deallocate ( DEBUG_ARRAY )
     if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
     if (mpp_pe()==0) print*,''
@@ -4832,7 +4827,8 @@ subroutine echo_fv3_setup()
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%nord ,format='("FV3 nord: ",(I3))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%dddmp ,format='("FV3 dddmp: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d2_bg ,format='("FV3 d2_bg: ",(F7.5))' )
-   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d4_bg ,format='("FV3 d4_bg: ",(F7.5))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d4_bg_top ,format='("FV3 d4_bg_top: ",(F7.5))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d4_bg_bot ,format='("FV3 d4_bg_bot: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%vtdm4 ,format='("FV3 vtdm4: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d2_bg_k1 ,format='("FV3 d2_bg_k1: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d2_bg_k2 ,format='("FV3 d2_bg_k2: ",(F7.5))' )
@@ -4981,19 +4977,21 @@ end subroutine echo_fv3_setup
    real(FVPRC), allocatable :: w_dt(:,:,:)
 
    integer :: nord
-   real(FVPRC):: dddmp, d4_bg, d2_bg, d_ext
+   real(FVPRC):: dddmp, d4_bg_top, d4_bg_bot, d2_bg, d_ext
 
 ! Save input damping state
    nord  = FV_Atm(1)%flagstruct%nord
    dddmp = FV_Atm(1)%flagstruct%dddmp
-   d4_bg = FV_Atm(1)%flagstruct%d4_bg
+   d4_bg_top = FV_Atm(1)%flagstruct%d4_bg_top
+   d4_bg_bot = FV_Atm(1)%flagstruct%d4_bg_bot
    d2_bg = FV_Atm(1)%flagstruct%d2_bg
    d_ext = FV_Atm(1)%flagstruct%d_ext
 
 ! Use 2nd order damping for spinup
    FV_Atm(1)%flagstruct%nord = 0
    FV_Atm(1)%flagstruct%dddmp = 0.2
-   FV_Atm(1)%flagstruct%d4_bg = 0.0
+   FV_Atm(1)%flagstruct%d4_bg_top = 0.0
+   FV_Atm(1)%flagstruct%d4_bg_bot = 0.0
    FV_Atm(1)%flagstruct%d2_bg = 0.0075
    FV_Atm(1)%flagstruct%d_ext = 0.02
 
@@ -5188,7 +5186,8 @@ end subroutine echo_fv3_setup
 ! Reset input damping parameters
      FV_Atm(1)%flagstruct%nord  = nord
      FV_Atm(1)%flagstruct%dddmp = dddmp
-     FV_Atm(1)%flagstruct%d4_bg = d4_bg
+     FV_Atm(1)%flagstruct%d4_bg_top = d4_bg_top
+     FV_Atm(1)%flagstruct%d4_bg_bot = d4_bg_bot
      FV_Atm(1)%flagstruct%d2_bg = d2_bg
      FV_Atm(1)%flagstruct%d_ext = d_ext
 
