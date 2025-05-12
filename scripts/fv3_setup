@@ -198,47 +198,10 @@ set CUBE_AGCM = ""
 set AGCM_NF = 6
 set GRID_TYPE = "Cubed-Sphere"
 
-echo "Enter the ${C1}Vertical Resolution${CN}: ${C2}LM${CN} (Default: 72)"
+echo "Enter the ${C1}Vertical Resolution${CN}: ${C2}LM${CN} (Default: 181)"
 set   AGCM_LM = $<
 if( .$AGCM_LM == . ) then
-  set AGCM_LM = 72
-endif
-
-
-#######################################################################
-#         Test to see if you want to use non-hydrostatic
-#######################################################################
-
-ASKHYDRO:
-
-set DEFAULT_NON_HYDROSTATIC = FALSE
-echo "Do you wish to run ${C1}NON-HYDROSTATIC${CN} dynamics? (Default: ${C2}${DEFAULT_NON_HYDROSTATIC}${CN})"
-
-set   DO_NONHYDRO  = $<
-if( .$DO_NONHYDRO == . ) then
-   set   DO_NONHYDRO  = $DEFAULT_NON_HYDROSTATIC
-else
-   set   DO_NONHYDRO  = `echo   $DO_NONHYDRO | tr "[:lower:]" "[:upper:]"`
-   if(  $DO_NONHYDRO == "Y"     | \
-        $DO_NONHYDRO == "YES"   | \
-        $DO_NONHYDRO == "T"     | \
-        $DO_NONHYDRO == "TRUE"  ) set DO_NONHYDRO = TRUE
-   if(  $DO_NONHYDRO == "N"     | \
-        $DO_NONHYDRO == "NO"    | \
-        $DO_NONHYDRO == "F"     | \
-        $DO_NONHYDRO == "FALSE" ) set DO_NONHYDRO = FALSE
-
-   if( $DO_NONHYDRO != "TRUE" & $DO_NONHYDRO != "FALSE" ) then
-      echo
-      echo "${C1}NON-HYDROSTATIC${CN} must be set equal to ${C2}TRUE/YES${CN} or ${C2}FALSE/NO${CN}!"
-      goto ASKHYDRO
-   endif
-endif
-
-if ( $DO_NONHYDRO == "TRUE" ) then
-   set USE_NONHYDRO = 1
-else
-   set USE_NONHYDRO = 0
+  set AGCM_LM = 181
 endif
 
 #######################################################################
@@ -358,15 +321,16 @@ else if ( $SITE == 'NAS' ) then
    if ($MODEL == 'has') then
       set NCPUS_PER_NODE = 24
    else if ($MODEL == 'bro') then
-      set NCPUS_PER_NODE = 28
+      # We use 24 of 28 cores per node for even division
+      set NCPUS_PER_NODE = 24
    else if ($MODEL == 'sky_ele') then
       set NCPUS_PER_NODE = 40
    else if ($MODEL == 'cas_ait') then
       set NCPUS_PER_NODE = 40
    else if ($MODEL == 'rom_ait') then
-      set NCPUS_PER_NODE = 128
+      set NCPUS_PER_NODE = 120
    else if ($MODEL == 'mil_ait') then
-      set NCPUS_PER_NODE = 128
+      set NCPUS_PER_NODE = 120
    endif
 
 else if( $SITE == 'AWS' | $SITE == 'Azure' ) then
@@ -428,62 +392,68 @@ set HIST_IM  = `expr $AGCM_IM \* 4`
 set HIST_JM  = `expr $AGCM_IM \* 2 + 1`
 
 if( $AGCM_IM <=  12 ) then
-   set DT = 900
+   set DT = 3600
    set FV_NX = 2
 else if( $AGCM_IM <=  24 ) then
-   set DT = 900
+   set DT = 1800
    set FV_NX = 4
 else if( $AGCM_IM <=  48 ) then
-   set DT = 450
-   set FV_NX = 4
-else if( $AGCM_IM <=  90 ) then
-   set DT = 450
-   set FV_NX = 4
-else if( $AGCM_IM <=  180 ) then
-   set DT = 450
+   set DT = 1200
    set FV_NX = 6
+else if( $AGCM_IM <=  90 ) then
+   set DT = 900
+   set FV_NX = 10
+else if( $AGCM_IM <=  180 ) then
+   set DT = 600
+   set FV_NX = 20
    set NUM_READERS = 2
    set DEF_IOS_NDS = 2
 else if( $AGCM_IM <= 360 ) then
    set DT = 450
-   set FV_NX = 12
+   set FV_NX = 30
    set NUM_READERS = 4
    set DEF_IOS_NDS = 2
 else if( $AGCM_IM <= 500 ) then
    set DT = 450
-   set FV_NX = 12
+   set FV_NX = 30
    set NUM_READERS = 4
    set USE_SHMEM = 1
    set DEF_IOS_NDS = 2
 else if( $AGCM_IM <= 720 ) then
-   set DT = 450
-   set FV_NX = 16
+   set DT = 300
+   set FV_NX = 40
    set NUM_READERS = 6
    set USE_SHMEM = 1
    set DEF_IOS_NDS = 3
-else if( $AGCM_IM <= 1440 ) then
-   set DT = 450
-   set FV_NX = 30
+else if( $AGCM_IM <= 1120 ) then
+   set DT = 300
+   set FV_NX = 60
    set NUM_READERS = 6
    set USE_SHMEM = 1
    set DEF_IOS_NDS = 4
-else if( $AGCM_IM <= 1536 ) then
-   set DT = 90
-   set FV_NX = 64
+else if( $AGCM_IM <= 1440 ) then
+   set DT = 225
+   set FV_NX = 80
+   set NUM_READERS = 6
+   set USE_SHMEM = 1
+   set DEF_IOS_NDS = 4
+else if( $AGCM_IM <= 2880 ) then
+   set DT = 150
+   set FV_NX = 80
    set NUM_READERS = 6
    set USE_SHMEM = 1
    set DEF_IOS_NDS = 4
 else
-   set DT = 45
-   set FV_NX = 64
+   set DT = 75
+   set FV_NX = 80
    set NUM_READERS = 6
    set USE_SHMEM = 1
    set DEF_IOS_NDS = 5
 endif
 
-# On desktop, we default to 6 processes
+# On SITE == GMAO.desktop, we default to 6 processes
 # Must be set here due to MODEL_NPES calc below
-if( $SITE != 'NAS' && $SITE != 'NCCS' && $SITE != 'AWS' && $SITE != 'Azure' ) then
+if( $SITE == 'GMAO.desktop' ) then
    set FV_NX = 1
 endif
 
@@ -643,9 +613,6 @@ set     GEOSDIR  = $GEOSDEF
 #
 setenv GEOSSRC  ${GEOSDIR}
 setenv GEOSBIN  ${GEOSDIR}/bin
-setenv GEOSETC  ${GEOSDIR}/etc
-
-setenv GEOSUTIL ${GEOSSRC}
 
 #######################################################################
 #                    Check for Group ID Sponsor Code
@@ -831,10 +798,6 @@ s?@BATCH_OUTPUTNAME?$BATCH_OUTPUTNAME?g
 s?@BATCH_JOINOUTERR?$BATCH_JOINOUTERR?g
 s?@SITE?$SITE?g
 s?@GEOSDIR?$GEOSDIR?g
-s?@GEOSSRC?$GEOSSRC?g
-s?@GEOSBIN?$GEOSBIN?g
-s?@GEOSETC?$GEOSETC?g
-s?@GEOSUTIL?$GEOSUTIL?g
 s?@SINGULARITY_BUILD?$SINGULARITY_BUILD?g
 s?@NATIVE_BUILD?$NATIVE_BUILD?g
 s?@SINGULARITY_SANDBOX?$SINGULARITY_SANDBOX?g
@@ -850,7 +813,6 @@ s/@FV_NY/$FV_NY/g
 s/@FV_PRECISION/$FV_PRECISION/g
 s/@USE_SHMEM/$USE_SHMEM/g
 s/@USE_IOSERVER/$USE_IOSERVER/g
-s/@USE_NONHYDRO/$USE_NONHYDRO/g
 s/@IOS_NDS/$IOS_NDS/g
 s/@NCPUS_PER_NODE/$NCPUS_PER_NODE/g
 s/@NUM_READERS/$NUM_READERS/g
