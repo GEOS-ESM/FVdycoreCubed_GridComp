@@ -2010,7 +2010,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     if (run_pyfv3 == 0) then
        call cpu_time(start)
 #endif
-
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
             FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
@@ -2033,7 +2032,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        call cpu_time(finish)
        if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
     else
-       call pyfv3_interface_f_run( &
+      call cpu_time(start)
+      call pyfv3_interface_f_run( &
             comm, &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
             FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
