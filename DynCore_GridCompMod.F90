@@ -1047,6 +1047,15 @@ contains
      VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                  &
+         SHORT_NAME = 'MZ',                                       &
+         LONG_NAME  = 'vertical_mass_flux',                        &
+         UNITS      = 'kg m-2 s-1',                                &
+         PRECISION  = ESMF_KIND_R4,                                &
+         DIMS       = MAPL_DimsHorzVert,                           &
+         VLOCATION  = MAPL_VLocationEdge,               RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'PV',                                        &
          LONG_NAME  = 'ertels_isentropic_potential_vorticity',     &
          UNITS      = 'm+2 kg-1 s-1',                            &
@@ -4533,6 +4542,7 @@ subroutine Run(gc, import, export, clock, rc)
 ! Compute and return the vertical mass flux
       call getVerticalMassFlux(mfxxyz, mfyxyz, mfzxyz, dt)
       call FILLOUT3r8 (export, 'MFZ' , mfzxyz , rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'MZ' , mfzxyz , rc=status); VERIFY_(STATUS)
 
       call FILLOUT3 (export, 'U'      , ur      , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'V'      , vr      , rc=status); VERIFY_(STATUS)
