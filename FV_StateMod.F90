@@ -1398,7 +1398,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 #endif
 
    endif
-
    select case ( FV_Atm(1)%flagstruct%nwat )
   ! Assign Tracer Indices for FV3
    case (6:7)
@@ -2033,6 +2032,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
     else
       call cpu_time(start)
+
       call pyfv3_interface_f_run( &
             comm, &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
@@ -2042,7 +2042,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%layout(1), FV_Atm(1)%layout(2), adiabatic, &
             ! input/output
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-            FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,1:7), &
+            FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,:), &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
             FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &

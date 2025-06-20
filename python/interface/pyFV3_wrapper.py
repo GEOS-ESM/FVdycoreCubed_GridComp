@@ -29,7 +29,7 @@ import ndsl.constants
 from ndsl.comm.comm_abc import Comm
 from ndsl.dsl.dace.build import set_distributed_caches
 from ndsl.dsl.gt4py_utils import is_gpu_backend
-from ndsl.dsl.typing import floating_point_precision
+from ndsl.dsl.typing import get_precision
 from ndsl.grid import DampingCoefficients, GridData, MetricTerms
 from ndsl.logging import ndsl_log
 from ndsl.optional_imports import cupy as cp
@@ -214,7 +214,7 @@ class GeosDycoreWrapper:
 
         self.dycore_state = pyFV3.DycoreState.init_zeros(
             quantity_factory=quantity_factory,
-            tracer_list=tracer_names,
+            tracer_count=tracer_count,
         )
         self.dycore_state.bdt = self.dycore_config.dt_atmos
         self.dycore_state.phis.data[:-1, :-1] = phis[:]
@@ -260,7 +260,7 @@ class GeosDycoreWrapper:
             f"             dt : {self.dycore_state.bdt}\n"
             f"         bridge : {self._fortran_mem_space} > {self._pace_mem_space}\n"
             f"        backend : {backend}\n"
-            f"          float : {floating_point_precision()}bit"
+            f"          float : {get_precision()}bit"
             f"  orchestration : {self._is_orchestrated}\n"
             f"          sizer : {sizer.nx}x{sizer.ny}x{sizer.nz}"
             f"(halo: {sizer.n_halo})\n"
@@ -331,7 +331,6 @@ class GeosDycoreWrapper:
                 cyd,
                 diss_estd,
             )
-
         # Enter orchestrated code - if applicable
         self._critical_path()
 
@@ -415,17 +414,7 @@ class GeosDycoreWrapper:
         # vapor, liquid, ice, rain, snow, graupel, cloud
         # This codes works because Fortran as moved all those tracers at the top of the list
         # it will fail if they are not contiguous (second loop)
-        for name, index in TRACERS_IN_FORTRAN.items():
-            safe_assign_array(
-                state.tracers[name].view[:],
-                q[isc:iec, jsc:jec, :, index],
-            )
-        for q_index in range(len(TRACERS_IN_FORTRAN), state.tracers.count):
-            q_index_shift = q_index - 7
-            safe_assign_array(
-                state.tracers[f"Tracer_{q_index_shift}"].view[:],
-                q[isc:iec, jsc:jec, :, q_index_shift],
-            )
+        state.tracers.quantity.data[isc:iec,jsc:jec,:-1,:] = q[isc:iec, jsc:jec, :, :]
 
         return state
 
@@ -539,8 +528,7 @@ class GeosDycoreWrapper:
             output_dict["diss_estd"] = self.dycore_state.diss_estd.data[:-1, :-1, :-1]
 
             # Tracers
-            output_dict["tracers"] = self.dycore_state.tracers.as_4D_array()
-
+            output_dict["tracers"] = self.dycore_state.tracers.quantity.data[:-1,:-1,:-1,:]
         return output_dict
 
     def _allocate_output_dir(self):
