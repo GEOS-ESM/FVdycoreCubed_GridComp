@@ -2180,13 +2180,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        !$ser data delz=FV_Atm(1)%delz
        !$ser data pt=FV_Atm(1)%pt
        !$ser data delp=FV_Atm(1)%delp
-       !$ser data qvapor=FV_Atm(1)%q(:,:,:,sphu)
-       !$ser data qliquid=FV_Atm(1)%q(:,:,:,qliq)
-       !$ser data qice=FV_Atm(1)%q(:,:,:,qice)
-       !$ser data qrain=FV_Atm(1)%q(:,:,:,rain)
-       !$ser data qsnow=FV_Atm(1)%q(:,:,:,snow)
-       !$ser data qgraupel=FV_Atm(1)%q(:,:,:,grpl)
-       !$ser data qcld=FV_Atm(1)%q(:,:,:,qcld)
+       !$ser data tracers=FV_Atm(1)%q(:,:,:,:)
        !$ser data ps=FV_Atm(1)%ps
        !$ser data pe=FV_Atm(1)%pe
        !$ser data pk=FV_Atm(1)%pk

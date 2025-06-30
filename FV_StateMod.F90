@@ -5,12 +5,12 @@ module FV_StateMod
 
 #ifdef SERIALIZE
 USE m_serialize, ONLY: &
+  fs_add_savepoint_metainfo, &
   fs_create_savepoint, &
   fs_disable_serialization, &
   fs_enable_serialization, &
   fs_read_field, &
-  fs_write_field, &
-  fs_add_savepoint_metainfo
+  fs_write_field
 USE utils_ppser, ONLY:  &
   ppser_finalize, &
   ppser_get_mode, &
@@ -3034,59 +3034,11 @@ SELECT CASE ( ppser_get_mode() )
 END SELECT
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu))
+    call fs_write_field(ppser_serializer, ppser_savepoint, 'tracers', FV_Atm(1)%q(:,:,:,:))
   CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu))
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'tracers', FV_Atm(1)%q(:,:,:,:))
   CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qvapor', FV_Atm(1)%q(:,:,:,sphu), ppser_zrperturb)
-END SELECT
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qliquid', FV_Atm(1)%q(:,:,:,qliq), ppser_zrperturb)
-END SELECT
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qice', FV_Atm(1)%q(:,:,:,qice), ppser_zrperturb)
-END SELECT
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qrain', FV_Atm(1)%q(:,:,:,rain), ppser_zrperturb)
-END SELECT
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qsnow', FV_Atm(1)%q(:,:,:,snow), ppser_zrperturb)
-END SELECT
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qgraupel', FV_Atm(1)%q(:,:,:,grpl), ppser_zrperturb)
-END SELECT
-SELECT CASE ( ppser_get_mode() )
-  CASE(0)
-    call fs_write_field(ppser_serializer, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld))
-  CASE(1)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld))
-  CASE(2)
-    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'qcld', FV_Atm(1)%q(:,:,:,qcld), ppser_zrperturb)
+    call fs_read_field(ppser_serializer_ref, ppser_savepoint, 'tracers', FV_Atm(1)%q(:,:,:,:), ppser_zrperturb)
 END SELECT
 SELECT CASE ( ppser_get_mode() )
   CASE(0)
