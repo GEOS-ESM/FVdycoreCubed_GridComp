@@ -5,7 +5,7 @@ module fv_regrid_c2c
 #define DEALLOCGLOB_(A) if(associated(A)) then;A=0;if(MAPL_ShmInitialized) then; call MAPL_DeAllocNodeArray(A,rc=status);else; deallocate(A);endif;NULLIFY(A);endif
 #endif
 
-   use fms_mod,            only: file_exist, read_data, field_exist
+   use fms2_io_mod,        only: file_exists
    use mpp_mod,            only: mpp_error, FATAL
    use mpp_domains_mod,    only: domain2d, mpp_update_domains, mpp_get_boundary, DGRID_NE
    use tracer_manager_mod, only: get_tracer_names, get_number_tracers, get_tracer_index
@@ -239,7 +239,7 @@ contains
       Atm(1)%q = 0.
 ! Read input FV core restart file
       fname = "fvcore_internal_restart_in"
-      if( file_exist(fname) ) then
+      if( file_exists(fname) ) then
 
          allocate(cfg(1))
          call formatter%open(fname,pFIO_READ,rc=status)
@@ -425,7 +425,7 @@ contains
 
 ! Read input topography
          write(fname1, "('topo_DYN_ave_',a,'x',a,'.data')") trim(imc), trim(jmc)
-         if (.not. file_exist(fname1)) then
+         if (.not. file_exists(fname1)) then
             call mpp_error(FATAL,'get_geos_cubed_ic: cannot find topo_DYN_ave file')
          endif
          allocate ( gz0(is_i:ie_i,js_i:je_i) )
@@ -456,7 +456,7 @@ contains
 ! Horiz Interp for moist tracers
 ! is there a moist restart file to interpolate?
 ! Read in tracers: only sphum at this point
-         if( file_exist("moist_internal_restart_in") ) then
+         if( file_exists("moist_internal_restart_in") ) then
             if (is_master()) print*, ''
             if (is_master()) print*, 'Regridding moist_internal_restart_in'
 

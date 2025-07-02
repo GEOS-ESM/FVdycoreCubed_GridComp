@@ -8,7 +8,8 @@ program interp_restarts
 !--------------------------------------------------------------------!
    use ESMF
    use mpp_mod,        only: mpp_error, FATAL, NOTE, mpp_root_pe, mpp_broadcast
-   use fms_mod,        only: print_memory_usage, fms_init, fms_end, file_exist
+   use fms_mod,        only: print_memory_usage, fms_init, fms_end
+   use fms2_io_mod,    only: file_exists
    use fv_control_mod, only: fv_init1, fv_init2, fv_end
    use fv_arrays_mod,  only: fv_atmos_type, REAL4, REAL8, FVPRC
    use fv_mp_mod,      only: is_master, ng, mp_gather, tile
@@ -185,7 +186,7 @@ program interp_restarts
       FV_Atm(1)%flagstruct%stretch_fac=schmidt_parameters(3)
    end if
 
-   if (n_files > 0) allocate(rst_files(n_files)) 
+   if (n_files > 0) allocate(rst_files(n_files))
 
 ! Initialize SHMEM in MAPL
    call pfl_initialize()
@@ -214,12 +215,12 @@ program interp_restarts
    call mpp_broadcast(nmoist, mpp_root_pe())
    call mpp_broadcast(isBinMoist, mpp_root_pe())
 
-   if (is_master()) print*, 'HYDROSTATIC : ', FV_Atm(1)%flagstruct%hydrostatic  
+   if (is_master()) print*, 'HYDROSTATIC : ', FV_Atm(1)%flagstruct%hydrostatic
    if (is_master()) print*, 'Make_NH     : ', FV_Atm(1)%flagstruct%Make_NH
    if (is_master()) print*, 'Tracers     : ', FV_Atm(1)%ncnst
 
 ! Need to get ak/bk
-   if( file_exist("fvcore_internal_restart_in") ) then
+   if( file_exists("fvcore_internal_restart_in") ) then
       open(IUNIT,file='fvcore_internal_restart_in' ,access='sequential',form='unformatted',status='old')
 ! Headers
       read (IUNIT, IOSTAT=status) header
@@ -232,7 +233,7 @@ program interp_restarts
       call mpp_error(FATAL, 'ABORT: fvcore_internal_restart_in does not exist')
    endif
 
-   if( file_exist("moist_internal_restart_in") ) then
+   if( file_exists("moist_internal_restart_in") ) then
       call rs_count( "moist_internal_restart_in",nmoist )
       if (mod(nmoist,km)/=0) then
          call mpp_error(FATAL, 'ABORT: '//'binary moist restart must have only 3D variabels')
@@ -282,7 +283,7 @@ program interp_restarts
 
    do i=1,n_files
 
-      if (file_exist(trim(extra_files(i)))) then
+      if (file_exists(trim(extra_files(i)))) then
          call rs_count(trim(extra_files(i)),nlevs)
          if (mod(nlevs,km) /= 0) then
             rst_files(i)%have_descriptor=.false.
@@ -323,9 +324,9 @@ program interp_restarts
       csfactory = CubedSphereGridFactory(im_world=npx-1,lm=npz,nx=npes_x,ny=npes_y,stretch_factor=schmidt_parameters(3), &
                   target_lon=schmidt_parameters(1),target_lat=schmidt_parameters(2))
    else
-      csfactory = CubedSphereGridFactory(im_world=npx-1,lm=npz,nx=npes_x,ny=npes_y) 
+      csfactory = CubedSphereGridFactory(im_world=npx-1,lm=npz,nx=npes_x,ny=npes_y)
    end if
-   grid = grid_manager%make_grid(csfactory,rc=status) 
+   grid = grid_manager%make_grid(csfactory,rc=status)
 
    FV_Atm(1)%flagstruct%Make_NH = .false. ! Do this after rescaling
    if (jm == 6*im) then
@@ -367,7 +368,7 @@ program interp_restarts
    call print_memuse_stats('interp_restarts: going to write restarts')
 
 ! write fvcore_internal_rst
-   if( file_exist("fvcore_internal_restart_in") ) then
+   if( file_exists("fvcore_internal_restart_in") ) then
 
       write(fname1, "('fvcore_internal_rst_c',i4.4,'_',i3.3,'L')") npx-1,npz
       if (is_master()) print*, 'Writing : ', TRIM(fname1)
@@ -385,7 +386,7 @@ program interp_restarts
       end if
 
       ! Headers
-      read (IUNIT, IOSTAT=status) header 
+      read (IUNIT, IOSTAT=status) header
       if(n_writers > 1) then
          call Write_Parallel(HEADER, OUNIT, ARRDES=ARRDES, RC=status)
          VERIFY_(STATUS)
@@ -395,7 +396,7 @@ program interp_restarts
       if (is_master()) print*, header
 
       read (IUNIT, IOSTAT=status) header(1:5)
-      if (is_master()) print*, header(1:5)  
+      if (is_master()) print*, header(1:5)
       header(1) = (npx-1)
       header(2) = (npy-1)*6
       header(3) = npz
@@ -407,7 +408,7 @@ program interp_restarts
          if (amwriter) write(OUNIT) header(1:5)
       endif
 
-      if (is_master()) print*, header(1:5) 
+      if (is_master()) print*, header(1:5)
       close(IUNIT)
 
 ! AK and BK
@@ -528,7 +529,7 @@ program interp_restarts
       allocate(r4_local(is:ie,js:je,npz+1))
       allocate(r4_local2D(is:ie,js:je))
 
-      if( file_exist("moist_internal_restart_in") ) then
+      if( file_exists("moist_internal_restart_in") ) then
          write(fname1, "('moist_internal_rst_c',i4.4,'_',i3.3,'L')") npx-1,npz
          if (is_master()) print*, 'Writing : ', TRIM(fname1)
          call ArrDescrSet(arrdes,offset=0_MPI_OFFSET_KIND)
@@ -565,12 +566,12 @@ program interp_restarts
          end if
       end if
       deallocate(r4_local)
- 
+
 ! extra restarts
 !
       do ifile=1,size(rst_files)
 
-         if (is_master()) write(*,*)'Writing results of ',trim(rst_files(ifile)%file_name) 
+         if (is_master()) write(*,*)'Writing results of ',trim(rst_files(ifile)%file_name)
          fname1=extra_output(ifile)
          if (is_master()) print*, 'Writing : ', TRIM(fname1)
          call ArrDescrSet(arrdes,offset=0_MPI_OFFSET_KIND)

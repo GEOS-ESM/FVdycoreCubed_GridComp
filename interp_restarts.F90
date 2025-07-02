@@ -9,7 +9,8 @@ program interp_restarts
    use ESMF
    use MAPL
    use mpp_mod,        only: mpp_error, FATAL, NOTE, mpp_root_pe, mpp_broadcast
-   use fms_mod,        only: print_memory_usage, fms_init, fms_end, file_exist
+   use fms_mod,        only: print_memory_usage, fms_init, fms_end
+   use fms2_io_mod,    only: file_exists
    use fv_control_mod, only: fv_init1, fv_init2, fv_end
    use fv_arrays_mod,  only: fv_atmos_type, FVPRC
    use fv_mp_mod,      only: is_master
@@ -220,7 +221,7 @@ program interp_restarts
 ! -------------------------------------------------------------
 
 ! Need to get input grid and ak/bk
-   if( file_exist("fvcore_internal_restart_in") ) then
+   if( file_exists("fvcore_internal_restart_in") ) then
       call InFmt%open("fvcore_internal_restart_in",pFIO_READ,rc=status)
       allocate(InCfg(1))
       InCfg(1) = InFmt%read()
@@ -260,7 +261,7 @@ program interp_restarts
    call print_memuse_stats('interp_restarts: Atm_i: init')
 
    nmoist  = 0
-   if( file_exist("moist_internal_restart_in") ) then
+   if( file_exists("moist_internal_restart_in") ) then
       call InFmt%open("moist_internal_restart_in",pFIO_READ,rc=status)
       allocate(InCfg(1))
       InCfg(1) = InFmt%read()
@@ -332,7 +333,7 @@ program interp_restarts
 
    do i=1,n_files
 
-      if (file_exist(trim(extra_files(i)))) then
+      if (file_exists(trim(extra_files(i)))) then
          rst_files(i)%file_name=trim(extra_files(i))
 
          call InFmt%open(trim(extra_files(i)),pFIO_READ,rc=status)
@@ -425,8 +426,8 @@ program interp_restarts
    je = Atm_i(1)%bd%jec
    isl=is
    iel=ie
-   jsl=(im)*(Atm_i(1)%tile-1)+js
-   jel=(im)*(Atm_i(1)%tile-1)+je
+   jsl=(im)*(Atm_i(1)%tile_of_mosaic-1)+js
+   jel=(im)*(Atm_i(1)%tile_of_mosaic-1)+je
    call ArrDescrInit(Arrdes_i,MPI_COMM_WORLD,im,jm,km, Atm_i(1)%layout(1), Atm_i(1)%layout(2)*6, &
                      n_readers,n_writers,isl,iel,jsl,jel,rc=status)
    call ArrDescrSet(Arrdes_i,offset=0_MPI_OFFSET_KIND)
@@ -449,8 +450,8 @@ program interp_restarts
    je = Atm(1)%bd%jec
    isl=is
    iel=ie
-   jsl=(npx-1)*(Atm(1)%tile-1)+js
-   jel=(npx-1)*(Atm(1)%tile-1)+je
+   jsl=(npx-1)*(Atm(1)%tile_of_mosaic-1)+js
+   jel=(npx-1)*(Atm(1)%tile_of_mosaic-1)+je
    call ArrDescrInit(Arrdes,MPI_COMM_WORLD,npx-1,(npx-1)*6,npz, Atm(1)%layout(1), Atm(1)%layout(2)*6, &
                      n_readers,n_writers,isl,iel,jsl,jel,rc=status)
    call ArrDescrSet(Arrdes,offset=0_MPI_OFFSET_KIND)
@@ -470,7 +471,7 @@ program interp_restarts
    call print_memuse_stats('interp_restarts: going to write restarts')
 
 ! write fvcore_internal_rst
-   if( file_exist("fvcore_internal_restart_in") ) then
+   if( file_exists("fvcore_internal_restart_in") ) then
 
       write(fname1, "('fvcore_internal_rst_c',i4.4,'_',i3.3,'L')") npx-1,npz
       if (is_master()) print*, 'Writing : ', TRIM(fname1)
@@ -583,7 +584,7 @@ program interp_restarts
       allocate(r4_local(is:ie,js:je,npz+1))
       allocate(r4_local2D(is:ie,js:je))
 
-      if( file_exist("moist_internal_restart_in") ) then
+      if( file_exists("moist_internal_restart_in") ) then
          write(fname1, "('moist_internal_rst_c',i4.4,'_',i3.3,'L')") npx-1,npz
          if (is_master()) print*, 'Writing : ', TRIM(fname1)
          imc = npx-1
