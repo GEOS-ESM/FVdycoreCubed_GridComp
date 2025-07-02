@@ -1,14 +1,14 @@
-   
+
 !  $Id$
-   
+
 !!!#define REAL8 8
-   
+
    subroutine GetWeights_init (in_ntiles,in_ncnst,in_npx,in_npy,in_npz,&
          in_nx,in_ny,in_hydro,in_mknh,comm)
-      use fms_mod,           only: fms_init, set_domain
+      use fms_mod,           only: fms_init
       use fv_control_mod,    only: fv_init1, fv_init2
       use fv_arrays_mod,     only: REAL4, REAL8, FVPRC
-      use FV_StateMod,       only : FV_Atm  
+      use FV_StateMod,       only : FV_Atm
       implicit none
       integer,intent(in) :: in_ntiles,in_ncnst
       integer,intent(in) :: in_npx,in_npy,in_npz
@@ -22,7 +22,7 @@
 !#endif
       integer :: p_split
       logical, allocatable :: grids_on_my_pe(:)
-   
+
       p_split = 1
 
       call fms_init(comm)
@@ -42,12 +42,10 @@
 
       call fv_init2(FV_atm, dt_who_cares, grids_on_my_pe, p_split)
 
-      call set_domain(FV_Atm(1)%domain)
-
    end subroutine GetWeights_init
 
    subroutine GetWeights(npx, npy, nlat, nlon, index, weight, id1, id2, jdc, l2c, &
-         ee1, ee2, ff1, ff2, gg1, gg2, e1, e2, f1, f2, g1, g2, sublons, sublats, AmNodeRoot, WriteNetcdf) 
+         ee1, ee2, ff1, ff2, gg1, gg2, e1, e2, f1, f2, g1, g2, sublons, sublats, AmNodeRoot, WriteNetcdf)
 #include "MAPL_Generic.h"
 
       use MAPL
@@ -58,7 +56,7 @@
       use fv_arrays_mod,     only : REAL4, REAL8, FVPRC
       use CUB2LATLON_mod,    only : init_latlon_grid, get_c2l_weight
       use GHOST_CUBSPH_mod,  only : B_grid, A_grid, ghost_cubsph_update
-      use FV_StateMod,       only : FV_Atm  
+      use FV_StateMod,       only : FV_Atm
       use fv_mp_mod,         only : is,js,ie,je, is_master
 
       include "netcdf.inc"
@@ -72,10 +70,10 @@
       integer,                     intent(  out) :: jdc(npx,npy)
       real(REAL8),                 intent(  out) :: l2c(4,npx,npy)
       real(REAL8),                 intent(  out) :: ee1(npx,npy,3)
-      real(REAL8),                 intent(  out) :: ee2(npx,npy,3) 
-      real(REAL8),                 intent(  out) :: ff1(npx,npy,3) 
-      real(REAL8),                 intent(  out) :: ff2(npx,npy,3) 
-      real(REAL8),                 intent(  out) :: gg1(npx,npy,3) 
+      real(REAL8),                 intent(  out) :: ee2(npx,npy,3)
+      real(REAL8),                 intent(  out) :: ff1(npx,npy,3)
+      real(REAL8),                 intent(  out) :: ff2(npx,npy,3)
+      real(REAL8),                 intent(  out) :: gg1(npx,npy,3)
       real(REAL8),                 intent(  out) :: gg2(npx,npy,3)
       real(REAL8), pointer                       ::  e1(:,:,:)
       real(REAL8), pointer                       ::  e2(:,:,:)
@@ -135,14 +133,14 @@
 
             call gnomonic_grids(A_grid, npx, grid_global(:,:,1,1), grid_global(:,:,2,1))
 
-! mirror_grid assumes that the tile=1 is centered 
+! mirror_grid assumes that the tile=1 is centered
 !   on equator and greenwich meridian Lon[-pi,pi]
 !------------------------------------------------
 
             call mirror_grid(grid_global, 0, npts, npts, ndims, ntiles)
 
 ! Shift the corner away from Japan.
-!  This will result in the corner 
+!  This will result in the corner
 !  close to the east coast of China.
 !-----------------------------------
 
@@ -243,7 +241,7 @@
             endif
 
 ! calculate weights for bilinear interpolation
-! from cubed sphere to latlon grid            
+! from cubed sphere to latlon grid
 !---------------------------------------------
             if (present(sublons) .and. present(sublats)) then
                call get_c2l_weight(sph_corner, npts, npts, ntiles, &
@@ -258,7 +256,7 @@
             deallocate ( sph_corner )
 
 ! calculate weights for bilinear interpolation
-! from cubed sphere to latlon grid            
+! from cubed sphere to latlon grid
 !---------------------------------------------
 
             call remap_coef( agrid, xlon, ylat, id1, id2, jdc, l2c )
@@ -266,7 +264,7 @@
             deallocate ( xlon, ylat )
             deallocate ( agrid      )
 
-! write out NETCDF weights file            
+! write out NETCDF weights file
 !---------------------------------------------
             if (present(WriteNetcdf)) then
                if (WriteNetcdf) then
@@ -321,7 +319,7 @@
 
             if (is_master()) print *, 'Reading weights for ', TRIM(c2l_fname)
 
-! read NETCDF weights file            
+! read NETCDF weights file
 !---------------------------------------------
             STATUS = NF_OPEN (trim(c2l_fname), NF_NOWRITE, c2l_unit)
 

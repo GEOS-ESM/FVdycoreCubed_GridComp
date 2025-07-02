@@ -17,7 +17,7 @@ module FV_StateMod
    use fv_mp_mod,         only: start_group_halo_update, complete_group_halo_update
    use fv_mp_mod,         only: group_halo_update_type
 
-   use fms_mod, only: fms_init, set_domain, nullify_domain
+   use fms_mod, only: fms_init
    use mpp_domains_mod, only: mpp_update_domains, CGRID_NE, DGRID_NE, mpp_get_boundary
    use mpp_parameter_mod, only: AGRID_PARAM=>AGRID, CORNER
    use fv_timing_mod,    only: timing_on, timing_off, timing_init, timing_prt
@@ -599,42 +599,42 @@ contains
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1120) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 100.0 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  90.0 )
           FV_Atm(1)%flagstruct%tau = 2.5
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
           FV_Atm(1)%flagstruct%tau = 2.0
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )
           FV_Atm(1)%flagstruct%tau = 1.5
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125)
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
           FV_Atm(1)%flagstruct%tau = 1.0
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.5 )
           FV_Atm(1)%flagstruct%tau = 1.0
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 10800) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375)
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  3.25)
           FV_Atm(1)%flagstruct%tau = 1.0
@@ -650,7 +650,7 @@ contains
       FV_Atm(1)%flagstruct%d4_bg_bot = 0.12 ! High-order Divg Damping coef
       FV_Atm(1)%flagstruct%d2_bg = 0.0  ! 2nd order Divg Damping coef
       FV_Atm(1)%flagstruct%d_ext = 0.0  ! External damping
-     ! Local Richardson-number turbulent mixing 
+     ! Local Richardson-number turbulent mixing
       FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
      ! Sponge layer
       FV_Atm(1)%flagstruct%n_sponge = 9
@@ -664,7 +664,7 @@ contains
       FV_Atm(1)%flagstruct%a_imp = 1.0
      ! dz_min is a NH delta-z limiter increasing may improve stability
       FV_Atm(1)%flagstruct%dz_min = 6.0
-     ! p_fac is a NH pressure fraction limiter near model top (0:0.25) 
+     ! p_fac is a NH pressure fraction limiter near model top (0:0.25)
       FV_Atm(1)%flagstruct%p_fac = 0.05
      ! General defaults
       FV_Atm(1)%flagstruct%make_nh = .false.
@@ -1920,7 +1920,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     call MAPL_TimerOn(MAPL,"--NH_ADIABATIC_INIT")
        if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
           allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
-          call nullify_domain ( )
           DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
           call prt_maxmin('Before adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
           call adiabatic_init(myDT,DEBUG_ARRAY,fac1)
@@ -1933,7 +1932,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
     call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
     if (.not. FV_OFF) then
-    call set_domain(FV_Atm(1)%domain)  ! needed for diagnostic output done in fv_dynamics
     allocate ( u_dt(isc:iec,jsc:jec,npz) )
     allocate ( v_dt(isc:iec,jsc:jec,npz) )
     allocate ( t_dt(isc:iec,jsc:jec,npz) )
@@ -2034,7 +2032,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     deallocate ( t_dt )
     deallocate ( w_dt )
 
-    call nullify_domain()
 
     endif
     call MAPL_TimerOff(MAPL,"--FV_DYNAMICS")
@@ -2713,9 +2710,9 @@ subroutine fv_getPKZ_NH(pkz,temp,qv,pe,delz)
 !-------------------------------------------------------------------------
 ! Re-compute the full (nonhydrostatic) pressure due to temperature changes
 !-------------------------------------------------------------------------
-!$omp parallel do default (none) & 
+!$omp parallel do default (none) &
 !$omp shared (npz, jsc, jec, isc, iec, pkz, kappa, rdg, delp, temp, zvir, qv, delz) &
-!$omp private (k, j, i) 
+!$omp private (k, j, i)
       do k=1,npz
          do j=jsc,jec
             do i=isc,iec
@@ -2748,9 +2745,9 @@ subroutine fv_getPKZ(pkz,pe)
   peln = log(pe)
   pk   = exp( kappa*peln )
 
-!$omp parallel do default (none) & 
+!$omp parallel do default (none) &
 !$omp shared (npz, jsc, jec, isc, iec, pkz, pk, kappa, peln) &
-!$omp private (k, j, i) 
+!$omp private (k, j, i)
       do k=1,npz
          do j=jsc,jec
             do i=isc,iec
@@ -5020,7 +5017,7 @@ end subroutine echo_fv3_setup
      allocate ( t0(isc:iec,jsc:jec, npz) )
      allocate (dp0(isc:iec,jsc:jec, npz) )
 
-!$omp parallel do default (none) & 
+!$omp parallel do default (none) &
 !$omp shared (npz, jsc, jec, isc, iec, n, sphum, u0, v0, t0, dp0, FV_Atm, zvir) &
 !$omp private (k, j, i)
        do k=1,npz
@@ -5084,7 +5081,7 @@ end subroutine echo_fv3_setup
             time_total)
 !Nudging back to IC
 !$omp parallel do default (none) &
-!$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) & 
+!$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) &
 !$omp private (i, j, k)
        do k=1,npz
           do j=jsc,jec+1
