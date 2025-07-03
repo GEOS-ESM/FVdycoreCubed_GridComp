@@ -5,7 +5,11 @@
 
 ! Shared Utilities
       use fms_mod,        only: fms_init, fms_end
-      use fms2_io_mod,    only: file_exist
+#if defined(FMS1_IO)
+      use fms_mod,        only: file_exists => file_exist
+#else
+      use fms2_io_mod,    only: file_exists
+#endif
       use mpp_mod,        only: mpp_error, FATAL, NOTE
       use fv_arrays_mod,  only: fv_atmos_type, FVPRC, REAL4, REAL8
       use fv_control_mod, only: npx,npy,npz, ntiles

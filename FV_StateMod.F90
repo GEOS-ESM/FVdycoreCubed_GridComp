@@ -18,6 +18,9 @@ module FV_StateMod
    use fv_mp_mod,         only: group_halo_update_type
 
    use fms_mod, only: fms_init
+#if defined(FMS1_IO)
+   use fms_mod, only: set_domain, nullify_domain
+#endif
    use mpp_domains_mod, only: mpp_update_domains, CGRID_NE, DGRID_NE, mpp_get_boundary
    use mpp_parameter_mod, only: AGRID_PARAM=>AGRID, CORNER
    use fv_timing_mod,    only: timing_on, timing_off, timing_init, timing_prt
@@ -1920,6 +1923,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     call MAPL_TimerOn(MAPL,"--NH_ADIABATIC_INIT")
        if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
           allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
+#if defined (FMS1_IO)
+          call nullify_domain ( )
+#endif
           DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
           call prt_maxmin('Before adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
           call adiabatic_init(myDT,DEBUG_ARRAY,fac1)
@@ -1932,6 +1938,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
     call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
     if (.not. FV_OFF) then
+#if defined (FMS1_IO)
+    call set_domain(FV_Atm(1)%domain)  ! needed for diagnostic output done in fv_dynamics
+#endif
     allocate ( u_dt(isc:iec,jsc:jec,npz) )
     allocate ( v_dt(isc:iec,jsc:jec,npz) )
     allocate ( t_dt(isc:iec,jsc:jec,npz) )
@@ -2032,6 +2041,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     deallocate ( t_dt )
     deallocate ( w_dt )
 
+#if defined (FMS1_IO)
+    call nullify_domain()
+#endif
 
     endif
     call MAPL_TimerOff(MAPL,"--FV_DYNAMICS")

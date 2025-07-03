@@ -5,7 +5,11 @@ module fv_regrid_c2c_bin
 #endif
 
    use fv_arrays_mod,  only: REAL4, REAL8, FVPRC
+#if defined (FMS1_IO)
+   use fms_mod,            only: file_exists => file_exist
+#else
    use fms2_io_mod,        only: file_exists
+#endif
    use mpp_mod,            only: mpp_error, FATAL, NOTE, mpp_broadcast,mpp_npes
    use mpp_parameter_mod,  only: AGRID_PARAM=>AGRID
    use mpp_domains_mod,    only: mpp_get_tile_id, domain2d, mpp_update_domains, mpp_get_boundary, DGRID_NE

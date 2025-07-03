@@ -5,7 +5,11 @@ module fv_regrid_c2c
 #define DEALLOCGLOB_(A) if(associated(A)) then;A=0;if(MAPL_ShmInitialized) then; call MAPL_DeAllocNodeArray(A,rc=status);else; deallocate(A);endif;NULLIFY(A);endif
 #endif
 
+#if defined (FMS1_IO)
+   use fms_mod,            only: file_exists => file_exist
+#else
    use fms2_io_mod,        only: file_exists
+#endif
    use mpp_mod,            only: mpp_error, FATAL
    use mpp_domains_mod,    only: domain2d, mpp_update_domains, mpp_get_boundary, DGRID_NE
    use tracer_manager_mod, only: get_tracer_names, get_number_tracers, get_tracer_index

@@ -10,7 +10,11 @@ program interp_restarts
    use MAPL
    use mpp_mod,        only: mpp_error, FATAL, NOTE, mpp_root_pe, mpp_broadcast
    use fms_mod,        only: print_memory_usage, fms_init, fms_end
+#if defined (FMS1_IO)
+   use fms_mod,        only: file_exists => file_exist
+#else
    use fms2_io_mod,    only: file_exists
+#endif
    use fv_control_mod, only: fv_init1, fv_init2, fv_end
    use fv_arrays_mod,  only: fv_atmos_type, FVPRC
    use fv_mp_mod,      only: is_master

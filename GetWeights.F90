@@ -6,6 +6,9 @@
    subroutine GetWeights_init (in_ntiles,in_ncnst,in_npx,in_npy,in_npz,&
          in_nx,in_ny,in_hydro,in_mknh,comm)
       use fms_mod,           only: fms_init
+#if defined (FMS1_IO)
+      use fms_mod,           only: set_domain
+#endif
       use fv_control_mod,    only: fv_init1, fv_init2
       use fv_arrays_mod,     only: REAL4, REAL8, FVPRC
       use FV_StateMod,       only : FV_Atm
@@ -41,6 +44,10 @@
       FV_Atm(1)%flagstruct%npy=FV_Atm(1)%flagstruct%npy+1
 
       call fv_init2(FV_atm, dt_who_cares, grids_on_my_pe, p_split)
+
+#if defined (FMS1_IO)
+      call set_domain(FV_Atm(1)%domain)
+#endif
 
    end subroutine GetWeights_init
 
