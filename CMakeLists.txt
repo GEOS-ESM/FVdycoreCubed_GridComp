@@ -196,6 +196,7 @@ ecbuild_add_executable (
    SOURCES interp_restarts_bin.F90
    LIBS ${this} OpenMP::OpenMP_Fortran)
 
+# Note this requires ESMA_cmake v4.19.0 or later
 include(check_fms1_io_support)
 check_fms1_io_support(FMS1_IO_SUPPORTED)
 if(FMS1_IO_SUPPORTED)
