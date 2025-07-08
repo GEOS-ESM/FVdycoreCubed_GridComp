@@ -124,8 +124,8 @@ endif
 #######################################################################
 
 setenv GEOSDIR @GEOSDIR
-setenv GEOSBIN @GEOSBIN
-setenv GEOSETC @GEOSETC
+setenv GEOSBIN ${GEOSDIR}/bin
+setenv GEOSETC ${GEOSDIR}/etc
 
 set TAG = `cat $GEOSETC/.FV3_VERSION`
 set RUN_CMD = "$GEOSBIN/esma_mpirun -np "
