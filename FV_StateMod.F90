@@ -718,6 +718,14 @@ contains
 !! Start up FV
     call MAPL_TimerOn(MAPL,"--FV_INIT")
     call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
+    ! Under ARM chips the `idiag` structure doesn't alloc-default to 0
+    FV_Atm(1)%idiag%id_ws = 0
+    FV_Atm(1)%idiag%id_te = 0
+    FV_Atm(1)%idiag%id_amdt = 0
+    FV_Atm(1)%idiag%id_mdt = 0
+    FV_Atm(1)%idiag%id_divg = 0
+    FV_Atm(1)%idiag%id_aam = 0
+    FV_Atm(1)%idiag%id_amdt = 0
     call MAPL_TimerOff(MAPL,"--FV_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
@@ -2032,7 +2040,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
     else
       call cpu_time(start)
-
       call pyfv3_interface_f_run( &
             comm, &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
@@ -2049,7 +2056,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             ! input/output
             FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
        call cpu_time(finish)
-       print *, rank, ', pyfv3_interface_f_run: time taken = ', finish - start, 's'
+       if (rank == 0) print *, rank, ', pyfv3_interface_f_run: time taken = ', finish - start, 's'
     end if
 #endif
 
