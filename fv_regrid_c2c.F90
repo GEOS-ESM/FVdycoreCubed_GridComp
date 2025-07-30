@@ -320,6 +320,8 @@ contains
          call prt_maxmin(' V_geos', v0, is_i, ie_i+1, js_i, je_i  , Atm_i(1)%ng, km, 1.0_FVPRC)
          allocate ( ud(isd:ied  ,jsd:jed+1,km) )
          allocate ( vd(isd:ied+1,jsd:jed  ,km) )
+         ud = 0.
+         vd = 0.
 !------------------------------------------------------------------!
 ! D->A : regrid : A-> D interpolation for U and V components
 !------------------------------------------------------------------!
@@ -986,6 +988,8 @@ end subroutine xyz_to_dgrid
     integer :: i,j,n
     integer :: is, ie, js, je
 
+    va_xyz_o = 0.d0
+    tmp_o = 0.
     is = Atm_i%bd%is
     ie = Atm_i%bd%ie
     js = Atm_i%bd%js
