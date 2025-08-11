@@ -4,7 +4,12 @@
       use constants_mod,  only: pi, grav
 
 ! Shared Utilities
-      use fms_mod,        only: fms_init, fms_end, file_exist
+      use fms_mod,        only: fms_init, fms_end
+#if defined(FMS1_IO)
+      use fms_mod,        only: file_exists => file_exist
+#else
+      use fms2_io_mod,    only: file_exists
+#endif
       use mpp_mod,        only: mpp_error, FATAL, NOTE
       use fv_arrays_mod,  only: fv_atmos_type, FVPRC, REAL4, REAL8
       use fv_control_mod, only: npx,npy,npz, ntiles
@@ -39,7 +44,7 @@
       real(REAL8) :: dlon, dlat
       integer :: nlon, nlat
       integer :: c2c_interp_npts
- 
+
       real(REAL8), allocatable :: lat1(:)
       real(REAL8), allocatable :: lon1(:)
       real(REAL8), allocatable :: r8latlon1(:,:)
@@ -115,7 +120,7 @@
       deallocate( phis_m )
     endif
 
-! Get GWD/TRB Variance 
+! Get GWD/TRB Variance
   ! if (npx-1 <= 180) then
       allocate( r8tmp(Atm(1)%isd:Atm(1)%ied,Atm(1)%jsd:Atm(1)%jed) )
       allocate ( gwd_global(im,im,6) )
@@ -133,13 +138,13 @@
       enddo
 ! Read GWD
       write(fname1, "('topo_GWD_var_',i3.3,'x',i2.2,'_DC.data')") nlon,nlat
-      if (.not. file_exist(fname1)) then
+      if (.not. file_exists(fname1)) then
          write(fname1, "('topo_GWD_var_',i3.3,'x',i3.3,'_DC.data')") nlon,nlat
-         if (.not. file_exist(fname1)) then
+         if (.not. file_exists(fname1)) then
             write(fname1, "('topo_GWD_var_',i4.4,'x',i3.3,'_DC.data')") nlon,nlat
-            if (.not. file_exist(fname1)) then
+            if (.not. file_exists(fname1)) then
                write(fname1, "('topo_GWD_var_',i4.4,'x',i4.4,'_DC.data')") nlon,nlat
-               if (.not. file_exist(fname1)) call mpp_error(FATAL,fname1)
+               if (.not. file_exists(fname1)) call mpp_error(FATAL,fname1)
             endif
          endif
       endif
@@ -178,13 +183,13 @@
       allocate ( rtrb(im,jm) )
 ! Read TRB
       write(fname1, "('topo_TRB_var_',i3.3,'x',i2.2,'_DC.data')") nlon,nlat
-      if (.not. file_exist(fname1)) then
+      if (.not. file_exists(fname1)) then
          write(fname1, "('topo_TRB_var_',i3.3,'x',i3.3,'_DC.data')") nlon,nlat
-         if (.not. file_exist(fname1)) then
+         if (.not. file_exists(fname1)) then
             write(fname1, "('topo_TRB_var_',i4.4,'x',i3.3,'_DC.data')") nlon,nlat
-            if (.not. file_exist(fname1)) then
+            if (.not. file_exists(fname1)) then
                write(fname1, "('topo_TRB_var_',i4.4,'x',i4.4,'_DC.data')") nlon,nlat
-               if (.not. file_exist(fname1)) call mpp_error(FATAL,fname1)
+               if (.not. file_exists(fname1)) call mpp_error(FATAL,fname1)
             endif
          endif
       endif
@@ -390,7 +395,7 @@
 ! Do DYN_ave interp
   allocate( var_out(npx_out,npx_out,ntiles) )
   write(fname1, "('topo_DYN_ave_',i4.4,'x',i5.5,'.data')") (npx_in),ntiles*(npx_in)
-  if (.not. file_exist(fname1)) call mpp_error(FATAL,fname1)
+  if (.not. file_exists(fname1)) call mpp_error(FATAL,fname1)
   open(IUNIT,file=fname1,form='unformatted',status='old')
   read(IUNIT) vari
   close(IUNIT)
@@ -418,7 +423,7 @@
 ! Do GWD interp
   if (npx_out-1 <= 360) then
   write(fname1, "('topo_GWD_var_',i4.4,'x',i5.5,'.data')") (npx_in),ntiles*(npx_in)
-  if (.not. file_exist(fname1)) call mpp_error(FATAL,fname1)
+  if (.not. file_exists(fname1)) call mpp_error(FATAL,fname1)
   open(IUNIT,file=fname1,form='unformatted',status='old')
   read(IUNIT) vari
   close(IUNIT)
@@ -449,7 +454,7 @@
 ! Do TRB interp
   if (npx_out-1 <= 360) then
   write(fname1, "('topo_TRB_var_',i4.4,'x',i5.5,'.data')") (npx_in),ntiles*(npx_in)
-  if (.not. file_exist(fname1)) call mpp_error(FATAL,fname1)
+  if (.not. file_exists(fname1)) call mpp_error(FATAL,fname1)
   open(IUNIT,file=fname1,form='unformatted',status='old')
   read(IUNIT) vari
   close(IUNIT)
@@ -467,10 +472,10 @@
   else
     var_out(:,:,:) = 0.0
   endif
-  write(fname2, "('topo_TRB_var_',i4.4,'x',i5.5,'.data')") (npx_out),ntiles*(npx_out) 
+  write(fname2, "('topo_TRB_var_',i4.4,'x',i5.5,'.data')") (npx_out),ntiles*(npx_out)
   open(OUNIT,file=fname2,form='unformatted',status='unknown')
   do l=1,ntiles
-     j1 = (npx_out)*(l-1) + 1 
+     j1 = (npx_out)*(l-1) + 1
      j2 = (npx_out)*(l-1) + npx_out
      varo(:,j1:j2)=var_out(:,:,l)
   enddo

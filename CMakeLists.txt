@@ -196,6 +196,18 @@ ecbuild_add_executable (
    SOURCES interp_restarts_bin.F90
    LIBS ${this} OpenMP::OpenMP_Fortran)
 
+# Note this macro requires ESMA_cmake v4.19.0 or later
+include(check_fms1_io_support)
+check_fms1_io_support(FMS1_IO_SUPPORTED)
+if(FMS1_IO_SUPPORTED)
+  message(STATUS "Using deprecated FMS1 I/O for ${this}")
+  target_compile_definitions (${this} PRIVATE FMS1_IO)
+  target_compile_definitions (interp_restarts.x PRIVATE FMS1_IO)
+  target_compile_definitions (interp_restarts_bin.x PRIVATE FMS1_IO)
+else()
+  message(STATUS "Using FMS2 I/O for ${this}")
+endif()
+
 if (BUILD_GEOS_GTFV3_INTERFACE)
   ecbuild_add_executable (
     TARGET fv3_driver.x

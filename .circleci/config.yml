@@ -1,7 +1,7 @@
 version: 2.1
 
 # Anchors in case we need to override the defaults from the orb
-#baselibs_version: &baselibs_version v8.9.0
+#baselibs_version: &baselibs_version v8.14.0
 #bcs_version: &bcs_version v12.0.0
 
 orbs:
@@ -10,6 +10,7 @@ orbs:
 workflows:
   build-test:
     jobs:
+      # Build GEOSgcm
       - ci/build:
           name: build-GEOSgcm-on-<< matrix.compiler >>
           context:
@@ -23,7 +24,7 @@ workflows:
           # V12 code uses a special branch for now.
           fixture_branch: feature/sdrabenh/gcm_v12
           # We comment out this as it will "undo" the fixture_branch
-          #mepodevelop: false
+          #mepodevelop: true
           persist_workspace: true # Needs to be true to run fv3/gcm experiment, costs extra
       - ci/run_fv3:
           name: run-FV3-on-<< matrix.compiler >>-with-GEOSgcm
