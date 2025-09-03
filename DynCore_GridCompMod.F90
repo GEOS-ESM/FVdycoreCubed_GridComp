@@ -66,6 +66,7 @@
   type(ESMF_FieldBundle), save :: bundleAdv
   integer :: NXQ = 0
   logical :: overwrite_Q = .true.
+  logical :: DEBUG_TQ_ERRORS
 
   public  SetServices      ! Register component methods
 
@@ -2613,6 +2614,9 @@ contains
     call MAPL_GetResource ( MAPL, DEBUG_ADV, 'DEBUG_ADV:', default=.FALSE., rc=status )
     VERIFY_(STATUS)        
 
+    call MAPL_GetResource ( MAPL, DEBUG_TQ_ERRORS, 'DEBUG_TQ_ERRORS:', default=.FALSE., rc=status )
+    VERIFY_(STATUS)        
+
 ! Generic SetServices
 !--------------------
 
@@ -3895,7 +3899,7 @@ subroutine Run(gc, import, export, clock, rc)
       ! -----------------------
       delpold = delp                            ! Old Pressure Thickness
 
-      call ADD_INCS ( STATE,IMPORT,DT,IS_WEIGHTED=IS_WEIGHTED )
+      call ADD_INCS ( MAPL,STATE,IMPORT,DT,IS_WEIGHTED=IS_WEIGHTED )
 
       if (DYN_DEBUG) call DEBUG_FV_STATE('ANA ADD_INCS',STATE)
 
@@ -6628,7 +6632,7 @@ end subroutine RUN
 ! Add Diabatic Forcing to State Variables
 ! ---------------------------------------
     call MAPL_TimerOn (GENSTATE,"PHYS_ADD_INCS")
-    call ADD_INCS ( STATE,IMPORT,DT )
+    call ADD_INCS ( GENSTATE,STATE,IMPORT,DT )
     call MAPL_TimerOff(GENSTATE,"PHYS_ADD_INCS")
 
 
@@ -6693,9 +6697,9 @@ end subroutine RUN
 
     tempxy = vars%pt * vars%pkz   ! Dry Temperature
 
-#if defined(DEBUG_T)
-  call Write_Profile(grid, tempxy, 'T')
-#endif
+!#if defined(DEBUG_T)
+!  call Write_Profile(grid, tempxy, 'T')
+!#endif
 
     if (DEBUG_DYN) then  
        call MAPL_MaxMin('DYN: Q_AF_INC ', qv)
@@ -7205,7 +7209,7 @@ end subroutine RUN
 end subroutine RunAddIncs
 
 !-----------------------------------------------------------------------
-  subroutine ADD_INCS ( STATE,IMPORT,DT,IS_WEIGHTED,RC )
+  subroutine ADD_INCS ( MAPL,STATE,IMPORT,DT,IS_WEIGHTED,RC )
 
    use fms_mod, only: set_domain, nullify_domain
    use fv_diagnostics_mod, only: prt_maxmin
@@ -7214,6 +7218,7 @@ end subroutine RunAddIncs
 !
 ! !INPUT PARAMETERS:
 
+   type (MAPL_MetaComp)                   :: MAPL
    type(DynState), pointer                :: STATE
    type(ESMF_State),       intent(INOUT)  :: IMPORT
    real(FVPRC),            intent(IN   )  :: DT
@@ -7230,6 +7235,7 @@ end subroutine RunAddIncs
     integer               :: status
     logical               :: is_weighted_
 
+    integer               :: II, JJ, I, J, L
     integer               :: is ,ie , js ,je , km
     integer               :: isd,ied, jsd,jed
     real(r4), allocatable :: fvQOLD(:,:,:), QTEND(:,:,:)
@@ -7241,6 +7247,9 @@ end subroutine RunAddIncs
     real(FVPRC), allocatable :: u_dt(:,:,:), v_dt(:,:,:), t_dt(:,:,:)
 
     real(kind=4), pointer :: tend(:,:,:)
+
+    real, pointer, dimension(:,:)   :: LONS
+    real, pointer, dimension(:,:)   :: LATS
 
     type(DynTracers)      :: qqq       ! Specific Humidity
     real(FVPRC), allocatable :: Q(:,:,:,:), CVM(:,:,:)
@@ -7271,6 +7280,9 @@ end subroutine RunAddIncs
     ied = state%grid%ied
     jsd = state%grid%jsd
     jed = state%grid%jed
+
+    call MAPL_Get( MAPL, LONS=LONS, LATS=LATS, RC=STATUS )
+    VERIFY_(STATUS)
 
 ! **********************************************************************
 ! ****  Use QV from FV3 init when coldstarting idealized cases      ****
@@ -7447,8 +7459,6 @@ end subroutine RunAddIncs
 
        DEALLOCATE( tend_ua )
        DEALLOCATE( tend_va )
-       DEALLOCATE( tend_un )
-       DEALLOCATE( tend_vn )
 
        ! **********************************************************************
        ! ****           Compute Old Pressure Thickness                     ****
@@ -7536,6 +7546,36 @@ end subroutine RunAddIncs
           STATE%VARS%PT =  STATE%VARS%PT                         *DPOLD
           STATE%VARS%PT = (STATE%VARS%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW
        endif
+
+       if (DEBUG_TQ_ERRORS) then
+       do L=1,KM
+         do J=js,je
+           do I=is,ie
+             if (STATE%VARS%PT(I,J,L) > 333.0) then
+                 print *, "Temperature spike detected : ", STATE%VARS%PT(I,J,L)
+                 print *, "  Total Physics  Increment : ", (DT*TEND(I,J,L)*(MAPL_CP/CVM(I,J,L)))/DPNEW(I,J,L)
+                 print *, "    IN ADD_INCS inside DYN   "
+                 II=I-is+1
+                 JJ=J-js+1
+                 print *, "  Latitude       =", LATS(II,JJ)*180.0/MAPL_PI
+                 print *, "  Longitude      =", LONS(II,JJ)*180.0/MAPL_PI
+                 print *, "  Pressure (mb)  =", 0.5*(STATE%VARS%PE(I,J,L+1)+STATE%VARS%PE(I,J,L))/100.0
+
+                 print *, "  UWND =", STATE%VARS%U(I,J,L), " UINC =", DT*TEND_UN(I,J,L)
+                 print *, "  VWND =", STATE%VARS%V(I,J,L), " VINC =", DT*TEND_VN(I,J,L)
+                 if (nwat >= 6) then
+                 print *, "  QV=", Q(I,J,L,sphum  ), "  QL=", Q(I,J,L,liq_wat), "  QI=", Q(I,J,L,ice_wat)
+                 print *, "  QR=", Q(I,J,L,rainwat), "  QS=", Q(I,J,L,snowwat), "  QG=", Q(I,J,L,graupel)
+                 end if
+             endif
+           end do ! IM loop
+         end do ! JM loop
+       end do ! LM loop
+       endif
+
+       DEALLOCATE( tend_un )
+       DEALLOCATE( tend_vn )
+
 
        ! Update PKZ from hydrostatic pressures
        !  This isn't entirely necessary, FV3 overwrites this in fv_dynamics
