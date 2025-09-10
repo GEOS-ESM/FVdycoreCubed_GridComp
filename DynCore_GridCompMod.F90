@@ -7246,10 +7246,10 @@ end subroutine RunAddIncs
 
     real(FVPRC), allocatable :: u_dt(:,:,:), v_dt(:,:,:), t_dt(:,:,:)
 
-    real(kind=4), pointer :: tend(:,:,:)
+    real(r4), pointer :: tend(:,:,:)
 
-    real, pointer, dimension(:,:)   :: LONS
-    real, pointer, dimension(:,:)   :: LATS
+    real(r4), pointer, dimension(:,:)   :: LONS
+    real(r4), pointer, dimension(:,:)   :: LATS
 
     type(DynTracers)      :: qqq       ! Specific Humidity
     real(FVPRC), allocatable :: Q(:,:,:,:), CVM(:,:,:)
