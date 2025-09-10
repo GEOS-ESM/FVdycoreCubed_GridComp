@@ -575,7 +575,7 @@ contains
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
          FV_Atm(1)%flagstruct%hydrostatic = .true.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0   )
          FV_Atm(1)%flagstruct%tau = 5.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
