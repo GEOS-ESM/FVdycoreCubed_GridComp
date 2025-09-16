@@ -7559,11 +7559,7 @@ end subroutine RunAddIncs
                   (Q(I,J,L,snowwat) < 0.0) .OR. (Q(I,J,L,snowwat)/=Q(I,J,L,snowwat)) .OR. & 
                   (Q(I,J,L,graupel) < 0.0) .OR. (Q(I,J,L,graupel)/=Q(I,J,L,graupel)) ) then
                  print *, "T or Q  spike detected : ", STATE%VARS%PT(I,J,L)
-                 if(is_weighted_) then 
-                 print *, "  Temp  ANA      Increment : ", (DT*TEND(I,J,L)*(MAPL_CP/CVM(I,J,L)))/DPNEW(I,J,L)
-                 else
-                 print *, "  Temp  Physics  Increment : ", (DT*TEND(I,J,L)*(MAPL_CP/CVM(I,J,L)))/DPNEW(I,J,L)
-                 endif
+                 print *, "  Temp  ANA|PHY  Increment : ", (DT*TEND(I,J,L)*(MAPL_CP/CVM(I,J,L)))/DPNEW(I,J,L)
                  print *, "    IN ADD_INCS inside DYN   "
                  II=I-is+1
                  JJ=J-js+1
