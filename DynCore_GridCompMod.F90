@@ -7551,9 +7551,15 @@ end subroutine RunAddIncs
        do L=1,KM
          do J=js,je
            do I=is,ie
-             if (STATE%VARS%PT(I,J,L) > 333.0) then
-                 print *, "Temperature spike detected : ", STATE%VARS%PT(I,J,L)
-                 print *, "  Total Physics  Increment : ", (DT*TEND(I,J,L)*(MAPL_CP/CVM(I,J,L)))/DPNEW(I,J,L)
+             if ( (STATE%VARS%PT(I,J,L) > 333.0) .OR. (STATE%VARS%PT(I,J,L)/=STATE%VARS%PT(I,J,L)) .OR. &
+                  (Q(I,J,L,sphum  ) < 0.0) .OR. (Q(I,J,L,sphum  )/=Q(I,J,L,sphum  )) .OR. &
+                  (Q(I,J,L,liq_wat) < 0.0) .OR. (Q(I,J,L,liq_wat)/=Q(I,J,L,liq_wat)) .OR. & 
+                  (Q(I,J,L,ice_wat) < 0.0) .OR. (Q(I,J,L,ice_wat)/=Q(I,J,L,ice_wat)) .OR. & 
+                  (Q(I,J,L,rainwat) < 0.0) .OR. (Q(I,J,L,rainwat)/=Q(I,J,L,rainwat)) .OR. & 
+                  (Q(I,J,L,snowwat) < 0.0) .OR. (Q(I,J,L,snowwat)/=Q(I,J,L,snowwat)) .OR. & 
+                  (Q(I,J,L,graupel) < 0.0) .OR. (Q(I,J,L,graupel)/=Q(I,J,L,graupel)) ) then
+                 print *, "T or Q  spike detected : ", STATE%VARS%PT(I,J,L)
+                 print *, "  Temp  ANA|PHY  Increment : ", (DT*TEND(I,J,L)*(MAPL_CP/CVM(I,J,L)))/DPNEW(I,J,L)
                  print *, "    IN ADD_INCS inside DYN   "
                  II=I-is+1
                  JJ=J-js+1
