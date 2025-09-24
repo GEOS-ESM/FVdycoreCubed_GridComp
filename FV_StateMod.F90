@@ -2626,6 +2626,7 @@ subroutine State_To_FV ( STATE )
 
     endif
 
+   FV_Atm(1)%q_con = tiny_number
 
    return
 
