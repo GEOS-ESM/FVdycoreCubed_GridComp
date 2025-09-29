@@ -122,25 +122,17 @@ else ()
 endif ()
 
 if (FV_PRECISION STREQUAL R4)
-   set (GFDL fms_r4)
+  set (GFDL FMS::fms_r4)
 elseif (FV_PRECISION STREQUAL R4R8) # FV is R4 but FMS is R8
-   # We need to add_dependencies for fms_r4 because CMake doesn't know we
-   # need it for include purposes. In R4R8, we only ever link against
-   # fms_r4, so it doesn't know we need to build it.
-   # NOTE NOTE NOTE: This should *not* be included in GEOSgcm v12
-   #     because FMS is pre-built library in that case.
-   add_dependencies (${this} fms_r4)
-   get_target_property (extra_incs fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
-   target_include_directories(${this} PRIVATE
-   $<BUILD_INTERFACE:${extra_incs}>
-   )
-   set (GFDL fms_r8)
+  get_target_property (extra_incs FMS::fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
+  target_include_directories(${this} PRIVATE $<BUILD_INTERFACE:${extra_incs}>)
+  set (GFDL FMS::fms_r8)
 elseif (FV_PRECISION STREQUAL R8)
-   set (GFDL fms_r8)
-   string(REPLACE " " ";" tmp ${FREAL8})
-   foreach(flag ${tmp})
-     target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
-   endforeach()
+  set (GFDL FMS::fms_r8)
+  string(REPLACE " " ";" tmp ${FREAL8})
+  foreach(flag ${tmp})
+    target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
+  endforeach()
 endif ()
 
 if (FV_PRECISION MATCHES R4)
@@ -167,6 +159,12 @@ ecbuild_add_executable (
   TARGET StandAlone_FV3_Dycore.x
   SOURCES StandAlone_FV3_Dycore.F90
   LIBS ${this} OpenMP::OpenMP_Fortran)
+
+find_package (JeMalloc)
+if(JeMalloc_FOUND)
+  message(STATUS "JeMalloc found, using for StandAlone_FV3_Dycore.x")
+  target_link_libraries (StandAlone_FV3_Dycore.x JeMalloc::JeMalloc)
+endif()
 
 ecbuild_add_executable (
   TARGET rs_scale.x
