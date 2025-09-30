@@ -1,0 +1,35 @@
+schema_version: 2.0.0
+component: DynCore
+
+category: IMPORT
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ SHORT_NAME  |                      LONG_NAME                      |   UNITS    |        DIMS         |     FIELD_TYPE     |       VLOCATION        |      RESTART       
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    DUDT     |               eastward_wind_tendency                |   m s-2    |  MAPL_DimsHorzVert  |  MAPL_VectorField  |  MAPL_VlocationCenter  |                    
+    DVDT     |               northward_wind_tendency               |   m s-2    |  MAPL_DimsHorzVert  |  MAPL_VectorField  |  MAPL_VlocationCenter  |                    
+    DWDT     |             vertical_velocity_tendency              |   m s-2    |  MAPL_DimsHorzVert  |  MAPL_VectorField  |  MAPL_VlocationCenter  |                    
+    DTDT     |        delta-p_weighted_temperature_tendency        |  Pa K s-1  |  MAPL_DimsHorzVert  |                    |  MAPL_VlocationCenter  |                    
+   DQVANA    |      specific_humidity_increment_from_analysis      |  kg kg-1   |  MAPL_DimsHorzVert  |                    |  MAPL_VlocationCenter  |                    
+   DQLANA    |  specific_humidity_liquid_increment_from_analysis   |  kg kg-1   |  MAPL_DimsHorzVert  |                    |  MAPL_VlocationCenter  |                    
+   DQIANA    |    specific_humidity_ice_increment_from_analysis    |  kg kg-1   |  MAPL_DimsHorzVert  |                    |  MAPL_VlocationCenter  |                    
+   DQRANA    |   specific_humidity_rain_increment_from_analysis    |  kg kg-1   |  MAPL_DimsHorzVert  |                    |  MAPL_VlocationCenter  |                    
+   DQSANA    |   specific_humidity_snow_increment_from_analysis    |  kg kg-1   |  MAPL_DimsHorzVert  |                    |  MAPL_VlocationCenter  |                    
+   DQGANA    |  specific_humidity_graupel_increment_from_analysis  |  kg kg-1   |  MAPL_DimsHorzVert  |                    |  MAPL_VlocationCenter  |                    
+   DOXANA    |            ozone_increment_from_analysis            |  kg kg-1   |  MAPL_DimsHorzVert  |                    |  MAPL_VlocationCenter  |                    
+   DPEDT     |               edge_pressure_tendency                |   Pa s-1   |  MAPL_DimsHorzVert  |                    |   MAPL_VlocationEdge   |                    
+    PHIS     |             surface_geopotential_height             |  m+2 s-2   |  MAPL_DimsHorzOnly  |                    |   MAPL_VlocationNone   |                    
+   VARFLT    |           variance_of_filtered_topography           |    m+2     |  MAPL_DimsHorzOnly  |                    |   MAPL_VlocationNone   |  MAPL_RestartSkip  
+
+# category: INTERNAL
+# #---------------------------------------------------------------------------------------------------------------------------------------------------------
+#  SHORT_NAME  |           LONG_NAME            |       UNITS        |   PRECISION    |        DIMS         |        RESTART         |       VLOCATION       
+# #---------------------------------------------------------------------------------------------------------------------------------------------------------
+#      AK      |    hybrid_sigma_pressure_a     |         Pa         |  ESMF_KIND_R8  |  MAPL_DimsVertOnly  |  MAPL_RestartRequired  |   MAPL_VlocationEdge  
+#      BK      |    hybrid_sigma_pressure_b     |         1          |  ESMF_KIND_R8  |  MAPL_DimsVertOnly  |  MAPL_RestartRequired  |   MAPL_VlocationEdge  
+#      U       |         eastward_wind          |       m s-1        |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |  MAPL_RestartRequired  |  MAPL_VlocationCenter 
+#      V       |         northward_wind         |       m s-1        |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |  MAPL_RestartRequired  |  MAPL_VlocationCenter 
+#      PT      |  scaled_potential_temperature  |  K Pa$^{-\kappa}$  |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |  MAPL_RestartRequired  |  MAPL_VlocationCenter 
+#      PE      |          air_pressure          |         Pa         |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |  MAPL_RestartRequired  |   MAPL_VlocationEdge  
+#     PKZ      |       pressure_to_kappa        |    Pa$^\kappa$     |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |  MAPL_RestartRequired  |  MAPL_VlocationCenter 
+#      DZ      |        height_thickness        |         m          |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |                        |  MAPL_VlocationCenter 
+#      W       |       vertical_velocity        |       m s-1        |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |                        |  MAPL_VlocationCenter
