@@ -311,7 +311,7 @@ contains
 
       !ARGUMENTS:
       type(ESMF_GridComp), intent(inout) :: gc     ! gridded component
-      integer, intent(out), optional     :: rc     ! return code
+      integer, intent(out), optional :: rc     ! return code
 
       !DESCRIPTION: Set services (register) for the FVCAM Dynamical Core
       !               Grid Component.
@@ -320,37 +320,32 @@ contains
       type (DynState), pointer :: dyn_internal_state
       type (DYN_wrap)                  :: wrap
 
-      integer                          :: FV3_STANDALONE
-      integer                          :: status
-      character(len=ESMF_MAXSTR)       :: IAm
-      character(len=ESMF_MAXSTR)       :: COMP_NAME
+      integer :: FV3_STANDALONE
+      integer :: status
+      character(len=ESMF_MAXSTR) :: IAm
+      character(len=ESMF_MAXSTR) :: COMP_NAME
 
-      type (ESMF_Config)               :: CF
-      type (ESMF_VM)                   :: VM
+      type(ESMF_Config) :: CF
+      type(ESMF_VM) :: VM
 
-      type (MAPL_MetaComp),      pointer :: MAPL
-      character (len=ESMF_MAXSTR)        :: LAYOUT_FILE
+      type(MAPL_MetaComp), pointer :: MAPL
+      character(len=ESMF_MAXSTR) :: LAYOUT_FILE
 
       ! Get the configuration from the component
-      call ESMF_GridCompGet( GC, CONFIG = CF, RC=STATUS )
-      call ESMF_GridCompGet( GC, name=COMP_NAME, RC=STATUS )
-      VERIFY_(STATUS)
+      call ESMF_GridCompGet(GC, CONFIG = CF, _RC)
+      call ESMF_GridCompGet(GC, name=COMP_NAME, _RC)
       Iam = trim(COMP_NAME) // "SetServices"
 
-      call ESMF_VMGetCurrent(VM, rc=STATUS)
-      VERIFY_(STATUS)
+      call ESMF_VMGetCurrent(VM, _RC)
 
-      call MAPL_MemUtilsWrite(VM, trim(IAm)//': Begin', RC=STATUS )
-      VERIFY_(STATUS)
+      call MAPL_MemUtilsWrite(VM, trim(IAm)//': Begin', _RC)
 
       ! Allocate this instance of the internal state and put it in wrapper.
-      allocate( dyn_internal_state, stat=status )
-      VERIFY_(STATUS)
+      allocate(dyn_internal_state, _STAT)
       wrap%dyn_state => dyn_internal_state
 
       ! Save pointer to the wrapped internal state in the GC
-      call ESMF_UserCompSetInternalState ( GC,'DYNstate',wrap,status )
-      VERIFY_(STATUS)
+      call ESMF_UserCompSetInternalState(GC, 'DYNstate', wrap, _RC)
 
 #include "DynCore_Import___.h"
       call MAPL_AddImportSpec(gc, &
@@ -358,8 +353,6 @@ contains
            LONG_NAME='advected_quantities', &
            UNITS='unknown', &
            DATATYPE=MAPL_BundleItem, _RC)
-
-      ! !EXPORT STATE:
 
 #include "DynCore_Export___.h"
       call MAPL_AddExportSpec(gc, &
@@ -419,94 +412,63 @@ contains
            UNITS= '', &
            DIMS=MAPL_DimsHorzOnly, &
            VLOCATION=MAPL_VLocationNone, _RC)
-      VERIFY_(STATUS)
 
 #include "DynCore_Internal___.h"
 
+      ! pchakrab: TODO: DO WE STILL NEED THIS COMMENT?
       !ALT: technically the first 2 records of "old" style FV restart have
       !     6 ints: YYYY MM DD H M S
       !     5 ints: I,J,K, KS (num true pressure levels), NQ (num tracers) headers
 
       ! Set the Profiling timers
-      call MAPL_TimerAdd(GC,    name="INITIALIZE"    ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="RUN"           ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="RUN2"          ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="-DYN_INIT"     ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="--FMS_INIT"    ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="--FV_INIT"     ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="-DYN_ANA"      ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="-DYN_PROLOGUE" ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="-DYN_CORE"     ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="-DYN_EPILOGUE" ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="--FV_DYNAMICS" ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="--MASS_FIX"    ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="FINALIZE"      ,RC=STATUS)
-      VERIFY_(STATUS)
+      call MAPL_TimerAdd(GC, name="INITIALIZE", _RC)
+      call MAPL_TimerAdd(GC, name="RUN", _RC)
+      call MAPL_TimerAdd(GC, name="RUN2", _RC)
+      call MAPL_TimerAdd(GC, name="-DYN_INIT", _RC)
+      call MAPL_TimerAdd(GC, name="--FMS_INIT", _RC)
+      call MAPL_TimerAdd(GC, name="--FV_INIT", _RC)
+      call MAPL_TimerAdd(GC, name="-DYN_ANA", _RC)
+      call MAPL_TimerAdd(GC, name="-DYN_PROLOGUE", _RC)
+      call MAPL_TimerAdd(GC, name="-DYN_CORE", _RC)
+      call MAPL_TimerAdd(GC, name="-DYN_EPILOGUE", _RC)
+      call MAPL_TimerAdd(GC, name="--FV_DYNAMICS", _RC)
+      call MAPL_TimerAdd(GC, name="--MASS_FIX", _RC)
+      call MAPL_TimerAdd(GC, name="FINALIZE", _RC)
 
       ! Register services for this component
-      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_INITIALIZE,  Initialize, rc=status)
-      VERIFY_(STATUS)
-      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_RUN,   Run, rc=status)
-      VERIFY_(STATUS)
-      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_RUN,   RunAddIncs, rc=status)
-      VERIFY_(STATUS)
-      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_FINALIZE, Finalize, rc=status)
-      VERIFY_(STATUS)
-      !  call MAPL_GridCompSetEntryPoint ( gc, ESMF_SETREADRESTART, Coldstart, rc=status)
-      !  VERIFY_(STATUS)
+      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_INITIALIZE,  Initialize, _RC)
+      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_RUN,   Run, _RC)
+      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_RUN,   RunAddIncs, _RC)
+      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_FINALIZE, Finalize, _RC)
+      !  call MAPL_GridCompSetEntryPoint ( gc, ESMF_SETREADRESTART, Coldstart, _RC)
 
       ! Setup FMS/FV3
-      call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-      VERIFY_(STATUS)
-      call MAPL_GetResource ( MAPL, LAYOUT_FILE, 'LAYOUT:', default='fvcore_layout.rc', rc=status )
-      VERIFY_(STATUS)
-      call DynSetup(GC, LAYOUT_FILE, rc=status)
-      VERIFY_(STATUS)
+      call MAPL_GetObjectFromGC(GC, MAPL, _RC)
+      call MAPL_GetResource(MAPL, LAYOUT_FILE, 'LAYOUT:', default='fvcore_layout.rc', _RC)
+      call DynSetup(GC, LAYOUT_FILE, _RC)
 
       ! Register prototype of cubed sphere grid and associated regridders
       call register_grid_and_regridders()
 
       ! At this point check if FV is standalone and init the grid
-      call ESMF_ConfigGetAttribute ( CF, FV3_STANDALONE, Label="FV3_STANDALONE:", default=0, RC=STATUS)
-      VERIFY_(STATUS)
-      if (FV3_STANDALONE /=0) then
-         call MAPL_GridCreate(GC, rc=status)
-         VERIFY_(STATUS)
-         call MAPL_AddExportSpec( gc,                              &
-              SHORT_NAME = 'TRADVEX',                                    &
-              LONG_NAME  = 'advected_quantities',                        &
-              UNITS      = 'unknown',                                    &
-              DATATYPE   = MAPL_BundleItem,               &
-              RC=STATUS  )
-         VERIFY_(STATUS)
+      call ESMF_ConfigGetAttribute(CF, FV3_STANDALONE, Label="FV3_STANDALONE:", default=0, _RC)
+      if (FV3_STANDALONE /= 0) then
+         call MAPL_GridCreate(GC, _RC)
+         call MAPL_AddExportSpec(gc, &
+              SHORT_NAME='TRADVEX', &
+              LONG_NAME='advected_quantities', &
+              UNITS='unknown', &
+              DATATYPE=MAPL_BundleItem, _RC)
       endif
 
-      call MAPL_GetResource ( MAPL, DEBUG_DYN, 'DEBUG_DYN:', default=.FALSE., rc=status )
-      VERIFY_(STATUS)
-
-      call MAPL_GetResource ( MAPL, DEBUG_ADV, 'DEBUG_ADV:', default=.FALSE., rc=status )
-      VERIFY_(STATUS)        
-
-      call MAPL_GetResource ( MAPL, DEBUG_TQ_ERRORS, 'DEBUG_TQ_ERRORS:', default=.FALSE., rc=status )
-      VERIFY_(STATUS)        
+      call MAPL_GetResource(MAPL, DEBUG_DYN, 'DEBUG_DYN:', default=.FALSE., _RC)
+      call MAPL_GetResource(MAPL, DEBUG_ADV, 'DEBUG_ADV:', default=.FALSE., _RC)
+      call MAPL_GetResource(MAPL, DEBUG_TQ_ERRORS, 'DEBUG_TQ_ERRORS:', default=.FALSE., _RC)
 
       ! Generic SetServices
-      call MAPL_GenericSetServices( GC, RC=STATUS )
-      VERIFY_(STATUS)
+      call MAPL_GenericSetServices(GC, _RC)
 
-      RETURN_(ESMF_SUCCESS)
+      _RETURN(_SUCCESS)
 
    end subroutine SetServices
 
