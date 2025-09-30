@@ -1,6 +1,243 @@
 schema_version: 2.0.0
 component: DynCore
 
+category: EXPORT
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    SHORT_NAME     |                                 LONG_NAME                                 |       UNITS        |        DIMS         |       VLOCATION        |     FIELD_TYPE     |   PRECISION
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        KE         |                   vertically_integrated_kinetic_energy                    |       J m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       TAVE        |                    vertically_averaged_dry_temperature                    |         K          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       UAVE        |                      vertically_averaged_zonal_wind                       |      m sec-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+      KEPHY        |       vertically_integrated_kinetic_energy_tendency_due_to_physics        |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      PEPHY        |              total_potential_energy_tendency_due_to_physics               |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      TEPHY        |                   mountain_work_tendency_due_to_physics                   |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      KEANA        |               total_kinetic_energy_tendency_due_to_analysis               |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      PEANA        |              total_potential_energy_tendency_due_to_analysis              |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      TEANA        |                  mountain_work_tendency_due_to_analysis                   |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      KEHOT        |         vertically_integrated_kinetic_energy_tendency_due_to_HOT          |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       KEDP        |   vertically_integrated_kinetic_energy_tendency_due_to_pressure_change    |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      KEADV        |  vertically_integrated_kinetic_energy_tendency_due_to_dynamics_advection  |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       KEPG        |  vertically_integrated_kinetic_energy_tendency_due_to_pressure_gradient   |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      KEDYN        |       vertically_integrated_kinetic_energy_tendency_due_to_dynamics       |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      PEDYN        |      vertically_integrated_potential_energy_tendency_due_to_dynamics      |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      TEDYN        |                  mountain_work_tendency_due_to_dynamics                   |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     KECDCOR       |        vertically_integrated_kinetic_energy_tendency_due_to_cdcore        |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     PECDCOR       |       vertically_integrated_potential_energy_tendency_due_to_cdcore       |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     TECDCOR       |                   mountain_work_tendency_due_to_cdcore                    |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      QFIXER       |       vertically_integrated_potential_energy_tendency_due_to_CONSV        |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     KEREMAP       |        vertically_integrated_kinetic_energy_tendency_due_to_remap         |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     PEREMAP       |       vertically_integrated_potential_energy_tendency_due_to_remap        |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     TEREMAP       |                    mountain_work_tendency_due_to_remap                    |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      KEGEN        |            vertically_integrated_generation_of_kinetic_energy             |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     DKERESIN      |     vertically_integrated_kinetic_energy_residual_from_inertial_terms     |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     DKERESPG      |        vertically_integrated_kinetic_energy_residual_from_PG_terms        |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     DMDTANA       |            vertically_integrated_mass_tendency_due_to_analysis            |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DOXDTANAINT     |           vertically_integrated_ozone_tendency_due_to_analysis            |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DQVDTANAINT     |        vertically_integrated_water_vapor_tendency_due_to_analysis         |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DQLDTANAINT     |        vertically_integrated_liquid_water_tendency_due_to_analysis        |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DQIDTANAINT     |         vertically_integrated_ice_water_tendency_due_to_analysis          |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     DMDTDYN       |            vertically_integrated_mass_tendency_due_to_dynamics            |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DOXDTDYNINT     |           vertically_integrated_ozone_tendency_due_to_dynamics            |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DTHVDTDYNINT    |            vertically_integrated_THV_tendency_due_to_dynamics             |    K kg m-2 s-1    |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DTHVDTREMAP     |       vertically_integrated_THV_tendency_due_to_vertical_remapping        |    K kg m-2 s-1    |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DTHVDTCONSV     |         vertically_integrated_THV_tendency_due_to_TE_conservation         |    K kg m-2 s-1    |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DTHVDTPHYINT    |             vertically_integrated_THV_tendency_due_to_physics             |    K kg m-2 s-1    |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DTHVDTANAINT    |            vertically_integrated_THV_tendency_due_to_analysis             |    K kg m-2 s-1    |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DQVDTDYNINT     |        vertically_integrated_water_vapor_tendency_due_to_dynamics         |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DQLDTDYNINT     |        vertically_integrated_liquid_water_tendency_due_to_dynamics        |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   DQIDTDYNINT     |         vertically_integrated_ice_water_tendency_due_to_dynamics          |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      CONVKE       |             vertically_integrated_kinetic_energy_convergence              |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     CONVTHV       |                 vertically_integrated_thetav_convergence                  |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     CONVCPT       |                vertically_integrated_enthalpy_convergence                 |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     CONVPHI       |              vertically_integrated_geopotential_convergence               |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+        U          |                               eastward_wind                               |       m s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |  MAPL_VectorField  |
+        V          |                              northward_wind                               |       m s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |  MAPL_VectorField  |
+        T          |                              air_temperature                              |         K          |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+        PL         |                            mid_level_pressure                             |         Pa         |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+       ZLE0        |                        edge_heights_above_surface                         |         m          |  MAPL_DimsHorzVert  |   MAPL_VlocationEdge   |                    |
+       ZL0         |                      mid_layer_heights_above_surface                      |         m          |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+       ZLE         |                               edge_heights                                |         m          |  MAPL_DimsHorzVert  |   MAPL_VlocationEdge   |                    |
+        ZL         |                             mid_layer_heights                             |         m          |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+        S          |                        mid_layer_dry_static_energy                        |         m          |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+       PLE         |                               edge_pressure                               |         Pa         |  MAPL_DimsHorzVert  |   MAPL_VlocationEdge   |                    |
+        TH         |                           potential_temperature                           |         K          |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+       PLK         |                           mid-layer_p$^\kappa$                            |    Pa$^\kappa$     |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+       PKE         |                              edge_p$^\kappa$                              |    Pa$^\kappa$     |  MAPL_DimsHorzVert  |   MAPL_VlocationEdge   |                    |
+       DELZ        |                      nonhydrostatic_layer_thickness                       |       m s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+        W          |                             vertical_velocity                             |       m s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+      OMEGA        |                  hydrostatic_vertical_pressure_velocity                   |       Pa s-1       |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+ #      CX         |                    eastward_accumulated_courant_number                    |                    |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |  ESMF_KIND_R8
+ #      CY         |                   northward_accumulated_courant_number                    |                    |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |  ESMF_KIND_R8
+ #      CU         |                    eastward_accumulated_courant_number                    |                    |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+ #      CV         |                   northward_accumulated_courant_number                    |                    |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+        MX         |             pressure_weighted_accumulated_eastward_mass_flux              |       Pa m+2       |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+        MY         |             pressure_weighted_accumulated_northward_mass_flux             |       Pa m+2       |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+       MFX         |             pressure_weighted_accumulated_eastward_mass_flux              |       Pa m+2       |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |  ESMF_KIND_R8
+       MFY         |             pressure_weighted_accumulated_northward_mass_flux             |       Pa m+2       |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |  ESMF_KIND_R8
+       MFZ         |                            vertical_mass_flux                             |     kg m-2 s-1     |  MAPL_DimsHorzVert  |   MAPL_VlocationEdge   |                    |  ESMF_KIND_R8
+        MZ         |                            vertical_mass_flux                             |     kg m-2 s-1     |  MAPL_DimsHorzVert  |   MAPL_VlocationEdge   |                    |  ESMF_KIND_R4
+        PV         |                   ertels_isentropic_potential_vorticity                   |    m+2 kg-1 s-1    |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+       EPV         |                        ertels_potential_vorticity                         |   K m+2 kg-1 s-1   |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+        Q          |                             specific_humidity                             |         1          |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+        QC         |                        specific_mass_of_condensate                        |         1          |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DUDTSUBZ      |                tendency_of_eastward_wind_due_to_subgrid_dz                |       m/s/s        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |  MAPL_VectorField  |
+     DVDTSUBZ      |               tendency_of_northward_wind_due_to_subgrid_dz                |       m/s/s        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |  MAPL_VectorField  |
+     DTDTSUBZ      |               tendency_of_air_temperature_due_to_subgrid_dz               |       K s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DWDTSUBZ      |              tendency_of_vertical_velocity_due_to_subgrid_dz              |       m/s/s        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DTDT_RAY      |             air_temperature_tendency_due_to_Rayleigh_friction             |       K s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DUDT_RAY      |            tendency_of_eastward_wind_due_to_Rayleigh_friction             |       m s-2        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |  MAPL_VectorField  |
+     DVDT_RAY      |            tendency_of_northward_wind_due_to_Rayleigh_friction            |       m s-2        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |  MAPL_VectorField  |
+     DWDT_RAY      |            vertical_velocity_tendency_due_to_Rayleigh_friction            |       m/s/s        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DUDTANA       |                 tendency_of_eastward_wind_due_to_analysis                 |       m/s/s        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |  MAPL_VectorField  |
+     DVDTANA       |                tendency_of_northward_wind_due_to_analysis                 |       m/s/s        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |  MAPL_VectorField  |
+     DTDTANA       |                tendency_of_air_temperature_due_to_analysis                |       K s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+    DDELPDTANA     |              tendency_of_pressure_thickness_due_to_analysis               |       K s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DUDTDYN       |                 tendency_of_eastward_wind_due_to_dynamics                 |       m/s/s        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DVDTDYN       |                tendency_of_northward_wind_due_to_dynamics                 |       m/s/s        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DTDTDYN       |                tendency_of_air_temperature_due_to_dynamics                |       K s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DQVDTDYN      |               tendency_of_specific_humidity_due_to_dynamics               |      kg/kg/s       |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DQIDTDYN      |                   tendency_of_ice_water_due_to_dynamics                   |      kg/kg/s       |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DQLDTDYN      |                 tendency_of_liquid_water_due_to_dynamics                  |      kg/kg/s       |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DOXDTDYN      |                     tendency_of_ozone_due_to_dynamics                     |   mol mol-1 s-1    |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+       PREF        |                          reference_air_pressure                           |         Pa         |  MAPL_DimsVertOnly  |   MAPL_VlocationEdge   |                    |
+        AK         |                          hybrid_sigma_pressure_a                          |         1          |  MAPL_DimsVertOnly  |   MAPL_VlocationEdge   |                    |
+        BK         |                          hybrid_sigma_pressure_b                          |         1          |  MAPL_DimsVertOnly  |   MAPL_VlocationEdge   |                    |
+       PHIS        |                              surface_height                               |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+        PS         |                             surface_pressure                              |         Pa         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+        TA         |                          surface_air_temperature                          |         K          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+        QA         |                         surface_specific_humidity                         |         1          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+        US         |                           surface_eastward_wind                           |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+        VS         |                          surface_northward_wind                           |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+      SPEED        |                            surface_wind_speed                             |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     WSPD_10M      |                             wind_speed_at_10m                             |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+ VVEL_UP_100_1000  |               max_vertical_velocity_up_between_100_1000_hPa               |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+ VVEL_DN_100_1000  |              max_vertical_velocity_down_between_100_1000_hPa              |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+        DZ         |                           surface_layer_height                            |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       SLP         |                            sea_level_pressure                             |         Pa         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      H1000        |                             height_at_1000_mb                             |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+    TROPP_EPV      |                 tropopause_pressure_based_on_EPV_estimate                 |         Pa         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+  TROPP_THERMAL    |               tropopause_pressure_based_on_thermal_estimate               |         Pa         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+  TROPP_BLENDED    |               tropopause_pressure_based_on_blended_estimate               |         Pa         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+  TROPK_BLENDED    |                tropopause_index_based_on_blended_estimate                 |      unitless      |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      TROPT        |            tropopause_temperature_using_blended_TROPP_estimate            |         K          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      TROPQ        |         tropopause_specific_humidity_using_blended_TROPP_estimate         |       kg/kg        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       PLE0        |                  pressure_at_layer_edges_before_dynamics                  |         Pa         |  MAPL_DimsHorzVert  |   MAPL_VlocationEdge   |                    |  ESMF_KIND_R8
+       PLE1        |                  pressure_at_layer_edges_after_dynamics                   |         Pa         |  MAPL_DimsHorzVert  |   MAPL_VlocationEdge   |                    |  ESMF_KIND_R8
+       DELP        |                            pressure_thickness                             |         Pa         |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DELPTOP       |                      pressure_thickness_at_model_top                      |         Pa         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     U_AGRID       |                          eastward_wind_on_A-Grid                          |       m s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     V_AGRID       |                         northward_wind_on_A-Grid                          |       m s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     U_CGRID       |                          eastward_wind_on_C-Grid                          |       m s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     V_CGRID       |                         northward_wind_on_C-Grid                          |       m s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     U_DGRID       |                      eastward_wind_on_native_D-Grid                       |       m s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     V_DGRID       |                      northward_wind_on_native_D-Grid                      |       m s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+        TV         |                          air_virtual_temperature                          |         K          |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+       THV         |                   scaled_virtual_potential_temperature                    |   K/Pa$^\kappa$    |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+    DPLEDTDYN      |                 tendency_of_edge_pressure_due_to_dynamics                 |       Pa s-1       |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+    DDELPDTDYN     |              tendency_of_pressure_thickness_due_to_dynamics               |       Pa s-1       |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+       UKE         |                eastward_flux_of_atmospheric_kinetic_energy                |     J m-1 s-1      |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       VKE         |               northward_flux_of_atmospheric_kinetic_energy                |     J m-1 s-1      |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       UCPT        |                   eastward_flux_of_atmospheric_enthalpy                   |     J m-1 s-1      |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       VCPT        |                  northward_flux_of_atmospheric_enthalpy                   |     J m-1 s-1      |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       UPHI        |               eastward_flux_of_atmospheric_potential_energy               |     J m-1 s-1      |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       VPHI        |              northward_flux_of_atmospheric_potential_energy               |     J m-1 s-1      |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       UQV         |                 eastward_flux_of_atmospheric_water_vapor                  |     kg m-1 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       VQV         |                 northward_flux_of_atmospheric_water_vapor                 |     kg m-1 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       UQL         |                 eastward_flux_of_atmospheric_liquid_water                 |     kg m-1 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       VQL         |                northward_flux_of_atmospheric_liquid_water                 |     kg m-1 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       UQI         |                     eastward_flux_of_atmospheric_ice                      |     kg m-1 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       VQI         |                     northward_flux_of_atmospheric_ice                     |     kg m-1 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       DKE         |       tendency_of_atmosphere_kinetic_energy_content_due_to_dynamics       |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       DCPT        |         tendency_of_atmosphere_dry_energy_content_due_to_dynamics         |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       DPET        |    tendency_of_atmosphere_topographic_potential_energy_due_to_dynamics    |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       WRKT        |                      work_done_by_atmosphere_at_top                       |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       DQV         |        tendency_of_atmosphere_water_vapor_content_due_to_dynamics         |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       DQL         |        tendency_of_atmosphere_liquid_water_content_due_to_dynamics        |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       DQI         |            tendency_of_atmosphere_ice_content_due_to_dynamics             |     kg m-2 s-1     |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       CNV         |              generation_of_atmosphere_kinetic_energy_content              |       W m-2        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       UH25        |                        updraft_helicity_2_to_5_km                         |      m+2 s-2       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       UH03        |                        updraft_helicity_0_to_3_km                         |      m+2 s-2       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      SRH01        |                     storm_relative_helicity_0_to_1_km                     |      m+2 s-2       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      SRH03        |                     storm_relative_helicity_0_to_3_km                     |      m+2 s-2       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+      SRH25        |                     storm_relative_helicity_2_to_5_km                     |      m+2 s-2       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       VORT        |                      vorticity_at_mid_layer_heights                       |        s-1         |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     VORT850       |                           vorticity_at_850_hPa                            |        s-1         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     VORT700       |                           vorticity_at_700_hPa                            |        s-1         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     VORT500       |                           vorticity_at_500_hPa                            |        s-1         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     VORT200       |                           vorticity_at_200_hPa                            |        s-1         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       DIVG        |                      divergence_at_mid_layer_heights                      |        s-1         |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     DIVG850       |                           divergence_at_850_hPa                           |        s-1         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     DIVG700       |                           divergence_at_700_hPa                           |        s-1         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     DIVG500       |                           divergence_at_500_hPa                           |        s-1         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     DIVG200       |                           divergence_at_200_hPa                           |        s-1         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       U850        |                         eastward_wind_at_850_hPa                          |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       U700        |                         eastward_wind_at_700_hPa                          |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       U500        |                         eastward_wind_at_500_hPa                          |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       U300        |                         eastward_wind_at_300_hPa                          |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       U250        |                         eastward_wind_at_250_hPa                          |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       U200        |                         eastward_wind_at_200_hPa                          |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       U100        |                         eastward_wind_at_100_hPa                          |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       UTOP        |                        eastward_wind_at_model_top                         |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       V850        |                         northward_wind_at_850_hPa                         |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       V700        |                         northward_wind_at_700_hPa                         |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       V500        |                         northward_wind_at_500_hPa                         |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       V300        |                         northward_wind_at_300_hPa                         |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       V250        |                         northward_wind_at_250_hPa                         |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       V200        |                         northward_wind_at_200_hPa                         |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       V100        |                         northward_wind_at_100_hPa                         |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       VTOP        |                        northward_wind_at_model_top                        |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       T850        |                        air_temperature_at_850_hPa                         |         K          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       T700        |                        air_temperature_at_700_hPa                         |         K          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       T500        |                        air_temperature_at_500_hPa                         |         K          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       T300        |                        air_temperature_at_300_hPa                         |         K          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       T250        |                        air_temperature_at_250_hPa                         |         K          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       T200        |                        air_temperature_at_200_hPa                         |         K          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       T100        |                        air_temperature_at_100_hPa                         |         K          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       TTOP        |                       air_temperature_at_model_top                        |         K          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       Q850        |                       specific_humidity_at_850_hPa                        |      kg kg-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       Q700        |                       specific_humidity_at_700_hPa                        |      kg kg-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       Q500        |                       specific_humidity_at_500_hPa                        |      kg kg-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       Q300        |                       specific_humidity_at_300_hPa                        |      kg kg-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       Q250        |                       specific_humidity_at_250_hPa                        |      kg kg-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       Q200        |                       specific_humidity_at_200_hPa                        |      kg kg-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       Q100        |                       specific_humidity_at_100_hPa                        |      kg kg-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       Z700        |                      geopotential_height_at_700_hPa                       |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       Z500        |                      geopotential_height_at_500_hPa                       |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       Z300        |                      geopotential_height_at_300_hPa                       |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       H850        |                             height_at_850_hPa                             |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       H700        |                             height_at_700_hPa                             |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       H500        |                             height_at_500_hPa                             |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       H300        |                             height_at_300_hPa                             |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       H250        |                             height_at_250_hPa                             |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       H200        |                             height_at_200_hPa                             |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       H100        |                             height_at_100_hPa                             |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     OMEGA850      |                             omega_at_850_hPa                              |       Pa s-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     OMEGA700      |                             omega_at_700_hPa                              |       Pa s-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     OMEGA500      |                             omega_at_500_hPa                              |       Pa s-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     OMEGA200      |                             omega_at_200_hPa                              |       Pa s-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+     OMEGA10       |                              omega_at_10_hPa                              |       Pa s-1       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       W850        |                               w_at_850_hPa                                |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       W500        |                               w_at_500_hPa                                |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       W200        |                               w_at_200_hPa                                |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       W10         |                                w_at_10_hPa                                |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       U50M        |                        eastward_wind_at_50_meters                         |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       V50M        |                        northward_wind_at_50_meters                        |       m s-1        |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |  MAPL_VectorField  |
+       DXC         |                               cgrid_delta_x                               |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       DYC         |                               cgrid_delta_y                               |         m          |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       AREA        |                              agrid_cell_area                              |        m+2         |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+        PT         |                       scaled_potential_temperature                        |  K Pa$^{-\kappa}$  |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+        PE         |                               air_pressure                                |         Pa         |  MAPL_DimsHorzVert  |   MAPL_VlocationEdge   |                    |
+       LONS        |                             Center_longitudes                             |      radians       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+       LATS        |                             Center_latitudes                              |      radians       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+   TIME_IN_DYN     |                        timer_for_main_dynamics_run                        |      seconds       |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+ #     PID         |                                process_id                                 |                    |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone   |                    |
+    QV_DYN_IN      |                    spec_humidity_at_begin_of_time_step                    |      kg kg-1       |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     T_DYN_IN      |                     temperature_at_begin_of_time_step                     |         K          |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     U_DYN_IN      |                       u_wind_at_begin_of_time_step                        |       m s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+     V_DYN_IN      |                       v_wind_at_begin_of_time_step                        |       m s-1        |  MAPL_DimsHorzVert  |  MAPL_VlocationCenter  |                    |
+    PLE_DYN_IN     |                    edge_pressure_at_begin_of_time_step                    |         Pa         |  MAPL_DimsHorzVert  |   MAPL_VlocationEdge   |                    |
+
+
 category: IMPORT
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  SHORT_NAME  |                      LONG_NAME                      |   UNITS    |        DIMS         |     FIELD_TYPE     |       VLOCATION        |      RESTART
@@ -19,6 +256,7 @@ category: IMPORT
    DPEDT     |               edge_pressure_tendency                |   Pa s-1   |  MAPL_DimsHorzVert  |                    |   MAPL_VlocationEdge   |
     PHIS     |             surface_geopotential_height             |  m+2 s-2   |  MAPL_DimsHorzOnly  |                    |   MAPL_VlocationNone   |
    VARFLT    |           variance_of_filtered_topography           |    m+2     |  MAPL_DimsHorzOnly  |                    |   MAPL_VlocationNone   |  MAPL_RestartSkip
+
 
 category: INTERNAL
 #---------------------------------------------------------------------------------------------------------------------------------------------------------
