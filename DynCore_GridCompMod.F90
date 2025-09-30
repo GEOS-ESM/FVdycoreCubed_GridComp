@@ -2300,98 +2300,13 @@ contains
            VLOCATION  = MAPL_VLocationEdge,             RC=STATUS  )
       VERIFY_(STATUS)
 
-      ! !INTERNAL STATE:
+      !INTERNAL STATE:
 
       !ALT: technically the first 2 records of "old" style FV restart have
       !     6 ints: YYYY MM DD H M S
       !     5 ints: I,J,K, KS (num true pressure levels), NQ (num tracers) headers
 
-      call MAPL_AddInternalSpec ( gc,                                &
-           SHORT_NAME = 'AK',                                        &
-           LONG_NAME  = 'hybrid_sigma_pressure_a',                   &
-           UNITS      = 'Pa',                                        &
-           PRECISION  = ESMF_KIND_R8,                                &
-           DIMS       = MAPL_DimsVertOnly,                           &
-           RESTART    = MAPL_RestartRequired,                        &
-           VLOCATION  = MAPL_VLocationEdge,               RC=STATUS  )
-      VERIFY_(STATUS)
-
-      call MAPL_AddInternalSpec ( gc,                                &
-           SHORT_NAME = 'BK',                                        &
-           LONG_NAME  = 'hybrid_sigma_pressure_b',                   &
-           UNITS      = '1',                                         &
-           PRECISION  = ESMF_KIND_R8,                                &
-           DIMS       = MAPL_DimsVertOnly,                           &
-           RESTART    = MAPL_RestartRequired,                        &
-           VLOCATION  = MAPL_VLocationEdge,               RC=STATUS  )
-      VERIFY_(STATUS)
-
-      call MAPL_AddInternalSpec ( gc,                                &
-           SHORT_NAME = 'U',                                         &
-           LONG_NAME  = 'eastward_wind',                             &
-           UNITS      = 'm s-1',                                     &
-           PRECISION  = ESMF_KIND_R8,                                &
-           DIMS       = MAPL_DimsHorzVert,                           &
-           RESTART    = MAPL_RestartRequired,                        &
-           VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-      VERIFY_(STATUS)
-
-      call MAPL_AddInternalSpec ( gc,                                &
-           SHORT_NAME = 'V',                                         &
-           LONG_NAME  = 'northward_wind',                            &
-           UNITS      = 'm s-1',                                     &
-           PRECISION  = ESMF_KIND_R8,                                &
-           DIMS       = MAPL_DimsHorzVert,                           &
-           RESTART    = MAPL_RestartRequired,                        &
-           VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-      VERIFY_(STATUS)
-
-      call MAPL_AddInternalSpec ( gc,                                &
-           SHORT_NAME = 'PT',                                        &
-           LONG_NAME  = 'scaled_potential_temperature',              &
-           UNITS      = 'K Pa$^{-\kappa}$',                          &
-           PRECISION  = ESMF_KIND_R8,                                &
-           DIMS       = MAPL_DimsHorzVert,                           &
-           RESTART    = MAPL_RestartRequired,                        &
-           VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-      VERIFY_(STATUS)
-
-      call MAPL_AddInternalSpec ( gc,                                &
-           SHORT_NAME = 'PE',                                        &
-           LONG_NAME  = 'air_pressure',                              &
-           UNITS      = 'Pa',                                        &
-           PRECISION  = ESMF_KIND_R8,                                &
-           DIMS       = MAPL_DimsHorzVert,                           &
-           RESTART    = MAPL_RestartRequired,                        &
-           VLOCATION  = MAPL_VLocationEdge,               RC=STATUS  )
-      VERIFY_(STATUS)
-
-      call MAPL_AddInternalSpec ( gc,                                &
-           SHORT_NAME = 'PKZ',                                       &
-           LONG_NAME  = 'pressure_to_kappa',                         &
-           UNITS      = 'Pa$^\kappa$',                               &
-           PRECISION  = ESMF_KIND_R8,                                &
-           DIMS       = MAPL_DimsHorzVert,                           &
-           RESTART    = MAPL_RestartRequired,                        &
-           VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-
-      call MAPL_AddInternalSpec ( gc,                                &
-           SHORT_NAME = 'DZ',                                      &
-           LONG_NAME  = 'height_thickness',                          &
-           UNITS      = 'm',                                         &
-           PRECISION  = ESMF_KIND_R8,                                &
-           DIMS       = MAPL_DimsHorzVert,                           &
-           VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-
-      call MAPL_AddInternalSpec ( gc,                                &
-           SHORT_NAME = 'W',                                         &
-           LONG_NAME  = 'vertical_velocity',                         &
-           UNITS      = 'm s-1',                                     &
-           PRECISION  = ESMF_KIND_R8,                                &
-           DIMS       = MAPL_DimsHorzVert,                           &
-           VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-      !EOS
-
+#include "DynCore_Internal___.h"
 
       ! Set the Profiling timers
       call MAPL_TimerAdd(GC,    name="INITIALIZE"    ,RC=STATUS)
