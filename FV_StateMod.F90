@@ -551,7 +551,7 @@ contains
    FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
    FV_Atm(1)%flagstruct%hydrostatic = .true.
    ! Rayleigh Damping
-   FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
+   FV_Atm(1)%flagstruct%rf_cutoff = 0.50e2
    FV_Atm(1)%flagstruct%tau = 5.0
    FV_Atm(1)%flagstruct%RF_fast = .false.
    if (FV_Atm(1)%flagstruct%ntiles == 6) then
@@ -561,98 +561,85 @@ contains
          FV_Atm(1)%flagstruct%hydrostatic = .true.
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
          FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 24) then
          FV_Atm(1)%flagstruct%hydrostatic = .true.
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
          FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
          FV_Atm(1)%flagstruct%hydrostatic = .true.
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0  )
          FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
          FV_Atm(1)%flagstruct%hydrostatic = .true.
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
          FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
          FV_Atm(1)%flagstruct%hydrostatic = .true.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 450.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
          FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%rf_cutoff = 0.70e2
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
          FV_Atm(1)%flagstruct%hydrostatic = .false.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
          FV_Atm(1)%flagstruct%tau = 4.0
-         FV_Atm(1)%flagstruct%rf_cutoff = 1.50e2
-         FV_Atm(1)%flagstruct%RF_fast = .true.
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
           FV_Atm(1)%flagstruct%hydrostatic = .false.
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 120.0 )
           FV_Atm(1)%flagstruct%tau = 3.0
-          FV_Atm(1)%flagstruct%rf_cutoff = 3.00e2
-          FV_Atm(1)%flagstruct%RF_fast = .true.
+          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1120) then
           FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 100.0 )
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  90.0 )
           FV_Atm(1)%flagstruct%tau = 2.5
-          FV_Atm(1)%flagstruct%rf_cutoff = 5.00e2
-          FV_Atm(1)%flagstruct%RF_fast = .true.
+          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
           FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
           FV_Atm(1)%flagstruct%tau = 2.0
-          FV_Atm(1)%flagstruct%rf_cutoff = 7.50e2
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
           FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0 )
-          FV_Atm(1)%flagstruct%tau = 1.0
-          FV_Atm(1)%flagstruct%rf_cutoff = 10.0e2
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0  )
+          FV_Atm(1)%flagstruct%tau = 1.5
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
           FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125)
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
           FV_Atm(1)%flagstruct%tau = 1.0
-          FV_Atm(1)%flagstruct%rf_cutoff = 12.5e2
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
           FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.5 )
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.5   )
           FV_Atm(1)%flagstruct%tau = 1.0
-          FV_Atm(1)%flagstruct%rf_cutoff = 15.0e2
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 10800) then
           FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  3.25)
+                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  4.6875 )
+          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  3.25   )
           FV_Atm(1)%flagstruct%tau = 1.0
-          FV_Atm(1)%flagstruct%rf_cutoff = 20.0e2
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
@@ -677,7 +664,7 @@ contains
       FV_Atm(1)%flagstruct%beta = 0.0
       FV_Atm(1)%flagstruct%a_imp = 1.0
      ! dz_min is a NH delta-z limiter increasing may improve stability
-      FV_Atm(1)%flagstruct%dz_min = 6.0
+      FV_Atm(1)%flagstruct%dz_min = 2.0
      ! p_fac is a NH pressure fraction limiter near model top (0:0.25) 
       FV_Atm(1)%flagstruct%p_fac = 0.05
      ! General defaults
@@ -696,7 +683,7 @@ contains
          FV_Atm(1)%flagstruct%d_con = 0.
       else
        ! Non-Monotonic advection schemes
-         FV_Atm(1)%flagstruct%hord_mt =  6
+         FV_Atm(1)%flagstruct%hord_mt =  5
          FV_Atm(1)%flagstruct%hord_vt =  6
          FV_Atm(1)%flagstruct%hord_tm =  6
          FV_Atm(1)%flagstruct%hord_dp = -6
