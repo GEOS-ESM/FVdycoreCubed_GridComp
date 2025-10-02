@@ -1,12 +1,8 @@
- !------------------------------------------------------------------------------
 #include "MAPL_Generic.h"
-!
-!------------------------------------------------------------------------------
+
 !BOP
-!
-! !MODULE: AdvCore_GridCompMod
-!
-! !DESCRIPTION: 
+!MODULE: AdvCore_GridCompMod
+!DESCRIPTION:
 !    This a MAPL component that can be used in
 !    either with offline or online applications to advect an arbitrary set
 !    of constituents.
@@ -21,7 +17,7 @@
 !   which this component is taken may be found in:
 !
 !   \begin{quote}
-!   Lin, S.-J. 2004, A vertically Lagrangian Finite-Volume Dynamical 
+!   Lin, S.-J. 2004, A vertically Lagrangian Finite-Volume Dynamical
 !   Core for Global Models. {\em Mon. Wea. Rev.}, {\bf 132}, 2293-2307.
 !   \end{quote}
 !
@@ -46,222 +42,119 @@
 !    state. Each Field in the Bundle is tested for ``Friendliness'' to
 !    advection; if friendly it is advected and its values updated.
 !
-!    Currently no Export capability is implemented. 
-!
-! !INTERFACE:
+!    Currently no Export capability is implemented.
 
+!INTERFACE:
 module AdvCore_GridCompMod
 
-!
-! !USES:
+   !USES:
+   use ESMF
+   use MAPL
+   use m_set_eta,       only: set_eta
+   use mpp_mod,         only: mpp_pe, mpp_root_pe
+   use fv_arrays_mod,   only: fv_atmos_type, FVPRC, REAL4, REAL8
+   use fms_mod,         only: fms_init, set_domain, nullify_domain
+   use fv_control_mod,  only: fv_init1, fv_init2, fv_end
+   use fv_tracer2d_mod, only: offline_tracer_advection
+   use fv_mp_mod,       only: is,ie, js,je, is_master, tile
+   use fv_grid_utils_mod, only: g_sum_r8
 
-      use ESMF
-      use MAPL
-      use m_set_eta,       only: set_eta
-      use mpp_mod,         only: mpp_pe, mpp_root_pe
-      use fv_arrays_mod,   only: fv_atmos_type, FVPRC, REAL4, REAL8
-      use fms_mod,         only: fms_init, set_domain, nullify_domain
-      use fv_control_mod,  only: fv_init1, fv_init2, fv_end
-      use fv_tracer2d_mod, only: offline_tracer_advection
-      use fv_mp_mod,       only: is,ie, js,je, is_master, tile
-      use fv_grid_utils_mod, only: g_sum_r8
+   use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
 
-      use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
+   USE FV_StateMod,     only: AdvCoreTracers => T_TRACERS
+   USE FV_StateMod,     only: FV_Atm
+   use CubeGridPrototype, only: register_grid_and_regridders
 
-      USE FV_StateMod,     only: AdvCoreTracers => T_TRACERS
-      USE FV_StateMod,     only: FV_Atm
-      use CubeGridPrototype, only: register_grid_and_regridders
+   implicit none
+   private
 
-      implicit none
-      private
+   integer :: QSPLIT
+   integer :: nx, ny
+   integer :: npes_x, npes_y
+   logical :: FV3_DynCoreIsRunning=.false.
+   integer :: AdvCore_Advection=1
+   logical :: rpt_mass=.false.
+   logical :: DEBUG_ADV = .false.
+   real(FVPRC) :: dt
 
-      integer     :: QSPLIT
-      integer     :: nx, ny
-      integer     :: npes_x, npes_y
-      real(FVPRC) :: dt
-      logical     :: FV3_DynCoreIsRunning=.false.
-      integer     :: AdvCore_Advection=1
-      logical     :: rpt_mass=.false.
-      logical     :: DEBUG_ADV = .false.
+   integer, parameter :: ntiles_per_pe = 1
 
-      integer,  parameter :: ntiles_per_pe = 1
+   ! Tracer I/O History stuff
+   integer, parameter :: ntracers=38
+   integer :: ntracer
+   character(len=ESMF_MAXSTR) :: myTracer
+   character(len=ESMF_MAXSTR) :: tMassStr
+   logical, save :: firstRun=.true.
 
-! Tracer I/O History stuff
-! -------------------------------------
-      integer, parameter         :: ntracers=38
-      integer                    :: ntracer
-      character(len=ESMF_MAXSTR) :: myTracer
-      character(len=ESMF_MAXSTR) :: tMassStr
-      logical    , SAVE          :: firstRun=.true.
+   !PUBLIC MEMBER FUNCTIONS:
 
-! !PUBLIC MEMBER FUNCTIONS:
+   public SetServices
+   logical, allocatable, save :: grids_on_my_pe(:)
+   !EOP
 
-      public SetServices
-      logical, allocatable, save :: grids_on_my_pe(:)
-
-!EOP
-
-!------------------------------------------------------------------------------
 contains
-!------------------------------------------------------------------------------
-!BOP
-! !IROUTINE: SetServices - Externally visible registration routine
-!
-! !INTERFACE:
-!
-      subroutine SetServices(GC, rc)
-!
-! !ARGUMENTS:
-      type(ESMF_GridComp), intent(inout) :: GC
-      integer, optional,   intent(  out) :: RC
-!
-! !DESCRIPTION:
-!
-!     User-supplied setservices routine.
-!     The register routine sets the subroutines to be called
-!     as the init, run, and finalize routines.  Note that those are
-!     private to the module.
-!
-!EOP
 
-      character(len=ESMF_MAXSTR)              :: IAm
-      integer                                 :: STATUS
-      character(len=ESMF_MAXSTR)              :: COMP_NAME
-      type (MAPL_MetaComp),      pointer      :: MAPL
-      character(len=ESMF_MAXSTR)              :: DYCORE
-      type(ESMF_VM)                           :: VM
-      integer                                 :: comm, ndt
-      integer                                 :: p_split=1
+   !BOP
+   !IROUTINE: SetServices - Externally visible registration routine
+   !INTERFACE:
+   subroutine SetServices(gc, rc)
+      !ARGUMENTS:
+      type(ESMF_GridComp), intent(inout) :: gc
+      integer, optional,   intent(  out) :: rc
 
-!=============================================================================
+      !DESCRIPTION:
+      ! User-supplied setservices routine.
+      ! The register routine sets the subroutines to be called
+      ! as the init, run, and finalize routines.  Note that those are
+      ! private to the module.
+      !EOP
 
-! Begin...
+      character(len=ESMF_MAXSTR) :: IAm
+      integer :: status
+      character(len=ESMF_MAXSTR) :: comp_name
+      type(MAPL_MetaComp), pointer :: MAPL
+      character(len=ESMF_MAXSTR) :: dycore
+      type(ESMF_VM) :: VM
+      integer :: comm, ndt
+      integer :: p_split=1
 
       ! Get my name and set-up traceback handle
-      ! ---------------------------------------
-    
-      call ESMF_GridCompGet( GC, NAME=COMP_NAME, vm=vm, RC=STATUS )
-      VERIFY_(STATUS)
-      Iam = trim(COMP_NAME) // 'SetServices'
+      call ESMF_GridCompGet(gc, name=comp_name, vm=vm, _RC)
+      Iam = trim(comp_name) // 'SetServices'
 
-!BOS
+#include "AdvCore_Import___.h"
+      call MAPL_AddImportSpec(gc, &
+           short_name='TRADV', &
+           long_name='advected_quantities', &
+           units='unknown', &
+           datatype=MAPL_BundleItem, _RC)
 
-! !IMPORT STATE:
-!
-    call MAPL_AddImportSpec ( gc,                                  &
-         SHORT_NAME = 'MFX',                                       &
-         LONG_NAME  = 'pressure_weighted_eastward_mass_flux',      &
-         UNITS      = 'Pa m+2 s-1',                                &
-         PRECISION  = ESMF_KIND_R8,                                &
-         DIMS       = MAPL_DimsHorzVert,                           &
-         VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-     VERIFY_(STATUS)
-
-    call MAPL_AddImportSpec ( gc,                                  &
-         SHORT_NAME = 'MFY',                                       &
-         LONG_NAME  = 'pressure_weighted_northward_mass_flux',     &
-         UNITS      = 'Pa m+2 s-1',                                &
-         PRECISION  = ESMF_KIND_R8,                                &
-         DIMS       = MAPL_DimsHorzVert,                           &
-         VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-     VERIFY_(STATUS)
-
-    call MAPL_AddImportSpec ( gc,                                  &
-         SHORT_NAME = 'CX',                                        &
-         LONG_NAME  = 'eastward_accumulated_courant_number',       &
-         UNITS      = '',                                          &
-         PRECISION  = ESMF_KIND_R8,                                &
-         DIMS       = MAPL_DimsHorzVert,                           &
-         VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-     VERIFY_(STATUS)
-
-    call MAPL_AddImportSpec ( gc,                                  &
-         SHORT_NAME = 'CY',                                        &
-         LONG_NAME  = 'northward_accumulated_courant_number',      &
-         UNITS      = '',                                          &
-         PRECISION  = ESMF_KIND_R8,                                &
-         DIMS       = MAPL_DimsHorzVert,                           &
-         VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
-     VERIFY_(STATUS)
-
-    call MAPL_AddImportSpec ( gc,                                  &
-         SHORT_NAME = 'PLE0',                                      &
-         LONG_NAME  = 'pressure_at_layer_edges_before_advection',  &
-         UNITS      = 'Pa',                                        &
-         PRECISION  = ESMF_KIND_R8,                                &
-         DIMS       = MAPL_DimsHorzVert,                           &
-         VLOCATION  = MAPL_VLocationEdge,             RC=STATUS  )
-     VERIFY_(STATUS)
-
-    call MAPL_AddImportSpec ( gc,                                  &
-         SHORT_NAME = 'PLE1',                                      &
-         LONG_NAME  = 'pressure_at_layer_edges_after_advection',   &                
-         UNITS      = 'Pa',                                        &
-         PRECISION  = ESMF_KIND_R8,                                &
-         DIMS       = MAPL_DimsHorzVert,                           &
-         VLOCATION  = MAPL_VLocationEdge,             RC=STATUS  )
-     VERIFY_(STATUS)
-
-    call MAPL_AddImportSpec( gc,                              &
-        SHORT_NAME = 'TRADV',                                        &
-        LONG_NAME  = 'advected_quantities',                        &
-        UNITS      = 'unknown',                                    &
-        DATATYPE   = MAPL_BundleItem,               &
-        RC=STATUS  )
-    VERIFY_(STATUS)
-
-  !EXPORT STATE:
-     call MAPL_AddExportSpec ( gc,                                  &
-          SHORT_NAME = 'AREA',                                      &
-          LONG_NAME  = 'agrid_cell_area',                           &
-          UNITS      = 'm+2'  ,                                     &
-          DIMS       = MAPL_DimsHorzOnly,                           &
-          VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
-     VERIFY_(STATUS)
- 
-
-! 3D Tracers
-     do ntracer=1,ntracers
-        write(myTracer, "('TEST_TRACER',i5.5)") ntracer-1
-        call MAPL_AddExportSpec ( gc,                             &
-             SHORT_NAME = TRIM(myTracer),                         &
-             LONG_NAME  = TRIM(myTracer),                         &
-             UNITS      = '1',                                    &
-             DIMS       = MAPL_DimsHorzVert,                      &
-             VLOCATION  = MAPL_VLocationCenter,               RC=STATUS  )
-        VERIFY_(STATUS)
-     enddo
-
-!EOS
+#include "AdvCore_Export___.h"
+      ! 3D Tracers
+      do ntracer=1,ntracers
+         write(myTracer, "('TEST_TRACER',i5.5)") ntracer-1
+         call MAPL_AddExportSpec(gc, &
+              short_name=trim(myTracer), &
+              long_name=trim(myTracer), &
+              units='1', &
+              dims=MAPL_DimsHorzVert, &
+              vlocation=MAPL_VLocationCenter, _RC)
+      enddo
 
       ! Set the Profiling timers
-      !-------------------------
-      call MAPL_TimerAdd(GC,    name="INITIALIZE"  ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="RUN"         ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="FINALIZE"    ,RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_TimerAdd(GC,    name="TOTAL"       ,RC=STATUS)
-      VERIFY_(STATUS)
+      call MAPL_TimerAdd(gc, name="INITIALIZE", _RC)
+      call MAPL_TimerAdd(gc, name="RUN", _RC)
+      call MAPL_TimerAdd(gc, name="FINALIZE", _RC)
+      call MAPL_TimerAdd(gc, name="TOTAL", _RC)
 
+      ! Register methods with MAPL
+      call MAPL_GridCompSetEntryPoint(gc, ESMF_METHOD_INITIALIZE, Initialize, _RC)
+      call MAPL_GridCompSetEntryPoint(gc, ESMF_METHOD_RUN, Run, _RC)
+      call MAPL_GridCompSetEntryPoint(gc, ESMF_METHOD_FINALIZE, Finalize, _RC)
 
-! Register methods with MAPL
-! --------------------------
-
-      call MAPL_GridCompSetEntryPoint ( GC, ESMF_METHOD_INITIALIZE,  Initialize, RC=status )
-      VERIFY_(STATUS)
-      call MAPL_GridCompSetEntryPoint ( GC, ESMF_METHOD_RUN,          Run,       RC=status )
-      VERIFY_(STATUS)
-      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_FINALIZE,     Finalize,  RC=status)
-      VERIFY_(STATUS)
-
-      ! Check if AdvCore is running without FV3_DynCoreIsRunning, if yes then setup the MAPL Grid 
-      ! ----------------------------------------------------------------------------
-      call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-      VERIFY_(STATUS)
-      call MAPL_GetResource(MAPL, DYCORE, 'DYCORE:', default="", RC=STATUS )
-      VERIFY_(STATUS)
+      ! Check if AdvCore is running without FV3_DynCoreIsRunning, if yes then setup the MAPL Grid
+      call MAPL_GetObjectFromGC(gc, MAPL, _RC)
+      call MAPL_GetResource(MAPL, dycore, 'DYCORE:', default="", _RC)
 
       if(adjustl(DYCORE)=="FV3") then
          FV3_DynCoreIsRunning = .true.
@@ -272,47 +165,34 @@ contains
          AdvCore_Advection = 1
       endif
 
-      call MAPL_GetResource(MAPL, AdvCore_Advection , label='AdvCore_Advection:', &
-                                  default=AdvCore_Advection, RC=STATUS )
-      VERIFY_(STATUS)
-
-      call MAPL_GetResource(MAPL, DEBUG_ADV, 'DEBUG_ADV:', default=.FALSE., RC=STATUS )
-      VERIFY_(STATUS)
+      call MAPL_GetResource(MAPL, AdvCore_Advection , label='AdvCore_Advection:', default=AdvCore_Advection, _RC)
+      call MAPL_GetResource(MAPL, DEBUG_ADV, 'DEBUG_ADV:', default=.FALSE., _RC)
 
       ! Start up FMS/MPP
       !-------------------------------------------
-      call ESMF_VMGet(VM,mpiCommunicator=comm,rc=STATUS)
-      VERIFY_(STATUS)
+      call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
       call fms_init(comm)
-      VERIFY_(STATUS)
 
       if (.NOT. FV3_DynCoreIsRunning) then
-      ! Make sure FV3 is setup
-      ! -----------------------
+         ! Make sure FV3 is setup
          call register_grid_and_regridders()
          call fv_init1(FV_Atm, dt, grids_on_my_pe, p_split)
-      ! Get Domain decomposition
-      !-------------------------
-         call MAPL_GetResource( MAPL, nx, 'NX:', default=0, RC=STATUS )
-         VERIFY_(STATUS)
+         ! Get Domain decomposition
+         call MAPL_GetResource(MAPL, nx, 'NX:', default=0, _RC)
          FV_Atm(1)%layout(1) = nx
-         call MAPL_GetResource( MAPL, ny, 'NY:', default=0, RC=STATUS )
-         VERIFY_(STATUS)
+         call MAPL_GetResource(MAPL, ny, 'NY:', default=0, _RC)
          if (FV_Atm(1)%flagstruct%grid_type == 4) then
             FV_Atm(1)%layout(2) = ny
          else
             FV_Atm(1)%layout(2) = ny / 6
          end if
-      ! Get Resolution Information
-      !---------------------------
-      ! FV grid dimensions setup from MAPL
-         call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'IM:', default= 32, RC=STATUS )
-         VERIFY_(STATUS)
-         call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npy, 'JM:', default=192, RC=STATUS )
-         VERIFY_(STATUS)
-         call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'LM:', default= 72, RC=STATUS )
-         VERIFY_(STATUS)
-      ! FV likes npx;npy in terms of cell vertices
+         ! Get Resolution Information
+         ! FV grid dimensions setup from MAPL
+         call MAPL_GetResource(MAPL, FV_Atm(1)%flagstruct%npx, 'IM:', default=32, _RC)
+         call MAPL_GetResource(MAPL, FV_Atm(1)%flagstruct%npy, 'JM:', default=192, _RC)
+         call MAPL_GetResource(MAPL, FV_Atm(1)%flagstruct%npz, 'LM:', default=72, _RC)
+
+         ! FV likes npx;npy in terms of cell vertices
          if (FV_Atm(1)%flagstruct%npy == 6*FV_Atm(1)%flagstruct%npx) then
             FV_Atm(1)%flagstruct%ntiles = 6
             FV_Atm(1)%flagstruct%npy    = FV_Atm(1)%flagstruct%npx+1
@@ -324,144 +204,111 @@ contains
          endif
       endif
 
-      call MAPL_GetResource( MAPL, ndt, 'RUN_DT:', default=0, RC=STATUS )
-      VERIFY_(STATUS)
+      call MAPL_GetResource(MAPL, ndt, 'RUN_DT:', default=0, _RC)
       DT = ndt
 
-      call MAPL_GetResource( MAPL, rpt_mass, 'ADV_CORE_REPORT_TRACER_MASS:', default=rpt_mass, RC=STATUS )
-      VERIFY_(STATUS)
-
-      call MAPL_GetResource( MAPL, QSPLIT, 'ADV_QSPLIT:', default=0, RC=STATUS )
-      VERIFY_(STATUS)
-
+      call MAPL_GetResource(MAPL, rpt_mass, 'ADV_CORE_REPORT_TRACER_MASS:', default=rpt_mass, _RC)
+      call MAPL_GetResource(MAPL, QSPLIT, 'ADV_QSPLIT:', default=0, _RC)
 
       ! Start up FV if AdvCore is running without FV3_DynCoreIsRunning
-      !--------------------------------------------------
       if (.NOT. FV3_DynCoreIsRunning) then
          call fv_init2(FV_Atm, dt, grids_on_my_pe, p_split)
       end if
 
-      ! Ending with a Generic SetServices call is a MAPL requirement 
-      !-------------------------------------------------------------
-      call MAPL_GenericSetServices    ( GC, rc=STATUS)
-      VERIFY_(STATUS)
+      ! Ending with a Generic SetServices call is a MAPL requirement
+      call MAPL_GenericSetServices(gc, _RC)
 
-      RETURN_(ESMF_SUCCESS)
+      _RETURN(_SUCCESS)
+   end subroutine SetServices
 
-      end subroutine SetServices
+   !BOP
+   !IROUTINE: Initialize - initialization routine
+   !INTERFACE:
+   subroutine Initialize(gc, import, export, clock, rc)
+      !INPUT/OUTPUT PARAMETERS:
+      type(ESMF_GridComp), intent(inout) :: gc  ! Gridded component
+      type(ESMF_State), intent(inout) :: import ! Import state
+      type(ESMF_State), intent(inout) :: export ! Export state
+      type(ESMF_Clock), intent(inout) :: clock  ! The clock
+      !OUTPUT PARAMETERS:
+      integer, optional, intent(out) :: rc      ! Error code
 
-!------------------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Initialize - initialization routine
-!
-! !INTERFACE:
-!
-  subroutine Initialize(GC, IMPORT, EXPORT, CLOCK, RC)
-!
-! !INPUT/OUTPUT PARAMETERS:
-      type(ESMF_GridComp), intent(inout) :: GC     ! Gridded component 
-      type(ESMF_State),    intent(inout) :: IMPORT ! Import state
-      type(ESMF_State),    intent(inout) :: EXPORT ! Export state
-      type(ESMF_Clock),    intent(inout) :: CLOCK  ! The clock
-!
-! !OUTPUT PARAMETERS:
-      integer, optional,   intent(  out) :: RC     ! Error code
-!
-! !DESCRIPTION:
-!     This initialization routine creates the import and export states,
-!     as well as the internal state, which is attached to the component.
-!     It also determines the distribution (and therefore the grid) 
-!     and performs allocations of persistent data, 
-!
-!EOP
-!=============================================================================
-!BOC
+      !DESCRIPTION:
+      ! This initialization routine creates the import and export states,
+      ! as well as the internal state, which is attached to the component.
+      ! It also determines the distribution (and therefore the grid)
+      ! and performs allocations of persistent data,
+      !EOP
 
-      character(len=ESMF_MAXSTR)         :: IAm
-      integer                            :: STATUS
-      character(len=ESMF_MAXSTR)         :: COMP_NAME
-      type(ESMF_Config)                  :: CF
-      type (MAPL_MetaComp),      pointer :: MAPL
-      type (ESMF_VM)                     :: VM
-      real, pointer                      :: temp2d(:,:)
-      integer                            :: IS, IE, JS, JE
-      logical                            :: gridCreated
-      type(ESMF_Grid)                    :: grid
+      !BOC
+      character(len=ESMF_MAXSTR) :: IAm, comp_name
+      type(ESMF_Config) :: cf
+      type(MAPL_MetaComp), pointer :: MAPL
+      type(ESMF_VM) :: vm
+      type(ESMF_Grid) :: grid
+      real, pointer :: temp2d(:,:)
+      logical :: gridCreated
+      integer :: is, ie, js, je, status
 
-! Begin... 
-
-! Get the target components name and set-up traceback handle.
-! -----------------------------------------------------------
-
+      ! Get the target components name and set-up traceback handle.
       Iam = "Initialize"
-      call ESMF_GridCompGet ( GC, name=COMP_NAME, config=CF, vm=VM, RC=STATUS )
-      VERIFY_(STATUS)
-      Iam = trim(COMP_NAME) // trim(Iam)
+      call ESMF_GridCompGet(gc, name=comp_name, config=cf, vm=vm, _RC)
+      Iam = trim(comp_name) // trim(Iam)
 
       ! Retrieve the pointer to the state
-      ! ---------------------------------
-      call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-      VERIFY_(STATUS)
+      call MAPL_GetObjectFromGC(gc, MAPL, _RC)
 
-      call MAPL_TimerOn(MAPL,"TOTAL")
-      call MAPL_TimerOn(MAPL,"INITIALIZE")
+      call MAPL_TimerOn(MAPL, "TOTAL")
+      call MAPL_TimerOn(MAPL, "INITIALIZE")
 
       gridCreated=.false.
-      call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-      VERIFY_(STATUS)
-      call ESMF_GridCompGet(GC,grid=grid,rc=status)
+      call MAPL_GetObjectFromGC(gc, MAPL, _RC)
+      call ESMF_GridCompGet(gc, grid=grid, rc=status)
       if (status == ESMF_SUCCESS) then
-         call ESMF_GridValidate(grid,rc=status)
-         if (status==ESMF_SUCCESS) GridCreated = .true.
+         call ESMF_GridValidate(grid, rc=status)
+         if (status==ESMF_SUCCESS) gridCreated = .true.
       end if
 
-      if (.not.GridCreated) then
-         call MAPL_GridCreate(GC, rc=status)
-         VERIFY_(STATUS)
-      endif
+      if (.not. gridCreated) call MAPL_GridCreate(gc, _RC)
 
-      call MAPL_GenericInitialize(GC, IMPORT, EXPORT, CLOCK, RC=STATUS)
-      VERIFY_(STATUS)
+      call MAPL_GenericInitialize(gc, import, export, clock, _RC)
+
       ! Compute Grid-Cell Area
-      ! ----------------------
       if (.NOT. FV3_DynCoreIsRunning) then
-         IS = FV_Atm(1)%bd%isc
-         IE = FV_Atm(1)%bd%iec
-         JS = FV_Atm(1)%bd%jsc
-         JE = FV_Atm(1)%bd%jec
-         call MAPL_GetPointer(EXPORT, temp2d, 'AREA', ALLOC=.TRUE., rc=status)
-         VERIFY_(STATUS)
-         temp2d = FV_Atm(1)%gridstruct%area(IS:IE,JS:JE)
+         is = FV_Atm(1)%bd%isc
+         ie = FV_Atm(1)%bd%iec
+         js = FV_Atm(1)%bd%jsc
+         je = FV_Atm(1)%bd%jec
+         call MAPL_GetPointer(export, temp2d, 'AREA', ALLOC=.TRUE., _RC)
+         temp2d = FV_Atm(1)%gridstruct%area(is:ie, js:je)
       endif
 
-      call MAPL_TimerOff(MAPL,"INITIALIZE")
-      call MAPL_TimerOff(MAPL,"TOTAL")
+      call MAPL_TimerOff(MAPL, "INITIALIZE")
+      call MAPL_TimerOff(MAPL, "TOTAL")
 
-      RETURN_(ESMF_SUCCESS)
+      _RETURN(_SUCCESS)
+   end subroutine Initialize
 
-      end subroutine Initialize
-!EOC
-!------------------------------------------------------------------------------
+
 !BOP
 !
 ! !IROUTINE: Run - run routine
 !
 ! !INTERFACE:
 !
-      subroutine Run(GC, IMPORT, EXPORT, CLOCK, RC)
+      subroutine Run(gc, import, export, clock, RC)
 !
 ! !INPUT/OUTPUT PARAMETERS:
-      type(ESMF_GridComp), intent(inout) :: GC     ! Gridded component 
-      type(ESMF_State),    intent(inout) :: IMPORT ! Import state
-      type(ESMF_State),    intent(inout) :: EXPORT ! Export state
-      type(ESMF_Clock),    intent(inout) :: CLOCK  ! The clock
+      type(ESMF_GridComp), intent(inout) :: gc     ! Gridded component
+      type(ESMF_State),    intent(inout) :: import ! Import state
+      type(ESMF_State),    intent(inout) :: export ! Export state
+      type(ESMF_Clock),    intent(inout) :: clock  ! The clock
 !
 ! !OUTPUT PARAMETERS:
       integer, optional,   intent(  out) :: RC     ! Error code
 !
 ! !DESCRIPTION:
-! 
+!
 ! The Run method advanced the advection one long time step, as
 ! specified in the configuration.  This may be broken down int a
 ! number of internal, small steps, also configurable.
@@ -531,7 +378,7 @@ contains
 ! ---------------------------------------
 
       Iam = 'Run'
-      call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
+      call ESMF_GridCompGet( gc, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
       VERIFY_(STATUS)
       Iam = trim(COMP_NAME) // Iam
 
@@ -539,7 +386,7 @@ contains
 
 ! Get parameters from generic state.
 !-----------------------------------
-      call MAPL_GetObjectFromGC ( GC, MAPL, RC=STATUS)
+      call MAPL_GetObjectFromGC ( gc, MAPL, RC=STATUS)
       VERIFY_(STATUS)
       call MAPL_Get( MAPL, IM=IM, JM=JM, LM=LM,   &
                                 RUNALARM = ALARM, &
@@ -549,17 +396,17 @@ contains
       call MAPL_TimerOn(MAPL,"TOTAL")
       call MAPL_TimerOn(MAPL,"RUN")
 
-      CALL MAPL_GetPointer(IMPORT, iPLE0, 'PLE0', ALLOC = .TRUE., RC=STATUS)
+      CALL MAPL_GetPointer(import, iPLE0, 'PLE0', ALLOC = .TRUE., RC=STATUS)
       VERIFY_(STATUS)
-      CALL MAPL_GetPointer(IMPORT, iPLE1, 'PLE1', ALLOC = .TRUE., RC=STATUS)
+      CALL MAPL_GetPointer(import, iPLE1, 'PLE1', ALLOC = .TRUE., RC=STATUS)
       VERIFY_(STATUS)
-      CALL MAPL_GetPointer(IMPORT, iMFX,   'MFX', ALLOC = .TRUE., RC=STATUS)
+      CALL MAPL_GetPointer(import, iMFX,   'MFX', ALLOC = .TRUE., RC=STATUS)
       VERIFY_(STATUS)
-      CALL MAPL_GetPointer(IMPORT, iMFY,   'MFY', ALLOC = .TRUE., RC=STATUS)
+      CALL MAPL_GetPointer(import, iMFY,   'MFY', ALLOC = .TRUE., RC=STATUS)
       VERIFY_(STATUS)
-      CALL MAPL_GetPointer(IMPORT, iCX,     'CX', ALLOC = .TRUE., RC=STATUS)
+      CALL MAPL_GetPointer(import, iCX,     'CX', ALLOC = .TRUE., RC=STATUS)
       VERIFY_(STATUS)
-      CALL MAPL_GetPointer(IMPORT, iCY,     'CY', ALLOC = .TRUE., RC=STATUS)
+      CALL MAPL_GetPointer(import, iCY,     'CY', ALLOC = .TRUE., RC=STATUS)
       VERIFY_(STATUS)
 
       ALLOCATE( PLE0(IM,JM,LM+1) )
@@ -580,7 +427,7 @@ contains
       !  in the import state.
       !--------------------------------------------------------------
 
-      call ESMF_StateGet(IMPORT, "TRADV", TRADV, rc=STATUS)
+      call ESMF_StateGet(import, "TRADV", TRADV, rc=STATUS)
       VERIFY_(STATUS)
 
       !-------------------------------------------------------------------
@@ -696,7 +543,7 @@ contains
             end if
 
             if (allocated(biggerlist)) then
-               deallocate(biggerlist)      
+               deallocate(biggerlist)
             end if
 
             firstRun=.false.
@@ -772,7 +619,7 @@ contains
          call global_integral(TMASS1, TRACERS, PLE1, IM,JM,LM, NQ)
          endif
 
-         ! Conserve Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air 
+         ! Conserve Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air
          ! --------------------------------------------------------------------------------
          if (rpt_mass) then
          do N=1,NQ
@@ -804,7 +651,7 @@ contains
             !-----------------------------------------------
             if (N<=min(ntracers,NQ)) then
                write(myTracer, "('TEST_TRACER',i5.5)") N-1
-               call MAPL_GetPointer(EXPORT, temp3D, TRIM(myTracer), rc=status)
+               call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
                VERIFY_(STATUS)
                if (associated(temp3D)) temp3D = TRACERS(:,:,:,N)
             endif
@@ -875,13 +722,13 @@ contains
 !
 ! !INTERFACE:
 !
-  subroutine Finalize(GC, IMPORT, EXPORT, CLOCK, RC)
+  subroutine Finalize(gc, import, export, clock, RC)
 !
 ! !INPUT/OUTPUT PARAMETERS:
-      type(ESMF_GridComp), intent(inout) :: GC     ! Gridded component 
-      type(ESMF_State),    intent(inout) :: IMPORT ! Import state
-      type(ESMF_State),    intent(inout) :: EXPORT ! Export state
-      type(ESMF_Clock),    intent(inout) :: CLOCK  ! The clock
+      type(ESMF_GridComp), intent(inout) :: gc     ! Gridded component
+      type(ESMF_State),    intent(inout) :: import ! Import state
+      type(ESMF_State),    intent(inout) :: export ! Export state
+      type(ESMF_Clock),    intent(inout) :: clock  ! The clock
 !
 ! !OUTPUT PARAMETERS:
       integer, optional,   intent(  out) :: RC     ! Error code
@@ -903,7 +750,7 @@ contains
 ! ---------------------------------------
 
       Iam = 'Finalize'
-      call ESMF_GridCompGet( GC, NAME=COMP_NAME, RC=STATUS )
+      call ESMF_GridCompGet( gc, NAME=COMP_NAME, RC=STATUS )
       VERIFY_(STATUS)
       Iam = trim(COMP_NAME) // TRIM(Iam)
 
@@ -913,7 +760,7 @@ contains
          call fv_end(FV_Atm, grids_on_my_pe, .false.)
       endif
 
-      call MAPL_GenericFinalize(GC, IMPORT, EXPORT, CLOCK, RC)
+      call MAPL_GenericFinalize(gc, import, export, clock, RC)
       VERIFY_(STATUS)
 
       RETURN_(ESMF_SUCCESS)

@@ -1,0 +1,20 @@
+schema_version: 2.0.0
+component: AdvCore
+
+category: EXPORT
+#-------------------------------------------------------------------------------------------
+   SHORT_NAME    |     LONG_NAME     |  UNITS  |        DIMS         |       VLOCATION       
+#-------------------------------------------------------------------------------------------
+      AREA       |  agrid_cell_area  |   m+2   |  MAPL_DimsHorzOnly  |   MAPL_VlocationNone  
+
+category: IMPORT
+#----------------------------------------------------------------------------------------------------------------------------------------------------------
+ SHORT_NAME  |                 LONG_NAME                  |    UNITS     |   PRECISION    |        DIMS         |       VLOCATION        |     DATATYPE     
+#----------------------------------------------------------------------------------------------------------------------------------------------------------
+    MFX      |    pressure_weighted_eastward_mass_flux    |  Pa m+2 s-1  |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |  MAPL_VLocationCenter  |                  
+    MFY      |   pressure_weighted_northward_mass_flux    |  Pa m+2 s-1  |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |  MAPL_VLocationCenter  |                  
+     CX      |    eastward_accumulated_courant_number     |      1       |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |  MAPL_VLocationCenter  |                  
+     CY      |    northward_accumulated_courant_number    |      1       |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |  MAPL_VLocationCenter  |                  
+    PLE0     |  pressure_at_layer_edges_before_advection  |      Pa      |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |   MAPL_VLocationEdge   |                  
+    PLE1     |  pressure_at_layer_edges_after_advection   |      Pa      |  ESMF_KIND_R8  |  MAPL_DimsHorzVert  |   MAPL_VLocationEdge   |                  
+
