@@ -15,16 +15,16 @@ module FVdycoreCubed_GridComp
 
    !USES:
    use ESMF
-   ! use MAPL
+   use mapl_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY
+
    use ESMFL_Mod, only: ESMFL_StateGetPointerToData, ESMFL_BundleGetPointerToData, MAPL_AreaMean
-   use MAPL_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY
    use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
    use MAPL_Constants, only: MAPL_VectorField, MAPL_BundleItem
    use MAPL_Constants, only: MAPL_RestartSkip, MAPL_RestartRequired, MAPL_InitialRestart
    use MAPL_Constants, only: MAPL_VLocationCenter, MAPL_VLocationEdge, MAPL_VLocationNone
    use MAPL_Constants, only: MAPL_DimsHorzVert, MAPL_DimsHorzOnly, MAPL_DimsVertOnly
-   use MAPL_GenericMod, only: MAPL_GridCompSetEntryPoint, MAPL_MetaComp, MAPL_TimerAdd, MAPL_TimerOn
+   use MAPL_GenericMod, only: MAPL_MetaComp, MAPL_TimerAdd, MAPL_TimerOn
    use MAPL_GenericMod, only: MAPL_TimerAdd, MAPL_TimerOn, MAPL_TimerOff
    use MAPL_GenericMod, only: MAPL_GenericSetServices, MAPL_GenericInitialize, MAPL_GenericFinalize
    use MAPL_GenericMod, only: MAPL_GetObjectFromGC, MAPL_GetResource, MAPL_GridCreate, MAPL_Get
@@ -42,6 +42,11 @@ module FVdycoreCubed_GridComp
    use MAPL_MaxMinMod, only: MAPL_MaxMin
    use MAPL_CommsMod, only: MAPL_AM_I_ROOT, ArrayGather
    use FileIOSharedMod, only: WRITE_PARALLEL
+
+   use mapl3g_generic, only: MAPL_GridCompGet, MAPL_GridCompGetResource
+   use mapl3g_generic, only: MAPL_GridCompSetEntryPoint
+   use pflogger, only: logger_t => logger
+
    use m_set_eta, only: set_eta
 
    ! FV Specific Module
@@ -272,18 +277,14 @@ module FVdycoreCubed_GridComp
    integer :: I, J, K  !  Default declaration for loops.
 
    ! Tracer I/O History stuff
-   integer, parameter         :: nlevs=5
-   integer, parameter         :: ntracers=11
-   integer                    :: nlev, ntracer
-   integer                    :: plevs(nlevs)
-   character(len=ESMF_MAXSTR) :: myTracer
-   data plevs /850,700,600,500,300/
+   integer, parameter :: ntracers=11
+   integer, parameter :: plevs(5) = [850, 700, 600, 500, 300]
 
    ! Wrapper for extracting internal state
 
-   type DYN_wrap
-      type (DynState), pointer :: DYN_STATE
-   end type DYN_wrap
+   type dyn_wrap
+      type(DynState), pointer :: dyn_state
+   end type dyn_wrap
 
    interface addTracer
       module procedure addTracer_r4
@@ -296,9 +297,6 @@ module FVdycoreCubed_GridComp
       module procedure Write_Profile_2d_R4
       module procedure Write_Profile_2d_R8
    end interface Write_Profile
-
-   real(kind=8) :: t1, t2
-   real(kind=8) :: dyn_run_timer
 
    logical :: DO_ADD_INCS = .true.
 
@@ -339,48 +337,34 @@ contains
       type(ESMF_GridComp), intent(inout) :: gc     ! gridded component
       integer, intent(out), optional :: rc     ! return code
 
-      !DESCRIPTION: Set services (register) for the FVCAM Dynamical Core
-      !               Grid Component.
+      !DESCRIPTION: Set services (register) for the FVCAM Dynamical Core GridComp
       !EOP
 
-      type (DynState), pointer :: dyn_internal_state
-      type (DYN_wrap)                  :: wrap
+      type(DynState), pointer :: dyn_internal_state
+      type(DYN_wrap) :: wrap
+      character(len=:), allocatable :: layout_file
+      character(len=ESMF_MAXSTR) :: myTracer
+      class(logger_t), pointer :: logger
+      integer :: FV3_STANDALONE, ilev, itracer, status
 
-      integer :: FV3_STANDALONE
-      integer :: status
-      character(len=ESMF_MAXSTR) :: IAm
-      character(len=ESMF_MAXSTR) :: comp_name
+      call MAPL_GridCompGet(gc, logger=logger, _RC)
+      call logger%info("SetServices:: starting...")
 
-      type(ESMF_Config) :: CF
-      type(ESMF_VM) :: VM
-
-      type(MAPL_MetaComp), pointer :: MAPL
-      character(len=ESMF_MAXSTR) :: LAYOUT_FILE
-
-      ! Get the configuration from the component
-      call ESMF_GridCompGet(gc, CONFIG = CF, _RC)
-      call ESMF_GridCompGet(gc, name=comp_name, _RC)
-      Iam = trim(comp_name) // "SetServices"
-
-      call ESMF_VMGetCurrent(VM, _RC)
-
-      call MAPL_MemUtilsWrite(VM, trim(IAm)//': Begin', _RC)
-
-      ! Allocate this instance of the internal state and put it in wrapper.
+      ! Wrap gridcomp's private state and store it in gc
       allocate(dyn_internal_state, _STAT)
       wrap%dyn_state => dyn_internal_state
-
-      ! Save pointer to the wrapped internal state in the gc
       call ESMF_UserCompSetInternalState(gc, 'DYNstate', wrap, _RC)
 
 #include "DynCore_Import___.h"
+#include "DynCore_Export___.h"
+#include "DynCore_Internal___.h"
+
       call MAPL_AddImportSpec(gc, &
            SHORT_NAME='TRADV', &
            LONG_NAME='advected_quantities', &
            UNITS='unknown', &
            DATATYPE=MAPL_BundleItem, _RC)
 
-#include "DynCore_Export___.h"
       call MAPL_AddExportSpec(gc, &
            SHORT_NAME='CX', &
            LONG_NAME='eastward_accumulated_courant_number', &
@@ -412,9 +396,9 @@ contains
            VLOCATION=MAPL_VLocationCenter, _RC)
 
 #ifdef SKIP_TRACERS
-      do ntracer=1,ntracers
-         do nlev=1,nlevs
-            write(myTracer, "('Q',i5.5,'_',i3.3)") ntracer-1, plevs(nlev)
+      do itracer = 1, ntracers
+         do ilev = 1, size(plevs)
+            write(myTracer, "('Q',i5.5,'_',i3.3)") itracer-1, plevs(ilev)
             call MAPL_AddExportSpec(gc, &
                  SHORT_NAME=TRIM(myTracer), &
                  LONG_NAME =TRIM(myTracer), &
@@ -422,7 +406,7 @@ contains
                  DIMS=MAPL_DimsHorzOnly, &
                  VLOCATION=MAPL_VLocationNone, _RC)
          enddo
-         write(myTracer, "('Q',i5.5)") ntracer-1
+         write(myTracer, "('Q',i5.5)") itracer-1
          call MAPL_AddExportSpec(gc, &
               SHORT_NAME=TRIM(myTracer), &
               LONG_NAME=TRIM(myTracer), &
@@ -438,8 +422,6 @@ contains
            UNITS= '', &
            DIMS=MAPL_DimsHorzOnly, &
            VLOCATION=MAPL_VLocationNone, _RC)
-
-#include "DynCore_Internal___.h"
 
       ! pchakrab: TODO: DO WE STILL NEED THIS COMMENT?
       !ALT: technically the first 2 records of "old" style FV restart have
@@ -462,38 +444,35 @@ contains
       call MAPL_TimerAdd(gc, name="FINALIZE", _RC)
 
       ! Register services for this component
-      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_INITIALIZE,  Initialize, _RC)
-      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_RUN,   Run, _RC)
-      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_RUN,   RunAddIncs, _RC)
-      call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_FINALIZE, Finalize, _RC)
+      call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Initialize,  Initialize, _RC)
+      call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Run, Run, phase_name="Run", _RC)
+      call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Run, RunAddIncs, phase_name="RunAddIncs", _RC)
+      call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Finalize, Finalize, _RC)
       !  call MAPL_GridCompSetEntryPoint(gc, ESMF_SETREADRESTART, Coldstart, _RC)
 
       ! Setup FMS/FV3
-      call MAPL_GetObjectFromGC(gc, MAPL, _RC)
-      call MAPL_GetResource(MAPL, LAYOUT_FILE, 'LAYOUT:', default='fvcore_layout.rc', _RC)
-      call DynSetup(gc, LAYOUT_FILE, _RC)
+      call MAPL_GridCompGetResource(gc, "LAYOUT", layout_file, default="fvcore_layout.rc", _RC)
+      call DynSetup(gc, layout_file, _RC)
 
       ! Register prototype of cubed sphere grid and associated regridders
       call register_grid_and_regridders()
 
-      ! At this point check if FV is standalone and init the grid
-      call ESMF_ConfigGetAttribute(CF, FV3_STANDALONE, Label="FV3_STANDALONE:", default=0, _RC)
-      if (FV3_STANDALONE /= 0) then
-         call MAPL_GridCreate(gc, _RC)
-         call MAPL_AddExportSpec(gc, &
-              SHORT_NAME='TRADVEX', &
-              LONG_NAME='advected_quantities', &
-              UNITS='unknown', &
-              DATATYPE=MAPL_BundleItem, _RC)
-      endif
+      ! ! At this point check if FV is standalone and init the grid
+      ! call ESMF_ConfigGetAttribute(CF, FV3_STANDALONE, Label="FV3_STANDALONE:", default=0, _RC)
+      ! if (FV3_STANDALONE /= 0) then
+      !    call MAPL_GridCreate(gc, _RC)
+      !    call MAPL_AddExportSpec(gc, &
+      !         SHORT_NAME='TRADVEX', &
+      !         LONG_NAME='advected_quantities', &
+      !         UNITS='unknown', &
+      !         DATATYPE=MAPL_BundleItem, _RC)
+      ! endif
 
-      call MAPL_GetResource(MAPL, DEBUG_DYN, 'DEBUG_DYN:', default=.FALSE., _RC)
-      call MAPL_GetResource(MAPL, DEBUG_ADV, 'DEBUG_ADV:', default=.FALSE., _RC)
-      call MAPL_GetResource(MAPL, DEBUG_TQ_ERRORS, 'DEBUG_TQ_ERRORS:', default=.FALSE., _RC)
+      call MAPL_GridCompGetResource(gc, "DEBUG_DYN", DEBUG_DYN, default=.false., _RC)
+      call MAPL_GridCompGetResource(gc, "DEBUG_ADV", DEBUG_ADV, default=.false., _RC)
+      call MAPL_GridCompGetResource(gc, "DEBUG_TQ_ERRORS", DEBUG_TQ_ERRORS, default=.false., _RC)
 
-      ! Generic SetServices
-      call MAPL_GenericSetServices(gc, _RC)
-
+      call logger%info("SetServices:: ...complete")
       _RETURN(_SUCCESS)
 
    end subroutine SetServices
@@ -503,11 +482,11 @@ contains
    subroutine Initialize(gc, import, export, clock, rc)
 
       !ARGUMENTS:
-      type(ESMF_GridComp), intent(inout) :: gc       ! composite gridded component
-      type(ESMF_State), intent(inout) :: import      ! import state
-      type(ESMF_State), intent(inout) :: export      ! export state
-      type(ESMF_Clock), intent(inout) :: clock       ! the clock
-      integer, intent(out), OPTIONAL     :: rc       ! Error code, 0 all is well, error otherwise
+      type(ESMF_GridComp):: gc   ! composite gridded component
+      type(ESMF_State) :: import ! import state
+      type(ESMF_State) :: export ! export state
+      type(ESMF_Clock) :: clock  ! the clock
+      integer, intent(out) :: rc ! Error code, 0 all is well, error otherwise
 
       type(ESMF_Config) :: cf
 
@@ -723,11 +702,11 @@ contains
    subroutine Run(gc, import, export, clock, rc)
 
       !ARGUMENTS:
-      type(ESMF_GridComp), intent(inout) :: gc
-      type(ESMF_State), intent(inout) :: import
-      type(ESMF_State), intent(inout) :: export
-      type(ESMF_Clock), intent(inout) :: clock
-      integer, intent(out), optional :: rc
+      type(ESMF_GridComp) :: gc
+      type(ESMF_State) :: import
+      type(ESMF_State) :: export
+      type(ESMF_Clock) :: clock
+      integer, intent(out) :: rc
       !EOP
 
       integer :: status
@@ -937,6 +916,10 @@ contains
       logical                             :: doTropvars
 
       integer :: FV3_STANDALONE
+
+      character(len=ESMF_MAXSTR) :: myTracer
+      integer :: itracer
+      real(kind=r8) :: t1, t2, dyn_run_timer
 
       Iam = "Run"
       call ESMF_GridCompGet(gc, name=comp_name, CONFIG=cf, grid=esmfgrid, _RC)
@@ -2276,14 +2259,14 @@ contains
          call FILLOUT3(export, 'PE'     , vars%pe , _RC)
 
 #ifdef SKIP_TRACERS
-         do ntracer=1,ntracers
-            write(myTracer, "('Q',i5.5)") ntracer-1
+         do itracer = 1, ntracers
+            write(myTracer, "('Q',i5.5)") itracer-1
             call MAPL_GetPointer(export, temp3D, TRIM(myTracer), _RC)
-            if((associated(temp3d)) .and. (NQ>=ntracer)) then
-               if (state%vars%tracer(ntracer)%is_r4) then
-                  temp3d = state%vars%tracer(ntracer)%content_r4
+            if((associated(temp3d)) .and. (NQ>=itracer)) then
+               if (state%vars%tracer(itracer)%is_r4) then
+                  temp3d = state%vars%tracer(itracer)%content_r4
                else
-                  temp3d = state%vars%tracer(ntracer)%content
+                  temp3d = state%vars%tracer(itracer)%content
                endif
             endif
          enddo
@@ -3713,7 +3696,7 @@ contains
          deallocate(ana_phis)
       end subroutine state_remap_
 
-   end subroutine RUN
+   end subroutine Run
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -3820,11 +3803,11 @@ contains
    subroutine RunAddIncs(gc, import, export, clock, rc)
 
       !ARGUMENTS:
-      type(ESMF_GridComp), intent(inout) :: gc
-      type (ESMF_State),   intent(inout) :: import
-      type (ESMF_State),   intent(inout) :: export
-      type (ESMF_Clock),   intent(in)    :: clock
-      integer, intent(out), optional     :: rc
+      type(ESMF_GridComp) :: gc
+      type(ESMF_State) :: import
+      type(ESMF_State) :: export
+      type(ESMF_Clock) :: clock
+      integer, intent(out) :: rc
       !EOP
 
       integer                                          :: status
@@ -4108,15 +4091,15 @@ contains
          if(associated(temp3d)) temp3d = (tempxy)*(p00/(0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1))))**kappa
 
 #ifdef SKIP_TRACERS
-         do ntracer=1,ntracers
-            write(myTracer, "('Q',i5.5)") ntracer-1
+         do itracer=1,ntracers
+            write(myTracer, "('Q',i5.5)") itracer-1
             call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
             VERIFY_(STATUS)
-            if((associated(temp3d)) .and. (STATE%GRID%NQ>=ntracer)) then
-               if (state%vars%tracer(ntracer)%is_r4) then
-                  temp3d = state%vars%tracer(ntracer)%content_r4
+            if((associated(temp3d)) .and. (STATE%GRID%NQ>=itracer)) then
+               if (state%vars%tracer(itracer)%is_r4) then
+                  temp3d = state%vars%tracer(itracer)%content_r4
                else
-                  temp3d = state%vars%tracer(ntracer)%content
+                  temp3d = state%vars%tracer(itracer)%content
                endif
             endif
          enddo
@@ -5101,11 +5084,11 @@ contains
    subroutine Finalize(gc, import, export, clock, rc)
 
       !ARGUMENTS:
-      type (ESMF_GridComp), intent(inout) :: gc
-      type (ESMF_State),    intent(inout) :: import
-      type (ESMF_State),    intent(inout) :: export
-      type (ESMF_Clock),    intent(inout) :: clock
-      integer, optional,    intent(  out) :: rc
+      type (ESMF_GridComp) :: gc
+      type (ESMF_State) :: import
+      type (ESMF_State) :: export
+      type (ESMF_Clock) :: clock
+      integer, intent(out) :: rc
       !EOP
 
       type (DYN_wrap) :: wrap
