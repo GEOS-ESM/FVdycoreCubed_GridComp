@@ -121,6 +121,9 @@ else ()
     DEPENDENCIES ${GFDL})
 endif ()
 
+mapl_acg (${this} DynCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS INTERNAL_SPECS)
+mapl_acg (${this} AdvCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS)
+
 if (FV_PRECISION STREQUAL R4)
   set (GFDL FMS::fms_r4)
 elseif (FV_PRECISION STREQUAL R4R8) # FV is R4 but FMS is R8

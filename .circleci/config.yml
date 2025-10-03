@@ -10,43 +10,48 @@ orbs:
 workflows:
   build-test:
     jobs:
-      - ci/build:
-          name: build-GEOSgcm-on-<< matrix.compiler >>
-          context:
-            - docker-hub-creds
-          matrix:
-            parameters:
-              compiler: [gfortran, ifort]
-          #baselibs_version: *baselibs_version
-          repo: GEOSgcm
-          checkout_fixture: true
-          mepodevelop: false
-          checkout_mapl3_release_branch: true
-          persist_workspace: true # Needs to be true to run fv3/gcm experiment, costs extra
-      - ci/run_fv3:
-          name: run-FV3-on-<< matrix.compiler >>-with-GEOSgcm
-          context:
-            - docker-hub-creds
-          matrix:
-            parameters:
-              compiler: [gfortran, ifort]
-          #baselibs_version: *baselibs_version
-          requires:
-            - build-GEOSgcm-on-<< matrix.compiler >>
-          repo: GEOSgcm
-      # Run AMIP GCM (1 hour, no ExtData)
-      - ci/run_gcm:
-          name: run-GCM-on-<< matrix.compiler >>
-          context:
-            - docker-hub-creds
-          matrix:
-            parameters:
-              compiler: [gfortran, ifort]
-          requires:
-            - build-GEOSgcm-on-<< matrix.compiler >>
-          repo: GEOSgcm
-          #baselibs_version: *baselibs_version
-          #bcs_version: *bcs_version
+      # We are turning off the GEOSgcm build and test for now, as the release/MAPL-v3
+      # branch in GEOSgcm is still based on v11, but the FV3 code in this repo is now based
+      # on v12. Once GEOSgcm MAPL3 is updated to v12, we can re-enable these tests.
+      #########################################################################################
+      # - ci/build:                                                                           #
+      #     name: build-GEOSgcm-on-<< matrix.compiler >>                                      #
+      #     context:                                                                          #
+      #       - docker-hub-creds                                                              #
+      #     matrix:                                                                           #
+      #       parameters:                                                                     #
+      #         compiler: [gfortran, ifort]                                                   #
+      #     #baselibs_version: *baselibs_version                                              #
+      #     repo: GEOSgcm                                                                     #
+      #     checkout_fixture: true                                                            #
+      #     mepodevelop: false                                                                #
+      #     checkout_mapl3_release_branch: true                                               #
+      #     persist_workspace: true # Needs to be true to run fv3/gcm experiment, costs extra #
+      # - ci/run_fv3:                                                                         #
+      #     name: run-FV3-on-<< matrix.compiler >>-with-GEOSgcm                               #
+      #     context:                                                                          #
+      #       - docker-hub-creds                                                              #
+      #     matrix:                                                                           #
+      #       parameters:                                                                     #
+      #         compiler: [gfortran, ifort]                                                   #
+      #     #baselibs_version: *baselibs_version                                              #
+      #     requires:                                                                         #
+      #       - build-GEOSgcm-on-<< matrix.compiler >>                                        #
+      #     repo: GEOSgcm                                                                     #
+      # # Run AMIP GCM (1 hour, no ExtData)                                                   #
+      # - ci/run_gcm:                                                                         #
+      #     name: run-GCM-on-<< matrix.compiler >>                                            #
+      #     context:                                                                          #
+      #       - docker-hub-creds                                                              #
+      #     matrix:                                                                           #
+      #       parameters:                                                                     #
+      #         compiler: [gfortran, ifort]                                                   #
+      #     requires:                                                                         #
+      #       - build-GEOSgcm-on-<< matrix.compiler >>                                        #
+      #     repo: GEOSgcm                                                                     #
+      #     #baselibs_version: *baselibs_version                                              #
+      #     #bcs_version: *bcs_version                                                        #
+      #########################################################################################
       - ci/build:
           name: build-GEOSfvdycore-as-<< matrix.fv_precision >>-on-<< matrix.compiler >>
           context:
