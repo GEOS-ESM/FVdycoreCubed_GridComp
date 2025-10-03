@@ -14,9 +14,35 @@ module FVdycoreCubed_GridComp
    !MODULE: FVdycoreCubed_GridComp --- Dynamical Core Grid Component
 
    !USES:
-   use ESMF                ! ESMF base class
-   use MAPL                ! GEOS base class
-   use m_set_eta,       only: set_eta
+   use ESMF
+   ! use MAPL
+   use ESMFL_Mod, only: ESMFL_StateGetPointerToData, ESMFL_BundleGetPointerToData, MAPL_AreaMean
+   use MAPL_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY
+   use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
+   use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
+   use MAPL_Constants, only: MAPL_VectorField, MAPL_BundleItem
+   use MAPL_Constants, only: MAPL_RestartSkip, MAPL_RestartRequired, MAPL_InitialRestart
+   use MAPL_Constants, only: MAPL_VLocationCenter, MAPL_VLocationEdge, MAPL_VLocationNone
+   use MAPL_Constants, only: MAPL_DimsHorzVert, MAPL_DimsHorzOnly, MAPL_DimsVertOnly
+   use MAPL_GenericMod, only: MAPL_GridCompSetEntryPoint, MAPL_MetaComp, MAPL_TimerAdd, MAPL_TimerOn
+   use MAPL_GenericMod, only: MAPL_TimerAdd, MAPL_TimerOn, MAPL_TimerOff
+   use MAPL_GenericMod, only: MAPL_GenericSetServices, MAPL_GenericInitialize, MAPL_GenericFinalize
+   use MAPL_GenericMod, only: MAPL_GetObjectFromGC, MAPL_GetResource, MAPL_GridCreate, MAPL_Get
+   use MAPL_GenericMod, only: MAPL_AddImportSpec, MAPL_AddExportSpec, MAPL_AddInternalSpec
+   use MAPL_AbstractRegridderMod, only: AbstractRegridder
+   use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
+   use MAPL_BaseMod, only: MAPL_AttributeSet, MAPL_FieldBundleAdd
+   use MAPL_BaseMod, only: MAPL_UNDEF, MAPL_RemapBounds
+   use MAPL_GridManagerMod, only: grid_manager
+   use MAPL_RegridderManagerMod, only: regridder_manager
+   use MAPL_RegridMethods, only: REGRID_METHOD_BILINEAR
+   use MAPL_CFIOMod, only: MAPL_CFIORead
+   use MAPL_MemUtilsMod, only: MAPL_MemUtilsWrite
+   use MAPL_FieldPointerUtilities, only: MAPL_FieldDestroy
+   use MAPL_MaxMinMod, only: MAPL_MaxMin
+   use MAPL_CommsMod, only: MAPL_AM_I_ROOT, ArrayGather
+   use FileIOSharedMod, only: WRITE_PARALLEL
+   use m_set_eta, only: set_eta
 
    ! FV Specific Module
    use fv_arrays_mod,  only: REAL4, REAL8, FVPRC
@@ -2914,7 +2940,7 @@ contains
       !   call RunAddIncs(gc, import, export, clock, rc)
       !endif
 
-      RETURN_(ESMF_SUCCESS)
+      _RETURN(_SUCCESS)
 
    contains
 
@@ -3026,12 +3052,12 @@ contains
          ! U
          iwind=0
          if( trim(uname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(uname), XTMP3d, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(uname), XTMP3d, _RC)
             iwind=iwind+1
          endif
          ! V
          if( trim(vname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(vname), YTMP3D, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(vname), YTMP3D, _RC)
             iwind=iwind+1
          endif
 
@@ -3117,7 +3143,7 @@ contains
 
          ! PE or PS
          if( trim(dpname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(dpname), XTMP3d, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(dpname), XTMP3d, _RC)
             call WRITE_PARALLEL('Replaying '//trim(dpname))
             if ( iapproach == 1 ) then ! convert lat-lon delp to cubed and proceed
                allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
@@ -3155,7 +3181,7 @@ contains
             enddo
          else
             if( trim(psname).ne.'NULL' ) then
-               call ESMFL_BundleGetPointertoData(ana_bundle, trim(psname), XTMP2D, _RC)
+               call ESMFL_BundleGetPointerToData(ana_bundle, trim(psname), XTMP2D, _RC)
                call WRITE_PARALLEL('Replaying '//trim(psname))
                allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
                allocate(     aux3D(size(XTMP2d ,1),size(XTMP2d ,2),1))
@@ -3196,7 +3222,7 @@ contains
 
          ! O3
          if( trim(o3name).ne.'NULL' ) then
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(o3name), XTMP3d, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(o3name), XTMP3d, _RC)
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
 
@@ -3233,7 +3259,7 @@ contains
 
          ! QV
          if( trim(qname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(qname), XTMP3d, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(qname), XTMP3d, _RC)
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
             call WRITE_PARALLEL('Replaying '//trim(qname))
@@ -3252,7 +3278,7 @@ contains
 
          ! PT
          if( trim(tname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(tname), XTMP3d, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(tname), XTMP3d, _RC)
             allocate(cubeTEMP3D(size(ana_thv,1),size(ana_thv,2),km))
             call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
             call WRITE_PARALLEL('Replaying '//trim(tname)// '; treated as '//trim(tvar))
@@ -3340,12 +3366,12 @@ contains
          ! U
          iwind=0
          if( trim(uname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(uname), TEMP3D, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(uname), TEMP3D, _RC)
             iwind=iwind+1
          endif
          ! V
          if( trim(vname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(vname), VTMP3D, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(vname), VTMP3D, _RC)
             iwind=iwind+1
          endif
 
@@ -3377,7 +3403,7 @@ contains
 
          ! DELP
          if( trim(psname)=='NULL' .and. trim(dpname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(dpname), TEMP3D, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(dpname), TEMP3D, _RC)
             call WRITE_PARALLEL('Replaying increment of '//trim(dpname))
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
@@ -3402,7 +3428,7 @@ contains
 
          ! PS
          if( trim(psname)/='NULL' .and. trim(dpname)=='NULL' ) then
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(psname), TEMP2D, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(psname), TEMP2D, _RC)
             call WRITE_PARALLEL('Replaying increment of '//trim(psname))
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
             allocate(     aux3D(size( TEMP2D,1),size( TEMP2D,2),1))
@@ -3429,7 +3455,7 @@ contains
 
          ! O3
          if( trim(o3name).ne.'NULL' ) then
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(o3name), TEMP3D, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(o3name), TEMP3D, _RC)
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
 
@@ -3456,7 +3482,7 @@ contains
 
          ! QV
          if( trim(qname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(qname), TEMP3D, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(qname), TEMP3D, _RC)
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
             call WRITE_PARALLEL('Replaying increment of '//trim(qname))
@@ -3476,7 +3502,7 @@ contains
                STATUS=99
                VERIFY_(STATUS)
             endif
-            call ESMFL_BundleGetPointertoData(ana_bundle, trim(tname), TEMP3D, _RC)
+            call ESMFL_BundleGetPointerToData(ana_bundle, trim(tname), TEMP3D, _RC)
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
             call WRITE_PARALLEL('Replaying increment of '//trim(tname))
@@ -3582,7 +3608,7 @@ contains
 
          call WRITE_PARALLEL('Replay start remapping')
          !
-         call ESMFL_BundleGetPointertoData(ana_bundle, 'phis', XTMP2D, _RC)
+         call ESMFL_BundleGetPointerToData(ana_bundle, 'phis', XTMP2D, _RC)
          allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
          allocate(     aux3D(size(XTMP2D ,1),size(XTMP2D ,2),1))
          aux3d(:,:,1)=XTMP2D ! this is a trick since the 2d interface to the transform has not worked for me (RT)
@@ -4543,7 +4569,7 @@ contains
       call MAPL_TimerOff(GENSTATE,"RUN2")
       call MAPL_TimerOff(GENSTATE,"TOTAL")
 
-      RETURN_(ESMF_SUCCESS)
+      _RETURN(_SUCCESS)
    end subroutine RunAddIncs
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -5119,7 +5145,7 @@ contains
       call MAPL_GenericFinalize ( gc, import, export, clock,  RC=STATUS)
       VERIFY_(STATUS)
 
-      RETURN_(ESMF_SUCCESS)
+      _RETURN(_SUCCESS)
 
    contains
 
@@ -5250,7 +5276,7 @@ contains
          endif
       endif
 
-      RETURN_(ESMF_SUCCESS)
+      _RETURN(_SUCCESS)
    end subroutine VertInterp
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -5836,7 +5862,7 @@ contains
 
       DYN_COLDSTART=.true.
 
-      RETURN_(ESMF_SUCCESS)
+      _RETURN(_SUCCESS)
 
    end subroutine COLDSTART
 
