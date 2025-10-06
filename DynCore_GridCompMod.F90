@@ -451,8 +451,6 @@ contains
 
    end subroutine SetServices
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
    subroutine Initialize(gc, import, export, clock, rc)
 
       !ARGUMENTS:
@@ -633,8 +631,6 @@ contains
       _RETURN(_SUCCESS)
 
    end subroutine Initialize
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    !BOP
    !IROUTINE: Run
@@ -1028,7 +1024,7 @@ contains
                VERIFY_(STATUS)
                if (isPresent) then
                   do while (.not.tend)
-                     call ESMF_ConfigGetAttribute(cf, value=tmpstring, default='', rc=status) !ALT: we don't check return status!!!
+                     call ESMF_ConfigGetAttribute(cf, value=tmpstring, default='', rc=status) !ALT: we don't check return status
                      if (tmpstring /= '')  then
                         n = n + 1
                         if (n > size(xlist)) then
@@ -3651,8 +3647,6 @@ contains
 
    end subroutine Run
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
    subroutine PULL_Q(STATE, import, QQQ, iNXQ, InFieldName, RC)
 
       type (DynState)        :: STATE
@@ -3740,8 +3734,6 @@ contains
       END DO
 
    end subroutine PULL_Q
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    !BOP
    !IROUTINE: RunAddIncs
@@ -4508,8 +4500,6 @@ contains
       _RETURN(_SUCCESS)
    end subroutine RunAddIncs
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
    subroutine ADD_INCS ( MAPL,STATE,import,DT,IS_WEIGHTED,RC )
 
       use fms_mod, only: set_domain, nullify_domain
@@ -4903,8 +4893,6 @@ contains
 
    end subroutine ADD_INCS
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
    subroutine FILLOUT3r8(export, name, V, RC)
       type (ESMF_State),  intent(inout) :: export
       character(len=*),   intent(IN   ) :: name
@@ -4920,8 +4908,6 @@ contains
       if(associated(cpl)) cpl=v
    end subroutine FILLOUT3r8
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
    subroutine FILLOUT3(export, name, V, RC)
       type (ESMF_State),  intent(inout) :: export
       character(len=*),   intent(IN   ) :: name
@@ -4936,8 +4922,6 @@ contains
       VERIFY_(STATUS)
       if(associated(cpl)) cpl=v
    end subroutine FILLOUT3
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    subroutine FILLOUT2(export, name, V, rc)
      type (ESMF_State),  intent(inout) :: export
@@ -4955,8 +4939,6 @@ contains
 
      return
    end subroutine FILLOUT2
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    subroutine Energetics (ua,va,thv,ple,delp,pk,phiS,keint,peint,teint,ke,cpt,gze)
 
@@ -5025,8 +5007,6 @@ contains
       return
    end subroutine Energetics
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
    !BOP
    !IROUTINE: Finalize
 
@@ -5094,8 +5074,6 @@ contains
 
    end subroutine FINALIZE
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
    subroutine get_slp ( km,ps,phis,slp,pe,pk,tv,H1000,H850,H500)
       implicit   none
 
@@ -5151,8 +5129,6 @@ contains
 
       return
    end subroutine get_slp
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    subroutine VertInterp(v2,v3,ple,pp,positive_definite,rc)
       real(r4), intent(OUT) :: v2(:,:)
@@ -5214,8 +5190,6 @@ contains
 
       _RETURN(_SUCCESS)
    end subroutine VertInterp
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    !BOP
    !IROUTINE: Coldstart
