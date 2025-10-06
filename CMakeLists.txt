@@ -118,10 +118,12 @@ else ()
     SRCS ${srcs}
     SUBCOMPONENTS fvdycore
     DEPENDENCIES ${dependencies}
-    DEPENDENCIES ${GFDL})
+    DEPENDENCIES ${GFDL}
+    TYPE SHARED
+  )
 endif ()
 
-mapl_acg (${this} DynCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS INTERNAL_SPECS)
+mapl_acg (${this} DynCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS INTERNAL_SPECS 3g)
 mapl_acg (${this} AdvCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS)
 
 if (FV_PRECISION STREQUAL R4)

@@ -1,31 +1,28 @@
 #include "MAPL_Generic.h"
 
 module FV_StateMod
-!BOP
-!
-! !MODULE: FV_StateMod --- GEOS5/CAM Cubed-Sphere fvcore state variables/init/run/finalize
-!
-! !USES:
+   !BOP
+   !MODULE: FV_StateMod --- GEOS5/CAM Cubed-Sphere fvcore state variables/init/run/finalize
+
+   !USES:
 #if defined( MAPL_MODE )
    use ESMF                ! ESMF base class
    use MAPL                ! MAPL base class
 #endif
+   use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
+   use MAPL_ConstantsMod, only: MAPL_KAPPA, MAPL_PI_R8, MAPL_ALHL, MAPL_PSDRY
+   use mapl3g_generic, only: MAPL_GridCompGetResource
 
-   use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS, &
-                                MAPL_KAPPA, MAPL_PI_R8, MAPL_ALHL, MAPL_PSDRY
-
-   use fv_mp_mod,         only: start_group_halo_update, complete_group_halo_update
-   use fv_mp_mod,         only: group_halo_update_type
+   use fv_mp_mod, only: start_group_halo_update, complete_group_halo_update, group_halo_update_type
 
    use fms_mod, only: fms_init, set_domain, nullify_domain
    use mpp_domains_mod, only: mpp_update_domains, CGRID_NE, DGRID_NE, mpp_get_boundary
    use mpp_parameter_mod, only: AGRID_PARAM=>AGRID, CORNER
-   use fv_timing_mod,    only: timing_on, timing_off, timing_init, timing_prt
+   use fv_timing_mod, only: timing_on, timing_off, timing_init, timing_prt
    use mpp_mod, only: mpp_pe, mpp_root_pe
-   use mpp_domains_mod,  only: domain2d
+   use mpp_domains_mod, only: domain2d
 
-   use fv_grid_utils_mod,  only: inner_prod, mid_pt_sphere, cubed_to_latlon, &
-                           ptop_min, g_sum
+   use fv_grid_utils_mod,  only: inner_prod, mid_pt_sphere, cubed_to_latlon, ptop_min, g_sum
    use fv_grid_tools_mod,  only: get_unit_vector
    use fv_control_mod, only: fv_init1, fv_init2
    use fv_arrays_mod , only: fv_atmos_type, FVPRC, REAL4, REAL8
@@ -35,229 +32,218 @@ module FV_StateMod
    use sw_core_mod, only: d2a2c_vect
    use fv_sg_mod, only: fv_subgrid_z
 
-   use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check, &
-                                 get_vorticity, updraft_helicity, bunkers_vector, helicity_relative_CAPS
+   use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check
+   use fv_diagnostics_mod, only: get_vorticity, updraft_helicity, bunkers_vector, helicity_relative_CAPS
 #ifdef RUN_GTFV3
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
    use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
    use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f_init, geos_gtfv3_interface_f_finalize
 #endif
 
-implicit none
-private
+   implicit none
+   private
 
 #include "mpif.h"
 
-  real(REAL8), save :: elapsed_time = 0
-  real(REAL8), save :: massD0
-  real(REAL8), save :: massADDED = 0.0
+   real(REAL8), save :: elapsed_time = 0
+   real(REAL8), save :: massD0
+   real(REAL8), save :: massADDED = 0.0
 
-  real(FVPRC), parameter :: tiny_number=1.e-15
-  real(FVPRC), parameter :: huge_number=1.e+15
+   real(FVPRC), parameter :: tiny_number=1.e-15
+   real(FVPRC), parameter :: huge_number=1.e+15
 
-! !PUBLIC DATA MEMBERS:
+   !PUBLIC DATA MEMBERS:
+   logical :: FV_OFF = .false.
+   integer :: INT_FV_OFF = 0
+   logical :: ADJUST_DT = .false.
+   logical :: DEBUG = .false.
+   logical :: DEBUG_DYN = .false.
+   logical :: DEBUG_ADV = .false.
+   logical :: COLDSTART = .false.
+   logical :: SW_DYNAMICS = .false.
+   integer :: INT_ADIABATIC = 0
+   logical :: ADIABATIC = .false.
+   logical :: FV_HYDROSTATIC = .true.
+   integer :: INT_check_mass = 0
+   logical :: check_mass = .false.
+   integer :: INT_fix_mass = 1
+   logical :: fix_mass = .true.
+   integer :: CASE_ID = 11
+   integer :: AdvCore_Advection = 0
+   integer :: FV3_QSPLIT = 0
+   character(:), allocatable :: FV3_CONFIG
 
-  logical :: FV_OFF = .false.
-  integer :: INT_FV_OFF = 0
-  logical :: ADJUST_DT = .false.
-  logical :: DEBUG = .false.
-  logical :: DEBUG_DYN = .false.
-  logical :: DEBUG_ADV = .false.
-  logical :: COLDSTART = .false.
-  logical :: SW_DYNAMICS = .false.
-  integer :: INT_ADIABATIC = 0
-  logical :: ADIABATIC = .false.
-  logical :: FV_HYDROSTATIC = .true.
-  integer :: INT_check_mass = 0
-  logical :: check_mass = .false.
-  integer :: INT_fix_mass = 1
-  logical :: fix_mass = .true.
-  integer :: CASE_ID = 11
-  integer :: AdvCore_Advection = 0
-  integer :: FV3_QSPLIT = 0
-  character(LEN=ESMF_MAXSTR) :: FV3_CONFIG
+   public FV_Atm
+   public FV_Setup, FV_InitState, FV_Run, FV_Finalize, FV_DA_Incs
+   public FV_HYDROSTATIC, ADIABATIC, DEBUG, DEBUG_DYN, DEBUG_ADV, COLDSTART, CASE_ID, SW_DYNAMICS, AdvCore_Advection
+   public FV_RESET_CONSTANTS
+   public FV_To_State, State_To_FV
+   public T_TRACERS, T_FVDYCORE_VARS, T_FVDYCORE_GRID, T_FVDYCORE_STATE
+   public fv_fillMassFluxes
+   public fv_computeMassFluxes
+   public fv_getVerticalMassFlux
+   public fv_getPK
+   public fv_getOmega
+   public fv_getVorticity
+   public fv_getDivergence
+   public fv_getUpdraftHelicity
+   public fv_getEPV
+   public fv_getDELZ
+   public fv_getPKZ
+   public fv_getQ
 
-  public FV_Atm
-  public FV_Setup, FV_InitState, FV_Run, FV_Finalize, FV_DA_Incs
-  public FV_HYDROSTATIC, ADIABATIC, DEBUG, DEBUG_DYN, DEBUG_ADV, COLDSTART, CASE_ID, SW_DYNAMICS, AdvCore_Advection
-  public FV_RESET_CONSTANTS
-  public FV_To_State, State_To_FV
-  public T_TRACERS, T_FVDYCORE_VARS, T_FVDYCORE_GRID, T_FVDYCORE_STATE
-  public fv_fillMassFluxes
-  public fv_computeMassFluxes
-  public fv_getVerticalMassFlux
-  public fv_getPK
-  public fv_getOmega
-  public fv_getVorticity
-  public fv_getDivergence
-  public fv_getUpdraftHelicity
-  public fv_getEPV
-  public fv_getDELZ
-  public fv_getPKZ
-  public fv_getQ
+   public debug_fv_state
 
-  public debug_fv_state
+   public fv_getAllWinds
+   public INTERP_AGRID_TO_DGRID
 
-  public fv_getAllWinds
-  public INTERP_AGRID_TO_DGRID
+   interface fv_computeMassFluxes
+      module procedure fv_computeMassFluxes_r4
+      module procedure fv_computeMassFluxes_r8
+   end interface fv_computeMassFluxes
 
-  interface fv_computeMassFluxes
-     module procedure fv_computeMassFluxes_r4
-     module procedure fv_computeMassFluxes_r8
-  end interface
+   interface fv_getAllWinds
+      module procedure fv_getAllWinds_3D_R4
+      module procedure fv_getAllWinds_3D
+      module procedure fv_getAllWinds_2D
+   end interface fv_getAllWinds
 
-  INTERFACE fv_getAllWinds
+   interface INTERP_AGRID_TO_DGRID
+      module procedure a2d3d    ! 2d to 3d
+      module procedure a2d2d    ! 2d to 2d
+   end interface INTERP_AGRID_TO_DGRID
 
-   MODULE PROCEDURE fv_getAllWinds_3D_R4
-   MODULE PROCEDURE fv_getAllWinds_3D
-   MODULE PROCEDURE fv_getAllWinds_2D
+   logical, save :: Init_FV_Domain = .true.
 
-  END INTERFACE
+   type(fv_atmos_type), allocatable, save :: FV_Atm(:)
+   logical, allocatable, save             :: grids_on_this_pe(:)
 
-  INTERFACE INTERP_AGRID_TO_DGRID
+   type T_TRACERS
+      logical :: is_r4
+      real(REAL8), dimension(:,:,:), pointer :: content
+      real(REAL4), dimension(:,:,:), pointer :: content_r4
+      character(LEN=ESMF_MAXSTR) :: tname
+   end type T_TRACERS
 
-   MODULE PROCEDURE a2d3d    ! 2d to 3d
-   MODULE PROCEDURE a2d2d    ! 2d to 2d
+   ! T_FVDYCORE_VARS contains the prognostic variables for FVdycore
+   type T_FVDYCORE_VARS
+      real(REAL8), dimension(:,:,:), pointer :: U      => NULL() ! U winds (D-grid)
+      real(REAL8), dimension(:,:,:), pointer :: V      => NULL() ! V winds (D-grid)
+      real(REAL8), dimension(:,:,:), pointer :: PT     => NULL() ! scaled virtual pot. temp.
+      real(REAL8), dimension(:,:,:), pointer :: PE     => NULL() ! Pressure at layer edges
+      real(REAL8), dimension(:,:,:), pointer :: PKZ    => NULL() ! P^kappa mean
+      real(REAL8), dimension(:,:,:), pointer :: DZ     => NULL() ! Height Thickness
+      real(REAL8), dimension(:,:,:), pointer :: W      => NULL() ! Vertical Velocity
+      type(T_TRACERS), dimension(:), pointer :: tracer => NULL() ! Tracers
+      integer :: nwat ! Number of water species
+   end type T_FVDYCORE_VARS
 
-  END INTERFACE
+   ! T_FVDYCORE_GRID contains information about the horizontal and vertical
+   ! discretization, unlike in ARIES where these data are split into HORZ_GRID
+   ! and VERT_GRID.  The reason for this: currently all of this information is
+   ! initialized in one call to FVCAM dynamics_init.
 
-  logical, save :: Init_FV_Domain = .true.
-
-  type(fv_atmos_type), allocatable, save :: FV_Atm(:)
-  logical, allocatable, save             :: grids_on_this_pe(:)
-
-  type T_TRACERS
-       logical                                   :: is_r4
-       real(REAL8), dimension(:,:,:  ), pointer     :: content
-       real(REAL4), dimension(:,:,:  ), pointer     :: content_r4
-       character(LEN=ESMF_MAXSTR)                          :: tname
-  end type T_TRACERS
-
-! T_FVDYCORE_VARS contains the prognostic variables for FVdycore
-  type T_FVDYCORE_VARS
-       real(REAL8), dimension(:,:,:  ), pointer     :: U      => NULL() ! U winds (D-grid)
-       real(REAL8), dimension(:,:,:  ), pointer     :: V      => NULL() ! V winds (D-grid)
-       real(REAL8), dimension(:,:,:  ), pointer     :: PT     => NULL() ! scaled virtual pot. temp.
-       real(REAL8), dimension(:,:,:  ), pointer     :: PE     => NULL() ! Pressure at layer edges
-       real(REAL8), dimension(:,:,:  ), pointer     :: PKZ    => NULL() ! P^kappa mean
-       real(REAL8), dimension(:,:,:  ), pointer     :: DZ     => NULL() ! Height Thickness
-       real(REAL8), dimension(:,:,:  ), pointer     :: W      => NULL() ! Vertical Velocity
-       type(T_TRACERS), dimension(:), pointer    :: tracer => NULL() ! Tracers
-       integer :: nwat ! Number of water species
-  end type T_FVDYCORE_VARS
-
-! T_FVDYCORE_GRID contains information about the horizontal and vertical
-! discretization, unlike in ARIES where these data are split into HORZ_GRID
-! and VERT_GRID.  The reason for this: currently all of this information is
-! initialized in one call to FVCAM dynamics_init.
-
-  type T_FVDYCORE_GRID
-!
+   type T_FVDYCORE_GRID
 #if defined( MAPL_MODE )
-    type (MAPL_MetaComp),   pointer :: FVgenstate
-    type (ESMF_Grid)                :: GRID           ! The 'horizontal' grid (2D decomp only)
+      type (MAPL_MetaComp),   pointer :: FVgenstate
+      type (ESMF_Grid)                :: GRID           ! The 'horizontal' grid (2D decomp only)
 #endif
 
-    integer                         :: NG               ! Ghosting
-!
-    integer                         :: IS               ! Start X-index (exclusive, unghosted)
-    integer                         :: IE               ! End X-index (exclusive, unghosted)
-    integer                         :: JS               ! Start Y-index (exclusive, unghosted)
-    integer                         :: JE               ! End Y-index (exclusive, unghosted)
-!
-    integer                         :: ISD              ! Start X-index (exclusive, ghosted)
-    integer                         :: IED              ! End X-index (exclusive, ghosted)
-    integer                         :: JSD              ! Start Y-index (exclusive, ghosted)
-    integer                         :: JED              ! End Y-index (exclusive, ghosted)
-!
-    integer                         :: NPX             ! Full X- dim
-    integer                         :: NPY             ! Full Y- dim
-    integer                         :: NPZ             ! Numer of levels
-    integer                         :: NPZ_P1          ! NPZ+1 (?)
+      integer                         :: NG               ! Ghosting
 
-    integer                         :: NTILES          ! How many log-rectangular tiles does my grid Have
-                                                       ! lat-lon      = 1
-                                                       ! cubed-sphere = 6
+      integer                         :: IS               ! Start X-index (exclusive, unghosted)
+      integer                         :: IE               ! End X-index (exclusive, unghosted)
+      integer                         :: JS               ! Start Y-index (exclusive, unghosted)
+      integer                         :: JE               ! End Y-index (exclusive, unghosted)
 
-    real(REAL8), allocatable           :: DXC(:,:)     ! local C-Grid DeltaX
-    real(REAL8), allocatable           :: DYC(:,:)     ! local C-Grid DeltaY
+      integer                         :: ISD              ! Start X-index (exclusive, ghosted)
+      integer                         :: IED              ! End X-index (exclusive, ghosted)
+      integer                         :: JSD              ! Start Y-index (exclusive, ghosted)
+      integer                         :: JED              ! End Y-index (exclusive, ghosted)
 
-    real(REAL8), allocatable           :: AREA(:,:)    ! local cell area
-    real(REAL8)                        :: GLOBALAREA   ! global area
+      integer                         :: NPX             ! Full X- dim
+      integer                         :: NPY             ! Full Y- dim
+      integer                         :: NPZ             ! Numer of levels
+      integer                         :: NPZ_P1          ! NPZ+1 (?)
 
-    integer                         :: KS              ! Number of true pressure levels (out of NPZ+1)
-    real(REAL8)                        :: PTOP            ! pressure at top (ak(1))
-    real(REAL8)                        :: PINT            ! initial pressure (ak(npz+1))
-    real(REAL8), dimension(:), pointer :: AK => NULL()    ! Sigma mapping
-    real(REAL8), dimension(:), pointer :: BK => NULL()    ! Sigma mapping
-    real(REAL8)                        :: f_coriolis_angle = 0
-!
-! Tracers
-!
-    integer                         :: NQ              ! Number of advected tracers
-  end type T_FVDYCORE_GRID
+      integer                         :: NTILES          ! log-rectangular tiles in grid: 1 for lat/lon, 6 for cubed-sphere
 
-  integer, parameter :: NUM_FVDYCORE_ALARMS        = 3
-  integer, parameter :: NUM_TIMES      = 8
-  integer, parameter :: TIME_TO_RUN  = 1
+      real(REAL8), allocatable           :: DXC(:,:)     ! local C-Grid DeltaX
+      real(REAL8), allocatable           :: DYC(:,:)     ! local C-Grid DeltaY
 
-  type T_FVDYCORE_STATE
+      real(REAL8), allocatable           :: AREA(:,:)    ! local cell area
+      real(REAL8)                        :: GLOBALAREA   ! global area
+
+      integer                         :: KS              ! Number of true pressure levels (out of NPZ+1)
+      real(REAL8)                        :: PTOP            ! pressure at top (ak(1))
+      real(REAL8)                        :: PINT            ! initial pressure (ak(npz+1))
+      real(REAL8), dimension(:), pointer :: AK => NULL()    ! Sigma mapping
+      real(REAL8), dimension(:), pointer :: BK => NULL()    ! Sigma mapping
+      real(REAL8)                        :: f_coriolis_angle = 0
+      !
+      ! Tracers
+      !
+      integer                         :: NQ              ! Number of advected tracers
+   end type T_FVDYCORE_GRID
+
+   integer, parameter :: NUM_FVDYCORE_ALARMS        = 3
+   integer, parameter :: NUM_TIMES      = 8
+   integer, parameter :: TIME_TO_RUN  = 1
+
+   type T_FVDYCORE_STATE
 !!!    private
-    type (T_FVDYCORE_VARS)               :: VARS
-    type (T_FVDYCORE_GRID )              :: GRID
+      type (T_FVDYCORE_VARS)               :: VARS
+      type (T_FVDYCORE_GRID )              :: GRID
 #if defined( MAPL_MODE )
-    type (ESMF_Clock), pointer           :: CLOCK
-    type (ESMF_Alarm)                    :: ALARMS(NUM_FVDYCORE_ALARMS)
-
+      type (ESMF_Clock), pointer           :: CLOCK
+      type (ESMF_Alarm)                    :: ALARMS(NUM_FVDYCORE_ALARMS)
 #endif
-    integer(kind=8)                      :: RUN_TIMES(4,NUM_TIMES)
-    logical                              :: DOTIME, DODYN
-    real(REAL8)                          :: DT          ! Large time step
-    integer                              :: KSPLIT
-    integer                              :: NSPLIT
-    integer                              :: NUM_CALLS
-  end type T_FVDYCORE_STATE
+      integer(kind=8)                      :: RUN_TIMES(4,NUM_TIMES)
+      logical                              :: DOTIME, DODYN
+      real(REAL8)                          :: DT          ! Large time step
+      integer                              :: KSPLIT
+      integer                              :: NSPLIT
+      integer                              :: NUM_CALLS
+   end type T_FVDYCORE_STATE
 
-! Constants used by fvcore
-    real(REAL8)                             :: pi
-    real(REAL8)                             :: omega    ! angular velocity of earth's rotation
-    real(FVPRC)                             :: cp       ! heat capacity of air at constant pressure
-    real(REAL8)                             :: radius   ! radius of the earth (m)
-    real(REAL8)                             :: rgas     ! Gas constant of the air
-    real(REAL8)                             :: rvap     ! Gas constant of vapor
-    real(FVPRC)                             :: kappa    ! kappa
-    real(REAL8)                             :: grav     ! Gravity
-    real(REAL8)                             :: hlv      ! latent heat of evaporation
-    real(FVPRC)                             :: zvir     ! RWV/RAIR-1
+   ! Constants used by fvcore
+   real(REAL8)                             :: pi
+   real(REAL8)                             :: omega    ! angular velocity of earth's rotation
+   real(FVPRC)                             :: cp       ! heat capacity of air at constant pressure
+   real(REAL8)                             :: radius   ! radius of the earth (m)
+   real(REAL8)                             :: rgas     ! Gas constant of the air
+   real(REAL8)                             :: rvap     ! Gas constant of vapor
+   real(FVPRC)                             :: kappa    ! kappa
+   real(REAL8)                             :: grav     ! Gravity
+   real(REAL8)                             :: hlv      ! latent heat of evaporation
+   real(FVPRC)                             :: zvir     ! RWV/RAIR-1
 
-  real(kind=4), pointer :: phis(:,:), varflt(:,:)
+   real(kind=4), pointer :: phis(:,:), varflt(:,:)
 
-  logical :: fv_first_run = .true.
+   logical :: fv_first_run = .true.
 
-  integer :: ntracers=11
+   integer :: ntracers=11
 
-  type (ESMF_Alarm)                    :: MASSALARM
-  type (ESMF_TimeInterval)             :: MassAlarmInt
-  logical :: first_mass_fix = .true.
+   type (ESMF_Alarm)                    :: MASSALARM
+   type (ESMF_TimeInterval)             :: MassAlarmInt
+   logical :: first_mass_fix = .true.
 
-!
-! !DESCRIPTION:
-!
-!      This module provides variables which are specific to the Lin-Rood
-!      dynamical core.  Most of them were previously SAVE variables in
-!      different routines and were set with an "if (first)" statement.
-!
-!      \begin{tabular}{|l|l|} \hline \hline
-!        lr\_init    &  Initialize the Lin-Rood variables  \\ \hline
-!        lr\_clean   &  Deallocate all internal data structures \\ \hline
-!                                \hline
-!      \end{tabular}
-!
-! !REVISION HISTORY:
-!   2007.07.17   Putman     Created from lat-lon core
-!
-!EOP
-!-----------------------------------------------------------------------
+   !DESCRIPTION:
+   !      This module provides variables which are specific to the Lin-Rood
+   !      dynamical core.  Most of them were previously SAVE variables in
+   !      different routines and were set with an "if (first)" statement.
+   !
+   !      \begin{tabular}{|l|l|} \hline \hline
+   !        lr\_init    &  Initialize the Lin-Rood variables  \\ \hline
+   !        lr\_clean   &  Deallocate all internal data structures \\ \hline
+   !                                \hline
+   !      \end{tabular}
+
+   !REVISION HISTORY:
+   !   2007.07.17   Putman     Created from lat-lon core
+
+   !EOP
+
    real(REAL8), parameter ::  D0_0                    =   0.0
    real(REAL8), parameter ::  D0_5                    =   0.5
    real(REAL8), parameter ::  D1_0                    =   1.0
@@ -272,126 +258,98 @@ private
 
 contains
 
-!-----------------------------------------------------------------------
-!
-! !INTERFACE:
- subroutine FV_RESET_CONSTANTS(FV_PI, FV_OMEGA, FV_CP, FV_RADIUS, FV_RGAS, &
-                               FV_RVAP, FV_KAPPA, FV_GRAV, FV_HLV, FV_ZVIR)
-   real (REAL8), optional, intent(IN) :: FV_PI
-   real (REAL8), optional, intent(IN) :: FV_OMEGA
-   real (REAL8), optional, intent(IN) :: FV_CP
-   real (REAL8), optional, intent(IN) :: FV_RADIUS
-   real (REAL8), optional, intent(IN) :: FV_RGAS
-   real (REAL8), optional, intent(IN) :: FV_RVAP
-   real (REAL8), optional, intent(IN) :: FV_KAPPA
-   real (REAL8), optional, intent(IN) :: FV_GRAV
-   real (REAL8), optional, intent(IN) :: FV_HLV
-   real (REAL8), optional, intent(IN) :: FV_ZVIR
+   !INTERFACE:
+   subroutine FV_RESET_CONSTANTS( &
+        FV_PI, FV_OMEGA, FV_CP, FV_RADIUS, FV_RGAS, &
+        FV_RVAP, FV_KAPPA, FV_GRAV, FV_HLV, FV_ZVIR)
+      real (REAL8), optional, intent(IN) :: FV_PI
+      real (REAL8), optional, intent(IN) :: FV_OMEGA
+      real (REAL8), optional, intent(IN) :: FV_CP
+      real (REAL8), optional, intent(IN) :: FV_RADIUS
+      real (REAL8), optional, intent(IN) :: FV_RGAS
+      real (REAL8), optional, intent(IN) :: FV_RVAP
+      real (REAL8), optional, intent(IN) :: FV_KAPPA
+      real (REAL8), optional, intent(IN) :: FV_GRAV
+      real (REAL8), optional, intent(IN) :: FV_HLV
+      real (REAL8), optional, intent(IN) :: FV_ZVIR
 
-   if (present(FV_PI)) then
-      pi = FV_PI
-   endif
-   if (present(FV_OMEGA)) then
-      omega = FV_OMEGA
-   endif
-   if (present(FV_CP)) then
-      cp = FV_CP
-   endif
-   if (present(FV_RADIUS)) then
-      radius = FV_RADIUS
-   endif
-   if (present(FV_RGAS)) then
-      rgas = FV_RGAS
-   endif
-   if (present(FV_RVAP)) then
-      rvap = FV_RVAP
-   endif
-   if (present(FV_KAPPA)) then
-      kappa = FV_KAPPA
-   endif
-   if (present(FV_GRAV)) then
-      grav   = FV_GRAV
-   endif
-   if (present(FV_HLV)) then
-      hlv = FV_HLV
-   endif
-   if (present(FV_ZVIR)) then
-      zvir = FV_ZVIR
-   endif
+      if (present(FV_PI)) then
+         pi = FV_PI
+      endif
+      if (present(FV_OMEGA)) then
+         omega = FV_OMEGA
+      endif
+      if (present(FV_CP)) then
+         cp = FV_CP
+      endif
+      if (present(FV_RADIUS)) then
+         radius = FV_RADIUS
+      endif
+      if (present(FV_RGAS)) then
+         rgas = FV_RGAS
+      endif
+      if (present(FV_RVAP)) then
+         rvap = FV_RVAP
+      endif
+      if (present(FV_KAPPA)) then
+         kappa = FV_KAPPA
+      endif
+      if (present(FV_GRAV)) then
+         grav   = FV_GRAV
+      endif
+      if (present(FV_HLV)) then
+         hlv = FV_HLV
+      endif
+      if (present(FV_ZVIR)) then
+         zvir = FV_ZVIR
+      endif
+   end subroutine FV_RESET_CONSTANTS
 
- end subroutine FV_RESET_CONSTANTS
-!
-!-----------------------------------------------------------------------
- subroutine FV_Setup(GC,LAYOUT_FILE, RC)
+   subroutine FV_Setup(gc, layout_file, rc)
+      use test_cases_mod, only : test_case
+      type(ESMF_GridComp), intent(inout) :: gc
+      character(len=*), intent(in) :: layout_file
+      integer, optional, intent(OUT) :: rc
 
-  use test_cases_mod, only : test_case
+      ! Local
+      type(ESMF_VM) :: vm
+      character(len=ESMF_MAXSTR) :: Iam='FV_StateMod::FV_Setup'
+      character(len=:), allocatable :: DYCORE
 
-  type (ESMF_GridComp)         , intent(INOUT) :: GC
-  character(LEN=*)             , intent(IN   ) :: LAYOUT_FILE
-  integer, optional            , intent(OUT  ) :: RC
-! Local
-   character(len=ESMF_MAXSTR)       :: IAm='FV_StateMod:FV_Setup'
-! Local variables
-   character(len=ESMF_MAXSTR)       :: DYCORE
+      real(FVPRC) :: DT
+      real :: temp_real
+      integer :: comm, ndt, nx, ny, status, p_split=1
 
-  type (ESMF_Config)           :: cf
-  type (ESMF_VM)               :: VM
-  integer              :: status
-  real(FVPRC) :: DT
+      call ESMF_VMGetCurrent(vm, _RC)
+      call MAPL_MemUtilsWrite(vm, trim(Iam), _RC)
 
-  integer   :: ndt,nx,ny
+      ! ! Retrieve the pointer to the state
+      ! call MAPL_GetObjectFromGC(gc, MAPL, _RC)
 
-  type (MAPL_MetaComp),          pointer :: MAPL  => NULL()
+      ! call MAPL_TimerOn(MAPL,"--FMS_INIT")
+      call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
+      call fms_init(comm)
+      ! call MAPL_TimerOff(MAPL, "--FMS_INIT")
+      call MAPL_MemUtilsWrite(vm, 'FV_StateMod::fms_init', _RC)
 
-  integer :: comm
-  integer :: p_split=1
+      ! Start up FV
+      ! call MAPL_TimerOn(MAPL,"--FV_INIT")
+      call fv_init1(FV_Atm, DT, grids_on_this_pe, p_split)
+      ! call MAPL_TimerOff(MAPL,"--FV_INIT")
+      call MAPL_MemUtilsWrite(vm, 'FV_StateMod::fv_init1', _RC)
 
-  real :: temp_real
-
-! BEGIN
-
-  call ESMF_VMGetCurrent(VM, rc=STATUS)
-  VERIFY_(STATUS)
-
-    call MAPL_MemUtilsWrite(VM, trim(IAm), RC=STATUS )
-    VERIFY_(STATUS)
-
-! Retrieve the pointer to the state
-! ---------------------------------
-
-  call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-  VERIFY_(STATUS)
-
-    call MAPL_TimerOn(MAPL,"--FMS_INIT")
-    call ESMF_VMGet(VM,mpiCommunicator=comm,rc=status)
-    VERIFY_(STATUS)
-    call fms_init(comm)
-    call MAPL_TimerOff(MAPL,"--FMS_INIT")
-    call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FMS_INIT', RC=STATUS )
-    VERIFY_(STATUS)
-! Start up FV
-    call MAPL_TimerOn(MAPL,"--FV_INIT")
-    call fv_init1(FV_Atm, DT, grids_on_this_pe, p_split)
-    call MAPL_TimerOff(MAPL,"--FV_INIT")
-    call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
-    VERIFY_(STATUS)
-
-! FV grid dimensions setup from MAPL
-      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'AGCM_IM:', default= 32, RC=STATUS )
-      VERIFY_(STATUS)
-      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npy, 'AGCM_JM:', default=192, RC=STATUS )
-      VERIFY_(STATUS)
-      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'AGCM_LM:', default= 72, RC=STATUS )
-      VERIFY_(STATUS)
+      ! FV grid dimensions setup from MAPL
+      call MAPL_GridCompGetResource(gc, "AGCM_IM", FV_Atm(1)%flagstruct%npx, default= 32, _RC)
+      call MAPL_GridCompGetResource(gc, "AGCM_JM", FV_Atm(1)%flagstruct%npy, default=192, _RC)
+      call MAPL_GridCompGetResource(gc, "AGCM_LM", FV_Atm(1)%flagstruct%npz, default= 72, _RC)
       if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
       ! stretch_fac is kind(R_GRID) in FV, so to prevent a MAPL failure on RC check, we pull
       ! AGCM.STRETCH_FACTOR: as a REAL32 and then cast it to REAL64. This is because
       ! FV_Atm(1)%flagstruct%stretch_fac is R_GRID => REAL64, and the MAPL_GetResource call
       ! is getting a REAL32
-      call MAPL_GetResource( MAPL, temp_real, 'AGCM.STRETCH_FACTOR:', default=1.0, RC=STATUS )
-      VERIFY_(STATUS)
+      call MAPL_GridCompGetResource(gc, "AGCM.STRETCH_FACTOR", temp_real, default=1.0, _RC)
       FV_Atm(1)%flagstruct%stretch_fac = temp_real
-! FV likes npx;npy in terms of cell vertices
+      ! FV likes npx;npy in terms of cell vertices
       if (FV_Atm(1)%flagstruct%npy == 6*FV_Atm(1)%flagstruct%npx) then
          FV_Atm(1)%flagstruct%ntiles = 6
          FV_Atm(1)%flagstruct%npy    = FV_Atm(1)%flagstruct%npx+1
@@ -401,386 +359,357 @@ contains
          FV_Atm(1)%flagstruct%npy    = FV_Atm(1)%flagstruct%npy+1
          FV_Atm(1)%flagstruct%npx    = FV_Atm(1)%flagstruct%npx+1
       endif
-! Check for Doubly Periodic Domain Info
-      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%deglat, label='FIXED_LATS:', default=FV_Atm(1)%flagstruct%deglat, rc=status )
-      VERIFY_(STATUS)
-! MPI decomp setup
-      call MAPL_GetResource( MAPL, nx, 'NX:', default=0, RC=STATUS )
-      VERIFY_(STATUS)
+      ! Check for Doubly Periodic Domain Info
+      call MAPL_GridCompGetResource(gc, "FIXED_LATS", FV_Atm(1)%flagstruct%deglat, default=FV_Atm(1)%flagstruct%deglat, _RC)
+      ! MPI decomp setup
+      call MAPL_GridCompGetResource(gc, "NX", nx, default=0, _RC)
       FV_Atm(1)%layout(1) = nx
-      call MAPL_GetResource( MAPL, ny, 'NY:', default=0, RC=STATUS )
-      VERIFY_(STATUS)
+      call MAPL_GridCompGetResource(gc, "NY", ny, default=0, _RC)
       if (FV_Atm(1)%flagstruct%grid_type == 4) then
          FV_Atm(1)%layout(2) = ny
       else
          FV_Atm(1)%layout(2) = ny / 6
       end if
 
-! Get other scalars
-! -----------------
+      ! Get other scalars
+      call MAPL_GridCompGetResource(gc, "RUN_DT", ndt, default=0, _RC)
+      DT = ndt
+      call MAPL_GridCompGetResource(gc, "DYCORE", DYCORE, default="", _RC)
 
-  call MAPL_GetResource( MAPL, ndt, 'RUN_DT:', default=0, RC=STATUS )
-  VERIFY_(STATUS)
-  DT = ndt
+      if(adjustl(DYCORE)=="FV3") then
+         AdvCore_Advection = 0
+      endif
+      if(adjustl(DYCORE)=="FV3+ADV") then
+         AdvCore_Advection = 1
+      endif
 
-  call MAPL_GetResource(MAPL, DYCORE, 'DYCORE:', default="", RC=STATUS )
-  VERIFY_(STATUS)
+      ! Advect tracers within DynCore(AdvCore_Advection=.false.)
+      !             or within AdvCore(AdvCore_Advection=.true.)
+      call MAPL_GridCompGetResource(gc, "AdvCore_Advection", AdvCore_Advection, default=AdvCore_Advection, _RC)
 
-  if(adjustl(DYCORE)=="FV3") then
-       AdvCore_Advection = 0
-  endif
-  if(adjustl(DYCORE)=="FV3+ADV") then
-       AdvCore_Advection = 1
-  endif
+      call MAPL_GridCompGetResource(gc, "FV3_QSPLIT", FV3_QSPLIT, default=FV3_QSPLIT, _RC)
+      call MAPL_GridCompGetResource(gc, "ADJUST_DT", ADJUST_DT, default=ADJUST_DT, _RC)
+      call MAPL_GridCompGetResource(gc, "fix_mass", INT_fix_mass, default=INT_fix_mass, _RC)
+      call MAPL_GridCompGetResource(gc, "check_mass", INT_check_mass, default=INT_check_mass, _RC)
+      call MAPL_GridCompGetResource(gc, "ADIABATIC", INT_ADIABATIC, default=INT_adiabatic, _RC)
+      call MAPL_GridCompGetResource(gc, "FV_OFF", INT_FV_OFF, default=INT_FV_OFF, _RC)
 
-! Advect tracers within DynCore(AdvCore_Advection=.false.)
-!             or within AdvCore(AdvCore_Advection=.true.)
-  call MAPL_GetResource( MAPL, AdvCore_Advection, label='AdvCore_Advection:', default=AdvCore_Advection, rc=status )
-  VERIFY_(STATUS)
-
-  call MAPL_GetResource( MAPL, FV3_QSPLIT, label='FV3_QSPLIT:', default=FV3_QSPLIT, rc=status )
-  VERIFY_(STATUS)
-  call MAPL_GetResource( MAPL, ADJUST_DT,       label='ADJUST_DT:'   , default=ADJUST_DT, rc=status )
-  VERIFY_(STATUS)
-  call MAPL_GetResource( MAPL, INT_fix_mass,    label='fix_mass:'    , default=INT_fix_mass, rc=status )
-  VERIFY_(STATUS)
-  call MAPL_GetResource( MAPL, INT_check_mass,  label='check_mass:'  , default=INT_check_mass, rc=status )
-  VERIFY_(STATUS)
-  call MAPL_GetResource( MAPL, INT_ADIABATIC,   label='ADIABATIC:'   , default=INT_adiabatic, rc=status )
-  VERIFY_(STATUS)
-  call MAPL_GetResource( MAPL, INT_FV_OFF,      label='FV_OFF:'      , default=INT_FV_OFF, rc=status )
-  VERIFY_(STATUS)
-
-  ! MAT The Fortran Standard, and thus gfortran, *does not allow* the use
-  !     of if (integer). So, we must convert integer resources to logicals
-
-  if (INT_fix_mass == 0) then
-     fix_mass = .FALSE.
-  else
-     fix_mass = .TRUE.
-  end if
-
-  if (INT_check_mass == 0) then
-     check_mass = .FALSE.
-  else
-     check_mass = .TRUE.
-  end if
-
-  if (INT_ADIABATIC == 0) then
-     ADIABATIC = .FALSE.
-  else
-     ADIABATIC = .TRUE.
-  end if
-
-  if (INT_FV_OFF == 0) then
-     FV_OFF = .FALSE.
-  else
-     FV_OFF = .TRUE.
-  end if
-
-! Constants
-!
-    pi     = MAPL_PI_R8
-    omega  = MAPL_OMEGA    ! angular velocity of earth's rotation
-    cp     = MAPL_CP       ! heat capacity of air at constant pressure
-    radius = MAPL_RADIUS   ! radius of the earth (m)
-    rgas   = MAPL_RGAS     ! Gas constant of the air
-    rvap   = MAPL_RVAP     ! Gas constant of vapor
-    kappa  = MAPL_KAPPA    ! kappa
-    grav   = MAPL_GRAV     ! Gravity
-    hlv    = MAPL_ALHL     ! latent heat of evaporation
-    zvir   = MAPL_RVAP/MAPL_RGAS - 1.   ! RWV/RAIR-1
-
-   ! option to enable different configurations for FV3
-    call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='STOCK', rc=status )
-    VERIFY_(STATUS)
-
-!
-! Create some resolution dependent defaults for FV3 in GEOS...
-!    These can be overrided in fv_core_nml in fvcore_layout.rc linked to input.nml
-!-------------------------------------------------------------
-  ! Number of water species for FV3 determined later
-  ! when reading the tracer bundle in fv_first_run
-   FV_Atm(1)%flagstruct%nwat = 0
-  ! Trigger to enable autoconversion/cloud processes on the fv_mapz step
-   FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
-  ! Veritical resolution dependencies
-   FV_Atm(1)%flagstruct%external_eta = .true.
-   if (FV_Atm(1)%flagstruct%npz >= 70) then
-     FV_Atm(1)%flagstruct%n_zfilter = 17 ! ~5mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 72) then
-     FV_Atm(1)%flagstruct%n_zfilter = 21 ! ~5mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 90) then
-     FV_Atm(1)%flagstruct%n_zfilter = 17 ! ~5mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 126) then
-     FV_Atm(1)%flagstruct%n_zfilter = 19 ! ~5mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 132) then
-     FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~5mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 136) then
-     FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~5mb
-   endif
-   if (FV_Atm(1)%flagstruct%npz >= 180) then
-     FV_Atm(1)%flagstruct%n_zfilter = 32 ! ~5mb
-   endif
-  ! Vertical remap options
-   FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
-   FV_Atm(1)%flagstruct%gmao_remap = 0   ! (0 for GFDL Schemes) (3 for GMAO Cubic)
-   FV_Atm(1)%flagstruct%gmao_top_bc = .true.
-   FV_Atm(1)%flagstruct%gmao_bot_bc = .true.
-   FV_Atm(1)%flagstruct%kord_tm =  9
-   FV_Atm(1)%flagstruct%kord_mt =  9
-   FV_Atm(1)%flagstruct%kord_wz =  9
-   FV_Atm(1)%flagstruct%kord_tr =  9
-  ! Some default horizontal flags
-   FV_Atm(1)%flagstruct%z_tracer = .true.
-   FV_Atm(1)%flagstruct%adjust_dry_mass = fix_mass
-   FV_Atm(1)%flagstruct%consv_am = .false.
-   FV_Atm(1)%flagstruct%fill = .true.
-   FV_Atm(1)%flagstruct%dwind_2d = .false.
-   FV_Atm(1)%flagstruct%delt_max = 0.002
-   FV_Atm(1)%flagstruct%ke_bg = 0.0
-  ! Some default time-splitting options
-   FV_Atm(1)%flagstruct%k_split = 1
-   FV_Atm(1)%flagstruct%n_split = 0
-  ! Cubed-Sphere Global Resolution Specific adjustments
-   FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
-   FV_Atm(1)%flagstruct%hydrostatic = .true.
-   ! Rayleigh Damping
-   FV_Atm(1)%flagstruct%rf_cutoff = 0.50e2
-   FV_Atm(1)%flagstruct%tau = 5.0
-   FV_Atm(1)%flagstruct%RF_fast = .false.
-   if (FV_Atm(1)%flagstruct%ntiles == 6) then
-     ! Cubed-sphere grid resolution and DT dependence
-     !              based on ideal remapping DT
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 12) then
-         FV_Atm(1)%flagstruct%hydrostatic = .true.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
-         FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%RF_fast = .false.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 24) then
-         FV_Atm(1)%flagstruct%hydrostatic = .true.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
-         FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%RF_fast = .false.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
-         FV_Atm(1)%flagstruct%hydrostatic = .true.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0  )
-         FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%RF_fast = .false.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
-         FV_Atm(1)%flagstruct%hydrostatic = .true.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
-         FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%RF_fast = .false.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
-         FV_Atm(1)%flagstruct%hydrostatic = .true.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
-         FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%RF_fast = .false.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
-         FV_Atm(1)%flagstruct%hydrostatic = .false.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
-         FV_Atm(1)%flagstruct%tau = 4.0
-         FV_Atm(1)%flagstruct%RF_fast = .false.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 120.0 )
-          FV_Atm(1)%flagstruct%tau = 3.0
-          FV_Atm(1)%flagstruct%RF_fast = .false.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1120) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  90.0 )
-          FV_Atm(1)%flagstruct%tau = 2.5
-          FV_Atm(1)%flagstruct%RF_fast = .false.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
-          FV_Atm(1)%flagstruct%tau = 2.0
-          FV_Atm(1)%flagstruct%RF_fast = .true.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0  )
-          FV_Atm(1)%flagstruct%tau = 1.5
-          FV_Atm(1)%flagstruct%RF_fast = .true.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
-          FV_Atm(1)%flagstruct%tau = 1.0
-          FV_Atm(1)%flagstruct%RF_fast = .true.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.5   )
-          FV_Atm(1)%flagstruct%tau = 1.0
-          FV_Atm(1)%flagstruct%RF_fast = .true.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 10800) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  4.6875 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  3.25   )
-          FV_Atm(1)%flagstruct%tau = 1.0
-          FV_Atm(1)%flagstruct%RF_fast = .true.
-      endif
-      FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
-     ! Divergence Damping
-     ! 6th order divergence default damping options
-      FV_Atm(1)%flagstruct%nord = 2
-      FV_Atm(1)%flagstruct%dddmp = 0.2  ! Smagorinsky damping coef
-      FV_Atm(1)%flagstruct%d4_bg_top = 0.12 ! High-order Divg Damping coef
-      FV_Atm(1)%flagstruct%d4_bg_bot = 0.12 ! High-order Divg Damping coef
-      FV_Atm(1)%flagstruct%d2_bg = 0.0  ! 2nd order Divg Damping coef
-      FV_Atm(1)%flagstruct%d_ext = 0.0  ! External damping
-     ! Local Richardson-number turbulent mixing 
-      FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
-     ! Sponge layer
-      FV_Atm(1)%flagstruct%n_sponge = 9
-      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.2
-      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.1
-      FV_Atm(1)%flagstruct%consv_te = 1.0
-     ! default NonHydrostatic settings (irrelavent to Hydrostatic)
-     ! a_imp > 0.5 for semi-implicit scheme [1 fully backward]
-     ! if (a_imp > 0.5) beta + a_imp must = 1.0
-      FV_Atm(1)%flagstruct%beta = 0.0
-      FV_Atm(1)%flagstruct%a_imp = 1.0
-     ! dz_min is a NH delta-z limiter increasing may improve stability
-      FV_Atm(1)%flagstruct%dz_min = 2.0
-     ! p_fac is a NH pressure fraction limiter near model top (0:0.25) 
-      FV_Atm(1)%flagstruct%p_fac = 0.05
-     ! General defaults
-      FV_Atm(1)%flagstruct%make_nh = .false.
-     ! This is the best/fastest option for tracers
-      FV_Atm(1)%flagstruct%hord_tr =  8
-      if (index(FV3_CONFIG,"MONOTONIC") > 0) then
-        ! Monotonic advection schemes
-         FV_Atm(1)%flagstruct%hord_mt =  10
-         FV_Atm(1)%flagstruct%hord_vt =  10
-         FV_Atm(1)%flagstruct%hord_tm =  10
-         FV_Atm(1)%flagstruct%hord_dp =  10
-        ! disable hyperdiffusion (vorticity damping)
-         FV_Atm(1)%flagstruct%vtdm4 = 0.0
-         FV_Atm(1)%flagstruct%do_vort_damp = .false.
-         FV_Atm(1)%flagstruct%d_con = 0.
+      ! MAT The Fortran Standard, and thus gfortran, *does not allow* the use
+      !     of if (integer). So, we must convert integer resources to logicals
+      if (INT_fix_mass == 0) then
+         fix_mass = .FALSE.
       else
-       ! Non-Monotonic advection schemes
-         FV_Atm(1)%flagstruct%hord_mt =  5
-         FV_Atm(1)%flagstruct%hord_vt =  6
-         FV_Atm(1)%flagstruct%hord_tm =  6
-         FV_Atm(1)%flagstruct%hord_dp = -6
-       ! Must now include hyperdiffusion (vorticity damping)
-         FV_Atm(1)%flagstruct%d_con = 1.
-         FV_Atm(1)%flagstruct%do_vort_damp = .true.
-         FV_Atm(1)%flagstruct%vtdm4 = 0.01
-       ! continue to adjust vorticity damping with
-       ! increasing resolution
-         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.01
+         fix_mass = .TRUE.
+      end if
+      if (INT_check_mass == 0) then
+         check_mass = .FALSE.
+      else
+         check_mass = .TRUE.
+      end if
+      if (INT_ADIABATIC == 0) then
+         ADIABATIC = .FALSE.
+      else
+         ADIABATIC = .TRUE.
+      end if
+      if (INT_FV_OFF == 0) then
+         FV_OFF = .FALSE.
+      else
+         FV_OFF = .TRUE.
+      end if
+
+      ! Constants
+      pi     = MAPL_PI_R8
+      omega  = MAPL_OMEGA    ! angular velocity of earth's rotation
+      cp     = MAPL_CP       ! heat capacity of air at constant pressure
+      radius = MAPL_RADIUS   ! radius of the earth (m)
+      rgas   = MAPL_RGAS     ! Gas constant of the air
+      rvap   = MAPL_RVAP     ! Gas constant of vapor
+      kappa  = MAPL_KAPPA    ! kappa
+      grav   = MAPL_GRAV     ! Gravity
+      hlv    = MAPL_ALHL     ! latent heat of evaporation
+      zvir   = MAPL_RVAP/MAPL_RGAS - 1.   ! RWV/RAIR-1
+
+      ! option to enable different configurations for FV3
+      call MAPL_GridCompGetResource(gc, "FV3_CONFIG", FV3_CONFIG, default='STOCK', _RC)
+
+      ! Create some resolution dependent defaults for FV3 in GEOS...
+      !    These can be overrided in fv_core_nml in fvcore_layout.rc linked to input.nml
+      ! Number of water species for FV3 determined later
+      ! when reading the tracer bundle in fv_first_run
+      FV_Atm(1)%flagstruct%nwat = 0
+      ! Trigger to enable autoconversion/cloud processes on the fv_mapz step
+      FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
+      ! Veritical resolution dependencies
+      FV_Atm(1)%flagstruct%external_eta = .true.
+      if (FV_Atm(1)%flagstruct%npz >= 70) then
+         FV_Atm(1)%flagstruct%n_zfilter = 17 ! ~5mb
+      endif
+      if (FV_Atm(1)%flagstruct%npz >= 72) then
+         FV_Atm(1)%flagstruct%n_zfilter = 21 ! ~5mb
+      endif
+      if (FV_Atm(1)%flagstruct%npz >= 90) then
+         FV_Atm(1)%flagstruct%n_zfilter = 17 ! ~5mb
+      endif
+      if (FV_Atm(1)%flagstruct%npz >= 126) then
+         FV_Atm(1)%flagstruct%n_zfilter = 19 ! ~5mb
+      endif
+      if (FV_Atm(1)%flagstruct%npz >= 132) then
+         FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~5mb
+      endif
+      if (FV_Atm(1)%flagstruct%npz >= 136) then
+         FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~5mb
+      endif
+      if (FV_Atm(1)%flagstruct%npz >= 180) then
+         FV_Atm(1)%flagstruct%n_zfilter = 32 ! ~5mb
+      endif
+      ! Vertical remap options
+      FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
+      FV_Atm(1)%flagstruct%gmao_remap = 0   ! (0 for GFDL Schemes) (3 for GMAO Cubic)
+      FV_Atm(1)%flagstruct%gmao_top_bc = .true.
+      FV_Atm(1)%flagstruct%gmao_bot_bc = .true.
+      FV_Atm(1)%flagstruct%kord_tm =  9
+      FV_Atm(1)%flagstruct%kord_mt =  9
+      FV_Atm(1)%flagstruct%kord_wz =  9
+      FV_Atm(1)%flagstruct%kord_tr =  9
+      ! Some default horizontal flags
+      FV_Atm(1)%flagstruct%z_tracer = .true.
+      FV_Atm(1)%flagstruct%adjust_dry_mass = fix_mass
+      FV_Atm(1)%flagstruct%consv_am = .false.
+      FV_Atm(1)%flagstruct%fill = .true.
+      FV_Atm(1)%flagstruct%dwind_2d = .false.
+      FV_Atm(1)%flagstruct%delt_max = 0.002
+      FV_Atm(1)%flagstruct%ke_bg = 0.0
+      ! Some default time-splitting options
+      FV_Atm(1)%flagstruct%k_split = 1
+      FV_Atm(1)%flagstruct%n_split = 0
+      ! Cubed-Sphere Global Resolution Specific adjustments
+      FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
+      FV_Atm(1)%flagstruct%hydrostatic = .true.
+      ! Rayleigh Damping
+      FV_Atm(1)%flagstruct%rf_cutoff = 0.50e2
+      FV_Atm(1)%flagstruct%tau = 5.0
+      FV_Atm(1)%flagstruct%RF_fast = .false.
+      if (FV_Atm(1)%flagstruct%ntiles == 6) then
+         ! Cubed-sphere grid resolution and DT dependence
+         !              based on ideal remapping DT
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 12) then
+            FV_Atm(1)%flagstruct%hydrostatic = .true.
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/3600.0  )
+            FV_Atm(1)%flagstruct%tau = 5.0
+            FV_Atm(1)%flagstruct%RF_fast = .false.
          endif
-         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.01
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 24) then
+            FV_Atm(1)%flagstruct%hydrostatic = .true.
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/1800.0  )
+            FV_Atm(1)%flagstruct%tau = 5.0
+            FV_Atm(1)%flagstruct%RF_fast = .false.
          endif
-         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.01
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
+            FV_Atm(1)%flagstruct%hydrostatic = .true.
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/1200.0  )
+            FV_Atm(1)%flagstruct%tau = 5.0
+            FV_Atm(1)%flagstruct%RF_fast = .false.
          endif
-         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.02
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
+            FV_Atm(1)%flagstruct%hydrostatic = .true.
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/ 600.0   )
+            FV_Atm(1)%flagstruct%tau = 5.0
+            FV_Atm(1)%flagstruct%RF_fast = .false.
          endif
-         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.03
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
+            FV_Atm(1)%flagstruct%hydrostatic = .true.
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/ 300.0   )
+            FV_Atm(1)%flagstruct%tau = 5.0
+            FV_Atm(1)%flagstruct%RF_fast = .false.
          endif
-         if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.04
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
+            FV_Atm(1)%flagstruct%hydrostatic = .false.
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/ 150.0   )
+            FV_Atm(1)%flagstruct%tau = 4.0
+            FV_Atm(1)%flagstruct%RF_fast = .false.
+         endif
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
+            FV_Atm(1)%flagstruct%hydrostatic = .false.
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/  75.0 )
+            if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = ceiling(DT/ 120.0 )
+            FV_Atm(1)%flagstruct%tau = 3.0
+            FV_Atm(1)%flagstruct%RF_fast = .false.
+         endif
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 1120) then
+            FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/  60.0 )
+            if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = ceiling(DT/  90.0 )
+            FV_Atm(1)%flagstruct%tau = 2.5
+            FV_Atm(1)%flagstruct%RF_fast = .false.
+         endif
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
+            FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/  37.5 )
+            if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = ceiling(DT/  60.0 )
+            FV_Atm(1)%flagstruct%tau = 2.0
+            FV_Atm(1)%flagstruct%RF_fast = .true.
+         endif
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
+            FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/  18.75 )
+            if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = ceiling(DT/  30.0  )
+            FV_Atm(1)%flagstruct%tau = 1.5
+            FV_Atm(1)%flagstruct%RF_fast = .true.
+         endif
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
+            FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/  15.0  )
+            if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = ceiling(DT/  15.0  )
+            FV_Atm(1)%flagstruct%tau = 1.0
+            FV_Atm(1)%flagstruct%RF_fast = .true.
+         endif
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
+            FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/   9.375 )
+            if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = ceiling(DT/   7.5   )
+            FV_Atm(1)%flagstruct%tau = 1.0
+            FV_Atm(1)%flagstruct%RF_fast = .true.
+         endif
+         if (FV_Atm(1)%flagstruct%npx*ceiling(FV_Atm(1)%flagstruct%stretch_fac) >= 10800) then
+            FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+            FV_Atm(1)%flagstruct%k_split = ceiling(DT/  4.6875 )
+            if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = ceiling(DT/  3.25   )
+            FV_Atm(1)%flagstruct%tau = 1.0
+            FV_Atm(1)%flagstruct%RF_fast = .true.
+         endif
+         FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
+         ! Divergence Damping
+         ! 6th order divergence default damping options
+         FV_Atm(1)%flagstruct%nord = 2
+         FV_Atm(1)%flagstruct%dddmp = 0.2  ! Smagorinsky damping coef
+         FV_Atm(1)%flagstruct%d4_bg_top = 0.12 ! High-order Divg Damping coef
+         FV_Atm(1)%flagstruct%d4_bg_bot = 0.12 ! High-order Divg Damping coef
+         FV_Atm(1)%flagstruct%d2_bg = 0.0  ! 2nd order Divg Damping coef
+         FV_Atm(1)%flagstruct%d_ext = 0.0  ! External damping
+         ! Local Richardson-number turbulent mixing 
+         FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
+         ! Sponge layer
+         FV_Atm(1)%flagstruct%n_sponge = 9
+         FV_Atm(1)%flagstruct%d2_bg_k1 = 0.2
+         FV_Atm(1)%flagstruct%d2_bg_k2 = 0.1
+         FV_Atm(1)%flagstruct%consv_te = 1.0
+         ! default NonHydrostatic settings (irrelavent to Hydrostatic)
+         ! a_imp > 0.5 for semi-implicit scheme [1 fully backward]
+         ! if (a_imp > 0.5) beta + a_imp must = 1.0
+         FV_Atm(1)%flagstruct%beta = 0.0
+         FV_Atm(1)%flagstruct%a_imp = 1.0
+         ! dz_min is a NH delta-z limiter increasing may improve stability
+         FV_Atm(1)%flagstruct%dz_min = 2.0
+         ! p_fac is a NH pressure fraction limiter near model top (0:0.25) 
+         FV_Atm(1)%flagstruct%p_fac = 0.05
+         ! General defaults
+         FV_Atm(1)%flagstruct%make_nh = .false.
+         ! This is the best/fastest option for tracers
+         FV_Atm(1)%flagstruct%hord_tr =  8
+         if (index(FV3_CONFIG,"MONOTONIC") > 0) then
+            ! Monotonic advection schemes
+            FV_Atm(1)%flagstruct%hord_mt =  10
+            FV_Atm(1)%flagstruct%hord_vt =  10
+            FV_Atm(1)%flagstruct%hord_tm =  10
+            FV_Atm(1)%flagstruct%hord_dp =  10
+            ! disable hyperdiffusion (vorticity damping)
+            FV_Atm(1)%flagstruct%vtdm4 = 0.0
+            FV_Atm(1)%flagstruct%do_vort_damp = .false.
+            FV_Atm(1)%flagstruct%d_con = 0.
+         else
+            ! Non-Monotonic advection schemes
+            FV_Atm(1)%flagstruct%hord_mt =  5
+            FV_Atm(1)%flagstruct%hord_vt =  6
+            FV_Atm(1)%flagstruct%hord_tm =  6
+            FV_Atm(1)%flagstruct%hord_dp = -6
+            ! Must now include hyperdiffusion (vorticity damping)
+            FV_Atm(1)%flagstruct%d_con = 1.
+            FV_Atm(1)%flagstruct%do_vort_damp = .true.
+            FV_Atm(1)%flagstruct%vtdm4 = 0.01
+            ! continue to adjust vorticity damping with
+            ! increasing resolution
+            if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
+               FV_Atm(1)%flagstruct%vtdm4 = 0.01
+            endif
+            if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
+               FV_Atm(1)%flagstruct%vtdm4 = 0.01
+            endif
+            if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
+               FV_Atm(1)%flagstruct%vtdm4 = 0.01
+            endif
+            if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
+               FV_Atm(1)%flagstruct%vtdm4 = 0.02
+            endif
+            if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
+               FV_Atm(1)%flagstruct%vtdm4 = 0.03
+            endif
+            if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
+               FV_Atm(1)%flagstruct%vtdm4 = 0.04
+            endif
+         endif
+         if (index(FV3_CONFIG,"MERRA-2") > 0) then
+            ! Override FV3 defaults with MERRA-2 hydrostatic configuration
+            FV_Atm(1)%flagstruct%hydrostatic = .true.
+            ! disable subgrid dz adjustment
+            FV_Atm(1)%flagstruct%fv_sg_adj = -1
+            ! Monotonic advection schemes
+            FV_Atm(1)%flagstruct%hord_mt =  10
+            FV_Atm(1)%flagstruct%hord_vt =  10
+            FV_Atm(1)%flagstruct%hord_tm =  10
+            FV_Atm(1)%flagstruct%hord_dp =  10
+            ! 2nd order damping
+            FV_Atm(1)%flagstruct%nord = 0
+            FV_Atm(1)%flagstruct%dddmp = 0.2
+            FV_Atm(1)%flagstruct%d4_bg_top = 0.0
+            FV_Atm(1)%flagstruct%d4_bg_bot = 0.0
+            FV_Atm(1)%flagstruct%d2_bg = 0.0075
+            FV_Atm(1)%flagstruct%d_ext = 0.02
+            ! disable vorticity damping
+            FV_Atm(1)%flagstruct%vtdm4 = 0.0
+            FV_Atm(1)%flagstruct%do_vort_damp = .false.
+            FV_Atm(1)%flagstruct%d_con = 0.
+            ! Use GMAO cubic remapping for TE
+            FV_Atm(1)%flagstruct%remap_option = 2 ! Remap TE in LogP
+            FV_Atm(1)%flagstruct%gmao_remap = 3   ! GMAO Cubic
+            ! do TE conservation just in the GMAO cubic remap
+            FV_Atm(1)%flagstruct%consv_te = 0.0
          endif
       endif
-      if (index(FV3_CONFIG,"MERRA-2") > 0) then
-       ! Override FV3 defaults with MERRA-2 hydrostatic configuration
-        FV_Atm(1)%flagstruct%hydrostatic = .true.
-       ! disable subgrid dz adjustment
-        FV_Atm(1)%flagstruct%fv_sg_adj = -1
-       ! Monotonic advection schemes
-        FV_Atm(1)%flagstruct%hord_mt =  10
-        FV_Atm(1)%flagstruct%hord_vt =  10
-        FV_Atm(1)%flagstruct%hord_tm =  10
-        FV_Atm(1)%flagstruct%hord_dp =  10
-       ! 2nd order damping
-        FV_Atm(1)%flagstruct%nord = 0
-        FV_Atm(1)%flagstruct%dddmp = 0.2
-        FV_Atm(1)%flagstruct%d4_bg_top = 0.0
-        FV_Atm(1)%flagstruct%d4_bg_bot = 0.0
-        FV_Atm(1)%flagstruct%d2_bg = 0.0075
-        FV_Atm(1)%flagstruct%d_ext = 0.02
-       ! disable vorticity damping
-        FV_Atm(1)%flagstruct%vtdm4 = 0.0
-        FV_Atm(1)%flagstruct%do_vort_damp = .false.
-        FV_Atm(1)%flagstruct%d_con = 0.
-       ! Use GMAO cubic remapping for TE
-        FV_Atm(1)%flagstruct%remap_option = 2 ! Remap TE in LogP
-        FV_Atm(1)%flagstruct%gmao_remap = 3   ! GMAO Cubic
-       ! do TE conservation just in the GMAO cubic remap
-        FV_Atm(1)%flagstruct%consv_te = 0.0
+
+      ! Start up FV
+      ! call MAPL_TimerOn(MAPL,"--FV_INIT")
+      call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
+      ! call MAPL_TimerOff(MAPL,"--FV_INIT")
+      call MAPL_MemUtilsWrite(VM, 'FV_StateMod::fv_init2', _RC)
+
+      ! Force compatibility of gmao_remap and n_zfilter
+      if (FV_Atm(1)%flagstruct%gmao_remap > 0) then
+         FV_Atm(1)%flagstruct%n_zfilter = 0
       endif
-   endif
 
-!! Start up FV
-    call MAPL_TimerOn(MAPL,"--FV_INIT")
-    call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
-    call MAPL_TimerOff(MAPL,"--FV_INIT")
-    call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
-    VERIFY_(STATUS)
+      _ASSERT(DT > 0.0, 'DT must be greater than zero')
 
-!! Force compatibility of gmao_remap and n_zfilter
-    if (FV_Atm(1)%flagstruct%gmao_remap > 0) then
-        FV_Atm(1)%flagstruct%n_zfilter = 0
-    endif
+      call WRITE_PARALLEL("Dynamics PE Layout ")
+      call WRITE_PARALLEL(FV_Atm(1)%layout(1)    ,format='("NPES_X  : ",(   I3))')
+      call WRITE_PARALLEL(FV_Atm(1)%layout(2)    ,format='("NPES_Y  : ",(   I3))')
 
-  _ASSERT(DT > 0.0, 'DT must be greater than zero')
+      call WRITE_PARALLEL((/FV_Atm(1)%flagstruct%npx,FV_Atm(1)%flagstruct%npy,FV_Atm(1)%flagstruct%npz/)       , &
+           format='("Resolution of dynamics restart     =",3I5)'  )
+      call WRITE_PARALLEL((/FV_Atm(1)%flagstruct%stretch_fac/)       , &
+           format='("                 stretch_fac       =",F10.4)'  )
 
-  call WRITE_PARALLEL("Dynamics PE Layout ")
-  call WRITE_PARALLEL(FV_Atm(1)%layout(1)    ,format='("NPES_X  : ",(   I3))')
-  call WRITE_PARALLEL(FV_Atm(1)%layout(2)    ,format='("NPES_Y  : ",(   I3))')
+      FV_HYDROSTATIC = FV_Atm(1)%flagstruct%hydrostatic
+      DEBUG = FV_Atm(1)%flagstruct%fv_debug
+      call MAPL_GridCompGetResource(gc, "DEBUG_STATE", DEBUG, default=DEBUG, _RC)
 
-  call WRITE_PARALLEL((/FV_Atm(1)%flagstruct%npx,FV_Atm(1)%flagstruct%npy,FV_Atm(1)%flagstruct%npz/)       , &
-    format='("Resolution of dynamics restart     =",3I5)'  )
-  call WRITE_PARALLEL((/FV_Atm(1)%flagstruct%stretch_fac/)       , &
-    format='("                 stretch_fac       =",F10.4)'  )
-
-  FV_HYDROSTATIC = FV_Atm(1)%flagstruct%hydrostatic
-  DEBUG          = FV_Atm(1)%flagstruct%fv_debug
-  call MAPL_GetResource(MAPL, DEBUG, 'DEBUG_STATE:', default=DEBUG, RC=STATUS)
-
-  call MAPL_MemUtilsWrite(VM, trim(Iam), RC=STATUS )
-  VERIFY_(STATUS)
+      call MAPL_MemUtilsWrite(vm, trim(Iam), _RC)
 
 #ifdef RUN_GTFV3
-  call MAPL_GetResource(MAPL, run_gtfv3, 'RUN_GTFV3:', default=0, RC=STATUS)
-  VERIFY_(STATUS)
+      call MAPL_GridCompGetResource(gc, "RUN_GTFV3", run_gtfv3, default=0, _RC)
 #endif
 
-  RETURN_(ESMF_SUCCESS)
-
-contains
-
- end subroutine FV_Setup
+      _RETURN(_SUCCESS)
+   end subroutine FV_Setup
 
  subroutine FV_InitState (STATE, CLOCK, INTERNAL, IMPORT, GC, RC)
 

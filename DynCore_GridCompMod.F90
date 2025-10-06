@@ -22,14 +22,14 @@ module FVdycoreCubed_GridComp
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
    use MAPL_Constants, only: MAPL_VectorField, MAPL_BundleItem
    use MAPL_Constants, only: MAPL_RestartSkip, MAPL_RestartRequired, MAPL_InitialRestart
-   use MAPL_Constants, only: MAPL_VLocationCenter, MAPL_VLocationEdge, MAPL_VLocationNone
+   ! use MAPL_Constants, only: MAPL_VLocationCenter, MAPL_VLocationEdge, MAPL_VLocationNone
    use MAPL_Constants, only: MAPL_DimsHorzVert, MAPL_DimsHorzOnly, MAPL_DimsVertOnly
 
    use MAPL_GenericMod, only: MAPL_MetaComp, MAPL_TimerAdd, MAPL_TimerOn
    use MAPL_GenericMod, only: MAPL_TimerAdd, MAPL_TimerOn, MAPL_TimerOff
    use MAPL_GenericMod, only: MAPL_GenericFinalize
    use MAPL_GenericMod, only: MAPL_GetObjectFromGC, MAPL_GetResource, MAPL_GridCreate, MAPL_Get
-   use MAPL_GenericMod, only: MAPL_AddImportSpec, MAPL_AddExportSpec, MAPL_AddInternalSpec
+   ! use MAPL_GenericMod, only: MAPL_AddImportSpec, MAPL_AddExportSpec, MAPL_AddInternalSpec
    use MAPL_AbstractRegridderMod, only: AbstractRegridder
    use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
    use MAPL_BaseMod, only: MAPL_AttributeSet, MAPL_FieldBundleAdd
@@ -47,6 +47,8 @@ module FVdycoreCubed_GridComp
 
    use mapl3g_generic, only: MAPL_GridCompGet, MAPL_GridCompGetResource
    use mapl3g_generic, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
+   use mapl3g_generic, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_FIELDBUNDLE
+   use mapl3g_VerticalStaggerLoc, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
    use pflogger, only: logger_t => logger
 
    use m_set_eta, only: set_eta
@@ -361,30 +363,34 @@ contains
 #include "DynCore_Export___.h"
 #include "DynCore_Internal___.h"
 
-      call MAPL_AddImportSpec(gc, &
-           SHORT_NAME='TRADV', &
-           LONG_NAME='advected_quantities', &
-           UNITS='unknown', &
-           DATATYPE=MAPL_BundleItem, _RC)
+      call MAPL_GridCompAddSpec(gc, &
+           state_intent=ESMF_STATEINTENT_IMPORT, &
+           short_name='TRADV', &
+           standard_name='advected_quantities', &
+           ! pchakrab: TODO - we shouldn't need dims and vstagger for a bundle
+           dims="xyz", &
+           vstagger=VERTICAL_STAGGER_NONE, &
+           units='unknown', &
+           itemtype=MAPL_STATEITEM_FIELDBUNDLE, _RC)
 
 #ifdef SKIP_TRACERS
       do itracer = 1, ntracers
          do ilev = 1, size(plevs)
             write(myTracer, "('Q',i5.5,'_',i3.3)") itracer-1, plevs(ilev)
             call MAPL_AddExportSpec(gc, &
-                 SHORT_NAME=TRIM(myTracer), &
-                 LONG_NAME =TRIM(myTracer), &
-                 UNITS='1', &
-                 DIMS=MAPL_DimsHorzOnly, &
-                 VLOCATION=MAPL_VLocationNone, _RC)
+                 short_name=TRIM(myTracer), &
+                 long_name =TRIM(myTracer), &
+                 units='1', &
+                 dims=MAPL_DimsHorzOnly, &
+                 vlocation=MAPL_VLocationNone, _RC)
          enddo
          write(myTracer, "('Q',i5.5)") itracer-1
          call MAPL_AddExportSpec(gc, &
-              SHORT_NAME=TRIM(myTracer), &
-              LONG_NAME=TRIM(myTracer), &
-              UNITS='1', &
-              DIMS=MAPL_DimsHorzVert, &
-              VLOCATION=MAPL_VLocationCenter, _RC)
+              short_name=TRIM(myTracer), &
+              long_name=TRIM(myTracer), &
+              units='1', &
+              dims=MAPL_DimsHorzVert, &
+              vlocation=MAPL_VLocationCenter, _RC)
       enddo
 #endif
 
@@ -426,11 +432,14 @@ contains
       call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=0, _RC)
       if (FV3_STANDALONE /= 0) then
          ! call MAPL_GridCreate(gc, _RC)
-         call MAPL_AddExportSpec(gc, &
+         call MAPL_GridCompAddSpec(gc, &
+              state_intent=ESMF_STATEINTENT_EXPORT, &
               short_name='TRADVEX', &
-              long_name='advected_quantities', &
+              standard_name='advected_quantities', &
+              dims="xyz", &
+              vstagger=VERTICAL_STAGGER_NONE, &
               units='unknown', &
-              datatype=MAPL_BundleItem, _RC)
+              itemtype=MAPL_STATEITEM_FIELDBUNDLE, _RC)
       endif
 
       call MAPL_GridCompGetResource(gc, "DEBUG_DYN", DEBUG_DYN, default=.false., _RC)
@@ -6083,115 +6092,93 @@ contains
 #endif
 
    subroutine addTracer_r8(state, bundle, var, grid, fieldname)
-      type (DynState), pointer         :: STATE
-      type (ESMF_FieldBundle)          :: BUNDLE
-      real(r8), pointer                :: var(:,:,:)
-      type (ESMF_Grid)                 :: GRID
-      type (ESMF_DistGrid)             :: DistGRID
-      character(len=ESMF_MAXSTR)       :: FIELDNAME
+      type(DynState), pointer :: state
+      type(ESMF_FieldBundle) :: bundle
+      real(r8), pointer :: var(:, :, :)
+      type(ESMF_Grid) :: grid
+      type(ESMF_DistGrid) :: dist_grid
+      character(len=ESMF_MAXSTR) :: fieldname
 
       integer :: nq,rc,status
-      type(DynTracers), pointer        :: t(:)
+      type(DynTracers), pointer :: t(:)
+      type(ESMF_Field) :: field
+      real(r8), pointer :: ptr(:, :, :)
 
-      character(len=ESMF_MAXSTR)       :: IAm='FV:addTracer_r8'
+      call ESMF_GridGet(grid, distGrid=dist_grid, _RC)
+      call ESMF_FieldBundleGet(bundle, fieldCount=nq, _RC)
 
-      type (ESMF_Field)                :: field
-      real(r8),              pointer   :: ptr(:,:,:)
+      nq = nq + 1
 
-      call ESMF_GridGet (GRID,  distGrid=distgrid,       RC=STATUS)
-      VERIFY_(STATUS)
+      field = ESMF_FieldCreate(grid, var, datacopyflag=ESMF_DATACOPY_VALUE, name=fieldname, _RC)
+      ! pchakrab - TODO: Need to replace MAPL_VLocationCenter with VERTICAL_STAGGER_CENTER
+      ! pchakrab - TODO: need a replacement for MAPL_DimsHorzVert
+      ! call ESMF_AttributeSet(field, name='VLOCATION', value=MAPL_VLocationCenter, _RC)
+      ! call ESMF_AttributeSet(field, name='DIMS', value=MAPL_DimsHorzVert, rc=status)
+      call MAPL_FieldBundleAdd(bundle, field, _RC)
 
-      call ESMF_FieldBundleGet(BUNDLE, fieldCount=NQ, RC=STATUS)
-      VERIFY_(STATUS)
-
-      NQ = NQ + 1
-
-      field = ESMF_FieldCreate(GRID, var, datacopyflag=ESMF_DATACOPY_VALUE, name=fieldname, RC=STATUS )
-      VERIFY_(STATUS)
-      call ESMF_AttributeSet(field,name='VLOCATION',value=MAPL_VLocationCenter,rc=status)
-      VERIFY_(STATUS)
-      call ESMF_AttributeSet(field,name='DIMS',value=MAPL_DimsHorzVert,rc=status)
-      VERIFY_(STATUS)
-      call MAPL_FieldBundleAdd ( bundle, field, rc=STATUS )
-      VERIFY_(STATUS)
-
-      if (NQ == 1) then
-         ALLOCATE(STATE%VARS%tracer(nq), STAT=STATUS)
-         VERIFY_(STATUS)
-         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, rc=status)
-         VERIFY_(STATUS)
+      if (nq == 1) then
+         allocate(state%VARS%tracer(nq), _STAT)
+         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
          state%vars%tracer(nq)%content => ptr
-         state%vars%tracer(nq  )%is_r4 = .false.
+         state%vars%tracer(nq)%is_r4 = .false.
       else
          allocate(t(nq))
          t(1:nq-1) = state%vars%tracer
          deallocate(state%vars%tracer)
          state%vars%tracer => t
-         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, rc=status)
-         VERIFY_(STATUS)
+         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
          state%vars%tracer(nq)%content => ptr
          state%vars%tracer(nq  )%is_r4 = .false.
       endif
 
-      STATE%GRID%NQ = NQ
+      state%grid%nq = nq
 
-      return
+      _RETURN(_SUCCESS)
    end subroutine addTracer_r8
 
    subroutine addTracer_r4(state, bundle, var, grid, fieldname)
-      type (DynState), pointer         :: STATE
-      type (ESMF_FieldBundle)          :: BUNDLE
-      real(r4), pointer                :: var(:,:,:)
-      type (ESMF_Grid)                 :: GRID
-      type (ESMF_DistGrid)             :: DistGRID
-      character(len=ESMF_MAXSTR)       :: FIELDNAME
+      type(DynState), pointer :: state
+      type(ESMF_FieldBundle) :: bundle
+      real(r4), pointer :: var(:, :, :)
+      type(ESMF_Grid) :: grid
+      type(ESMF_DistGrid) :: dist_grid
+      character(len=ESMF_MAXSTR) :: fieldname
 
       integer :: nq,rc,status
-      type(DynTracers), pointer        :: t(:)
+      type(DynTracers), pointer :: t(:)
+      type(ESMF_Field) :: field
+      real(r4), pointer :: ptr(:, :, :)
 
-      character(len=ESMF_MAXSTR)       :: IAm='FV:addTracer_r4'
+      call ESMF_GridGet(grid, distGrid=dist_grid, _RC)
+      call ESMF_FieldBundleGet(bundle, fieldCount=NQ, _RC)
 
-      type (ESMF_Field)                :: field
-      real(r4),              pointer   :: ptr(:,:,:)
+      nq = nq + 1
 
-      call ESMF_GridGet (GRID,  distGrid=distgrid,       RC=STATUS)
-      VERIFY_(STATUS)
-
-      call ESMF_FieldBundleGet(BUNDLE, fieldCount=NQ, RC=STATUS)
-      VERIFY_(STATUS)
-
-      NQ = NQ + 1
-
-      field = ESMF_FieldCreate(GRID, var, datacopyflag=ESMF_DATACOPY_VALUE, name=fieldname, RC=STATUS )
-      VERIFY_(STATUS)
-      call ESMF_AttributeSet(field,name='VLOCATION',value=MAPL_VLocationCenter,rc=status)
-      VERIFY_(STATUS)
-      call ESMF_AttributeSet(field,name='DIMS',value=MAPL_DimsHorzVert,rc=status)
-      VERIFY_(STATUS)
-      call MAPL_FieldBundleAdd ( bundle, field, rc=STATUS )
-      VERIFY_(STATUS)
+      field = ESMF_FieldCreate(grid, var, datacopyflag=ESMF_DATACOPY_VALUE, name=fieldname, _RC)
+      ! pchakrab - TODO: Need to replace MAPL_VLocationCenter with VERTICAL_STAGGER_CENTER
+      ! pchakrab - TODO: need a replacement for MAPL_DimsHorzVert
+      ! call ESMF_AttributeSet(field, name='VLOCATION', value=MAPL_VLocationCenter, _RC)
+      ! call ESMF_AttributeSet(field, name='DIMS', value=MAPL_DimsHorzVert, _RC)
+      call MAPL_FieldBundleAdd(bundle, field, _RC)
 
       if (NQ == 1) then
-         ALLOCATE(STATE%VARS%tracer(nq), STAT=STATUS)
-         VERIFY_(STATUS)
-         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, rc=status)
-         VERIFY_(STATUS)
+         allocate(state%VARS%tracer(nq), _STAT)
+         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
          state%vars%tracer(nq)%content_r4 => ptr
-         state%vars%tracer(nq  )%is_r4 = .true.
+         state%vars%tracer(nq)%is_r4 = .true.
       else
          allocate(t(nq))
          t(1:nq-1) = state%vars%tracer
          deallocate(state%vars%tracer)
          state%vars%tracer => t
-         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, rc=status)
-         VERIFY_(STATUS)
+         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
          state%vars%tracer(nq)%content_r4 => ptr
          state%vars%tracer(nq  )%is_r4 = .true.
       endif
 
-      STATE%GRID%NQ = NQ
+      state%grid%nq = nq
 
-      return
+      _RETURN(_SUCCESS)
    end subroutine addTracer_r4
 
    subroutine freeTracers(state)
@@ -6462,3 +6449,11 @@ contains
    end function R4_TO_R8
 
 end module FVdycoreCubed_GridComp
+
+subroutine SetServices(gc, rc)
+   use ESMF
+   use FVdycoreCubed_GridComp, only : mySetservices=>SetServices
+   type(ESMF_GridComp) :: gc
+   integer, intent(out) :: rc
+   call mySetServices(gc, rc=rc)
+end subroutine SetServices
