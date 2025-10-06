@@ -24,9 +24,10 @@ module FVdycoreCubed_GridComp
    use MAPL_Constants, only: MAPL_RestartSkip, MAPL_RestartRequired, MAPL_InitialRestart
    use MAPL_Constants, only: MAPL_VLocationCenter, MAPL_VLocationEdge, MAPL_VLocationNone
    use MAPL_Constants, only: MAPL_DimsHorzVert, MAPL_DimsHorzOnly, MAPL_DimsVertOnly
+
    use MAPL_GenericMod, only: MAPL_MetaComp, MAPL_TimerAdd, MAPL_TimerOn
    use MAPL_GenericMod, only: MAPL_TimerAdd, MAPL_TimerOn, MAPL_TimerOff
-   use MAPL_GenericMod, only: MAPL_GenericSetServices, MAPL_GenericInitialize, MAPL_GenericFinalize
+   use MAPL_GenericMod, only: MAPL_GenericFinalize
    use MAPL_GenericMod, only: MAPL_GetObjectFromGC, MAPL_GetResource, MAPL_GridCreate, MAPL_Get
    use MAPL_GenericMod, only: MAPL_AddImportSpec, MAPL_AddExportSpec, MAPL_AddInternalSpec
    use MAPL_AbstractRegridderMod, only: AbstractRegridder
@@ -41,10 +42,11 @@ module FVdycoreCubed_GridComp
    use MAPL_FieldPointerUtilities, only: MAPL_FieldDestroy
    use MAPL_MaxMinMod, only: MAPL_MaxMin
    use MAPL_CommsMod, only: MAPL_AM_I_ROOT, ArrayGather
+
    use FileIOSharedMod, only: WRITE_PARALLEL
 
    use mapl3g_generic, only: MAPL_GridCompGet, MAPL_GridCompGetResource
-   use mapl3g_generic, only: MAPL_GridCompSetEntryPoint
+   use mapl3g_generic, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
    use pflogger, only: logger_t => logger
 
    use m_set_eta, only: set_eta
@@ -365,36 +367,6 @@ contains
            UNITS='unknown', &
            DATATYPE=MAPL_BundleItem, _RC)
 
-      call MAPL_AddExportSpec(gc, &
-           SHORT_NAME='CX', &
-           LONG_NAME='eastward_accumulated_courant_number', &
-           UNITS='', &
-           PRECISION=ESMF_KIND_R8, &
-           DIMS=MAPL_DimsHorzVert, &
-           VLOCATION=MAPL_VLocationCenter, _RC)
-
-      call MAPL_AddExportSpec(gc, &
-           SHORT_NAME='CY', &
-           LONG_NAME='northward_accumulated_courant_number', &
-           UNITS='', &
-           PRECISION=ESMF_KIND_R8, &
-           DIMS=MAPL_DimsHorzVert, &
-           VLOCATION=MAPL_VLocationCenter, _RC)
-
-      call MAPL_AddExportSpec(gc, &
-           SHORT_NAME='CU', &
-           LONG_NAME='eastward_accumulated_courant_number', &
-           UNITS= '', &
-           DIMS=MAPL_DimsHorzVert, &
-           VLOCATION=MAPL_VLocationCenter, _RC)
-
-      call MAPL_AddExportSpec(gc, &
-           SHORT_NAME='CV', &
-           LONG_NAME='northward_accumulated_courant_number', &
-           UNITS='', &
-           DIMS=MAPL_DimsHorzVert, &
-           VLOCATION=MAPL_VLocationCenter, _RC)
-
 #ifdef SKIP_TRACERS
       do itracer = 1, ntracers
          do ilev = 1, size(plevs)
@@ -415,13 +387,6 @@ contains
               VLOCATION=MAPL_VLocationCenter, _RC)
       enddo
 #endif
-
-      call MAPL_AddExportSpec(gc, &
-           SHORT_NAME='PID', &
-           LONG_NAME='process_id', &
-           UNITS= '', &
-           DIMS=MAPL_DimsHorzOnly, &
-           VLOCATION=MAPL_VLocationNone, _RC)
 
       ! pchakrab: TODO: DO WE STILL NEED THIS COMMENT?
       !ALT: technically the first 2 records of "old" style FV restart have
@@ -457,16 +422,16 @@ contains
       ! Register prototype of cubed sphere grid and associated regridders
       call register_grid_and_regridders()
 
-      ! ! At this point check if FV is standalone and init the grid
-      ! call ESMF_ConfigGetAttribute(CF, FV3_STANDALONE, Label="FV3_STANDALONE:", default=0, _RC)
-      ! if (FV3_STANDALONE /= 0) then
-      !    call MAPL_GridCreate(gc, _RC)
-      !    call MAPL_AddExportSpec(gc, &
-      !         SHORT_NAME='TRADVEX', &
-      !         LONG_NAME='advected_quantities', &
-      !         UNITS='unknown', &
-      !         DATATYPE=MAPL_BundleItem, _RC)
-      ! endif
+      ! At this point check if FV is standalone and init the grid
+      call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=0, _RC)
+      if (FV3_STANDALONE /= 0) then
+         ! call MAPL_GridCreate(gc, _RC)
+         call MAPL_AddExportSpec(gc, &
+              short_name='TRADVEX', &
+              long_name='advected_quantities', &
+              units='unknown', &
+              datatype=MAPL_BundleItem, _RC)
+      endif
 
       call MAPL_GridCompGetResource(gc, "DEBUG_DYN", DEBUG_DYN, default=.false., _RC)
       call MAPL_GridCompGetResource(gc, "DEBUG_ADV", DEBUG_ADV, default=.false., _RC)
@@ -488,53 +453,39 @@ contains
       type(ESMF_Clock) :: clock  ! the clock
       integer, intent(out) :: rc ! Error code, 0 all is well, error otherwise
 
-      type(ESMF_Config) :: cf
-
       type(DYN_wrap) :: wrap
-      type (DynState), pointer :: state
+      type(DynState), pointer :: state
+      type(DynGrid), pointer :: DycoreGrid
+
+      type(ESMF_Field) :: field
+      type(ESMF_State) :: internal
+      type(ESMF_TimeInterval) :: intv
+      type(ESMF_Alarm) :: alarm
+      type(ESMF_FieldBundle) :: tradv, tradvex
 
       type(MAPL_MetaComp), pointer :: MAPL
 
-      character(len=ESMF_MAXSTR) :: layout_file
+      character(len=:), allocatable :: layout_file, ReplayMode
 
-      type(ESMF_Field) :: field
       real(r4), pointer :: pref(:), ak4(:), bk4(:)
+      real(r4), pointer :: ple(:,:,:)
+      real(r4), pointer :: u(:,:,:), v(:,:,:), t(:,:,:)
+      real(r4), pointer :: temp2d(:,:)
 
       real(r8), pointer ::  ak(:), bk(:)
       real(r8), pointer ::  ud(:,:,:), vd(:,:,:)
       real(r8), pointer ::  pe(:,:,:), pt(:,:,:), pk(:,:,:)
-
       real(r8), allocatable ::  ur(:,:,:), vr(:,:,:)
 
-      real(r4), pointer :: ple(:,:,:)
-      real(r4), pointer :: u(:,:,:), v(:,:,:), t(:,:,:)
-
-      character(len=ESMF_MAXSTR) :: ReplayMode
       real :: DNS_INTERVAL
-      type(ESMF_TimeInterval) :: intv
-      type(ESMF_Alarm) :: alarm
       integer :: ColdRestart=0
+      integer :: ifirst, ilast, jfirst, jlast, km
+      integer :: i, numTracers, fv3_standalone, status
 
-      integer :: status
-      character(len=ESMF_MAXSTR) :: IAm
-      character(len=ESMF_MAXSTR) :: comp_name
+      class(logger_t), pointer :: logger
 
-      type(ESMF_State) :: internal
-      type (DynGrid), pointer :: DycoreGrid
-
-      real(r4), pointer :: temp2d(:,:)
-
-      integer :: ifirst, ilast, jfirst, jlast
-      integer :: km
-      type(ESMF_FieldBundle) :: tradv, tradvex
-      integer :: i, numTracers, fv3_standalone
-
-      Iam = "Initialize"
-      call ESMF_GridCompGet(gc, name=comp_name, config=cf, _RC)
-      Iam = trim(comp_name) // Iam
-
-      ! Call Generic Initialize
-      call MAPL_GenericInitialize(gc, import, export, clock, _RC)
+      call MAPL_GridCompGet(gc, logger=logger, _RC)
+      call logger%info("Initialize:: starting...")
 
       ! Retrieve the pointer to the state
       call MAPL_GetObjectFromGC(gc, MAPL, _RC)
@@ -543,55 +494,48 @@ contains
       call MAPL_TimerOn(MAPL, "TOTAL")
       call MAPL_TimerOn(MAPL, "INITIALIZE")
 
-      ! Get the private internal state
+      ! Get the private state
       call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, _RC)
       state => wrap%dyn_state
 
       DycoreGrid  => state%grid ! direct handle to grid
 
-      ! Get file names from the configuration
-      !BOR
-      ! !RESOURCE_ITEM: none :: name of layout file
-      call MAPL_GetResource(MAPL, layout_file, 'LAYOUT:', default='fvcore_layout.rc', _RC)
-      !EOR
-
-      call MAPL_GetResource(MAPL, DO_ADD_INCS, 'DO_ADD_INCS:', default=DO_ADD_INCS, _RC)
+      call MAPL_GridCompGetResource(gc, "LAYOUT", layout_file, default="fvcore_layout.rc", _RC)
+      call MAPL_GridCompGetResource(gc, 'DO_ADD_INCS:', DO_ADD_INCS, default=DO_ADD_INCS, _RC)
 
       ! Check for ColdStart from the configuration
-      call MAPL_GetResource(MAPL, ColdRestart, 'COLDSTART:', default=0, _RC)
+      call MAPL_GridCompGetResource(gc, "COLDSTART", ColdRestart, default=0, _RC)
       if (ColdRestart /= 0 ) then
          call Coldstart(gc, import, export, clock, _RC)
       endif
 
       ! Set Private Internal State from Restart File
-      call MAPL_Get(MAPL, INTERNAL_ESMF_STATE=internal, _RC)
+      call MAPL_GridCompGetInternalState(gc, internal, _RC)
 
       call MAPL_TimerOn(MAPL, "-DYN_INIT")
       call DynInit(state, clock, internal, import, gc, _RC)
       call MAPL_TimerOff(MAPL, "-DYN_INIT")
 
       ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
-      call MAPL_GetPointer(export, pref, 'PREF', ALLOC=.true., _RC)
-      call MAPL_GetPointer(export, ak4, 'AK', ALLOC=.true., _RC)
-      call MAPL_GetPointer(export, bk4, 'BK', ALLOC=.true., _RC)
-
-      call MAPL_GetPointer(internal, ak, 'AK', _RC)
-      call MAPL_GetPointer(internal, bk, 'BK', _RC)
-
+      call MAPL_GetPointer(internal, ak, "AK", _RC)
+      call MAPL_GetPointer(internal, bk, "BK", _RC)
+      call MAPL_GetPointer(export, ak4, "AK", ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, bk4, "BK", ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, pref, "PREF", ALLOC=.true., _RC)
       ak4 = ak
       bk4 = bk
       pref = ak + bk * P00
 
-      call MAPL_GetPointer(internal, ud, 'U', _RC)
-      call MAPL_GetPointer(internal, vd, 'V', _RC)
-      call MAPL_GetPointer(internal, pe, 'PE', _RC)
-      call MAPL_GetPointer(internal, pt, 'PT', _RC)
-      call MAPL_GetPointer(internal, pk, 'PKZ', _RC)
+      call MAPL_GetPointer(internal, ud, "U", _RC)
+      call MAPL_GetPointer(internal, vd, "V", _RC)
+      call MAPL_GetPointer(internal, pe, "PE", _RC)
+      call MAPL_GetPointer(internal, pt, "PT", _RC)
+      call MAPL_GetPointer(internal, pk, "PKZ", _RC)
 
-      call MAPL_GetPointer(export, ple, 'PLE', ALLOC=.true., _RC)
-      call MAPL_GetPointer(export, u, 'U', ALLOC=.true., _RC)
-      call MAPL_GetPointer(export, v, 'V', ALLOC=.true., _RC)
-      call MAPL_GetPointer(export, t, 'T', ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, ple, "PLE", ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, u, "U", ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, v, "V", ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, t, "T", ALLOC=.true., _RC)
 
       ! Create A-Grid Winds
       ifirst = state%grid%is
@@ -613,13 +557,13 @@ contains
       deallocate(ur, vr)
 
       ! Fill Grid-Cell Area Delta-X/Y
-      call MAPL_GetPointer(export, temp2d, 'DXC', ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, temp2d, "DXC", ALLOC=.true., _RC)
       temp2d = DycoreGrid%dxc
 
-      call MAPL_GetPointer(export, temp2d, 'DYC', ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, temp2d, "DYC", ALLOC=.true., _RC)
       temp2d = DycoreGrid%dyc
 
-      call MAPL_GetPointer(export, temp2d, 'AREA', ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, temp2d, "AREA", ALLOC=.true., _RC)
       temp2d = DycoreGrid%area
 
       ! ======================================================================
@@ -630,25 +574,25 @@ contains
       !     would be to move the computation to phase 2 of Initialize and
       !     eliminate this section alltogether
       ! ======================================================================
-      call ESMF_StateGet(export, 'PREF', FIELD, _RC)
+      call ESMF_StateGet(export, "PREF", field, _RC)
       call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
 
-      call ESMF_StateGet(export, 'PLE', FIELD, _RC)
+      call ESMF_StateGet(export, "PLE", field, _RC)
       call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
 
-      call ESMF_StateGet(export, 'U', FIELD, _RC)
+      call ESMF_StateGet(export, "U", field, _RC)
       call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
 
-      call ESMF_StateGet(export, 'V', FIELD, _RC)
+      call ESMF_StateGet(export, "V", field, _RC)
       call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
 
-      call ESMF_StateGet(export, 'T', FIELD, _RC)
+      call ESMF_StateGet(export, "T", field, _RC)
       call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
 
-      call MAPL_GetResource(MAPL, fv3_standalone, label="FV3_STANDALONE:", default=0, _RC)
+      call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", fv3_standalone, default=0, _RC)
       if (fv3_standalone /= 0) then
-         call ESMF_StateGet(import, 'TRADV', tradv, _RC)
-         call ESMF_StateGet(export, 'TRADVEX', tradvex, _RC)
+         call ESMF_StateGet(import, "TRADV", tradv, _RC)
+         call ESMF_StateGet(export, "TRADVEX", tradvex, _RC)
          call ESMF_FieldBundleGet(tradv, fieldCount=numTracers, _RC)
          do i=1,numTracers
             call ESMF_FieldBundleGet(tradv, fieldIndex=i, field=field, _RC)
@@ -664,11 +608,11 @@ contains
       ! work whether the clock is backed-up and ticked
       ! or not.
 
-      call MAPL_GetResource(MAPL, ReplayMode, 'REPLAY_MODE:', default="NoReplay", _RC)
+      call MAPL_GridCompGetResource(gc, "REPLAY_MODE", ReplayMode, default="NoReplay", _RC)
       if (adjustl(ReplayMode) == "Intermittent") then
-         call MAPL_GetResource(MAPL, DNS_INTERVAL, 'REPLAY_INTERVAL:', default=21600., _RC)
-         call ESMF_TimeIntervalSet(intv, S=nint(DNS_INTERVAL), _RC)
-         alarm = ESMF_AlarmCreate(name='INTERMITTENT', clock=clock, ringInterval=intv, sticky=.false., _RC)
+         call MAPL_GridCompGetResource(gc, "REPLAY_INTERVAL", DNS_INTERVAL, default=21600., _RC)
+         call ESMF_TimeIntervalSet(intv, s=nint(DNS_INTERVAL), _RC)
+         alarm = ESMF_AlarmCreate(name="INTERMITTENT", clock=clock, ringInterval=intv, sticky=.false., _RC)
          call ESMF_AlarmRingerOn(alarm, _RC)
       end if
 
