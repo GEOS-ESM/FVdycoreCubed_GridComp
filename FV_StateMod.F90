@@ -14,7 +14,8 @@ module FV_StateMod
    use MAPL_GenericMod, only: MAPL_MetaComp, MAPL_Get, MAPL_GetObjectFromGC, MAPL_GetResource
    use ESMFL_Mod, only: ESMFL_StateGetPointerToData
    use FileIOSharedMod, only: WRITE_PARALLEL
-   use mapl3g_generic, only: MAPL_GridCompGetResource, MAPL_GridCompGet
+
+   use mapl3g_generic, only: MAPL_GridCompGetResource, MAPL_GridCompGet, MAPL_GridCompGetInternalState
    use mapl3g_Geom_API, only: MAPL_GridGet
 #endif
    use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
@@ -717,45 +718,31 @@ contains
       _RETURN(_SUCCESS)
    end subroutine FV_Setup
 
-   subroutine FV_InitState(state, clock, internal, import, gc, rc)
+   subroutine FV_InitState(state, clock, import, gc, rc)
 
       use test_cases_mod, only : test_case, init_double_periodic
 
       type(T_FVDYCORE_STATE), pointer :: state
-
       type(ESMF_Clock), target, intent(inout) :: clock
-      type(ESMF_GridComp), intent(inout) :: gc
-      type(ESMF_State), intent(inout) :: internal
       type(ESMF_State), intent(inout) :: import
+      type(ESMF_GridComp), intent(inout) :: gc
       integer, optional, intent(out) :: rc
 
       ! Local variables
 
-      real(REAL4), pointer :: LATS (:,:)
-      real(REAL4), pointer :: LONS (:,:)
+      ! real(REAL4), pointer :: lats(:,:)
+      ! real(REAL4), pointer :: lons(:,:)
 
+      type(ESMF_State) :: internal
       type(ESMF_TimeInterval) :: Time2Run
       type(ESMF_VM) :: vm
+      type(ESMF_Time) :: fv_time
       type(T_FVDYCORE_GRID), pointer :: grid
-      integer :: status
-      real(REAL8) :: DT
-      real :: rPRS
+      character(len=ESMF_MAXSTR) :: IAm='FV:FV_InitState'
       character(len=1) :: sCODE, rCODE, zCODE
 
-      integer :: is ,ie , js ,je    !  Local dims
-      integer :: isc,iec, jsc,jec   !  Local dims
-      integer :: isd,ied, jsd,jed   !  Local dims
-      integer :: k                  !  Vertical loop index
-      integer :: ng
-      integer :: ndt
-
-      integer :: i,j
-
-      type(ESMF_Time) :: fv_time
-      integer :: days, seconds
-
-      character(len=ESMF_MAXSTR) :: IAm='FV:FV_InitState'
-
+      real :: rPRS
+      real(REAL8) :: DT
       real(REAL8), dimension(:), pointer     :: AK1 => null(), AK => null()
       real(REAL8), dimension(:), pointer     :: BK1 => null(), BK => null()
       real(REAL8), dimension(:,:,:), pointer :: U => null()
@@ -772,22 +759,24 @@ contains
       real(REAL8), allocatable :: VD(:,:,:)
 
       logical :: hybrid
-      integer :: tile_in
-      integer :: gid, masterproc
+
+      integer :: is , ie, js, je    !  Local dims
+      integer :: isc, iec, jsc, jec !  Local dims
+      integer :: isd, ied, jsd, jed !  Local dims
+      integer :: ng, ndt, days, seconds, tile_in, gid, rootproc
+      integer :: i, j, k, status
 
 #ifdef RUN_GTFV3
       logical :: halting_mode(5)
       integer :: comm
 #endif
 
-      ! BEGIN
-
       call MAPL_GridCompGetResource(gc, "RUN_DT", ndt, default=0, _RC)
       DT = ndt
 
       ! state%grid%FVgenstate => MAPL
       grid => state%grid     ! For convenience
-      state%DOTIME= .TRUE.
+      state%DOTIME= .true.
       state%DT = DT
       state%KSPLIT = FV_Atm(1)%flagstruct%K_SPLIT
       state%NSPLIT = FV_Atm(1)%flagstruct%N_SPLIT
@@ -797,9 +786,9 @@ contains
       grid%NPZ = FV_Atm(1)%flagstruct%NPZ
       grid%NPZ_P1 = FV_Atm(1)%flagstruct%NPZ+1
       grid%NTILES = 6
-      grid%NQ = MAX(1,FV_Atm(1)%flagstruct%ncnst)
+      grid%NQ = max(1,FV_Atm(1)%flagstruct%ncnst)
 
-      masterproc = mpp_root_pe()
+      rootproc = mpp_root_pe()
       gid = mpp_pe()
 
       call ESMF_GridCompGet(gc, vm=vm, _RC)
@@ -810,6 +799,7 @@ contains
       call WRITE_PARALLEL(' ')
 
       ! Get pointers to internal state vars
+      call MAPL_GridCompGetInternalState(gc, internal, _RC)
       call MAPL_GetPointer(internal, ak1, "AK", _RC) ! 1-based
       call MAPL_GetPointer(internal, bk1, "BK", _RC) ! 1-based
       call MAPL_GetPointer(internal, u, "U", _RC) ! A-Grid U Wind
@@ -903,9 +893,6 @@ contains
          endif
       endif
 
-      ! Check coordinate information
-      call MAPL_GridGet(grid%grid, latitudes=lats, longitudes=lons, _RC)
-
       state%clock => clock
       call ESMF_TimeIntervalSet(Time2Run, s=nint(state%DT), _RC)
 
@@ -977,7 +964,7 @@ contains
                  FV_Atm(1)%ks, FV_Atm(1)%ptop, FV_Atm(1)%domain, tile_in, FV_Atm(1)%bd)
             ! Copy FV to internal State
             call FV_To_State(state)
-            if(gid==masterproc) write(*,*) 'Doubly Periodic IC generated LAT:', FV_Atm(1)%flagstruct%deglat
+            if(gid==rootproc) write(*,*) 'Doubly Periodic IC generated LAT:', FV_Atm(1)%flagstruct%deglat
          else
             allocate(UA(isc:iec  ,jsc:jec  ,1:FV_Atm(1)%npz))
             allocate(VA(isc:iec  ,jsc:jec  ,1:FV_Atm(1)%npz))
@@ -1015,19 +1002,19 @@ contains
 
       endif ! COLDSTART
 
-      if ( (gid==0)                              ) print *, ' '
-      if ( (gid==0) .and. (COLDSTART)            ) print *, 'COLDSTARTING FV3'
-      if ( (gid==0) .and. (ADIABATIC)            ) print *, 'FV3 being run Adiabatically'
-      if ( (gid==0) .and. (.not. FV_HYDROSTATIC) ) print *, 'FV3 being run Non-Hydrostatic'
-      if ( (gid==0) .and. (.not. FV_HYDROSTATIC) .and. (FV_Atm(1)%flagstruct%Make_NH) ) &
-           print *, 'FV3 Coldstarting Non-Hydrostatic W and DZ'
-      if ( (gid==0) .and. (FV_HYDROSTATIC)       ) print *, 'FV3 being run Hydrostatic'
-      if ( (gid==0) .and. (SW_DYNAMICS)          ) print *, 'FV3 being run as Shallow-Water Model: test_case=', test_case
-      if ( (gid==0) .and. (FV_Atm(1)%flagstruct%grid_type == 4) ) &
-           print*, 'FV3 being run as Doubly-Periodic: test_case=', test_case
-      state%vars%nwat = FV_Atm(1)%flagstruct%nwat
-      if ( (gid==0)                              ) print *, 'FV3 water species nwat=', FV_Atm(1)%flagstruct%nwat
-      if ( (gid==0)                              ) print *, ' '
+      if (gid == rootproc) then
+         print *, ' '
+         if (COLDSTART) print *, 'COLDSTARTING FV3'
+         if (ADIABATIC) print *, 'FV3 being run Adiabatically'
+         if (.not. FV_HYDROSTATIC) print *, 'FV3 being run Non-Hydrostatic'
+         if ((.not. FV_HYDROSTATIC) .and. (FV_Atm(1)%flagstruct%Make_NH)) print *, 'FV3 Coldstarting Non-Hydrostatic W and DZ'
+         if (FV_HYDROSTATIC) print *, 'FV3 being run Hydrostatic'
+         if (SW_DYNAMICS) print *, 'FV3 being run as Shallow-Water Model: test_case=', test_case
+         if (FV_Atm(1)%flagstruct%grid_type == 4) print*, 'FV3 being run as Doubly-Periodic: test_case=', test_case
+         state%vars%nwat = FV_Atm(1)%flagstruct%nwat
+         print *, 'FV3 water species nwat=', FV_Atm(1)%flagstruct%nwat
+         print *, ' '
+      end if
 
       if (DEBUG) call debug_fv_state('DEBUG_RESTART',state)
 
@@ -1063,7 +1050,7 @@ contains
 300      format(A1,A1,A1,2x,i5,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
       endif
 
-      call MAPL_MemUtilsWrite(vm, 'FV_StateMod: FV Initialize', _RC)
+      call MAPL_MemUtilsWrite(vm, 'FV_StateMod::FV Initialize', _RC)
 
 #ifdef RUN_GTFV3
       if (run_gtfv3 /= 0) then

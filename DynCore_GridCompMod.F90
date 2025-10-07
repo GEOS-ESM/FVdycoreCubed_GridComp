@@ -517,7 +517,7 @@ contains
       call MAPL_GridCompGetInternalState(gc, internal, _RC)
 
       ! call MAPL_TimerOn(MAPL, "-DYN_INIT")
-      call DynInit(state, clock, internal, import, gc, _RC)
+      call DynInit(state, clock, import, gc, _RC)
       ! call MAPL_TimerOff(MAPL, "-DYN_INIT")
 
       ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
