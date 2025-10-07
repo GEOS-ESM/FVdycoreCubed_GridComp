@@ -511,7 +511,6 @@ contains
       call MAPL_GridCompGetResource(gc, "COLDSTART", ColdRestart, default=0, _RC)
       if (ColdRestart /= 0 ) then
          call Coldstart(gc, import, export, clock, _RC)
-         _HERE
       endif
 
       ! Set Private Internal State from Restart File
@@ -5226,7 +5225,8 @@ contains
       real(REAL4), pointer :: lons(:,:), lats(:,:)
 
       integer :: i, j, k, n, L
-      integer :: IS, IE, JS, JE, KS, KE, IM, JM, KM, LS
+      ! integer :: IS, IE, JS, JE, KS, KE, IM, JM, KM, LS
+      integer :: is, ie, js, je, ks, ke, im, jm, km, ls
       integer :: case_id, case_rotation, case_tracers
 
       real :: T0
@@ -5274,10 +5274,10 @@ contains
       endif
 
       call MAPL_GetPointer(internal, U, "U", _RC) ! A-Grid U Wind
-      IS = lbound(U,1); IE = ubound(U,1)
-      JS = lbound(U,2); JE = ubound(U,2)
-      KS = lbound(U,3); KE = ubound(U,3)
-      KM = KE-KS+1
+      is = lbound(U,1); ie = ubound(U,1)
+      js = lbound(U,2); je = ubound(U,2)
+      ks = lbound(U,3); ke = ubound(U,3)
+      km = ke-ks+1
       call MAPL_GetPointer(internal, V, "V", _RC) ! A-Grid V Wind
       call MAPL_GetPointer(internal, PT, "PT", _RC) ! potential temperature
       call MAPL_GetPointer(internal, PE1, "PE", _RC) ! edge pressures - 1 based
@@ -5291,7 +5291,7 @@ contains
 
       U = 0.0
 
-      ALLOCATE( PS(IS:IE,JS:JE) )
+      ALLOCATE( PS(is:ie,js:je) )
 
       call MAPL_GridCompGetResource(gc, "IM", IM, default=0, _RC)
       call MAPL_GridCompGetResource(gc, "JM", JM, default=0, _RC)
@@ -5301,8 +5301,8 @@ contains
          call MAPL_GridCompGetResource(gc, "CASE_ID", case_id, default=1, _RC)
          DYN_CASE = case_id
 
-         do j=JS,JE
-            do i=IS,IE
+         do j=js,je
+            do i=is,ie
                LONc = lons(i,j)
                LATc = lats(i,j)
                U(i,j,1)  = sw_uwnd(LONc,LATc,case_id)
@@ -5315,7 +5315,7 @@ contains
 
       else              ! 3-D Baroclinic
 
-         U(IS:IE,JS:JE,KE) = .001*abs(lats(:,:))
+         U(is:ie,js:je,KE) = .001*abs(lats(:,:))
          V = 0.0
 
          ! pchakrab - TODO: read ak from resource file, if present
@@ -5384,10 +5384,10 @@ contains
          if (case_id == 1) then ! Steady State
 
             perturb = .false.
-            do k=KS,KE
+            do k=ks,ke
                eta = 0.5*( (ak(k-1)+ak(k))/1.e5 + bk(k-1)+bk(k) )
-               do j=JS,JE
-                  do i=IS,IE
+               do j=js,je
+                  do i=is,ie
                      LONc = lons(i,j)
                      LATc = lats(i,j)
                      U(i,j,k) = u_wind(LONc,LATc,eta,perturb,rot_ang)
@@ -5402,10 +5402,10 @@ contains
          elseif (case_id == 2) then ! Baroclinic Wave
 
             perturb = .true.
-            do k=KS,KE
+            do k=ks,ke
                eta = 0.5*( (ak(k-1)+ak(k))/1.e5 + bk(k-1)+bk(k) )
-               do j=JS,JE
-                  do i=IS,IE
+               do j=js,je
+                  do i=is,ie
                      LONc = lons(i,j)
                      LATc = lats(i,j)
                      U(i,j,k) = u_wind(LONc,LATc,eta,perturb,rot_ang)
@@ -5429,15 +5429,15 @@ contains
 
             !PURE_ADVECTION = .true.
 
-            allocate(Q5(IS:IE, JS:JE, 0:KM-1), _STAT)
-            allocate(Q6(IS:IE, JS:JE, 0:KM-1), _STAT)
+            allocate(Q5(is:ie, js:je, 0:KM-1), _STAT)
+            allocate(Q6(is:ie, js:je, 0:KM-1), _STAT)
 
             ztop = 12000.0
             dz   = ztop/KM
-            do k=KS,KE
+            do k=ks,ke
                height = (ztop - 0.5*dz) - (k)*dz  ! Layer middle height
-               do j=JS,JE
-                  do i=IS,IE
+               do j=js,je
+                  do i=is,ie
                      LONc = lons(i,j)
                      LATc = lats(i,j)
                      call  advection('56', LONc, LATc, height, rot_ang,  &
@@ -5454,9 +5454,9 @@ contains
                PE(:,:,L) = AK(L) + BK(L)*PS(:,:)
             enddo
 
-            do k=KS,KE
-               do j=JS,JE
-                  do i=IS,IE
+            do k=ks,ke
+               do j=js,je
+                  do i=is,ie
                      PKZ(i,j,k) = ( (PE(i,j,k+1)**kappa) - (PE(i,j,k)**kappa) ) /  &
                             ( kappa*(log(PE(i,j,k+1))-log(PE(i,j,k))) )
                   enddo
@@ -5467,8 +5467,8 @@ contains
 
          elseif (case_id == 4) then ! 3D Rossby-Haurwitz
 
-            do j=JS,JE
-               do i=IS,IE
+            do j=js,je
+               do i=is,ie
                   LONc = lons(i,j)
                   LATc = lats(i,j)
                   pressure = 500.
@@ -5482,9 +5482,9 @@ contains
             do L=lbound(PE,3),ubound(PE,3)
                PE(:,:,L) = AK(L) + BK(L)*PS(:,:)
             enddo
-            do k=KS,KE
-               do j=JS,JE
-                  do i=IS,IE
+            do k=ks,ke
+               do j=js,je
+                  do i=is,ie
                      LONc = lons(i,j)
                      LATc = lats(i,j)
                      pressure = 0.5*(PE(i,j,k)+PE(i,j,k+1))
@@ -5497,9 +5497,9 @@ contains
                enddo
             enddo
 
-            do k=KS,KE
-               do j=JS,JE
-                  do i=IS,IE
+            do k=ks,ke
+               do j=js,je
+                  do i=is,ie
                      PKZ(i,j,k) = ( (PE(i,j,k+1)**kappa) - (PE(i,j,k)**kappa) ) /  &
                           ( kappa*(log(PE(i,j,k+1))-log(PE(i,j,k))) )
                   enddo
@@ -5509,9 +5509,9 @@ contains
 
          elseif (case_id == 5) then ! Mountain-Induced Rossby Wave
 
-            do k=KS,KE
-               do j=JS,JE
-                  do i=IS,IE
+            do k=ks,ke
+               do j=js,je
+                  do i=is,ie
                      LONc = lons(i,j)
                      LATc = lats(i,j)
                      pressure = 0.5*(PE(i,j,k)+PE(i,j,k+1))
@@ -5527,9 +5527,9 @@ contains
                PE(:,:,L) = AK(L) + BK(L)*PS(:,:)
             enddo
 
-            do k=KS,KE
-               do j=JS,JE
-                  do i=IS,IE
+            do k=ks,ke
+               do j=js,je
+                  do i=is,ie
                      PKZ(i,j,k) = ( (PE(i,j,k+1)**kappa) - (PE(i,j,k)**kappa) ) /  &
                           ( kappa*(log(PE(i,j,k+1))-log(PE(i,j,k))) )
                   enddo
@@ -5549,10 +5549,10 @@ contains
             ! Get ICs
             ztop = 10000.d0
             dz   = ztop/KM
-            do k=KS,KE
+            do k=ks,ke
                height = (ztop - 0.5d0*dz) - (k)*dz  ! Layer middle height
-               do j=JS,JE
-                  do i=IS,IE
+               do j=js,je
+                  do i=is,ie
                      LONc = lons(i,j)
                      LATc = lats(i,j)
                      call gravity_wave(case_rotation, LONc,LATc, height, dummy_1, dummy_2, dummy_3, dummy_4, PS(i,j))
@@ -5568,8 +5568,8 @@ contains
                PTOP = 27381.905d0
                do k=lbound(PE,3),ubound(PE,3)
                   height = ztop - k*dz  ! Layer edge height
-                  do j=JS,JE
-                     do i=IS,IE
+                  do j=js,je
+                     do i=is,ie
                         LONc = lons(i,j)
                         LATc = lats(i,j)
                         call gravity_wave(case_rotation, LONc,LATc, height, dummy_1, dummy_2, dummy_3, dummy_4, dummy_5, pressure=dummy_6)
@@ -5587,9 +5587,9 @@ contains
                PE(:,:,L) = AK(L) + BK(L)*PS(:,:)
             enddo
 
-            do k=KS,KE
-               do j=JS,JE
-                  do i=IS,IE
+            do k=ks,ke
+               do j=js,je
+                  do i=is,ie
                      PKZ(i,j,k) = ( (PE(i,j,k+1)**kappa) - (PE(i,j,k)**kappa) ) /  &
                           ( kappa*(log(PE(i,j,k+1))-log(PE(i,j,k))) )
                   enddo
@@ -5600,14 +5600,12 @@ contains
 
          endif ! case_id
 
-         !--------------------
          ! Parse Tracers
-         !--------------------
          if (FV3_STANDALONE /= 0) then
             call ESMF_StateGet(import, "TRADV", tradv_bundle, _RC)
-            call ESMF_GridCompGet(gc, grid=esmfgrid, _RC)
+            call MAPL_GridCompGet(gc, grid=esmfgrid, _RC)
 
-            allocate(tracer(IS:IE, JS:JE, 1:KM), _STAT)
+            allocate(tracer(is:ie, js:je, 1:KM), _STAT)
 
             tracer(:,:,:)  = 0.0
             fieldname = 'Q'
@@ -5627,10 +5625,10 @@ contains
                !     tracer q1
                !-------------------
                tracer(:,:,:) = 0.0
-               do k=KS,KE
+               do k=ks,ke
                   eta = 0.5*( (ak(k-1)+ak(k))/1.e5 + bk(k-1)+bk(k) )
-                  do j=JS,JE
-                     do i=IS,IE
+                  do j=js,je
+                     do i=is,ie
                         LONc = lons(i,j)
                         LATc = lats(i,j)
                         dummy_1 = tracer_q1_q2(LONc,LATc,eta,rot_ang,r0_6)
@@ -5644,10 +5642,10 @@ contains
                !-------------------
                !     tracer q2
                !-------------------
-               do k=KS,KE
+               do k=ks,ke
                   eta = 0.5*( (ak(k-1)+ak(k))/1.e5 + bk(k-1)+bk(k) )
-                  do j=JS,JE
-                     do i=IS,IE
+                  do j=js,je
+                     do i=is,ie
                         LONc = lons(i,j)
                         LATc = lats(i,j)
                         dummy_1 = tracer_q1_q2(LONc,LATc,eta,rot_ang,r1_0)
@@ -5661,10 +5659,10 @@ contains
                !-------------------
                !     tracer q3
                !-------------------
-               do k=KS,KE
+               do k=ks,ke
                   eta = 0.5*( (ak(k-1)+ak(k))/1.e5 + bk(k-1)+bk(k) )
-                  do j=JS,JE
-                     do i=IS,IE
+                  do j=js,je
+                     do i=is,ie
                         LONc = lons(i,j)
                         LATc = lats(i,j)
                         dummy_1 = tracer_q3(LONc,LATc,eta,rot_ang)
