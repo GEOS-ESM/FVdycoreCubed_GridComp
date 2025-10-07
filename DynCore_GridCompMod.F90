@@ -550,14 +550,11 @@ contains
 
       allocate(ur(ifirst:ilast,jfirst:jlast,km))
       allocate(vr(ifirst:ilast,jfirst:jlast,km))
-
       call getAllWinds(ud, vd, ur=ur, vr=vr)
-
       u = ur
       v = vr
       t = pt*pk
       ple = pe
-
       deallocate(ur, vr)
 
       ! Fill Grid-Cell Area Delta-X/Y
@@ -5606,7 +5603,6 @@ contains
             call MAPL_GridCompGet(gc, grid=esmfgrid, _RC)
 
             allocate(tracer(is:ie, js:je, 1:KM), _STAT)
-
             tracer(:,:,:)  = 0.0
             fieldname = 'Q'
             call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
@@ -5704,7 +5700,8 @@ contains
 
             deallocate(tracer, _STAT)
 
-         endif
+         endif ! parse tracers
+
       endif
 
       deallocate(PS)
