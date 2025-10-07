@@ -49,6 +49,8 @@ module FVdycoreCubed_GridComp
    use mapl3g_generic, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
    use mapl3g_generic, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_FIELDBUNDLE
    use mapl3g_VerticalStaggerLoc, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
+   use mapl3g_Geom_API, only: MAPL_GridGet
+   use mapl3g_State_API, only: MAPL_StateGetPointer
    use pflogger, only: logger_t => logger
 
    use m_set_eta, only: set_eta
@@ -452,7 +454,6 @@ contains
    end subroutine SetServices
 
    subroutine Initialize(gc, import, export, clock, rc)
-
       !ARGUMENTS:
       type(ESMF_GridComp):: gc   ! composite gridded component
       type(ESMF_State) :: import ! import state
@@ -470,16 +471,15 @@ contains
       type(ESMF_Alarm) :: alarm
       type(ESMF_FieldBundle) :: tradv, tradvex
 
-      type(MAPL_MetaComp), pointer :: MAPL
-
       character(len=:), allocatable :: layout_file, ReplayMode
 
-      real(r4), pointer :: pref(:), ak4(:), bk4(:)
+      real(r4), pointer :: pref(:)
       real(r4), pointer :: ple(:,:,:)
       real(r4), pointer :: u(:,:,:), v(:,:,:), t(:,:,:)
       real(r4), pointer :: temp2d(:,:)
 
       real(r8), pointer ::  ak(:), bk(:)
+      real(r4), pointer ::  ak4(:), bk4(:)
       real(r8), pointer ::  ud(:,:,:), vd(:,:,:)
       real(r8), pointer ::  pe(:,:,:), pt(:,:,:), pk(:,:,:)
       real(r8), allocatable ::  ur(:,:,:), vr(:,:,:)
@@ -494,12 +494,9 @@ contains
       call MAPL_GridCompGet(gc, logger=logger, _RC)
       call logger%info("Initialize:: starting...")
 
-      ! Retrieve the pointer to the state
-      call MAPL_GetObjectFromGC(gc, MAPL, _RC)
-
-      ! Start the timers
-      call MAPL_TimerOn(MAPL, "TOTAL")
-      call MAPL_TimerOn(MAPL, "INITIALIZE")
+      ! ! Start the timers
+      ! call MAPL_TimerOn(MAPL, "TOTAL")
+      ! call MAPL_TimerOn(MAPL, "INITIALIZE")
 
       ! Get the private state
       call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, _RC)
@@ -508,26 +505,27 @@ contains
       DycoreGrid  => state%grid ! direct handle to grid
 
       call MAPL_GridCompGetResource(gc, "LAYOUT", layout_file, default="fvcore_layout.rc", _RC)
-      call MAPL_GridCompGetResource(gc, 'DO_ADD_INCS:', DO_ADD_INCS, default=DO_ADD_INCS, _RC)
+      call MAPL_GridCompGetResource(gc, "DO_ADD_INCS", DO_ADD_INCS, default=DO_ADD_INCS, _RC)
 
       ! Check for ColdStart from the configuration
       call MAPL_GridCompGetResource(gc, "COLDSTART", ColdRestart, default=0, _RC)
       if (ColdRestart /= 0 ) then
          call Coldstart(gc, import, export, clock, _RC)
+         _HERE
       endif
 
       ! Set Private Internal State from Restart File
       call MAPL_GridCompGetInternalState(gc, internal, _RC)
 
-      call MAPL_TimerOn(MAPL, "-DYN_INIT")
+      ! call MAPL_TimerOn(MAPL, "-DYN_INIT")
       call DynInit(state, clock, internal, import, gc, _RC)
-      call MAPL_TimerOff(MAPL, "-DYN_INIT")
+      ! call MAPL_TimerOff(MAPL, "-DYN_INIT")
 
       ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
+      call MAPL_GetPointer(export, ak4, "AK", _RC)
+      call MAPL_GetPointer(export, bk4, "BK", _RC)
       call MAPL_GetPointer(internal, ak, "AK", _RC)
       call MAPL_GetPointer(internal, bk, "BK", _RC)
-      call MAPL_GetPointer(export, ak4, "AK", ALLOC=.true., _RC)
-      call MAPL_GetPointer(export, bk4, "BK", ALLOC=.true., _RC)
       call MAPL_GetPointer(export, pref, "PREF", ALLOC=.true., _RC)
       ak4 = ak
       bk4 = bk
@@ -625,11 +623,10 @@ contains
 
       !========End intermittent replay========================
 
-      call MAPL_TimerOff(MAPL,"INITIALIZE")
-      call MAPL_TimerOff(MAPL,"TOTAL")
+      ! call MAPL_TimerOff(MAPL,"INITIALIZE")
+      ! call MAPL_TimerOff(MAPL,"TOTAL")
 
       _RETURN(_SUCCESS)
-
    end subroutine Initialize
 
    !BOP
@@ -719,7 +716,7 @@ contains
       real(r8), allocatable ::delpold(:,:,:) ! temporary array
       real(r8), allocatable ::     ox(:,:,:) ! temporary array
       real(r8), allocatable ::     zl(:,:,:) ! temporary array
-      real(r8), allocatable ::    zle(:,:,:) ! temporary array 
+      real(r8), allocatable ::    zle(:,:,:) ! temporary array
       real(r8), allocatable ::  logpe(:,:,:) ! temporary array
       real(r8), allocatable ::   delp(:,:,:) ! temporary array
       real(r8), allocatable ::   dudt(:,:,:) ! temporary array
@@ -4009,7 +4006,7 @@ contains
          !  call Write_Profile(grid, tempxy, 'T')
          !#endif
 
-         if (DEBUG_DYN) then  
+         if (DEBUG_DYN) then
             call MAPL_MaxMin('DYN: Q_AF_INC ', qv)
             call MAPL_MaxMin('DYN: T_AF_INC ', tempxy, pmax=TMAX, pmin=TMIN)
             call MAPL_MaxMin('DYN: U_AF_INC ', ua)
@@ -4157,10 +4154,10 @@ contains
             VERIFY_(STATUS)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'U100',  rc=status)         
-         VERIFY_(STATUS) 
-         if(associated(temp2d)) then                                    
-            call VertInterp(temp2d,ur,logpe,log(10000.)  ,  rc=status)     
+         call MAPL_GetPointer(export,temp2d,'U100',  rc=status)
+         VERIFY_(STATUS)
+         if(associated(temp2d)) then
+            call VertInterp(temp2d,ur,logpe,log(10000.)  ,  rc=status)
             VERIFY_(STATUS)
          end if
 
@@ -4178,10 +4175,10 @@ contains
             VERIFY_(STATUS)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'U300',  rc=status)         
-         VERIFY_(STATUS) 
-         if(associated(temp2d)) then                                    
-            call VertInterp(temp2d,ur,logpe,log(30000.)  ,  rc=status)     
+         call MAPL_GetPointer(export,temp2d,'U300',  rc=status)
+         VERIFY_(STATUS)
+         if(associated(temp2d)) then
+            call VertInterp(temp2d,ur,logpe,log(30000.)  ,  rc=status)
             VERIFY_(STATUS)
          end if
 
@@ -4305,14 +4302,14 @@ contains
          end if
 
          call MAPL_GetPointer(export,temp2d,'Q100',  rc=status)
-         VERIFY_(STATUS) 
+         VERIFY_(STATUS)
          if(associated(temp2d)) then
             call VertInterp(temp2d,qv,logpe,log(10000.)  ,  positive_definite=.true., rc=status)
             VERIFY_(STATUS)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'Q200',  rc=status)         
-         VERIFY_(STATUS) 
+         call MAPL_GetPointer(export,temp2d,'Q200',  rc=status)
+         VERIFY_(STATUS)
          if(associated(temp2d)) then
             call VertInterp(temp2d,qv,logpe,log(20000.)  ,  positive_definite=.true., rc=status)
             VERIFY_(STATUS)
@@ -4325,10 +4322,10 @@ contains
             VERIFY_(STATUS)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'Q300',  rc=status)         
-         VERIFY_(STATUS) 
+         call MAPL_GetPointer(export,temp2d,'Q300',  rc=status)
+         VERIFY_(STATUS)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,qv,logpe,log(30000.)  ,  positive_definite=.true., rc=status)     
+            call VertInterp(temp2d,qv,logpe,log(30000.)  ,  positive_definite=.true., rc=status)
             VERIFY_(STATUS)
          end if
 
@@ -4339,10 +4336,10 @@ contains
             VERIFY_(STATUS)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'Q700',  rc=status)         
-         VERIFY_(STATUS) 
+         call MAPL_GetPointer(export,temp2d,'Q700',  rc=status)
+         VERIFY_(STATUS)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,qv,logpe,log(70000.)  ,  positive_definite=.true., rc=status)     
+            call VertInterp(temp2d,qv,logpe,log(70000.)  ,  positive_definite=.true., rc=status)
             VERIFY_(STATUS)
          end if
 
@@ -4838,10 +4835,10 @@ contains
                   do I=is,ie
                      if ( (STATE%VARS%PT(I,J,L) > 333.0) .OR. (STATE%VARS%PT(I,J,L)/=STATE%VARS%PT(I,J,L)) .OR. &
                           (Q(I,J,L,sphum  ) < 0.0) .OR. (Q(I,J,L,sphum  )/=Q(I,J,L,sphum  )) .OR. &
-                          (Q(I,J,L,liq_wat) < 0.0) .OR. (Q(I,J,L,liq_wat)/=Q(I,J,L,liq_wat)) .OR. & 
-                          (Q(I,J,L,ice_wat) < 0.0) .OR. (Q(I,J,L,ice_wat)/=Q(I,J,L,ice_wat)) .OR. & 
-                          (Q(I,J,L,rainwat) < 0.0) .OR. (Q(I,J,L,rainwat)/=Q(I,J,L,rainwat)) .OR. & 
-                          (Q(I,J,L,snowwat) < 0.0) .OR. (Q(I,J,L,snowwat)/=Q(I,J,L,snowwat)) .OR. & 
+                          (Q(I,J,L,liq_wat) < 0.0) .OR. (Q(I,J,L,liq_wat)/=Q(I,J,L,liq_wat)) .OR. &
+                          (Q(I,J,L,ice_wat) < 0.0) .OR. (Q(I,J,L,ice_wat)/=Q(I,J,L,ice_wat)) .OR. &
+                          (Q(I,J,L,rainwat) < 0.0) .OR. (Q(I,J,L,rainwat)/=Q(I,J,L,rainwat)) .OR. &
+                          (Q(I,J,L,snowwat) < 0.0) .OR. (Q(I,J,L,snowwat)/=Q(I,J,L,snowwat)) .OR. &
                           (Q(I,J,L,graupel) < 0.0) .OR. (Q(I,J,L,graupel)/=Q(I,J,L,graupel)) ) then
                         print *, "T or Q  spike detected : ", STATE%VARS%PT(I,J,L)
                         print *, "  Temp  ANA|PHY  Increment : ", (DT*TEND(I,J,L)*(MAPL_CP/CVM(I,J,L)))/DPNEW(I,J,L)
@@ -5212,144 +5209,102 @@ contains
 
       !ARGUMENTS:
       type(ESMF_GridComp), intent(inout) :: gc
-      type(ESMF_State),    intent(inout) :: import
-      type(ESMF_State),    intent(inout) :: export
-      type (ESMF_Clock),   intent(inout) :: clock
-      integer, intent(out), optional     :: rc
+      type(ESMF_State), intent(inout) :: import
+      type(ESMF_State), intent(inout) :: export
+      type (ESMF_Clock), intent(inout) :: clock
+      integer, intent(out), optional :: rc
       !EOP
 
-      character(len=ESMF_MAXSTR)        :: IAm="Coldstart"
-      character(len=ESMF_MAXSTR)        :: comp_name
       integer                           :: status
 
-      type (MAPL_MetaComp),     pointer :: MAPL
-      type (ESMF_State)                 :: INTERNAL
+      type(ESMF_State) :: internal
 
-      real(REAL8), pointer                 :: AK(:), BK(:)
-      real(REAL8), pointer                 :: U      (:,:,:)
-      real(REAL8), pointer                 :: V      (:,:,:)
-      real(REAL8), pointer                 :: PT     (:,:,:)
-      real(REAL8), pointer                 :: PE     (:,:,:)
-      real(REAL8), pointer                 :: PKZ    (:,:,:)
-      real(kind=4), pointer             :: phis   (:,:)
-      real(REAL4), pointer                     :: LONS   (:,:)
-      real(REAL4), pointer                     :: LATS   (:,:)
-      real                              :: T0
-      integer                           :: L
-      type(ESMF_Config)                 :: CF
-      integer                           :: i,j,k,n
-      integer                           :: IS,IE, JS,JE, KS,KE, IM,JM,KM, LS
+      real(REAL8), pointer :: AK1(:), BK1(:), AK(:), BK(:)
+      real(REAL8), pointer :: U(:,:,:), V(:,:,:), PT(:,:,:)
+      real(REAL8), pointer :: PE1(:,:,:), PE(:,:,:), PKZ(:,:,:)
+      real(REAL4), pointer :: phis(:,:)
+      real(REAL4), pointer :: lons(:,:), lats(:,:)
 
-      integer                     :: case_id
-      integer                     :: case_rotation
-      integer                     :: case_tracers
+      integer :: i, j, k, n, L
+      integer :: IS, IE, JS, JE, KS, KE, IM, JM, KM, LS
+      integer :: case_id, case_rotation, case_tracers
 
+      real :: T0
       real(REAL8) :: dummy_1, dummy_2, dummy_3, dummy_4, dummy_5, dummy_6
       real(REAL8) :: dz, ztop, height, pressure
       real(REAL8) :: LONc,LATc
       real(REAL8) :: eta, eta_top, rot_ang
       real(REAL8) :: ptop, pint
       real(REAL8), allocatable :: PS(:,:)
+
+      type(DYN_wrap) :: wrap
+      type(DynState), pointer :: state
+      type(DynGrid),  pointer :: grid
+
       logical :: perturb
       logical :: ak_is_missing = .false.
       logical :: bk_is_missing = .false.
       integer :: FV3_STANDALONE
-
-      type (DYN_wrap) :: wrap
-      type (DynState), pointer :: STATE
-      type (DynGrid),  pointer :: GRID
-
       logical :: isPresent
 
       ! Tracer Stuff
-      real(r4), pointer                :: TRACER(:,:,:)
-      real(REAL8), allocatable            :: Q5(:,:,:)
-      real(REAL8), allocatable            :: Q6(:,:,:)
-      type (ESMF_Grid)                 :: esmfGRID
-      type (ESMF_FieldBundle)          :: TRADV_BUNDLE
-      character(len=ESMF_MAXSTR)       :: FIELDNAME
-      character(len=ESMF_MAXSTR)       :: STRING
-      real(REAL8), parameter    :: r0_6=0.6
-      real(REAL8), parameter    :: r1_0=1.0
+      real(REAL4), pointer :: tracer(:,:,:)
+      real(REAL8), allocatable :: Q5(:,:,:)
+      real(REAL8), allocatable :: Q6(:,:,:)
+      type(ESMF_Grid) :: esmfgrid
+      type(ESMF_FieldBundle) :: tradv_bundle
+      character(len=ESMF_MAXSTR) :: fieldname
+      character(len=ESMF_MAXSTR) :: string
+      real(REAL8), parameter :: r0_6=0.6
+      real(REAL8), parameter :: r1_0=1.0
 
-      call ESMF_GridCompGet( gc, name=comp_name, CONFIG=CF, RC=STATUS )
-      VERIFY_(STATUS)
-      Iam = trim(comp_name) // trim(Iam)
-
-      ! Retrieve the pointer to the state
-      call MAPL_GetObjectFromGC (gc, MAPL,  RC=STATUS )
-      VERIFY_(STATUS)
-
-      call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, status)
-      VERIFY_(STATUS)
+      call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, _RC)
       state => wrap%dyn_state
-      grid  => state%grid   ! direct handle to grid
+      grid  => state%grid ! direct handle to grid
 
-      !BOR
-      ! !RESOURCE_ITEM: K :: Value of isothermal temperature on coldstart
-      call MAPL_GetResource ( MAPL, T0, 'T0:', default=273., RC=STATUS )
-      VERIFY_(STATUS)
-      !EOR
-      call MAPL_Get ( MAPL,                &
-           INTERNAL_ESMF_STATE=INTERNAL, &
-           lats = LATS,                  &
-           lons = LONS,                  &
-           RC=STATUS )
-      VERIFY_(STATUS)
+      call MAPL_GridCompGetResource(gc, "T0", T0, default=273., _RC)
+      call MAPL_GridCompGetInternalState(gc, internal, _RC)
+      call MAPL_GridCompGet(gc, grid=esmfgrid, _RC)
+      call MAPL_GridGet(esmfgrid, latitudes=lats, longitudes=lons, _RC)
 
       if (FV_Atm(1)%flagstruct%grid_type == 4) then
          ! Doubly-Period setup based on first LAT/LON coordinate
-         LONS(:,:) =  0.0
-         LATS(:,:) = 15.0*PI/180.0
+         lons(:,:) =  0.0
+         lats(:,:) = 15.0*PI/180.0
       endif
 
-      ! A-Grid U Wind
-      call MAPL_GetPointer(Internal,U,'U'  ,rc=STATUS)
-      VERIFY_(STATUS)
-      ! A-Grid V Wind
-      call MAPL_GetPointer(Internal,V,'V'  ,rc=STATUS)
-      ! Surface Geopotential
-      call MAPL_GetPointer ( import, phis, 'PHIS', RC=STATUS )
-      VERIFY_(STATUS)
-      ! Potential-Temperature
-      call MAPL_GetPointer(Internal,PT,'PT',rc=STATUS)
-      VERIFY_(STATUS)
-      ! Edge Pressures
-      call MAPL_GetPointer(Internal,PE  ,'PE',rc=STATUS)
-      VERIFY_(STATUS)
-      ! Presssure ^ kappa at mid-layers
-      call MAPL_GetPointer(Internal,PKZ ,'PKZ',rc=STATUS)
-      VERIFY_(STATUS)
-      ! AK and BK for vertical coordinate
-      call MAPL_GetPointer(Internal,ak  ,'AK' ,rc=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_GetPointer(Internal,bk  ,'BK' ,rc=STATUS)
-      VERIFY_(STATUS)
+      call MAPL_GetPointer(internal, U, "U", _RC) ! A-Grid U Wind
+      IS = lbound(U,1); IE = ubound(U,1)
+      JS = lbound(U,2); JE = ubound(U,2)
+      KS = lbound(U,3); KE = ubound(U,3)
+      KM = KE-KS+1
+      call MAPL_GetPointer(internal, V, "V", _RC) ! A-Grid V Wind
+      call MAPL_GetPointer(internal, PT, "PT", _RC) ! potential temperature
+      call MAPL_GetPointer(internal, PE1, "PE", _RC) ! edge pressures - 1 based
+      PE(is:ie, js:je, 0:km) => PE1(is:ie, js:je, 1:km+1)
+      call MAPL_GetPointer(internal, PKZ , "PKZ", _RC) ! presssure ^ kappa at mid-layers
+      call MAPL_GetPointer(internal, ak1, "AK" , _RC) ! AK for vertical coordinate - 1 based
+      ak(0:km) => ak1(1:km+1)
+      call MAPL_GetPointer(internal, bk1, "BK" , _RC) ! BK for vertical coordinate - 1 based
+      bk(0:km) => bk1(1:km+1)
+      call MAPL_GetPointer(import, phis, "PHIS", _RC) ! surface geopotential
 
       U = 0.0
 
-      IS = lbound(U,1)
-      IE = ubound(U,1)
-      JS = lbound(U,2)
-      JE = ubound(U,2)
-      KS = lbound(U,3)
-      KE = ubound(U,3)
-      KM = KE-KS+1
-
       ALLOCATE( PS(IS:IE,JS:JE) )
 
-      call ESMF_ConfigGetAttribute( cf, IM, label='IM:', default=0 , rc = rc )
-      call ESMF_ConfigGetAttribute( cf, JM, label='JM:', default=0 , rc = rc )
+      call MAPL_GridCompGetResource(gc, "IM", IM, default=0, _RC)
+      call MAPL_GridCompGetResource(gc, "JM", JM, default=0, _RC)
 
       if (KM<=2) then   ! Shallow Water
 
-         call ESMF_ConfigGetAttribute( cf, case_id, label='CASE_ID:', default=1 , rc = rc )
+         call MAPL_GridCompGetResource(gc, "CASE_ID", case_id, default=1, _RC)
          DYN_CASE = case_id
 
          do j=JS,JE
             do i=IS,IE
-               LONc = LONS(i,j)
-               LATc = LATS(i,j)
+               LONc = lons(i,j)
+               LATc = lats(i,j)
                U(i,j,1)  = sw_uwnd(LONc,LATc,case_id)
                V(i,j,1)  = sw_vwnd(LONc,LATc,case_id)
                PE(i,j,0) = sw_phis(LONc,LATc,case_id)
@@ -5363,55 +5318,53 @@ contains
          U(IS:IE,JS:JE,KE) = .001*abs(lats(:,:))
          V = 0.0
 
-         call ESMF_ConfigFindLabel( cf, 'AK:', isPresent=isPresent, rc = status )
-         VERIFY_(STATUS)
-         if (isPresent) then
-            do L = 0, SIZE(AK)-1
-               call ESMF_ConfigNextLine  ( CF, rc=STATUS )
-               call ESMF_ConfigGetAttribute( cf, AK(L), rc = status )
-               VERIFY_(STATUS)
-            enddo
-         else
-            ak_is_missing = .true.
-         endif
+         ! pchakrab - TODO: read ak from resource file, if present
+         ! call ESMF_ConfigFindLabel( cf, 'AK:', isPresent=isPresent, rc = status )
+         ! VERIFY_(STATUS)
+         ! if (isPresent) then
+         !    do L = 0, SIZE(AK)-1
+         !       call ESMF_ConfigNextLine  ( CF, rc=STATUS )
+         !       call ESMF_ConfigGetAttribute( cf, AK(L), rc = status )
+         !       VERIFY_(STATUS)
+         !    enddo
+         ! else
+         ak_is_missing = .true.
+         ! endif
 
-         call ESMF_ConfigFindLabel( cf, 'BK:', isPresent=isPresent, rc = status )
-         VERIFY_(STATUS)
-         if (isPresent) then
-            do L = 0, SIZE(bk)-1
-               call ESMF_ConfigNextLine  ( CF, rc=STATUS )
-               call ESMF_ConfigGetAttribute( cf, BK(L), rc = status )
-               VERIFY_(STATUS)
-            enddo
-         else
-            bk_is_missing = .true.
-         endif
+         ! pchakrab - TODO: read bk from resource file, if present
+         ! call ESMF_ConfigFindLabel( cf, 'BK:', isPresent=isPresent, rc = status )
+         ! VERIFY_(STATUS)
+         ! if (isPresent) then
+         !    do L = 0, SIZE(bk)-1
+         !       call ESMF_ConfigNextLine  ( CF, rc=STATUS )
+         !       call ESMF_ConfigGetAttribute( cf, BK(L), rc = status )
+         !       VERIFY_(STATUS)
+         !    enddo
+         ! else
+         bk_is_missing = .true.
+         ! endif
 
          if (ak_is_missing .or. bk_is_missing) call set_eta(km, ls, ptop, pint, AK, BK)
-         
-         _ASSERT(ANY(AK /= 0.0) .or. ANY(BK /= 0.0),'needs informative message')
-         do L=lbound(PE,3),ubound(PE,3)
+         _ASSERT(any(AK /= 0.0) .or. any(BK /= 0.0), "needs informative message")
+
+         do L = lbound(PE,3), ubound(PE,3)
             PE(:,:,L) = AK(L) + BK(L)*MAPL_P00
          enddo
-
-         PKZ = 0.5*(PE(:,:,lbound(PE,3)  :ubound(PE,3)-1) + &
-              PE(:,:,lbound(PE,3)+1:ubound(PE,3)  ) )
+         PKZ = 0.5*( PE(:,:,lbound(PE,3):ubound(PE,3)-1) + PE(:,:,lbound(PE,3)+1:ubound(PE,3)) )
          PKZ = PKZ**MAPL_KAPPA
-
          PT = T0/PKZ
 
          ! Check if running standalone model
-         call ESMF_ConfigGetAttribute ( CF, FV3_STANDALONE, Label="FV3_STANDALONE:", default=0, RC=STATUS)
-         VERIFY_(STATUS)
+         call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=0, _RC)
 
          ! 3D Baroclinic Test Cases
-         call ESMF_ConfigGetAttribute( cf, case_id      , label='CASE_ID:'      , default=0 , rc = rc )
-         call ESMF_ConfigGetAttribute( cf, case_rotation, label='CASE_ROTATION:', default=0 , rc = rc )
-         call ESMF_ConfigGetAttribute( cf, case_tracers , label='CASE_TRACERS:' , default=1234, rc = rc )
+         call MAPL_GridCompGetResource(gc, "CASE_ID", case_id, default=0, _RC)
+         call MAPL_GridCompGetResource(gc, "CASE_ROTATION", case_rotation, default=0 , _RC)
+         call MAPL_GridCompGetResource(gc, "CASE_TRACERS" , case_tracers, default=1234, _RC)
          DYN_CASE = case_id
 
-         write(STRING,'(A,I5,A)') "Initializing CASE_ID ", case_id, " in FVcubed:"
-         call WRITE_PARALLEL( trim(STRING) )
+         write(string,'(A,I5,A)') "Initializing CASE_ID ", case_id, " in FVcubed:"
+         call WRITE_PARALLEL( trim(string) )
 
          ! Parse case_rotation
          if (case_rotation == -1) rot_ang =  0
@@ -5435,8 +5388,8 @@ contains
                eta = 0.5*( (ak(k-1)+ak(k))/1.e5 + bk(k-1)+bk(k) )
                do j=JS,JE
                   do i=IS,IE
-                     LONc = LONS(i,j)
-                     LATc = LATS(i,j)
+                     LONc = lons(i,j)
+                     LATc = lats(i,j)
                      U(i,j,k) = u_wind(LONc,LATc,eta,perturb,rot_ang)
                      V(i,j,k) = v_wind(LONc,LATc,eta,perturb,rot_ang)
                      if (k==KS) phis(i,j) = surface_geopotential(LONc,LATc,rot_ang)
@@ -5453,8 +5406,8 @@ contains
                eta = 0.5*( (ak(k-1)+ak(k))/1.e5 + bk(k-1)+bk(k) )
                do j=JS,JE
                   do i=IS,IE
-                     LONc = LONS(i,j)
-                     LATc = LATS(i,j)
+                     LONc = lons(i,j)
+                     LATc = lats(i,j)
                      U(i,j,k) = u_wind(LONc,LATc,eta,perturb,rot_ang)
                      V(i,j,k) = v_wind(LONc,LATc,eta,perturb,rot_ang)
                      if (k==KS) phis(i,j) = surface_geopotential(LONc,LATc,rot_ang)
@@ -5476,10 +5429,8 @@ contains
 
             !PURE_ADVECTION = .true.
 
-            allocate( Q5(IS:IE, JS:JE, 0:KM-1), STAT=STATUS)
-            VERIFY_(STATUS)
-            allocate( Q6(IS:IE, JS:JE, 0:KM-1), STAT=STATUS)
-            VERIFY_(STATUS)
+            allocate(Q5(IS:IE, JS:JE, 0:KM-1), _STAT)
+            allocate(Q6(IS:IE, JS:JE, 0:KM-1), _STAT)
 
             ztop = 12000.0
             dz   = ztop/KM
@@ -5487,8 +5438,8 @@ contains
                height = (ztop - 0.5*dz) - (k)*dz  ! Layer middle height
                do j=JS,JE
                   do i=IS,IE
-                     LONc = LONS(i,j)
-                     LATc = LATS(i,j)
+                     LONc = lons(i,j)
+                     LATc = lats(i,j)
                      call  advection('56', LONc, LATc, height, rot_ang,  &
                           dummy_1, dummy_2, dummy_3, dummy_4, &
                           PS(i,j), Q5(i,j,k), Q6(i,j,k))
@@ -5518,8 +5469,8 @@ contains
 
             do j=JS,JE
                do i=IS,IE
-                  LONc = LONS(i,j)
-                  LATc = LATS(i,j)
+                  LONc = lons(i,j)
+                  LATc = lats(i,j)
                   pressure = 500.
                   call Rossby_Haurwitz(LONc,LATc, pressure, dummy_1, dummy_2, dummy_3, dummy_4, PS(i,j))
                   U(i,j,1)  = dummy_1
@@ -5534,8 +5485,8 @@ contains
             do k=KS,KE
                do j=JS,JE
                   do i=IS,IE
-                     LONc = LONS(i,j)
-                     LATc = LATS(i,j)
+                     LONc = lons(i,j)
+                     LATc = lats(i,j)
                      pressure = 0.5*(PE(i,j,k)+PE(i,j,k+1))
                      call Rossby_Haurwitz(LONc,LATc, pressure, dummy_1, dummy_2, dummy_3, dummy_4, PS(i,j))
                      U(i,j,k)  = dummy_1
@@ -5561,8 +5512,8 @@ contains
             do k=KS,KE
                do j=JS,JE
                   do i=IS,IE
-                     LONc = LONS(i,j)
-                     LATc = LATS(i,j)
+                     LONc = lons(i,j)
+                     LATc = lats(i,j)
                      pressure = 0.5*(PE(i,j,k)+PE(i,j,k+1))
                      call mountain_Rossby(case_rotation,LONc,LATc, pressure, dummy_1, dummy_2, dummy_3, dummy_4, PS(i,j))
                      U(i,j,k)  = dummy_1
@@ -5602,8 +5553,8 @@ contains
                height = (ztop - 0.5d0*dz) - (k)*dz  ! Layer middle height
                do j=JS,JE
                   do i=IS,IE
-                     LONc = LONS(i,j)
-                     LATc = LATS(i,j)
+                     LONc = lons(i,j)
+                     LATc = lats(i,j)
                      call gravity_wave(case_rotation, LONc,LATc, height, dummy_1, dummy_2, dummy_3, dummy_4, PS(i,j))
                      U(i,j,k)  = dummy_1
                      V(i,j,k)  = dummy_2
@@ -5619,8 +5570,8 @@ contains
                   height = ztop - k*dz  ! Layer edge height
                   do j=JS,JE
                      do i=IS,IE
-                        LONc = LONS(i,j)
-                        LATc = LATS(i,j)
+                        LONc = lons(i,j)
+                        LATc = lats(i,j)
                         call gravity_wave(case_rotation, LONc,LATc, height, dummy_1, dummy_2, dummy_3, dummy_4, dummy_5, pressure=dummy_6)
                         PE(i,j,k) = dummy_6
                         eta     = PE(i,j,k)/PS(i,j)
@@ -5635,7 +5586,7 @@ contains
             do L=lbound(PE,3),ubound(PE,3)
                PE(:,:,L) = AK(L) + BK(L)*PS(:,:)
             enddo
-            
+
             do k=KS,KE
                do j=JS,JE
                   do i=IS,IE
@@ -5653,25 +5604,21 @@ contains
          ! Parse Tracers
          !--------------------
          if (FV3_STANDALONE /= 0) then
-            call ESMF_StateGet(import, 'TRADV' , TRADV_BUNDLE,   RC=STATUS)
-            VERIFY_(STATUS)
+            call ESMF_StateGet(import, "TRADV", tradv_bundle, _RC)
+            call ESMF_GridCompGet(gc, grid=esmfgrid, _RC)
 
-            call ESMF_GridCompGet(gc, grid=esmfGRID, rc=STATUS)
-            VERIFY_(STATUS)
+            allocate(tracer(IS:IE, JS:JE, 1:KM), _STAT)
 
-            allocate( TRACER(IS:IE, JS:JE, 1:KM), STAT=STATUS)
-            VERIFY_(STATUS)
-
-            TRACER(:,:,:)  = 0.0
-            FIELDNAME = 'Q'
-            call addTracer(STATE, TRADV_BUNDLE, TRACER, esmfGRID, FIELDNAME)
+            tracer(:,:,:)  = 0.0
+            fieldname = 'Q'
+            call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
 
             if (case_tracers /= 1234) then
 
                do n=1,case_tracers
-                  TRACER(:,:,:)  = 0.0
-                  write(FIELDNAME, "('Q',i3.3)") n
-                  call addTracer(STATE, TRADV_BUNDLE, TRACER, esmfGRID, FIELDNAME)
+                  tracer(:,:,:) = 0.0
+                  write(fieldname, "('Q',i3.3)") n
+                  call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
                enddo
 
             else
@@ -5679,20 +5626,20 @@ contains
                !-------------------
                !     tracer q1
                !-------------------
-               TRACER(:,:,:) = 0.0
+               tracer(:,:,:) = 0.0
                do k=KS,KE
                   eta = 0.5*( (ak(k-1)+ak(k))/1.e5 + bk(k-1)+bk(k) )
                   do j=JS,JE
                      do i=IS,IE
-                        LONc = LONS(i,j)
-                        LATc = LATS(i,j)
+                        LONc = lons(i,j)
+                        LATc = lats(i,j)
                         dummy_1 = tracer_q1_q2(LONc,LATc,eta,rot_ang,r0_6)
-                        TRACER(i,j,k) = dummy_1
+                        tracer(i,j,k) = dummy_1
                      enddo
                   enddo
                enddo
-               FIELDNAME = 'Q1'
-               call addTracer(STATE, TRADV_BUNDLE, TRACER, esmfGRID, FIELDNAME)
+               fieldname = 'Q1'
+               call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
 
                !-------------------
                !     tracer q2
@@ -5701,15 +5648,15 @@ contains
                   eta = 0.5*( (ak(k-1)+ak(k))/1.e5 + bk(k-1)+bk(k) )
                   do j=JS,JE
                      do i=IS,IE
-                        LONc = LONS(i,j)
-                        LATc = LATS(i,j)
+                        LONc = lons(i,j)
+                        LATc = lats(i,j)
                         dummy_1 = tracer_q1_q2(LONc,LATc,eta,rot_ang,r1_0)
-                        TRACER(i,j,k) = dummy_1
+                        tracer(i,j,k) = dummy_1
                      enddo
                   enddo
                enddo
-               FIELDNAME = 'Q2'
-               call addTracer(STATE, TRADV_BUNDLE, TRACER, esmfGRID, FIELDNAME)
+               fieldname = 'Q2'
+               call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
 
                !-------------------
                !     tracer q3
@@ -5718,63 +5665,57 @@ contains
                   eta = 0.5*( (ak(k-1)+ak(k))/1.e5 + bk(k-1)+bk(k) )
                   do j=JS,JE
                      do i=IS,IE
-                        LONc = LONS(i,j)
-                        LATc = LATS(i,j)
+                        LONc = lons(i,j)
+                        LATc = lats(i,j)
                         dummy_1 = tracer_q3(LONc,LATc,eta,rot_ang)
-                        TRACER(i,j,k) = dummy_1
+                        tracer(i,j,k) = dummy_1
                      enddo
                   enddo
                enddo
-               FIELDNAME = 'Q3'
-               call addTracer(STATE, TRADV_BUNDLE, TRACER, esmfGRID, FIELDNAME)
+               fieldname = 'Q3'
+               call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
 
                !-------------------
                !     tracer q4
                !-------------------
-               TRACER(:,:,:)  = 1.0_r4
-               FIELDNAME = 'Q4'
-               call addTracer(STATE, TRADV_BUNDLE, TRACER, esmfGRID, FIELDNAME)
-               VERIFY_(STATUS)
+               tracer(:,:,:)  = 1.0_r4
+               fieldname = 'Q4'
+               call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
 
                !-------------------
                !     tracer q5
                !-------------------
                if (allocated(Q5)) then
-                  TRACER(:,:,:)  = Q5(:,:,:)
-                  FIELDNAME = 'Q5'
-                  call addTracer(STATE, TRADV_BUNDLE, TRACER, esmfGRID, FIELDNAME)
-                  VERIFY_(STATUS)
-                  deallocate( Q5, STAT=STATUS)
-                  VERIFY_(STATUS)
+                  tracer(:,:,:)  = Q5(:,:,:)
+                  fieldname = 'Q5'
+                  call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
+                  deallocate(Q5, _STAT)
                endif
 
                !-------------------
                !     tracer q6
                !-------------------
                if (allocated(Q6)) then
-                  TRACER(:,:,:)  = Q6(:,:,:)
-                  FIELDNAME = 'Q6'
-                  call addTracer(STATE, TRADV_BUNDLE, TRACER, esmfGRID, FIELDNAME)
-                  VERIFY_(STATUS)
-                  deallocate( Q6, STAT=STATUS)
-                  VERIFY_(STATUS)
+                  tracer(:,:,:)  = Q6(:,:,:)
+                  fieldname = 'Q6'
+                  call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
+                  deallocate(Q6, _STAT)
                endif
 
             endif
 
-            deallocate( TRACER, STAT=STATUS)
-            VERIFY_(STATUS)
+            deallocate(tracer, _STAT)
 
          endif
       endif
 
-      DEALLOCATE( PS )
+      deallocate(PS)
 
       DYN_COLDSTART=.true.
 
       _RETURN(_SUCCESS)
 
-   end subroutine COLDSTART
+   end subroutine Coldstart
 
 #ifdef MY_SET_ETA
    subroutine set_eta(km, ptop, ak, bk)
@@ -6387,7 +6328,7 @@ contains
             print*,' '
          End IF
       endif
-      
+
       deallocate(arr_global, glbArr)
 
    End Subroutine Write_Profile_R4

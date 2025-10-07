@@ -2,9 +2,9 @@ schema_version: 2.0.0
 component: DynCore
 
 category: EXPORT
-#---------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    SHORT_NAME     |                                 LONG_NAME                                 |       UNITS        |  DIMS | VLOC |     FIELD_TYPE     |   PRECISION
-#---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    SHORT_NAME     |                                 LONG_NAME                                 |       UNITS        |  DIMS | VLOC |     FIELD_TYPE     | TYPEKIND
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
         KE         |                   vertically_integrated_kinetic_energy                    |       J m-2        |  xy   |  N   |                    |
        TAVE        |                    vertically_averaged_dry_temperature                    |         K          |  xy   |  N   |                    |
        UAVE        |                      vertically_averaged_zonal_wind                       |      m sec-1       |  xy   |  N   |  MAPL_VectorField  |
@@ -66,16 +66,16 @@ category: EXPORT
        DELZ        |                      nonhydrostatic_layer_thickness                       |       m s-1        |  xyz  |  C   |                    |
         W          |                             vertical_velocity                             |       m s-1        |  xyz  |  C   |                    |
       OMEGA        |                  hydrostatic_vertical_pressure_velocity                   |       Pa s-1       |  xyz  |  C   |                    |
-        CX         |                    eastward_accumulated_courant_number                    |         1          |  xyz  |  C   |                    |  ESMF_KIND_R8
-        CY         |                   northward_accumulated_courant_number                    |         1          |  xyz  |  C   |                    |  ESMF_KIND_R8
+        CX         |                    eastward_accumulated_courant_number                    |         1          |  xyz  |  C   |                    |  R8
+        CY         |                   northward_accumulated_courant_number                    |         1          |  xyz  |  C   |                    |  R8
         CU         |                    eastward_accumulated_courant_number                    |         1          |  xyz  |  C   |                    |
         CV         |                   northward_accumulated_courant_number                    |         1          |  xyz  |  C   |                    |
         MX         |             pressure_weighted_accumulated_eastward_mass_flux              |       Pa m+2       |  xyz  |  C   |                    |
         MY         |             pressure_weighted_accumulated_northward_mass_flux             |       Pa m+2       |  xyz  |  C   |                    |
-       MFX         |             pressure_weighted_accumulated_eastward_mass_flux              |       Pa m+2       |  xyz  |  C   |                    |  ESMF_KIND_R8
-       MFY         |             pressure_weighted_accumulated_northward_mass_flux             |       Pa m+2       |  xyz  |  C   |                    |  ESMF_KIND_R8
-       MFZ         |                            vertical_mass_flux                             |     kg m-2 s-1     |  xyz  |  E   |                    |  ESMF_KIND_R8
-        MZ         |                            vertical_mass_flux                             |     kg m-2 s-1     |  xyz  |  E   |                    |  ESMF_KIND_R4
+       MFX         |             pressure_weighted_accumulated_eastward_mass_flux              |       Pa m+2       |  xyz  |  C   |                    |  R8
+       MFY         |             pressure_weighted_accumulated_northward_mass_flux             |       Pa m+2       |  xyz  |  C   |                    |  R8
+       MFZ         |                            vertical_mass_flux                             |     kg m-2 s-1     |  xyz  |  E   |                    |  R8
+        MZ         |                            vertical_mass_flux                             |     kg m-2 s-1     |  xyz  |  E   |                    |  R4
         PV         |                   ertels_isentropic_potential_vorticity                   |    m+2 kg-1 s-1    |  xyz  |  C   |                    |
        EPV         |                        ertels_potential_vorticity                         |   K m+2 kg-1 s-1   |  xyz  |  C   |                    |
         Q          |                             specific_humidity                             |         1          |  xyz  |  C   |                    |
@@ -121,8 +121,8 @@ category: EXPORT
   TROPK_BLENDED    |                tropopause_index_based_on_blended_estimate                 |      unitless      |  xy   |  N   |                    |
       TROPT        |            tropopause_temperature_using_blended_TROPP_estimate            |         K          |  xy   |  N   |                    |
       TROPQ        |         tropopause_specific_humidity_using_blended_TROPP_estimate         |       kg/kg        |  xy   |  N   |                    |
-       PLE0        |                  pressure_at_layer_edges_before_dynamics                  |         Pa         |  xyz  |  E   |                    |  ESMF_KIND_R8
-       PLE1        |                  pressure_at_layer_edges_after_dynamics                   |         Pa         |  xyz  |  E   |                    |  ESMF_KIND_R8
+       PLE0        |                  pressure_at_layer_edges_before_dynamics                  |         Pa         |  xyz  |  E   |                    |  R8
+       PLE1        |                  pressure_at_layer_edges_after_dynamics                   |         Pa         |  xyz  |  E   |                    |  R8
        DELP        |                            pressure_thickness                             |         Pa         |  xyz  |  C   |                    |
      DELPTOP       |                      pressure_thickness_at_model_top                      |         Pa         |  xy   |  N   |                    |
      U_AGRID       |                          eastward_wind_on_A-Grid                          |       m s-1        |  xyz  |  C   |                    |
@@ -259,15 +259,15 @@ category: IMPORT
 
 
 category: INTERNAL
-#---------------------------------------------------------------------------------------------------------------------------
- SHORT_NAME  |           LONG_NAME            |       UNITS        |   PRECISION    |  DIMS |        RESTART         | VLOC
-#---------------------------------------------------------------------------------------------------------------------------
-     AK      |    hybrid_sigma_pressure_a     |         Pa         |  ESMF_KIND_R8  |    z  |  MAPL_RestartRequired  |  E
-     BK      |    hybrid_sigma_pressure_b     |         1          |  ESMF_KIND_R8  |    z  |  MAPL_RestartRequired  |  E
-     U       |         eastward_wind          |       m s-1        |  ESMF_KIND_R8  |  xyz  |  MAPL_RestartRequired  |  C
-     V       |         northward_wind         |       m s-1        |  ESMF_KIND_R8  |  xyz  |  MAPL_RestartRequired  |  C
-     PT      |  scaled_potential_temperature  |  K Pa$^{-\kappa}$  |  ESMF_KIND_R8  |  xyz  |  MAPL_RestartRequired  |  C
-     PE      |          air_pressure          |         Pa         |  ESMF_KIND_R8  |  xyz  |  MAPL_RestartRequired  |  E
-    PKZ      |       pressure_to_kappa        |    Pa$^\kappa$     |  ESMF_KIND_R8  |  xyz  |  MAPL_RestartRequired  |  C
-     DZ      |        height_thickness        |         m          |  ESMF_KIND_R8  |  xyz  |                        |  C
-     W       |       vertical_velocity        |       m s-1        |  ESMF_KIND_R8  |  xyz  |                        |  C
+#---------------------------------------------------------------------------------------------------------------------
+ SHORT_NAME  |           LONG_NAME            |       UNITS        | TYPEKIND |  DIMS |        RESTART         | VLOC
+#---------------------------------------------------------------------------------------------------------------------
+     AK      |    hybrid_sigma_pressure_a     |         Pa         |     R8   |    z  |  MAPL_RestartRequired  |  E
+     BK      |    hybrid_sigma_pressure_b     |         1          |     R8   |    z  |  MAPL_RestartRequired  |  E
+     U       |         eastward_wind          |       m s-1        |     R8   |  xyz  |  MAPL_RestartRequired  |  C
+     V       |         northward_wind         |       m s-1        |     R8   |  xyz  |  MAPL_RestartRequired  |  C
+     PT      |  scaled_potential_temperature  |  K Pa$^{-\kappa}$  |     R8   |  xyz  |  MAPL_RestartRequired  |  C
+     PE      |          air_pressure          |         Pa         |     R8   |  xyz  |  MAPL_RestartRequired  |  E
+    PKZ      |       pressure_to_kappa        |    Pa$^\kappa$     |     R8   |  xyz  |  MAPL_RestartRequired  |  C
+     DZ      |        height_thickness        |         m          |     R8   |  xyz  |                        |  C
+     W       |       vertical_velocity        |       m s-1        |     R8   |  xyz  |                        |  C
