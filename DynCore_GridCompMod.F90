@@ -622,6 +622,7 @@ contains
       ! call MAPL_TimerOff(MAPL,"INITIALIZE")
       ! call MAPL_TimerOff(MAPL,"TOTAL")
 
+      call logger%info("Initialize:: ...complete")
       _RETURN(_SUCCESS)
    end subroutine Initialize
 
@@ -654,16 +655,15 @@ contains
       integer :: status
       type(ESMF_FieldBundle) :: bundle, ana_bundle
       type(ESMF_Field) :: field, ana_field
-      type(ESMF_Config) :: cf
       type(ESMF_Alarm) :: alarm
       type(ESMF_Grid) :: esmfgrid, ana_grid
       type(ESMF_Time) :: current_time, RefTime
+      type(ESMF_HConfig) :: hconfig
+
       class(AbstractRegridder), pointer :: L2C, C2L
 
-      type(MAPL_MetaComp), pointer :: MAPL
-
       type(DYN_wrap) :: wrap
-      type(DynState), pointer :: STATE
+      type(DynState), pointer :: state
       type(DynGrid), pointer :: grid
       type(DynVars), pointer :: vars
 
@@ -740,22 +740,22 @@ contains
       real(r8), allocatable :: pedyn (:,:)
       real(r8), allocatable :: tedyn (:,:)
 
-      real(kind=4), allocatable :: dqvdtanaint1(:,:)
-      real(kind=4), allocatable :: dqvdtanaint2(:,:)
-      real(kind=4), allocatable :: dqldtanaint1(:,:)
-      real(kind=4), allocatable :: dqldtanaint2(:,:)
-      real(kind=4), allocatable :: dqidtanaint1(:,:)
-      real(kind=4), allocatable :: dqidtanaint2(:,:)
-      real(kind=4), allocatable :: doxdtanaint1(:,:)
-      real(kind=4), allocatable :: doxdtanaint2(:,:)
-      real(kind=4), allocatable :: dthdtanaint1(:,:)
-      real(kind=4), allocatable :: dthdtanaint2(:,:)
+      real(r4), allocatable :: dqvdtanaint1(:,:)
+      real(r4), allocatable :: dqvdtanaint2(:,:)
+      real(r4), allocatable :: dqldtanaint1(:,:)
+      real(r4), allocatable :: dqldtanaint2(:,:)
+      real(r4), allocatable :: dqidtanaint1(:,:)
+      real(r4), allocatable :: dqidtanaint2(:,:)
+      real(r4), allocatable :: doxdtanaint1(:,:)
+      real(r4), allocatable :: doxdtanaint2(:,:)
+      real(r4), allocatable :: dthdtanaint1(:,:)
+      real(r4), allocatable :: dthdtanaint2(:,:)
 
-      real(kind=4), allocatable :: tropp1(:,:)   ! Tropopause Pressure
-      real(kind=4), allocatable :: tropp2(:,:)   ! Tropopause Pressure
-      real(kind=4), allocatable :: tropp3(:,:)   ! Tropopause Pressure
-      real(kind=4), allocatable :: tropt (:,:)   ! Tropopause Temperature
-      real(kind=4), allocatable :: tropq (:,:)   ! Tropopause Specific Humidity
+      real(r4), allocatable :: tropp1(:,:)   ! Tropopause Pressure
+      real(r4), allocatable :: tropp2(:,:)   ! Tropopause Pressure
+      real(r4), allocatable :: tropp3(:,:)   ! Tropopause Pressure
+      real(r4), allocatable :: tropt (:,:)   ! Tropopause Temperature
+      real(r4), allocatable :: tropq (:,:)   ! Tropopause Specific Humidity
 
       real(r8), allocatable :: omaxyz(:,:,:) ! vertical pressure velocity (pa/sec)
       real(r8), allocatable :: epvxyz(:,:,:) ! ertel's potential vorticity
@@ -770,35 +770,35 @@ contains
       real(r8), allocatable :: trsum1(:)     ! Global Sum of Tracers before Add_Incs
       real(r8), allocatable :: trsum2(:)     ! Global Sum of Tracers after  Add_Incs
 
-      real(kind=4), pointer ::      dudtana(:,:,:)
-      real(kind=4), pointer ::      dvdtana(:,:,:)
-      real(kind=4), pointer ::      dtdtana(:,:,:)
-      real(kind=4), pointer ::     ddpdtana(:,:,:)
-      real(kind=4), pointer ::       qctmp (:,:,:)
-      real(kind=4), pointer ::       dqldt (:,:,:)
-      real(kind=4), pointer ::       dqidt (:,:,:)
-      real(kind=4), pointer ::       doxdt (:,:,:)
-      real(kind=4), pointer ::      dqvana (:,:,:)
-      real(kind=4), pointer ::      dqlana (:,:,:)
-      real(kind=4), pointer ::      dqiana (:,:,:)
-      real(kind=4), pointer ::      dqrana (:,:,:)
-      real(kind=4), pointer ::      dqsana (:,:,:)
-      real(kind=4), pointer ::      dqgana (:,:,:)
-      real(kind=4), pointer ::      doxana (:,:,:)
-      real(kind=4), pointer ::       temp3d(:,:,:)
-      real(kind=4), pointer ::       vtmp3d(:,:,:)
-      real(kind=4), pointer ::         area(:,:)
-      real(kind=4), pointer ::       temp2d(:,:)
-      real(kind=4), pointer ::       tempu (:,:)
-      real(kind=4), pointer ::       tempv (:,:)
-      real(kind=4), allocatable ::   cubetemp3d(:,:,:)
-      real(kind=4), allocatable ::   cubevtmp3d(:,:,:)
+      real(r4), pointer ::      dudtana(:,:,:)
+      real(r4), pointer ::      dvdtana(:,:,:)
+      real(r4), pointer ::      dtdtana(:,:,:)
+      real(r4), pointer ::     ddpdtana(:,:,:)
+      real(r4), pointer ::       qctmp (:,:,:)
+      real(r4), pointer ::       dqldt (:,:,:)
+      real(r4), pointer ::       dqidt (:,:,:)
+      real(r4), pointer ::       doxdt (:,:,:)
+      real(r4), pointer ::      dqvana (:,:,:)
+      real(r4), pointer ::      dqlana (:,:,:)
+      real(r4), pointer ::      dqiana (:,:,:)
+      real(r4), pointer ::      dqrana (:,:,:)
+      real(r4), pointer ::      dqsana (:,:,:)
+      real(r4), pointer ::      dqgana (:,:,:)
+      real(r4), pointer ::      doxana (:,:,:)
+      real(r4), pointer ::       temp3d(:,:,:)
+      real(r4), pointer ::       vtmp3d(:,:,:)
+      real(r4), pointer ::         area(:,:)
+      real(r4), pointer ::       temp2d(:,:)
+      real(r4), pointer ::       tempu (:,:)
+      real(r4), pointer ::       tempv (:,:)
+      real(r4), allocatable ::   cubetemp3d(:,:,:)
+      real(r4), allocatable ::   cubevtmp3d(:,:,:)
 
-      real(kind=4), pointer :: uh25(:,:)
-      real(kind=4), pointer :: uh03(:,:)
-      real(kind=4), pointer :: srh01(:,:)
-      real(kind=4), pointer :: srh03(:,:)
-      real(kind=4), pointer :: srh25(:,:)
+      real(r4), pointer :: uh25(:,:)
+      real(r4), pointer :: uh03(:,:)
+      real(r4), pointer :: srh01(:,:)
+      real(r4), pointer :: srh03(:,:)
+      real(r4), pointer :: srh25(:,:)
 
       real(r8),     allocatable ::   uatmp(:,:,:)
       real(r8),     allocatable ::   vatmp(:,:,:)
@@ -807,20 +807,15 @@ contains
 
       character(len=ESMF_MAXSTR), ALLOCATABLE       :: NAMES (:)
       character(len=ESMF_MAXSTR), ALLOCATABLE       :: NAMES0(:)
-      character(len=ESMF_MAXSTR) :: IAm
-      character(len=ESMF_MAXSTR) :: comp_name
       character(len=ESMF_MAXSTR) :: STRING
-      character(len=ESMF_MAXSTR) :: ReplayFile
-      character(len=ESMF_MAXSTR) :: ReplayType
-      character(len=ESMF_MAXSTR) :: ReplayMode
-      character(len=ESMF_MAXSTR) :: cremap,tremap
-      character(len=ESMF_MAXSTR) :: uname,vname,tname,qname,psname,dpname,o3name,rgrid,tvar
+      character(len=:), allocatable :: ReplayMode, ReplayFile, ReplayType
+      character(len=:), allocatable :: cremap,tremap
+      character(len=:), allocatable :: uname,vname,tname,qname,psname,dpname,o3name,rgrid,tvar
 
-      type(MAPL_SunOrbit)        :: ORBIT
-      real(kind=4), pointer      :: LATS(:,:)
-      real(kind=4), pointer      :: LONS(:,:)
-      real(kind=4), allocatable  ::  ZTH(:,:)
-      real(kind=4), allocatable  ::  SLR(:,:)
+      type(MAPL_SunOrbit) :: ORBIT
+      real(r4), pointer :: lats(:,:), lons(:,:)
+      real(r4), allocatable  ::  ZTH(:,:)
+      real(r4), allocatable  ::  SLR(:,:)
 
       real                  :: rc_blend_p_above
       real                  :: rc_blend_p_below
@@ -829,8 +824,8 @@ contains
 
       real                  :: HGT_SURFACE
 
-      character(len=ESMF_MAXSTR) :: ANA_IS_WEIGHTED
-      logical                    ::     IS_WEIGHTED
+      character(len=:), allocatable :: ANA_IS_WEIGHTED
+      logical                    ::     is_weighted
 
       type(DynTracers)            :: qqq       ! Specific Humidity
       type(DynTracers)            :: ooo       ! ox
@@ -848,10 +843,8 @@ contains
       logical                             :: exclude
       character(len=ESMF_MAXSTR)          :: tmpstring
       character(len=ESMF_MAXSTR)          :: fieldname
-      character(len=ESMF_MAXSTR)          :: adjustTracerMode
-      character(len=ESMF_MAXSTR), allocatable :: xlist(:)
+      character(len=:), allocatable :: adjustTracerMode, xlist(:)
       character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
-      integer, parameter                  :: XLIST_MAX = 60
       logical                             :: isPresent
 
       logical                             :: doEnergetics
@@ -862,139 +855,121 @@ contains
       character(len=ESMF_MAXSTR) :: myTracer
       integer :: itracer
       real(kind=r8) :: t1, t2, dyn_run_timer
+      class(logger_t), pointer :: logger
 
-      Iam = "Run"
-      call ESMF_GridCompGet(gc, name=comp_name, CONFIG=cf, grid=esmfgrid, _RC)
-      Iam = trim(comp_name) // trim(Iam)
-
+      call MAPL_GridCompGet(gc, grid=esmfgrid, hconfig=hconfig, logger=logger, _RC)
+      call logger%info("Run:: starting...")
       call ESMF_GridValidate(esmfgrid, _RC)
 
-      ! Retrieve the pointer to the generic state
-      call MAPL_GetObjectFromGC(gc, MAPL, _RC)
+      ! call MAPL_TimerOn(MAPL, "TOTAL")
+      ! call MAPL_TimerOn(MAPL, "RUN")
 
-      call MAPL_TimerOn(MAPL, "TOTAL")
-      call MAPL_TimerOn(MAPL, "RUN")
-
-      call MAPL_Get(MAPL, LONS=LONS, LATS=LATS, _RC)
-
-      call MAPL_GetPointer(export, temp2d, 'LONS', _RC)
-      if( associated(temp2D) ) temp2d = LONS
-      call MAPL_GetPointer(export, temp2d, 'LATS', _RC)
-      if( associated(temp2D) ) temp2d = LATS
+      call MAPL_GridGet(esmfgrid, longitudes=lons, latitudes=lats, _RC)
+      call MAPL_GetPointer(export, temp2d, "LONS", _RC)
+      if( associated(temp2D) ) temp2d = lons
+      call MAPL_GetPointer(export, temp2d, "LATS", _RC)
+      if( associated(temp2D) ) temp2d = lats
 
       ! Retrieve the pointer to the internal state
-      call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, status)
-      VERIFY_(STATUS)
+      call ESMF_UserCompGetInternalState(gc, "DYNstate", wrap, _RC)
       state => wrap%dyn_state
 
-      vars  => state%vars   ! direct handle to control variables
-      grid  => state%grid   ! direct handle to grid
-      dt    =  state%dt     ! dynamics time step (large)
+      vars => state%vars ! direct handle to control variables
+      grid => state%grid ! direct handle to grid
+      dt =  state%dt ! dynamics time step (large)
 
-      ifirstxy = grid%is
-      ilastxy  = grid%ie
-      jfirstxy = grid%js
-      jlastxy  = grid%je
+      ifirstxy = grid%is; ilastxy  = grid%ie
+      jfirstxy = grid%js; jlastxy  = grid%je
+      im = grid%npx; jm = grid%npy; km = grid%npz
 
-      im       = grid%npx
-      jm       = grid%npy
-      km       = grid%npz
-
-      is_ringing = ESMF_AlarmIsRinging(STATE%ALARMS(TIME_TO_RUN), _RC)
+      is_ringing = ESMF_AlarmIsRinging(state%ALARMS(TIME_TO_RUN), _RC)
       if (.not. is_ringing) return
 
       ! Allocate Arrays
-      ! ---------------
-      ALLOCATE(   delp(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(   dudt(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(   dvdt(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(   dtdt(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(   dqdt(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(  dthdt(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(  ddpdt(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(  dpedt(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
-      ALLOCATE( tempxy(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(    pe0(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
-      ALLOCATE(    pe1(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
-      ALLOCATE(     pl(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     ua(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     va(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     uc(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     vc(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(    uc0(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(    vc0(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     ur(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     vr(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     qv(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     ql(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     qi(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     qr(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     qs(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     qg(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(     ox(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-
-      ALLOCATE(  qsum1(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
-      ALLOCATE(  qsum2(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
-
-      ALLOCATE(   dmdt(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
+      allocate(  delp(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(  dudt(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(  dvdt(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(  dtdt(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(  dqdt(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate( dthdt(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate( ddpdt(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate( dpedt(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1))
+      allocate(tempxy(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(   pe0(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1))
+      allocate(   pe1(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1))
+      allocate(    pl(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    ua(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    va(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    uc(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    vc(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(   uc0(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(   vc0(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    ur(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    vr(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    qv(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    ql(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    qi(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    qr(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    qs(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    qg(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(    ox(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate( qsum1(ifirstxy:ilastxy,jfirstxy:jlastxy     ))
+      allocate( qsum2(ifirstxy:ilastxy,jfirstxy:jlastxy     ))
+      allocate(  dmdt(ifirstxy:ilastxy,jfirstxy:jlastxy     ))
 
       doEnergetics=.false.
-      call MAPL_GetPointer(export, temp2D, 'KEANA', _RC)
+      call MAPL_GetPointer(export, temp2D, "KEANA", _RC)
       if(associated(temp2D)) doEnergetics=.true.
-      call MAPL_GetPointer(export, temp2D, 'PEANA', _RC)
+      call MAPL_GetPointer(export, temp2D, "PEANA", _RC)
       if(associated(temp2D)) doEnergetics=.true.
-      call MAPL_GetPointer(export, temp2D, 'TEANA', _RC)
+      call MAPL_GetPointer(export, temp2D, "TEANA", _RC)
       if(associated(temp2D)) doEnergetics=.true.
-      call MAPL_GetPointer(export, temp2D, 'KEDYN', _RC)
+      call MAPL_GetPointer(export, temp2D, "KEDYN", _RC)
       if(associated(temp2D)) doEnergetics=.true.
-      call MAPL_GetPointer(export, temp2D, 'PEDYN', _RC)
+      call MAPL_GetPointer(export, temp2D, "PEDYN", _RC)
       if(associated(temp2D)) doEnergetics=.true.
-      call MAPL_GetPointer(export, temp2D, 'TEDYN', _RC)
+      call MAPL_GetPointer(export, temp2D, "TEDYN", _RC)
       if(associated(temp2D)) doEnergetics=.true.
       if (doEnergetics) then
-         ALLOCATE(  kedyn(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
-         ALLOCATE(  pedyn(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
-         ALLOCATE(  tedyn(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
-         ALLOCATE(  kenrg(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
-         ALLOCATE(  penrg(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
-         ALLOCATE(  tenrg(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
-         ALLOCATE( kenrg0(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
-         ALLOCATE( penrg0(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
-         ALLOCATE( tenrg0(ifirstxy:ilastxy,jfirstxy:jlastxy)    )
+         allocate( kedyn(ifirstxy:ilastxy,jfirstxy:jlastxy))
+         allocate( pedyn(ifirstxy:ilastxy,jfirstxy:jlastxy))
+         allocate( tedyn(ifirstxy:ilastxy,jfirstxy:jlastxy))
+         allocate( kenrg(ifirstxy:ilastxy,jfirstxy:jlastxy))
+         allocate( penrg(ifirstxy:ilastxy,jfirstxy:jlastxy))
+         allocate( tenrg(ifirstxy:ilastxy,jfirstxy:jlastxy))
+         allocate(kenrg0(ifirstxy:ilastxy,jfirstxy:jlastxy))
+         allocate(penrg0(ifirstxy:ilastxy,jfirstxy:jlastxy))
+         allocate(tenrg0(ifirstxy:ilastxy,jfirstxy:jlastxy))
       endif
 
-      ALLOCATE(   vort(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-      ALLOCATE(   divg(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-
-      ALLOCATE(  tmp3d(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-
-      ALLOCATE( phisxy   (ifirstxy:ilastxy,jfirstxy:jlastxy     ) )
-      ALLOCATE(    plk   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
-      ALLOCATE(   pkxy   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
-      ALLOCATE(     zl   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
-      ALLOCATE(    zle   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
-      ALLOCATE(  logpe   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
-      ALLOCATE( omaxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
-      ALLOCATE( epvxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
-      ALLOCATE(  cxxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
-      ALLOCATE(  cyxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
-      ALLOCATE( mfxxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
-      ALLOCATE( mfyxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km  ) )
-      ALLOCATE( mfzxyz   (ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
+      allocate(  vort(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(  divg(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate( tmp3d(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(phisxy(ifirstxy:ilastxy,jfirstxy:jlastxy     ))
+      allocate(   plk(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(  pkxy(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1))
+      allocate(    zl(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(   zle(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1))
+      allocate( logpe(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1))
+      allocate(omaxyz(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(epvxyz(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate( cxxyz(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate( cyxyz(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(mfxxyz(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(mfyxyz(ifirstxy:ilastxy,jfirstxy:jlastxy,km  ))
+      allocate(mfzxyz(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1))
 
       ! Report advected friendlies
-      call ESMF_StateGet(import, 'TRADV', bundle, _RC)
+      call ESMF_StateGet(import, "TRADV", bundle, _RC)
 
-      !-------------------------------------------------------------------
       ! ALT: this section attempts to limit the amount of advected tracers
-      !-------------------------------------------------------------------
       adjustTracers = .false.
-      call MAPL_GetResource(MAPL, adjustTracerMode, 'EXCLUDE_ADVECTION_TRACERS:', default='ALWAYS', _RC)
-      if (adjustTracerMode == 'ALWAYS') then
+      call MAPL_GridCompGetResource(gc, "EXCLUDE_ADVECTION_TRACERS", adjustTracerMode, default="ALWAYS", _RC)
+      if (adjustTracerMode == "ALWAYS") then
          adjustTracers = .true.
-      else if (adjustTracerMode == 'PREDICTOR') then
+      else if (adjustTracerMode == "PREDICTOR") then
          !get PredictorAlarm from clock
-         call ESMF_ClockGetAlarm(clock, alarmName='PredictorAlarm', alarm=PredictorAlarm, rc=status)
+         call ESMF_ClockGetAlarm(clock, alarmName="PredictorAlarm", alarm=PredictorAlarm, rc=status)
          if (status == ESMF_SUCCESS) then
             !check if ringing
             if (ESMF_AlarmIsRinging(predictorAlarm)) then
@@ -1002,60 +977,62 @@ contains
             end if
          end if
       else
-         call WRITE_PARALLEL('Invalid option, ignored')
+         call logger%info("Run:: Invalid value specified for EXCLUDE_ADVECTION_TRACERS, ignored")
          adjustTracers = .false.
       end if
       if (adjustTracers) then
          if (firstime) then
-            firstime=.false.
+            firstime = .false.
             ! get the list of excluded tracers from resource
             n = 0
-            call ESMF_ConfigFindLabel(cf, 'EXCLUDE_ADVECTION_TRACERS_LIST:', isPresent=isPresent, _RC)
-            if(isPresent .or. (AdvCore_Advection >= 1)) then
-               tend  = .false.
-               allocate(xlist(XLIST_MAX), stat=status)
-               VERIFY_(STATUS)
-               if (isPresent) then
-                  do while (.not.tend)
-                     call ESMF_ConfigGetAttribute(cf, value=tmpstring, default='', rc=status) !ALT: we don't check return status
-                     if (tmpstring /= '')  then
-                        n = n + 1
-                        if (n > size(xlist)) then
-                           allocate(biggerlist(2*n), _STAT)
-                           biggerlist(1:n-1)=xlist
-                           call move_alloc(from=biggerlist, to=xlist)
-                        end if
-                        xlist(n) = tmpstring
-                     end if
-                     call ESMF_ConfigNextLine(cf, tableEnd=tend, _RC)
-                  enddo
-               endif
-            end if
+            ! call ESMF_ConfigFindLabel(cf, "EXCLUDE_ADVECTION_TRACERS_LIST:", isPresent=isPresent, _RC)
+            ! if(isPresent .or. (AdvCore_Advection >= 1)) then
+            !    tend  = .false.
+            !    allocate(xlist(XLIST_MAX), stat=status)
+            !    VERIFY_(STATUS)
+            !    if (isPresent) then
+            !       do while (.not.tend)
+            !          call ESMF_ConfigGetAttribute(cf, value=tmpstring, default="", rc=status) !ALT: we don't check return status
+            !          if (tmpstring /= "")  then
+            !             n = n + 1
+            !             if (n > size(xlist)) then
+            !                allocate(biggerlist(2*n), _STAT)
+            !                biggerlist(1:n-1)=xlist
+            !                call move_alloc(from=biggerlist, to=xlist)
+            !             end if
+            !             xlist(n) = tmpstring
+            !          end if
+            !          call ESMF_ConfigNextLine(cf, tableEnd=tend, _RC)
+            !       enddo
+            !    endif
+            ! end if
+            xlist = ESMF_HConfigAsStringSeq(hconfig, keyString="EXCLUDE_ADVECTION_TRACERS_LIST", stringLen=ESMF_MAXSTR, _RC)
+            if (allocated(xlist)) n = size(xlist)
 
             ! Count the number of tracers
             call ESMF_FieldBundleGet(bundle, grid=bgrid, fieldCount=nqt, _RC)
-            BundleAdv = ESMF_FieldBundleCreate(name='xTRADV', _RC)
+            BundleAdv = ESMF_FieldBundleCreate(name="xTRADV", _RC)
             call ESMF_FieldBundleSet(BundleAdv, grid=bgrid, _RC)
-            !loop over NQ in TRADV
+            ! loop over NQ in TRADV
             do i = 1, nqt
                !get field from TRADV and its name
                call ESMF_FieldBundleGet(bundle, fieldIndex=i, field=field, _RC)
                call ESMF_FieldGet(FIELD, name=fieldname, _RC)
                !exclude everything that is not cloud/water species
                if ( (AdvCore_Advection >= 1    ) .and. &
-                    (trim(fieldname) /= 'Q'       ) .and. &
-                    (trim(fieldname) /= 'QLCN'    ) .and. &
-                    (trim(fieldname) /= 'QLLS'    ) .and. &
-                    (trim(fieldname) /= 'QICN'    ) .and. &
-                    (trim(fieldname) /= 'QILS'    ) .and. &
-                    (trim(fieldname) /= 'CLCN'    ) .and. &
-                    (trim(fieldname) /= 'CLLS'    ) .and. &
-                    (trim(fieldname) /= 'NCPL'    ) .and. &
-                    (trim(fieldname) /= 'NCPI'    ) .and. &
-                    (trim(fieldname) /= 'QRAIN'   ) .and. &
-                    (trim(fieldname) /= 'QSNOW'   ) .and. &
-                    (trim(fieldname) /= 'QGRAUPEL') ) then
-                  write(STRING,'(A,A)') "FV3+ADV is excluding ", trim(fieldname)
+                    (trim(fieldname) /= "Q"       ) .and. &
+                    (trim(fieldname) /= "QLCN"    ) .and. &
+                    (trim(fieldname) /= "QLLS"    ) .and. &
+                    (trim(fieldname) /= "QICN"    ) .and. &
+                    (trim(fieldname) /= "QILS"    ) .and. &
+                    (trim(fieldname) /= "CLCN"    ) .and. &
+                    (trim(fieldname) /= "CLLS"    ) .and. &
+                    (trim(fieldname) /= "NCPL"    ) .and. &
+                    (trim(fieldname) /= "NCPI"    ) .and. &
+                    (trim(fieldname) /= "QRAIN"   ) .and. &
+                    (trim(fieldname) /= "QSNOW"   ) .and. &
+                    (trim(fieldname) /= "QGRAUPEL") ) then
+                  write(STRING,"(A,A)") "FV3+ADV is excluding ", trim(fieldname)
                   call WRITE_PARALLEL(trim(STRING))
                   n = n + 1
                   if (n > size(xlist)) then
@@ -1106,31 +1083,31 @@ contains
       endif
 
       ! Surface Geopotential from import state
-      call MAPL_GetPointer(import, PHIS, 'PHIS', _RC)
+      call MAPL_GetPointer(import, PHIS, "PHIS", _RC)
 
       phisxy = real(phis,kind=r8)
 
       ! Get tracers from import State (Note: Contains Updates from Analysis)
-      call PULL_Q (STATE, import, qqq, NXQ, RC=rc)
+      call PULL_Q (state, import, qqq, NXQ, _RC)
 
       !-----------------------------
       ! end of fewer_tracers-section
       !-----------------------------
 
       do k=1,size(names)
-         pos = index(names(k), '::')
+         pos = index(names(k), "::")
          if(pos > 0) then
-            if( (names(k)(pos+2:))=='OX' ) ooo = vars%tracer(k)
-         elseif(names(k)=='Q') then
+            if( (names(k)(pos+2:))=="OX" ) ooo = vars%tracer(k)
+         elseif(names(k)=="Q") then
             qqq = vars%tracer(k)
          end if
       end do
 
       ! WMP Begin REPLAY/ANA section
-      call ESMF_ConfigGetAttribute(cf, FV3_STANDALONE, label="FV3_STANDALONE:", default=0, _RC)
+      call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=0, _RC)
       if (FV3_STANDALONE == 0) then
-         call MAPL_TimerOn(MAPL, "-DYN_ANA")
-         call ESMF_ClockGetAlarm(clock, 'ReplayShutOff', alarm, _RC)
+         ! call MAPL_TimerOn(MAPL, "-DYN_ANA")
+         call ESMF_ClockGetAlarm(clock, "ReplayShutOff", alarm, _RC)
          is_shutoff = ESMF_AlarmIsRinging(alarm, _RC)
       else
          is_shutoff = .true.
@@ -1139,12 +1116,12 @@ contains
       if (.not. is_shutoff) then
          ! If requested, do Intermittent Replay
 
-         call MAPL_GetResource(MAPL, ReplayMode, 'REPLAY_MODE:', default="NoReplay", _RC)
+         call MAPL_GridCompGetResource(gc, "REPLAY_MODE", ReplayMode, default="NoReplay", _RC)
 
          REPLAYING: if(adjustl(ReplayMode)=="Intermittent") then
 
             ! If replay alarm is ringing, we need to reset state
-            call ESMF_ClockGetAlarm(clock, 'INTERMITTENT', alarm, _RC)
+            call ESMF_ClockGetAlarm(clock, "INTERMITTENT", alarm, _RC)
             call ESMF_ClockGet(clock, CurrTime=current_time, _RC)
 
             is_ringing = ESMF_AlarmIsRinging(alarm, _RC)
@@ -1157,41 +1134,43 @@ contains
                call ESMF_AlarmRingerOff(alarm, _RC)
 
                ! Read in file name of field to replay to and all other relavant resources
-               call MAPL_GetResource(MAPL, ReplayFile, 'REPLAY_FILE:', _RC)
-               call MAPL_GetResource(MAPL, ReplayType, 'REPLAY_TYPE:', default="FULL", _RC)
-               call MAPL_GetResource(MAPL, im_replay, label="REPLAY_IM:", _RC)
-               call MAPL_GetResource(MAPL, jm_replay, label="REPLAY_JM:", _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_FILE", ReplayFile, _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_TYPE", ReplayType, default="FULL", _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_IM", im_replay, _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_JM", jm_replay, _RC)
 
-               call MAPL_GetResource(MAPL, psname, label="REPLAY_PSNAME:", default="NULL",  _RC)
-               call MAPL_GetResource(MAPL, dpname, label="REPLAY_DPNAME:", default="delp",  _RC)
-               call MAPL_GetResource(MAPL, uname, label="REPLAY_UNAME:", default="uwnd",   _RC)
-               call MAPL_GetResource(MAPL, vname, label="REPLAY_VNAME:", default="vwnd",   _RC)
-               call MAPL_GetResource(MAPL, tname, label="REPLAY_TNAME:", default="theta",  _RC)
-               call MAPL_GetResource(MAPL, qname, label="REPLAY_QNAME:", default="sphu",   _RC)
-               call MAPL_GetResource(MAPL, o3name, label="REPLAY_O3NAME:", default="ozone", _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_PSNAME", psname, default="NULL",  _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_DPNAME", dpname, default="delp",  _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_UNAME", uname, default="uwnd",   _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_VNAME", vname, default="vwnd",   _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_TNAME", tname, default="theta",  _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_QNAME", qname, default="sphu",   _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_O3NAME", o3name, default="ozone", _RC)
 
-               call MAPL_GetResource(MAPL, rgrid, label="REPLAY_GRID:", default="D-GRID", _RC)
-               call MAPL_GetResource(MAPL, tvar, label="REPLAY_TVAR:", default="THETAV", _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_GRID", rgrid, default="D-GRID", _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_TVAR", tvar, default="THETAV", _RC)
 
-               call MAPL_GetResource(MAPL, CREMAP, label="REPLAY_REMAP:", default="no", _RC)
-               call MAPL_GetResource(MAPL, TREMAP, label="REPLAY_REMAP_ALL_TRACERS:", default="yes", _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_REMAP", cremap, default="no", _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_REMAP_ALL_TRACERS", tremap, default="yes", _RC)
 
-               call MAPL_GetResource(MAPL, rc_blend, 'REPLAY_BLEND:', default=0, _RC)
-               call MAPL_GetResource(MAPL, rc_blend_p_above, 'REPLAY_BLEND_P_ABOVE:', default=10.0, _RC)
-               call MAPL_GetResource(MAPL, rc_blend_p_below, 'REPLAY_BLEND_P_BELOW:', default=100.0, _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_BLEND", rc_blend, default=0, _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_BLEND_P_ABOVE", rc_blend_p_above, default=10.0, _RC)
+               call MAPL_GridCompGetResource(gc, "REPLAY_BLEND_P_BELOW", rc_blend_p_below, default=100.0, _RC)
 
-               call MAPL_GetResource(MAPL, sclinc, label='SCLINC:', default=1.0, _RC)
+               call MAPL_GridCompGetResource(gc, "SCLINC", sclinc, default=1.0, _RC)
 
                ! Read the fields to be reset into a bundle
-               call ESMF_ConfigGetAttribute(cf, nx_ana, label ='NX:', _RC)
-               call ESMF_ConfigGetAttribute(cf, ny_ana, label ='NY:', _RC)
+               ! call ESMF_ConfigGetAttribute(cf, nx_ana, label ="NX:", _RC)
+               ! call ESMF_ConfigGetAttribute(cf, ny_ana, label ="NY:", _RC)
+               call MAPL_GridCompGetResource(gc, "NX", nx_ana, _RC)
+               call MAPL_GridCompGetResource(gc, "NY", ny_ana, _RC)
 
                block
                   use MAPL_LatLonGridFactoryMod
                   ana_grid = grid_manager%make_grid( &
                        & LatLonGridFactory(im_world=IM_REPLAY, jm_world=JM_REPLAY, lm=km, &
                        & nx=nx_ana, ny=ny_ana, rc=status))
-                  VERIFY_(status)
+                  _VERIFY(status)
                end block
 
                ana_bundle = ESMF_FieldBundleCreate(_RC)
@@ -1212,7 +1191,7 @@ contains
                !      are in memory or need reading from file.
                !    call incremental_
                !    call state_remap_
-               if (trim(ReplayType)=='FULL') then
+               if (trim(ReplayType)=="FULL") then
                   call dump_n_splash_
                else
                   call incremental_
@@ -1238,9 +1217,9 @@ contains
          if (.not. ADIABATIC) then
             do k=1,size(names)
 
-               pos = index(names(k),'::')
+               pos = index(names(k),"::")
                if(pos > 0) then
-                  if( (names(k)(pos+2:))=='OX' ) then
+                  if( (names(k)(pos+2:))=="OX" ) then
                      if ( (ooo%is_r4) .and. associated(ooo%content_r4) ) then
                         if (size(ox)==size(ooo%content_r4)) then
                            ox = ooo%content_r4
@@ -1253,7 +1232,7 @@ contains
                   endif
                endif
 
-               if( trim(names(k))=='Q'  ) then
+               if( trim(names(k))=="Q"  ) then
                   if ( (qqq%is_r4) .and. associated(qqq%content_r4) ) then
                      if (size(qv)==size(qqq%content_r4)) then
                         qv = qqq%content_r4
@@ -1263,30 +1242,30 @@ contains
                         qv = qqq%content
                      endif
                   endif
-                  _ASSERT(all(qv >= 0.0),'Before AnaAddIncs: negative or nan water vapor detected')
+                  _ASSERT(all(qv >= 0.0),"Before AnaAddIncs: negative or nan water vapor detected")
                endif
 
             enddo
          endif
 
          ! Diagnostics Before Analysis Increments are Added
-         ALLOCATE(delpold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-         ALLOCATE(  qdnew(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-         ALLOCATE(  qdold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-         ALLOCATE(  qvold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-         ALLOCATE(  qlold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-         ALLOCATE(  qiold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-         ALLOCATE(  qrold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-         ALLOCATE(  qsold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-         ALLOCATE(  qgold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+         allocate(delpold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+         allocate(  qdnew(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+         allocate(  qdold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+         allocate(  qvold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+         allocate(  qlold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+         allocate(  qiold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+         allocate(  qrold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+         allocate(  qsold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+         allocate(  qgold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
 
-         call MAPL_GetPointer(import, dqvana, 'DQVANA', _RC)   ! Get QV Increment from Analysis
-         call MAPL_GetPointer(import, dqlana, 'DQLANA', _RC)   ! Get QL Increment from Analysis
-         call MAPL_GetPointer(import, dqiana, 'DQIANA', _RC)   ! Get QI Increment from Analysis
-         call MAPL_GetPointer(import, dqrana, 'DQRANA', _RC)   ! Get QR Increment from Analysis
-         call MAPL_GetPointer(import, dqsana, 'DQSANA', _RC)   ! Get QS Increment from Analysis
-         call MAPL_GetPointer(import, dqgana, 'DQGANA', _RC)   ! Get QG Increment from Analysis
-         call MAPL_GetPointer(import, doxana, 'DOXANA', _RC)   ! Get OX Increment from Analysis
+         call MAPL_GetPointer(import, dqvana, "DQVANA", _RC)   ! Get QV Increment from Analysis
+         call MAPL_GetPointer(import, dqlana, "DQLANA", _RC)   ! Get QL Increment from Analysis
+         call MAPL_GetPointer(import, dqiana, "DQIANA", _RC)   ! Get QI Increment from Analysis
+         call MAPL_GetPointer(import, dqrana, "DQRANA", _RC)   ! Get QR Increment from Analysis
+         call MAPL_GetPointer(import, dqsana, "DQSANA", _RC)   ! Get QS Increment from Analysis
+         call MAPL_GetPointer(import, dqgana, "DQGANA", _RC)   ! Get QG Increment from Analysis
+         call MAPL_GetPointer(import, doxana, "DOXANA", _RC)   ! Get OX Increment from Analysis
 
          QL = 0.0
          QI = 0.0
@@ -1294,37 +1273,35 @@ contains
          QS = 0.0
          QG = 0.0
          do N = 1,size(names)
-            if( trim(names(N)).eq.'QLCN' .or. &
-                 trim(names(N)).eq.'QLLS' ) then
+            if( trim(names(N)).eq."QLCN" .or. trim(names(N)).eq."QLLS" ) then
                if( state%vars%tracer(N)%is_r4 ) then
                   QL = QL + state%vars%tracer(N)%content_r4
                else
                   QL = QL + state%vars%tracer(N)%content
                endif
             endif
-            if( trim(names(N)).eq.'QICN' .or. &
-                 trim(names(N)).eq.'QILS' ) then
+            if( trim(names(N)).eq."QICN" .or. trim(names(N)).eq."QILS" ) then
                if( state%vars%tracer(N)%is_r4 ) then
                   QI = QI + state%vars%tracer(N)%content_r4
                else
                   QI = QI + state%vars%tracer(N)%content
                endif
             endif
-            if( trim(names(N)).eq.'QRAIN' ) then
+            if( trim(names(N)).eq."QRAIN" ) then
                if( state%vars%tracer(N)%is_r4 ) then
                   QR = state%vars%tracer(N)%content_r4
                else
                   QR = state%vars%tracer(N)%content
                endif
             endif
-            if( trim(names(N)).eq.'QSNOW' ) then
+            if( trim(names(N)).eq."QSNOW" ) then
                if( state%vars%tracer(N)%is_r4 ) then
                   QS = state%vars%tracer(N)%content_r4
                else
                   QS = state%vars%tracer(N)%content
                endif
             endif
-            if( trim(names(N)).eq.'QGRAUPEL' ) then
+            if( trim(names(N)).eq."QGRAUPEL" ) then
                if( state%vars%tracer(N)%is_r4 ) then
                   QG = state%vars%tracer(N)%content_r4
                else
@@ -1351,23 +1328,23 @@ contains
          end if
 
          ! DUDTANA
-         call MAPL_GetPointer(export, dudtana, 'DUDTANA', _RC)
+         call MAPL_GetPointer(export, dudtana, "DUDTANA", _RC)
          if( associated(dudtana) ) dudtana = ur
 
          ! DVDTANA
-         call MAPL_GetPointer(export, dvdtana, 'DVDTANA', _RC)
+         call MAPL_GetPointer(export, dvdtana, "DVDTANA", _RC)
          if( associated(dvdtana) ) dvdtana = vr
 
          ! DTDTANA
-         call MAPL_GetPointer(export, dtdtana, 'DTDTANA', _RC)
+         call MAPL_GetPointer(export, dtdtana, "DTDTANA", _RC)
          if( associated(dtdtana) ) dtdtana = vars%pt * vars%pkz
 
          ! DDELPDTANA
-         call MAPL_GetPointer(export, ddpdtana, 'DDELPDTANA', _RC)
+         call MAPL_GetPointer(export, ddpdtana, "DDELPDTANA", _RC)
          if( associated(ddpdtana) ) ddpdtana = delp
 
          ! DTHVDTANAINT
-         call MAPL_GetPointer(export, temp2D, 'DTHVDTANAINT', _RC)
+         call MAPL_GetPointer(export, temp2D, "DTHVDTANAINT", _RC)
          if( associated(temp2D) ) then
             tempxy       = vars%pt*(1+eps*(qv-dqvana))   ! Set tempxy = TH*QVold (Before Analysis Update)
             ALLOCATE( dthdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
@@ -1379,7 +1356,7 @@ contains
          endif
 
          ! DQVDTANAINT
-         call MAPL_GetPointer(export, temp2D, 'DQVDTANAINT', _RC)
+         call MAPL_GetPointer(export, temp2D, "DQVDTANAINT", _RC)
          if( associated(temp2D) ) then
             ALLOCATE( dqvdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
             ALLOCATE( dqvdtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
@@ -1391,14 +1368,13 @@ contains
          endif
 
          ! DQLDTANAINT
-         call MAPL_GetPointer(export, temp2D, 'DQLDTANAINT', _RC)
+         call MAPL_GetPointer(export, temp2D, "DQLDTANAINT", _RC)
          if( associated(temp2D) ) then
             ALLOCATE( dqldtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
             ALLOCATE( dqldtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
             dqldtanaint1 = 0.0
             do N = 1,size(names)
-               if( trim(names(N)).eq.'QLCN' .or. &
-                    trim(names(N)).eq.'QLLS' ) then
+               if( trim(names(N)).eq."QLCN" .or. trim(names(N)).eq."QLLS" ) then
                   do k=1,km
                      if( state%vars%tracer(N)%is_r4 ) then
                         dqldtanaint1 = dqldtanaint1 + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
@@ -1414,14 +1390,13 @@ contains
          endif
 
          ! DQIDTANAINT
-         call MAPL_GetPointer(export, temp2D, 'DQIDTANAINT', _RC)
+         call MAPL_GetPointer(export, temp2D, "DQIDTANAINT", _RC)
          if( associated(temp2D) ) then
             ALLOCATE( dqidtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
             ALLOCATE( dqidtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
             dqidtanaint1 = 0.0
             do N = 1,size(names)
-               if( trim(names(N)).eq.'QICN' .or. &
-                    trim(names(N)).eq.'QILS' ) then
+               if( trim(names(N)).eq."QICN" .or. trim(names(N)).eq."QILS" ) then
                   do k=1,km
                      if( state%vars%tracer(N)%is_r4 ) then
                         dqidtanaint1 = dqidtanaint1 + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
@@ -1437,10 +1412,10 @@ contains
          endif
 
          ! DOXDTANAINT
-         call MAPL_GetPointer(export, temp2D, 'DOXDTANAINT', _RC)
+         call MAPL_GetPointer(export, temp2D, "DOXDTANAINT", _RC)
          if( associated(temp2D) ) then
-            ALLOCATE( doxdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-            ALLOCATE( doxdtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+            allocate( doxdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+            allocate( doxdtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
             tempxy       = OX-doxana   ! Set tempxy = OXold (Before Analysis Update)
             doxdtanaint1 = 0.0
             do k=1,km
@@ -1456,23 +1431,23 @@ contains
             QDOLD = 1.0 - (QVOLD+QLOLD+QIOLD)
             QDNEW = 1.0 - (QV   +QL   +QI   )
          endif
-         call MAPL_GetPointer(export, area, 'AREA', _RC)
+         call MAPL_GetPointer(export, area, "AREA", _RC)
 
          allocate( trsum1(nq) )
          allocate( trsum2(nq) )
 
-         call MAPL_GetResource(MAPL, ANA_IS_WEIGHTED, label="ANA_IS_WEIGHTED:", default='NO', _RC)
+         call MAPL_GridCompGetResource(gc, "ANA_IS_WEIGHTED", ANA_IS_WEIGHTED, default="NO", _RC)
          ANA_IS_WEIGHTED = ESMF_UtilStringUpperCase(ANA_IS_WEIGHTED)
-         IS_WEIGHTED =   adjustl(ANA_IS_WEIGHTED)=="YES" .or. adjustl(ANA_IS_WEIGHTED)=="NO"
-         _ASSERT(IS_WEIGHTED ,'needs informative message')
-         IS_WEIGHTED = adjustl(ANA_IS_WEIGHTED)=="YES"
+         is_weighted =   adjustl(ANA_IS_WEIGHTED)=="YES" .or. adjustl(ANA_IS_WEIGHTED)=="NO"
+         _ASSERT(is_weighted, "needs informative message")
+         is_weighted = adjustl(ANA_IS_WEIGHTED)=="YES"
 
          ! Add Analysis Tendencies
-         delpold = delp                            ! Old Pressure Thickness
+         delpold = delp ! Old Pressure Thickness
 
-         call ADD_INCS(MAPL, STATE, import, DT, IS_WEIGHTED=IS_WEIGHTED)
+         call ADD_INCS(esmfgrid, state, import, DT, is_weighted=is_weighted)
 
-         if (DYN_DEBUG) call DEBUG_FV_STATE('ANA ADD_INCS', STATE)
+         if (DYN_DEBUG) call DEBUG_FV_STATE("ANA ADD_INCS", state)
 
          delp = vars%pe(:,:,2:)-vars%pe(:,:,:km)   ! Updated Pressure Thickness
 
@@ -1480,7 +1455,7 @@ contains
          if ((.not. ADIABATIC)) then
             do n=1,NQ
                qsum1(:,:) = 0.0_r8
-               if( STATE%VARS%TRACER(N)%IS_R4 ) then
+               if( state%vars%TRACER(N)%IS_R4 ) then
                   do k=1,km
                      where( delp(:,:,k).ne.delpold(:,:,k) )
                         qsum1(:,:) = qsum1(:,:) + state%vars%tracer(n)%content_r4(:,:,k)*delpold(:,:,k)
@@ -1505,17 +1480,17 @@ contains
          ! Update Specific Mass of Aerosol Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air After ANA Updates
          if ((.not. ADIABATIC)) then
             do n=1,NQ
-               if( (trim(names(n)).ne.'Q'   ) .and. &
-                    (trim(names(n)).ne.'QLLS') .and. &
-                    (trim(names(n)).ne.'QLCN') .and. &
-                    (trim(names(n)).ne.'QILS') .and. &
-                    (trim(names(n)).ne.'QICN') .and. &
-                    (trim(names(n)).ne.'CLLS') .and. &
-                    (trim(names(n)).ne.'CLCN') .and. &
-                    (trim(names(n)).ne.'QRAIN') .and. &
-                    (trim(names(n)).ne.'QSNOW') .and. &
-                    (trim(names(n)).ne.'QGRAUPEL') ) then
-                  if( STATE%VARS%TRACER(N)%IS_R4 ) then
+               if( (trim(names(n)).ne."Q"   ) .and. &
+                    (trim(names(n)).ne."QLLS") .and. &
+                    (trim(names(n)).ne."QLCN") .and. &
+                    (trim(names(n)).ne."QILS") .and. &
+                    (trim(names(n)).ne."QICN") .and. &
+                    (trim(names(n)).ne."CLLS") .and. &
+                    (trim(names(n)).ne."CLCN") .and. &
+                    (trim(names(n)).ne."QRAIN") .and. &
+                    (trim(names(n)).ne."QSNOW") .and. &
+                    (trim(names(n)).ne."QGRAUPEL") ) then
+                  if( state%vars%TRACER(N)%IS_R4 ) then
                      state%vars%tracer(n)%content_r4 = state%vars%tracer(n)%content_r4 * ( QDNEW/QDOLD )
                   else
                      state%vars%tracer(n)%content    = state%vars%tracer(n)%content    * ( QDNEW/QDOLD )
@@ -1528,7 +1503,7 @@ contains
          if ((.not. ADIABATIC)) then
             do n=1,NQ
                qsum1(:,:) = 0.0_r8
-               if( STATE%VARS%TRACER(N)%IS_R4 ) then
+               if( state%vars%TRACER(N)%IS_R4 ) then
                   do k=1,km
                      where( delp(:,:,k).ne.delpold(:,:,k) )
                         qsum1(:,:) = qsum1(:,:) + state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
@@ -1553,16 +1528,16 @@ contains
          ! Ensure Conservation of Global Mass of Aerosol Constituents After ANA Updates
          if ((.not. ADIABATIC)) then
             do n=1,NQ
-               if( (trim(names(n)).ne.'Q'   ) .and. &
-                    (trim(names(n)).ne.'QLLS') .and. &
-                    (trim(names(n)).ne.'QLCN') .and. &
-                    (trim(names(n)).ne.'QILS') .and. &
-                    (trim(names(n)).ne.'QICN') .and. &
-                    (trim(names(n)).ne.'CLLS') .and. &
-                    (trim(names(n)).ne.'CLCN') .and. &
-                    (trim(names(n)).ne.'QRAIN') .and. &
-                    (trim(names(n)).ne.'QSNOW') .and. &
-                    (trim(names(n)).ne.'QGRAUPEL')       ) then
+               if( (trim(names(n)).ne."Q"   ) .and. &
+                    (trim(names(n)).ne."QLLS") .and. &
+                    (trim(names(n)).ne."QLCN") .and. &
+                    (trim(names(n)).ne."QILS") .and. &
+                    (trim(names(n)).ne."QICN") .and. &
+                    (trim(names(n)).ne."CLLS") .and. &
+                    (trim(names(n)).ne."CLCN") .and. &
+                    (trim(names(n)).ne."QRAIN") .and. &
+                    (trim(names(n)).ne."QSNOW") .and. &
+                    (trim(names(n)).ne."QGRAUPEL")       ) then
 
                   if( real(trsum1(n),kind=4).ne.MAPL_UNDEF .and. &
                        real(trsum2(n),kind=4).ne.MAPL_UNDEF       ) then
@@ -1570,9 +1545,9 @@ contains
                   else
                      trsum2(n) = 1.0d0
                   endif
-                  ! IF (MAPL_AM_I_ROOT()) print *, trim(names(n)),' ratio is: ',trsum2(n)
+                  ! IF (MAPL_AM_I_ROOT()) print *, trim(names(n))," ratio is: ",trsum2(n)
 
-                  if( STATE%VARS%TRACER(N)%IS_R4 ) then
+                  if( state%vars%TRACER(N)%IS_R4 ) then
                      do k=1,km
                         where( delp(:,:,k).ne.delpold(:,:,k) )
                            state%vars%tracer(n)%content_r4(:,:,k) = state%vars%tracer(n)%content_r4(:,:,k) * trsum2(n)
@@ -1594,9 +1569,9 @@ contains
 
          ! Update Local Copy of QV and OX to account for Global Sum Adjustment
          do k=1,size(names)
-            pos = index(names(k),'::')
+            pos = index(names(k),"::")
             if(pos > 0) then
-               if( (names(k)(pos+2:))=='OX' ) then
+               if( (names(k)(pos+2:))=="OX" ) then
                   if ( ooo%is_r4 ) then
                      ox = ooo%content_r4
                   else
@@ -1604,18 +1579,18 @@ contains
                   endif
                endif
             endif
-            if( trim(names(k))=='Q'  ) then
+            if( trim(names(k))=="Q"  ) then
                if ( qqq%is_r4 ) then
                   qv = qqq%content_r4
                else
                   qv = qqq%content
                endif
-               _ASSERT(all(qv >= 0.0),'After AnaAddIncs: negative or nan water vapor detected')
+               _ASSERT(all(qv >= 0.0),"After AnaAddIncs: negative or nan water vapor detected")
             endif
          enddo
 
          ! Diagnostics After Analysis Increments are Added
-         call MAPL_GetPointer(export, temp2D, 'DMDTANA', _RC)
+         call MAPL_GetPointer(export, temp2D, "DMDTANA", _RC)
          if( associated(temp2D) ) temp2D = ( (vars%pe(:,:,km+1)-vars%pe(:,:,1)) - dmdt )/(grav*dt)
 
          call getAllWinds(vars%u, vars%v, UC=uc0, VC=vc0, UR=ur, VR=vr)
@@ -1623,32 +1598,32 @@ contains
          dmdt = vars%pe(:,:,km+1)-vars%pe(:,:,1)     ! Psurf-Ptop
 
          ! DUDTANA
-         call MAPL_GetPointer(export, dudtana, 'DUDTANA', _RC)
+         call MAPL_GetPointer(export, dudtana, "DUDTANA", _RC)
          if( associated(dudtana) ) then
             dudtana = (ur-dudtana)/dt
          endif
 
          ! DVDTANA
-         call MAPL_GetPointer(export, dvdtana, 'DVDTANA', _RC)
+         call MAPL_GetPointer(export, dvdtana, "DVDTANA", _RC)
          if( associated(dvdtana) ) then
             dvdtana = (vr-dvdtana)/dt
          endif
 
          ! DTDTANA
-         call MAPL_GetPointer(export, dtdtana, 'DTDTANA', _RC)
+         call MAPL_GetPointer(export, dtdtana, "DTDTANA", _RC)
          if( associated(dtdtana) ) then
             dtdtana = ((vars%pt*vars%pkz)-dtdtana)/dt
          endif
 
          ! DDELPDTANA
-         call MAPL_GetPointer(export, ddpdtana, 'DDELPDTANA', _RC)
+         call MAPL_GetPointer(export, ddpdtana, "DDELPDTANA", _RC)
          if( associated(ddpdtana) ) then
             ddpdtana = (delp-ddpdtana)/dt
          endif
 
          ! DTHVDTANAINT
          ! ------------
-         call MAPL_GetPointer(export, temp2D, 'DTHVDTANAINT', _RC)
+         call MAPL_GetPointer(export, temp2D, "DTHVDTANAINT", _RC)
          if( associated(temp2D) ) then
             tempxy       = vars%pt*(1+eps*qv)   ! Set tempxy = TH*QVnew (After Analysis Update)
             dthdtanaint2 = 0.0
@@ -1661,7 +1636,7 @@ contains
          endif
 
          ! DQVDTANAINT
-         call MAPL_GetPointer(export, temp2D, 'DQVDTANAINT', _RC)
+         call MAPL_GetPointer(export, temp2D, "DQVDTANAINT", _RC)
          if( associated(temp2D) ) then
             tempxy       = qv         ! Set tempxy = QNEW (After Analysis Update)
             dqvdtanaint2 = 0.0
@@ -1674,12 +1649,12 @@ contains
          endif
 
          ! DQLDTANAINT
-         call MAPL_GetPointer(export, temp2D, 'DQLDTANAINT', _RC)
+         call MAPL_GetPointer(export, temp2D, "DQLDTANAINT", _RC)
          if( associated(temp2D) ) then
             dqldtanaint2 = 0.0
             do N = 1,size(names)
-               if( trim(names(N)).eq.'QLCN' .or. &
-                    trim(names(N)).eq.'QLLS' ) then
+               if( trim(names(N)).eq."QLCN" .or. &
+                    trim(names(N)).eq."QLLS" ) then
                   do k=1,km
                      if( state%vars%tracer(N)%is_r4 ) then
                         dqldtanaint2 = dqldtanaint2 + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
@@ -1695,12 +1670,12 @@ contains
          endif
 
          ! DQIDTANAINT
-         call MAPL_GetPointer(export, temp2D, 'DQIDTANAINT', _RC)
+         call MAPL_GetPointer(export, temp2D, "DQIDTANAINT", _RC)
          if( associated(temp2D) ) then
             dqidtanaint2 = 0.0
             do N = 1,size(names)
-               if( trim(names(N)).eq.'QICN' .or. &
-                    trim(names(N)).eq.'QILS' ) then
+               if( trim(names(N)).eq."QICN" .or. &
+                    trim(names(N)).eq."QILS" ) then
                   do k=1,km
                      if( state%vars%tracer(N)%is_r4 ) then
                         dqidtanaint2 = dqidtanaint2 + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
@@ -1716,7 +1691,7 @@ contains
          endif
 
          ! DOXDTANAINT
-         call MAPL_GetPointer(export, temp2D, 'DOXDTANAINT', _RC)
+         call MAPL_GetPointer(export, temp2D, "DOXDTANAINT", _RC)
          if( associated(temp2D) ) then
             tempxy       = ox         ! Set tempxy = OXnew (After Analysis Update)
             doxdtanaint2 = 0.0
@@ -1745,9 +1720,9 @@ contains
          qv = 0.0
          if (.not. ADIABATIC) then
             do k=1,size(names)
-               pos = index(names(k),'::')
+               pos = index(names(k),"::")
                if(pos > 0) then
-                  if( (names(k)(pos+2:))=='OX' ) then
+                  if( (names(k)(pos+2:))=="OX" ) then
                      if ( (ooo%is_r4) .and. associated(ooo%content_r4) ) then
                         if (size(ox)==size(ooo%content_r4)) then
                            ox = ooo%content_r4
@@ -1759,7 +1734,7 @@ contains
                      endif
                   endif
                endif
-               if( trim(names(k))=='Q'  ) then
+               if( trim(names(k))=="Q"  ) then
                   if ( (qqq%is_r4) .and. associated(qqq%content_r4) ) then
                      if (size(qv)==size(qqq%content_r4)) then
                         qv = qqq%content_r4
@@ -1769,7 +1744,7 @@ contains
                         qv = qqq%content
                      endif
                   endif
-                  _ASSERT(all(qv >= 0.0),'DYN_ANA: negative or nan water vapor detected')
+                  _ASSERT(all(qv >= 0.0),"DYN_ANA: negative or nan water vapor detected")
                endif
             enddo
          endif
@@ -1777,16 +1752,17 @@ contains
          delp   = vars%pe(:,:,2:)  -vars%pe(:,:,:km)   ! Pressure Thickness
          dmdt   = vars%pe(:,:,km+1)-vars%pe(:,:,1)     ! Psurf-Ptop
          tempxy = vars%pt * (1.0+eps*qv)
-         if (doEnergetics) &
-              call Energetics (ur,vr,tempxy,vars%pe,delp,vars%pkz,phisxy,kenrg,penrg,tenrg)
+         if (doEnergetics) then
+            call Energetics(ur, vr,tempxy, vars%pe, delp, vars%pkz, phisxy, kenrg, penrg, tenrg)
+         end if
 
       endif
-      if (FV3_STANDALONE == 0) then
-         call MAPL_TimerOff(MAPL,"-DYN_ANA")
-      endif
+      ! if (FV3_STANDALONE == 0) then
+      !    call MAPL_TimerOff(MAPL,"-DYN_ANA")
+      ! endif
 
 
-      call MAPL_TimerOn(MAPL,"-DYN_PROLOGUE")
+      ! call MAPL_TimerOn(MAPL,"-DYN_PROLOGUE")
       ! Create FV Thermodynamic Variables
       tempxy = vars%pt * vars%pkz      ! Compute Dry Temperature
 
@@ -1799,24 +1775,24 @@ contains
       dqdt   =     qv       ! Specific Humidity  Tendency
       dthdt  = vars%pt*(1.0+eps*qv)*delp
 
-      call FILLOUT3(export, 'QV_DYN_IN',       qv, _RC)
-      call FILLOUT3(export, 'T_DYN_IN',    tempxy, _RC)
-      call FILLOUT3(export, 'U_DYN_IN',        ur, _RC)
-      call FILLOUT3(export, 'V_DYN_IN',        vr, _RC)
-      call FILLOUT3(export, 'PLE_DYN_IN', vars%pe, _RC)
+      call FILLOUT3(export, "QV_DYN_IN",       qv, _RC)
+      call FILLOUT3(export, "T_DYN_IN",    tempxy, _RC)
+      call FILLOUT3(export, "U_DYN_IN",        ur, _RC)
+      call FILLOUT3(export, "V_DYN_IN",        vr, _RC)
+      call FILLOUT3(export, "PLE_DYN_IN", vars%pe, _RC)
 
       ! Initialize 3-D Tracer Dynamics Tendencies
-      call MAPL_GetPointer( export,dqldt,'DQLDTDYN', _RC)
-      call MAPL_GetPointer( export,dqidt,'DQIDTDYN', _RC)
-      call MAPL_GetPointer( export,doxdt,'DOXDTDYN', _RC)
+      call MAPL_GetPointer( export,dqldt,"DQLDTDYN", _RC)
+      call MAPL_GetPointer( export,dqidt,"DQIDTDYN", _RC)
+      call MAPL_GetPointer( export,doxdt,"DOXDTDYN", _RC)
 
       if (allocated(names)) then
 
          if( associated(dqldt) ) then
             dqldt = 0.0
             do k = 1,size(names)
-               if( trim(names(k)).eq.'QLCN' .or. &
-                    trim(names(k)).eq.'QLLS' ) then
+               if( trim(names(k)).eq."QLCN" .or. &
+                    trim(names(k)).eq."QLLS" ) then
                   if( state%vars%tracer(k)%is_r4 ) then
                      if (size(dqldt)==size(state%vars%tracer(k)%content_r4)) &
                           dqldt = dqldt - state%vars%tracer(k)%content_r4
@@ -1831,8 +1807,8 @@ contains
          if( associated(dqidt) ) then
             dqidt = 0.0
             do k = 1,size(names)
-               if( trim(names(k)).eq.'QICN' .or. &
-                    trim(names(k)).eq.'QILS' ) then
+               if( trim(names(k)).eq."QICN" .or. &
+                    trim(names(k)).eq."QILS" ) then
                   if( state%vars%tracer(k)%is_r4 ) then
                      if (size(dqidt)==size(state%vars%tracer(k)%content_r4)) &
                           dqidt = dqidt - state%vars%tracer(k)%content_r4
@@ -1847,9 +1823,9 @@ contains
          if( associated(doxdt) ) then
             doxdt = 0.0
             do k = 1,size(names)
-               pos = index(names(k),'::')
+               pos = index(names(k),"::")
                if(pos > 0) then
-                  if( (names(k)(pos+2:))=='OX' ) then
+                  if( (names(k)(pos+2:))=="OX" ) then
                      if( state%vars%tracer(k)%is_r4 ) then
                         if (size(doxdt)==size(state%vars%tracer(k)%content_r4)) &
                              doxdt = doxdt - state%vars%tracer(k)%content_r4
@@ -1864,7 +1840,7 @@ contains
       endif
 
       ! Initialize 2-D Vertically Integrated Tracer Dynamics Tendencies
-      call MAPL_GetPointer(export, temp2D, 'DQVDTDYNINT', _RC)
+      call MAPL_GetPointer(export, temp2D, "DQVDTDYNINT", _RC)
       if( associated(temp2D) ) then
          temp2d = 0.0
          do k=1,km
@@ -1872,12 +1848,12 @@ contains
          enddo
       endif
 
-      call MAPL_GetPointer(export, temp2D, 'DQLDTDYNINT', _RC)
+      call MAPL_GetPointer(export, temp2D, "DQLDTDYNINT", _RC)
       if( associated(temp2D) ) then
          temp2d = 0.0
          do N = 1,size(names)
-            if( trim(names(N)).eq.'QLCN' .or. &
-                 trim(names(N)).eq.'QLLS' ) then
+            if( trim(names(N)).eq."QLCN" .or. &
+                 trim(names(N)).eq."QLLS" ) then
                if( state%vars%tracer(N)%is_r4 ) then
                   do k=1,km
                      temp2d = temp2d - state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
@@ -1891,12 +1867,12 @@ contains
          enddo
       endif
 
-      call MAPL_GetPointer(export, temp2D, 'DQIDTDYNINT', _RC)
+      call MAPL_GetPointer(export, temp2D, "DQIDTDYNINT", _RC)
       if( associated(temp2D) ) then
          temp2d = 0.0
          do N = 1,size(names)
-            if( trim(names(N)).eq.'QICN' .or. &
-                 trim(names(N)).eq.'QILS' ) then
+            if( trim(names(N)).eq."QICN" .or. &
+                 trim(names(N)).eq."QILS" ) then
                if( state%vars%tracer(N)%is_r4 ) then
                   do k=1,km
                      temp2d = temp2d - state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
@@ -1910,13 +1886,13 @@ contains
          enddo
       endif
 
-      call MAPL_GetPointer(export, temp2D, 'DOXDTDYNINT', _RC)
+      call MAPL_GetPointer(export, temp2D, "DOXDTDYNINT", _RC)
       if( associated(temp2D) ) then
          temp2d = 0.0
          do N = 1,size(names)
-            pos = index(names(N),'::')
+            pos = index(names(N),"::")
             if(pos > 0) then
-               if( (names(N)(pos+2:))=='OX' ) then
+               if( (names(N)(pos+2:))=="OX" ) then
                   if( state%vars%tracer(N)%is_r4 ) then
                      do k=1,km
                         temp2d = temp2d - state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
@@ -1939,14 +1915,14 @@ contains
          kenrg = (kenrg0-kenrg)/DT
          penrg = (penrg0-penrg)/DT
          tenrg = (tenrg0-tenrg)/DT
-         call FILLOUT2(export, 'KEANA', kenrg, _RC)
-         call FILLOUT2(export, 'PEANA', penrg, _RC)
-         call FILLOUT2(export, 'TEANA', tenrg, _RC)
+         call FILLOUT2(export, "KEANA", kenrg, _RC)
+         call FILLOUT2(export, "PEANA", penrg, _RC)
+         call FILLOUT2(export, "TEANA", tenrg, _RC)
       endif
 
       ! Call Wrapper (DynRun) for FVDycore
-      call MAPL_GetResource( MAPL, CONSV, 'CONSV:', default=1, _RC)
-      call MAPL_GetResource( MAPL,  FILL,  'FILL:', default=0, _RC)
+      call MAPL_GridCompGetResource(gc, "CONSV", CONSV, default=1, _RC)
+      call MAPL_GridCompGetResource(gc, "FILL", FILL,  default=0, _RC)
 
       LCONSV = CONSV.eq.1
       LFILL  =  FILL.eq.1
@@ -1954,28 +1930,28 @@ contains
       ! Get pressures before dynamics
       pe0=vars%pe
 
-      call MAPL_TimerOff(MAPL, "-DYN_PROLOGUE")
+      ! call MAPL_TimerOff(MAPL, "-DYN_PROLOGUE")
 
       !-------------------------------------------------------
 
-      call MAPL_TimerOn(MAPL, "-DYN_CORE")
+      ! call MAPL_TimerOn(MAPL, "-DYN_CORE")
       t1 = MPI_Wtime(status)
-      call DynRun(STATE, export, clock, gc, PLE0=pe0, _RC)
+      call DynRun(state, export, clock, gc, PLE0=pe0, _RC)
       t2 = MPI_Wtime(status)
       dyn_run_timer = t2-t1
-      call MAPL_TimerOff(MAPL, "-DYN_CORE")
+      ! call MAPL_TimerOff(MAPL, "-DYN_CORE")
 
-      call MAPL_TimerOn(MAPL, "-DYN_EPILOGUE")
+      ! call MAPL_TimerOn(MAPL, "-DYN_EPILOGUE")
       ! Computational diagnostics
-      call MAPL_GetPointer(export, temp2d, 'TIME_IN_DYN', _RC)
+      call MAPL_GetPointer(export, temp2d, "TIME_IN_DYN", _RC)
       if(associated(temp2d)) temp2d = dyn_run_timer
-      call MAPL_GetPointer(export, temp2d, 'PID', _RC)
+      call MAPL_GetPointer(export, temp2d, "PID", _RC)
       if(associated(temp2d)) temp2d = 0 !WMP need to get from MAPL gid
 
       !#define DEBUG_WINDS
 #if defined(DEBUG_WINDS)
-      call Write_Profile(grid, vars%u, 'U-after-DynRun')
-      call Write_Profile(grid, vars%v, 'V-after-DynRun')
+      call Write_Profile(grid, vars%u, "U-after-DynRun")
+      call Write_Profile(grid, vars%v, "V-after-DynRun")
 #endif
       plk  = exp( kappa * log( 0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1)) ) )
       pkxy = exp( kappa * log( vars%pe ) )
@@ -1984,33 +1960,33 @@ contains
 
       if (SW_DYNAMICS) then
 
-         call MAPL_GetPointer(export, temp2d, 'PHIS', _RC)
+         call MAPL_GetPointer(export, temp2d, "PHIS", _RC)
          if(associated(temp2d)) temp2d = phisxy
 
-         call MAPL_GetPointer(export, temp2d, 'PS', _RC)
+         call MAPL_GetPointer(export, temp2d, "PS", _RC)
          if(associated(temp2d)) temp2d =  vars%pe(:,:,km+1)/GRAV
 
          call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
-         call FILLOUT3(export, 'U_DGRID', vars%u  , _RC)
-         call FILLOUT3(export, 'V_DGRID', vars%v  , _RC)
-         call FILLOUT3(export, 'U_CGRID', uc      , _RC)
-         call FILLOUT3(export, 'V_CGRID', vc      , _RC)
-         call FILLOUT3(export, 'U_AGRID', ua      , _RC)
-         call FILLOUT3(export, 'V_AGRID', va      , _RC)
+         call FILLOUT3(export, "U_DGRID", vars%u  , _RC)
+         call FILLOUT3(export, "V_DGRID", vars%v  , _RC)
+         call FILLOUT3(export, "U_CGRID", uc      , _RC)
+         call FILLOUT3(export, "V_CGRID", vc      , _RC)
+         call FILLOUT3(export, "U_AGRID", ua      , _RC)
+         call FILLOUT3(export, "V_AGRID", va      , _RC)
 
-         call FILLOUT3(export, 'U'      , ur      , _RC)
-         call FILLOUT3(export, 'V'      , vr      , _RC)
+         call FILLOUT3(export, "U"      , ur      , _RC)
+         call FILLOUT3(export, "V"      , vr      , _RC)
 
       else               ! .not. SW_DYNAMICS
 
          ! Load Local Variable with Vapor Specific Humidity
-         if ((.not. ADIABATIC) .and. (STATE%GRID%NQ > 0)) then
+         if ((.not. ADIABATIC) .and. (state%grid%NQ > 0)) then
             if ( qqq%is_r4 ) then
                if (size(qv)==size(qqq%content_r4)) qv = qqq%content_r4
             else
                if (size(qv)==size(qqq%content)   ) qv = qqq%content
             endif
-            _ASSERT(all(qv >= 0.0),'After DynRun: negative or nan water vapor detected')
+            _ASSERT(all(qv >= 0.0),"After DynRun: negative or nan water vapor detected")
          else
             qv = 0.0
          endif
@@ -2019,7 +1995,7 @@ contains
          delp  = ( vars%pe(:,:,2:) - vars%pe(:,:,:km) )
          dthdt = ( vars%pt*(1.0+eps*qv)*delp-dthdt )/dt
 
-         call MAPL_GetPointer(export, temp2d, 'DTHVDTDYNINT', _RC)
+         call MAPL_GetPointer(export, temp2d, "DTHVDTDYNINT", _RC)
          if(associated(temp2d)) then
             qsum1 = 0.0
             do k=1,km
@@ -2042,22 +2018,22 @@ contains
 
          ! Compute absolute vorticity on the D grid
          call getEPV(vars%pt, vort, ua, va, epvxyz)
-         call MAPL_GetPointer(export, temp3D, 'EPV', _RC)
+         call MAPL_GetPointer(export, temp3D, "EPV", _RC)
          if(associated(temp3d)) temp3d = epvxyz*(p00**kappa)
 
          ! Compute Tropopause Pressure, Temperature, and Moisture
          doTropvars=.false.
-         call MAPL_GetPointer(export, temp2D, 'TROPP_THERMAL', _RC)
+         call MAPL_GetPointer(export, temp2D, "TROPP_THERMAL", _RC)
          if(associated(temp2D)) doTropvars=.true.
-         call MAPL_GetPointer(export, temp2D, 'TROPP_EPV', _RC)
+         call MAPL_GetPointer(export, temp2D, "TROPP_EPV", _RC)
          if(associated(temp2D)) doTropvars=.true.
-         call MAPL_GetPointer(export, temp2D, 'TROPP_BLENDED', _RC)
+         call MAPL_GetPointer(export, temp2D, "TROPP_BLENDED", _RC)
          if(associated(temp2D)) doTropvars=.true.
-         call MAPL_GetPointer(export, temp2D, 'TROPK_BLENDED', _RC)
+         call MAPL_GetPointer(export, temp2D, "TROPK_BLENDED", _RC)
          if(associated(temp2D)) doTropvars=.true.
-         call MAPL_GetPointer(export, temp2D, 'TROPT', _RC)
+         call MAPL_GetPointer(export, temp2D, "TROPT", _RC)
          if(associated(temp2D)) doTropvars=.true.
-         call MAPL_GetPointer(export, temp2D, 'TROPQ', _RC)
+         call MAPL_GetPointer(export, temp2D, "TROPQ", _RC)
          if(associated(temp2D)) doTropvars=.true.
 
          if (doTropvars) then
@@ -2566,7 +2542,7 @@ contains
          ! Fill Surface and Near-Surface Variables
          HGT_SURFACE = 50.0
          if (km .eq. 72) HGT_SURFACE =  0.0
-         call MAPL_GetResource(MAPL, HGT_SURFACE, label="HGT_SURFACE:", default=HGT_SURFACE, _RC)
+         call MAPL_GridCompGetResource(gc, "HGT_SURFACE", HGT_SURFACE, default=HGT_SURFACE, _RC)
          if ( HGT_SURFACE .gt. 0.0 ) then
             ! Near surface height for surface
             call MAPL_GetPointer(export, temp2d, 'DZ', _RC)
@@ -2789,7 +2765,7 @@ contains
 
       end if   ! SW_DYNAMICS
 
-      call MAPL_TimerOff(MAPL, "-DYN_EPILOGUE")
+      ! call MAPL_TimerOff(MAPL, "-DYN_EPILOGUE")
 
       ! De-Allocate Arrays
 
@@ -2857,14 +2833,15 @@ contains
 
       call freeTracers(state)
 
-      call MAPL_TimerOff(MAPL, "RUN")
-      call MAPL_TimerOff(MAPL, "TOTAL")
+      ! call MAPL_TimerOff(MAPL, "RUN")
+      ! call MAPL_TimerOff(MAPL, "TOTAL")
 
       !if (ADIABATIC) then
       !  ! Fill Exports
       !   call RunAddIncs(gc, import, export, clock, rc)
       !endif
 
+      call logger%info("Run:: ...complete")
       _RETURN(_SUCCESS)
 
    contains
@@ -2872,17 +2849,17 @@ contains
       subroutine check_replay_time_(lring)
 
          logical :: lring
-
+         
          integer :: REPLAY_REF_DATE, REPLAY_REF_TIME, REPLAY_REF_TGAP
          integer :: REF_TIME(6), REF_TGAP(6)
-         type (ESMF_TimeInterval)  :: RefTGap
+         type(ESMF_TimeInterval)  :: RefTGap
 
-         call MAPL_GetResource(MAPL, ReplayType, 'REPLAY_TYPE:', default="FULL", _RC)
+         call MAPL_GridCompGetResource(gc, "REPLAY_TYPE", ReplayType, default="FULL", _RC)
          !  if (trim(ReplayType) == "FULL") return
 
-         call MAPL_GetResource(MAPL, REPLAY_REF_DATE, label = 'REPLAY_REF_DATE:', default=-1, _RC)
-         call MAPL_GetResource(MAPL, REPLAY_REF_TIME, label = 'REPLAY_REF_TIME:', default=-1, _RC)
-         call MAPL_GetResource(MAPL, REPLAY_REF_TGAP, label = 'REPLAY_REF_TGAP:', default=-1, _RC)
+         call MAPL_GridCompGetResource(gc, "REPLAY_REF_DATE", REPLAY_REF_DATE, default=-1, _RC)
+         call MAPL_GridCompGetResource(gc, "REPLAY_REF_TIME", REPLAY_REF_TIME, default=-1, _RC)
+         call MAPL_GridCompGetResource(gc, "REPLAY_REF_TGAP", REPLAY_REF_TGAP, default=-1, _RC)
 
          if(REPLAY_REF_DATE==-1.or.REPLAY_REF_TIME==-1) return
 
@@ -2933,9 +2910,9 @@ contains
 
       subroutine dump_n_splash_
 
-         real(kind=4), pointer :: XTMP2d (:,:) =>NULL()
-         real(kind=4), pointer :: XTMP3d(:,:,:)=>NULL()
-         real(kind=4), pointer :: YTMP3d(:,:,:)=>NULL()
+         real(r4), pointer :: XTMP2d (:,:) =>NULL()
+         real(r4), pointer :: XTMP3d(:,:,:)=>NULL()
+         real(r4), pointer :: YTMP3d(:,:,:)=>NULL()
          real(r8), allocatable :: ana_thv (:,:,:)
          real(r8), allocatable :: ana_phis  (:,:)
          real(r8), allocatable :: ana_pkxy  (:,:,:)
@@ -2993,7 +2970,7 @@ contains
          else if(iwind==1) then
             status=1
             call WRITE_PARALLEL('cannot handle single wind component')
-            VERIFY_(STATUS)
+            _VERIFY(STATUS)
          else if (iwind==2) then
 #ifdef INC_WINDS
             if (iapproach==1) then
@@ -3145,37 +3122,38 @@ contains
             endif
          endif
 
-         ! O3
-         if( trim(o3name).ne.'NULL' ) then
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(o3name), XTMP3d, _RC)
-            allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-            call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
+         ! pchakrab - TODO: orbit??
+         ! ! O3
+         ! if( trim(o3name).ne.'NULL' ) then
+         !    call ESMFL_BundleGetPointerToData(ana_bundle, trim(o3name), XTMP3d, _RC)
+         !    allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
+         !    call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
 
-            ! Ozone needs to be adjusted to OX
-            call WRITE_PARALLEL('Replaying '//trim(o3name))
+         !    ! Ozone needs to be adjusted to OX
+         !    call WRITE_PARALLEL('Replaying '//trim(o3name))
 
-            call MAPL_Get(MAPL, LONS=LONS, LATS=LATS, ORBIT=ORBIT, _RC)
+         !    call MAPL_Get(MAPL, lons=lons, lats=lats, ORBIT=ORBIT, _RC)
 
-            allocate( ZTH( size(LONS,1),size(LONS,2) ) )
-            allocate( SLR( size(LONS,1),size(LONS,2) ) )
+         !    allocate( ZTH( size(lons,1),size(lons,2) ) )
+         !    allocate( SLR( size(lons,1),size(lons,2) ) )
 
-            call MAPL_SunGetInsolation(LONS, LATS, ORBIT, ZTH, SLR, clock=clock, _RC)
+         !    call MAPL_SunGetInsolation(lons, lats, ORBIT, ZTH, SLR, clock=clock, _RC)
 
-            pl = ( vars%pe(:,:,2:) + vars%pe(:,:,:km) ) * 0.5
+         !    pl = ( vars%pe(:,:,2:) + vars%pe(:,:,:km) ) * 0.5
 
-            do L=1,km
-               if( ooo%is_r4 ) then
-                  where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
-                       ooo%content_r4(:,:,L) = max(0.,cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6)
-               else
-                  where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
-                       ooo%content   (:,:,L) = max(0.,cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6)
-               endif
-            enddo
+         !    do L=1,km
+         !       if( ooo%is_r4 ) then
+         !          where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
+         !               ooo%content_r4(:,:,L) = max(0.,cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6)
+         !       else
+         !          where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
+         !               ooo%content   (:,:,L) = max(0.,cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6)
+         !       endif
+         !    enddo
 
-            deallocate( ZTH, SLR )
-            deallocate(cubeTEMP3D)
-         endif
+         !    deallocate( ZTH, SLR )
+         !    deallocate(cubeTEMP3D)
+         ! endif
          if( ooo%is_r4 ) then ! ana_qq(2) used as aux var to hold ox
             ana_qq(:,:,:,2) = ooo%content_r4
          else
@@ -3284,7 +3262,7 @@ contains
          if(.not.allhere) then
             call WRITE_PARALLEL('Not all varibles needed for replay are available')
             status = 999
-            VERIFY_(status)
+            _VERIFY(status)
          endif
          call WRITE_PARALLEL('Starting incremental replay')
 
@@ -3304,7 +3282,7 @@ contains
          if(iwind==1) then
             status=1
             print *, 'cannot handle single wind component'
-            VERIFY_(STATUS)
+            _VERIFY(STATUS)
          else if (iwind==2) then
             allocate(cubeTEMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
             allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
@@ -3378,32 +3356,33 @@ contains
             enddo
          endif
 
-         ! O3
-         if( trim(o3name).ne.'NULL' ) then
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(o3name), TEMP3D, _RC)
-            allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-            call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
+         ! pchakrab - TODO: orbit?
+         ! ! O3
+         ! if( trim(o3name).ne.'NULL' ) then
+         !    call ESMFL_BundleGetPointerToData(ana_bundle, trim(o3name), TEMP3D, _RC)
+         !    allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
+         !    call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
 
-            ! Ozone needs to be adjusted to OX
-            call WRITE_PARALLEL('Replaying increment of '//trim(o3name))
+         !    ! Ozone needs to be adjusted to OX
+         !    call WRITE_PARALLEL('Replaying increment of '//trim(o3name))
 
-            call MAPL_Get(MAPL, LONS=LONS, LATS=LATS, ORBIT=ORBIT, _RC)
+         !    call MAPL_Get(MAPL, lons=lons, lats=lats, ORBIT=ORBIT, _RC)
 
-            allocate( ZTH( size(LONS,1),size(LONS,2) ) )
-            allocate( SLR( size(LONS,1),size(LONS,2) ) )
+         !    allocate( ZTH( size(lons,1),size(lons,2) ) )
+         !    allocate( SLR( size(lons,1),size(lons,2) ) )
 
-            call MAPL_SunGetInsolation(LONS, LATS, ORBIT, ZTH, SLR, clock=clock, _RC)
+         !    call MAPL_SunGetInsolation(lons, lats, ORBIT, ZTH, SLR, clock=clock, _RC)
 
-            pl = ( vars%pe(:,:,2:) + vars%pe(:,:,:km) ) * 0.5
+         !    pl = ( vars%pe(:,:,2:) + vars%pe(:,:,:km) ) * 0.5
 
-            do L=1,km
-               where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
-                    dqox(:,:,L) = cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6
-            enddo
+         !    do L=1,km
+         !       where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
+         !            dqox(:,:,L) = cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6
+         !    enddo
 
-            deallocate( ZTH, SLR )
-            deallocate(cubeTEMP3D)
-         endif
+         !    deallocate( ZTH, SLR )
+         !    deallocate(cubeTEMP3D)
+         ! endif
 
          ! QV
          if( trim(qname).ne.'NULL' ) then
@@ -3420,12 +3399,12 @@ contains
             if(trim(tvar).ne.'TV') then
                call WRITE_PARALLEL('Error: Cannot Replay TVAR '//trim(tvar))
                STATUS=99
-               VERIFY_(STATUS)
+               _VERIFY(STATUS)
             endif
             if(trim(tname).ne.'tv') then
                call WRITE_PARALLEL('Error: Cannot Replay TNAME '//trim(tname))
                STATUS=99
-               VERIFY_(STATUS)
+               _VERIFY(STATUS)
             endif
             call ESMFL_BundleGetPointerToData(ana_bundle, trim(tname), TEMP3D, _RC)
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
@@ -3477,9 +3456,9 @@ contains
 
       subroutine state_remap_
 
-         real(kind=4), pointer :: XTMP2d (:,:) =>NULL()
-         real(kind=4), pointer :: XTMP3d(:,:,:)=>NULL()
-         real(kind=4), pointer :: YTMP3d(:,:,:)=>NULL()
+         real(r4), pointer :: XTMP2d (:,:) =>NULL()
+         real(r4), pointer :: XTMP3d(:,:,:)=>NULL()
+         real(r4), pointer :: YTMP3d(:,:,:)=>NULL()
          real(r8), allocatable :: ana_thv (:,:,:)
          real(r8), allocatable :: ana_phis  (:,:)
          real(r8), allocatable :: ana_qq    (:,:,:,:)
@@ -3513,7 +3492,7 @@ contains
          if (nq3d<2) then
             call WRITE_PARALLEL('state_remap: invalid number of tracers')
             status=999
-            VERIFY_(STATUS)
+            _VERIFY(STATUS)
          endif
 
          iib = lbound(vars%pe,1)
@@ -3553,7 +3532,7 @@ contains
                   if (icnt>nq3d) then
                      call WRITE_PARALLEL('state_remap: number of tracers exceeds known value')
                      status=999
-                     VERIFY_(STATUS)
+                     _VERIFY(STATUS)
                   endif
                   call ESMFL_BundleGetPointerToData(BUNDLE, NAME, ptr3dr4, _RC)
                   ana_qq(:,:,:,icnt) = ptr3dr4
@@ -3562,7 +3541,7 @@ contains
             if (icnt/=nq3d) then
                call WRITE_PARALLEL('state_remap: inconsitent number of tracers')
                status=999
-               VERIFY_(STATUS)
+               _VERIFY(STATUS)
             endif
          else
             if( qqq%is_r4 ) then
@@ -3640,9 +3619,9 @@ contains
 
    end subroutine Run
 
-   subroutine PULL_Q(STATE, import, QQQ, iNXQ, InFieldName, RC)
+   subroutine PULL_Q(state, import, QQQ, iNXQ, InFieldName, RC)
 
-      type (DynState)        :: STATE
+      type (DynState)        :: state
       type (ESMF_State)              :: import
       type (DynTracers)               :: QQQ       ! Specific Humidity
       integer,           intent(IN)  :: iNXQ
@@ -3680,14 +3659,14 @@ contains
       VERIFY_(STATUS)
 
       NQ = NQ + iNXQ
-      STATE%GRID%NQ = NQ       ! GRID%NQ is now the "official" NQ
+      state%grid%NQ = NQ       ! grid%NQ is now the "official" NQ
 
       ! Tracer pointer array
-      IF( ASSOCIATED( STATE%VARS%tracer ) ) then
+      IF( ASSOCIATED( state%vars%tracer ) ) then
          call freeTracers(state)
       ENDIF
 
-      ALLOCATE(STATE%VARS%tracer(nq), STAT=STATUS)
+      ALLOCATE(state%vars%tracer(nq), STAT=STATUS)
       VERIFY_(STATUS)
 
       DO n = 1, NQ-iNXQ
@@ -3698,11 +3677,11 @@ contains
          call ESMF_ArrayGet(array,typekind=kind,rc=status)
          VERIFY_(STATUS)
 
-         STATE%VARS%TRACER(N)%IS_R4  = (kind == ESMF_TYPEKIND_R4)   ! Is real*4?
+         state%vars%TRACER(N)%IS_R4  = (kind == ESMF_TYPEKIND_R4)   ! Is real*4?
 
-         STATE%VARS%TRACER(N)%TNAME = fieldname
+         state%vars%TRACER(N)%TNAME = fieldname
 
-         if ( STATE%VARS%TRACER(N)%IS_R4 ) then
+         if ( state%vars%TRACER(N)%IS_R4 ) then
             call ESMF_ArrayGet(array, localDE=0, farrayptr=ptr_r4, rc=status)
             VERIFY_(STATUS)
             state%vars%tracer(n)%content_r4 => MAPL_RemapBounds(PTR_R4, i1,in,j1,jn, &
@@ -3748,16 +3727,12 @@ contains
       integer, intent(out) :: rc
       !EOP
 
-      integer                                          :: status
-      character(len=ESMF_MAXSTR) :: IAm
-
-      type (MAPL_MetaComp), pointer :: genstate
-
-      type (DYN_wrap) :: wrap
-      type (DynState), pointer :: STATE
-      type (DynGrid),  pointer :: GRID
-      type (DynVars),  pointer :: VARS
-      type (DynTracers)                 :: qqq     ! Specific Humidity
+      type(DYN_wrap) :: wrap
+      type(DynState), pointer :: state
+      type(DynGrid), pointer :: grid
+      type(DynVars), pointer :: vars
+      type(DynTracers) :: qqq                ! Specific Humidity
+      type(ESMF_Grid) :: esmfgrid
 
       real(r8), allocatable :: penrg (:,:)   ! Vertically Integrated Cp*T
       real(r8), allocatable :: kenrg (:,:)   ! Vertically Integrated K
@@ -3766,8 +3741,8 @@ contains
       real(r8), allocatable :: kenrg0(:,:)   ! Vertically Integrated K
       real(r8), allocatable :: tenrg0(:,:)   ! PHIS*(Psurf-Ptop)
 
-      real(r8),     pointer :: phisxy(:,:)
-      real(r4),     pointer ::   phis(:,:)
+      real(r8), pointer     :: phisxy(:,:)
+      real(r4), pointer     ::   phis(:,:)
       real(r8), allocatable ::    slp(:,:)
       real(r8), allocatable ::  H1000(:,:)
       real(r8), allocatable ::  H850 (:,:)
@@ -3793,107 +3768,90 @@ contains
       real(r8), allocatable ::  logpe(:,:,:)
       real(r8), allocatable ::  logps(:,:)
 
-      real(FVPRC)              :: dt
-
       real(r4), pointer     :: QOLD(:,:,:)
       real(r4), pointer     :: temp3d(:,:,:)
       real(r4), pointer     :: temp2d(:,:  )
 
-      integer ifirstxy, ilastxy
-      integer jfirstxy, jlastxy
-      integer im,jm,km, iNXQ
       real(r4), pointer     :: ztemp1(:,:  )
       real(r4), pointer     :: ztemp2(:,:  )
       real(r4), pointer     :: ztemp3(:,:  )
 
-      real(kind=4), allocatable :: dthdtphyint1(:,:)
-      real(kind=4), allocatable :: dthdtphyint2(:,:)
+      real(r4), allocatable :: dthdtphyint1(:,:)
+      real(r4), allocatable :: dthdtphyint2(:,:)
 
+      real(FVPRC) :: dt
       logical :: doEnergetics
+      integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
+      integer :: im, jm, km, iNXQ
+      integer :: i, j, k, status
+      class(logger_t), pointer :: logger
 
-      integer i,j,k
+      call MAPL_GridCompGet(gc, grid=esmfgrid, logger=logger, _RC)
+      call logger%info("RunAddIncs:: starting...")
 
-      character(len=ESMF_MAXSTR) :: comp_name
-
-      Iam = "RunAddIncs"
-      call ESMF_GridCompGet( gc, name=comp_name, RC=STATUS )
-      VERIFY_(STATUS)
-      Iam = trim(comp_name) // trim(Iam)
-
-      ! Retrieve the pointer to the generic state
-      call MAPL_GetObjectFromGC (gc, GENSTATE,  RC=STATUS )
-      VERIFY_(STATUS)
-
-      call MAPL_TimerOn(GENSTATE,"TOTAL")
-      call MAPL_TimerOn(GENSTATE,"RUN2")
+      ! call MAPL_TimerOn(GENSTATE,"TOTAL")
+      ! call MAPL_TimerOn(GENSTATE,"RUN2")
 
       ! Retrieve the pointer to the internal state
-      call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, status)
-      VERIFY_(STATUS)
+      call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, _RC)
       state => wrap%dyn_state
 
-      vars  => state%vars   ! direct handle to control variables
-      grid  => state%grid   ! direct handle to grid
-      dt    =  state%dt     ! dynamics time step (large)
+      vars => state%vars ! direct handle to control variables
+      grid => state%grid ! direct handle to grid
+      dt = state%dt      ! dynamics time step (large)
 
-      ifirstxy = grid%is
-      ilastxy  = grid%ie
-      jfirstxy = grid%js
-      jlastxy  = grid%je
+      ifirstxy = grid%is; ilastxy  = grid%ie
+      jfirstxy = grid%js; jlastxy  = grid%je
 
-      im  = grid%npx
-      jm  = grid%npy
-      km  = grid%npz
-      iNXQ = 0
+      im  = grid%npx; jm  = grid%npy
+      km  = grid%npz; iNXQ = 0
 
       if (.not. SW_DYNAMICS) then
 
-         ALLOCATE( dthdtphyint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-         ALLOCATE( dthdtphyint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+         allocate( dthdtphyint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+         allocate( dthdtphyint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
 
          doEnergetics=.false.
-         call MAPL_GetPointer(export,temp2D,'KE'   ,rc=status); VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2D, "KE", _RC)
          if(associated(temp2D)) doEnergetics=.true.
-         call MAPL_GetPointer(export,temp2D,'KEPHY',rc=status); VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2D, "KEPHY", _RC)
          if(associated(temp2D)) doEnergetics=.true.
-         call MAPL_GetPointer(export,temp2D,'PEPHY',rc=status); VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2D, "PEPHY", _RC)
          if(associated(temp2D)) doEnergetics=.true.
-         call MAPL_GetPointer(export,temp2D,'TEPHY',rc=status); VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2D, "TEPHY", _RC)
          if(associated(temp2D)) doEnergetics=.true.
          if (doEnergetics) then
-            ALLOCATE(  kenrg(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-            ALLOCATE(  penrg(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-            ALLOCATE(  tenrg(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-            ALLOCATE( kenrg0(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-            ALLOCATE( penrg0(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-            ALLOCATE( tenrg0(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+            allocate(  kenrg(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+            allocate(  penrg(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+            allocate(  tenrg(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+            allocate( kenrg0(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+            allocate( penrg0(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+            allocate( tenrg0(ifirstxy:ilastxy,jfirstxy:jlastxy) )
          endif
 
-         ALLOCATE(  tmp3d(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
-         ALLOCATE( phisxy(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-         ALLOCATE(  logps(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+         allocate(  tmp3d(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+         allocate( phisxy(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+         allocate(  logps(ifirstxy:ilastxy,jfirstxy:jlastxy) )
 
-         ALLOCATE(     ua(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
-         ALLOCATE(     va(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
-         ALLOCATE(     uc(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
-         ALLOCATE(     vc(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
-         ALLOCATE(     ur(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
-         ALLOCATE(     vr(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
-         ALLOCATE(     qv(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
-         ALLOCATE(     pl(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
-         ALLOCATE(  logpl(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
-         ALLOCATE(     dp(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
-         ALLOCATE(    thv(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
-         ALLOCATE( tempxy(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate(     ua(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate(     va(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate(     uc(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate(     vc(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate(     ur(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate(     vr(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate(     qv(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate(     pl(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate(  logpl(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate(     dp(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate(    thv(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate( tempxy(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
 
-         ALLOCATE(    plk(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
-         ALLOCATE(    pke(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
-         ALLOCATE(  logpe(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
-         ALLOCATE(    zle(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
+         allocate(    plk(ifirstxy:ilastxy,jfirstxy:jlastxy,km)   )
+         allocate(    pke(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
+         allocate(  logpe(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
+         allocate(    zle(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
 
-
-         call MAPL_GetPointer ( import, PHIS, 'PHIS', RC=STATUS )
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(import, PHIS, "PHIS", _RC)
 
          phisxy = real(phis,kind=r8)
 
@@ -3901,16 +3859,16 @@ contains
          dp = ( vars%pe(:,:,2:) - vars%pe (:,:,:km) )
 
          ! Load Specific Humidity
-         call MAPL_GetPointer(export,QOLD,'Q',  rc=status)
+         call MAPL_GetPointer(export, QOLD, 'Q', _RC)
 
-         call PULL_Q ( STATE, import, qqq, iNXQ, RC=rc )
-         if ((.not. ADIABATIC) .and. (STATE%GRID%NQ > 0)) then
+         call PULL_Q(state, import, qqq, iNXQ, _RC)
+         if ((.not. ADIABATIC) .and. (state%grid%NQ > 0)) then
             if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
                if (size(qv)==size(qqq%content_r4)) qv = qqq%content_r4
             elseif (associated(qqq%content)) then
                if (size(qv)==size(qqq%content)) qv = qqq%content
             endif
-            _ASSERT(all(qv >= 0.0),'RunAddIncs: negative or nan water vapor detected')
+            _ASSERT(all(qv >= 0.0), "RunAddIncs: negative or nan water vapor detected")
          else
             qv = 0.0
          endif
@@ -3928,8 +3886,7 @@ contains
          endif
 
          ! DTHVDTPHYINT
-         call MAPL_GetPointer ( export, temp2D, 'DTHVDTPHYINT', rc=status )
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2D, "DTHVDTPHYINT", _RC)
          if( associated(temp2D) ) then
             dthdtphyint1 = 0.0
             do k=1,km
@@ -3938,12 +3895,12 @@ contains
          endif
 
          ! Add Diabatic Forcing to State Variables
-         call MAPL_TimerOn (GENSTATE,"PHYS_ADD_INCS")
-         call ADD_INCS ( GENSTATE,STATE,import,DT )
-         call MAPL_TimerOff(GENSTATE,"PHYS_ADD_INCS")
+         ! call MAPL_TimerOn (GENSTATE,"PHYS_ADD_INCS")
+         call ADD_INCS(esmfgrid, state, import, DT)
+         ! call MAPL_TimerOff(GENSTATE,"PHYS_ADD_INCS")
 
 
-         if (DYN_DEBUG) call DEBUG_FV_STATE('PHYSICS ADD_INCS',STATE)
+         if (DYN_DEBUG) call DEBUG_FV_STATE('PHYSICS ADD_INCS',state)
 
          ! Update Mid-Layer Pressure and Pressure Thickness
          dp = ( vars%pe(:,:,2:) - vars%pe (:,:,:km) )
@@ -3955,12 +3912,12 @@ contains
 
          ! Get Cubed-Sphere Wind Exports
          call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
-         call FILLOUT3 (export, 'U_DGRID', vars%u  , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'V_DGRID', vars%v  , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'U_CGRID', uc      , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'V_CGRID', vc      , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'U_AGRID', ua      , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'V_AGRID', va      , rc=status); VERIFY_(STATUS)
+         call FILLOUT3(export, 'U_DGRID', vars%u, _RC)
+         call FILLOUT3(export, 'V_DGRID', vars%v, _RC)
+         call FILLOUT3(export, 'U_CGRID', uc, _RC)
+         call FILLOUT3(export, 'V_CGRID', vc, _RC)
+         call FILLOUT3(export, 'U_AGRID', ua, _RC)
+         call FILLOUT3(export, 'V_AGRID', va, _RC)
 
          ! Compute Energetics After Diabatic Forcing
          thv = vars%pt*(1.0+eps*qv)
@@ -3970,27 +3927,25 @@ contains
 #endif
 
          if (doEnergetics) then
-            call Energetics (ur,vr,thv,vars%pe,dp,vars%pkz,phisxy,kenrg,penrg,tenrg)
-            call MAPL_GetPointer(export,temp2d,'KE',  rc=status)
-            VERIFY_(STATUS)
+            call Energetics(ur,vr,thv,vars%pe,dp,vars%pkz,phisxy,kenrg,penrg,tenrg)
+            call MAPL_GetPointer(export, temp2d, "KE", _RC)
             if(associated(temp2d)) temp2d = kenrg
             kenrg = (kenrg-kenrg0)/DT
             penrg = (penrg-penrg0)/DT
             tenrg = (tenrg-tenrg0)/DT
-            call FILLOUT2 (export, 'KEPHY', kenrg, rc=status); VERIFY_(STATUS)
-            call FILLOUT2 (export, 'PEPHY', penrg, rc=status); VERIFY_(STATUS)
-            call FILLOUT2 (export, 'TEPHY', tenrg, rc=status); VERIFY_(STATUS)
+            call FILLOUT2(export, "KEPHY", kenrg, _RC)
+            call FILLOUT2(export, "PEPHY", penrg, _RC)
+            call FILLOUT2(export, "TEPHY", tenrg, _RC)
          endif
 
          ! DTHVDTPHYINT
-         call MAPL_GetPointer ( export, temp2D, 'DTHVDTPHYINT', rc=status )
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2D, "DTHVDTPHYINT", _RC)
          if( associated(temp2D) ) then
             dthdtphyint2 = 0.0
             do k=1,km
                dthdtphyint2 = dthdtphyint2 + thv(:,:,k)*dp(:,:,k)
             enddo
-            temp2D       = (dthdtphyint2-dthdtphyint1) * MAPL_P00**MAPL_KAPPA / (MAPL_GRAV*DT)
+            temp2D = (dthdtphyint2-dthdtphyint1) * MAPL_P00**MAPL_KAPPA / (MAPL_GRAV*DT)
          endif
 
          plk = exp( kappa * log( 0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1)) ) )
@@ -4011,29 +3966,27 @@ contains
             if (TMAX >= 333.0_r8) call Write_Profile(grid, tempxy, 'TAFINC')
          endif
 
-         call FILLOUT3 (export, 'DELP'   , dp      , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'U'      , ur      , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'V'      , vr      , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'T'      , tempxy  , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'Q'      , qv      , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'PL'     , pl      , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'PLE'    , vars%pe , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'PLK'    , plk     , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'PKE'    , pke     , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'THV'    , thv     , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'PT'     , vars%pt , rc=status); VERIFY_(STATUS)
-         call FILLOUT3 (export, 'PE'     , vars%pe , rc=status); VERIFY_(STATUS)
+         call FILLOUT3(export, "DELP", dp, _RC)
+         call FILLOUT3(export, "U", ur, _RC)
+         call FILLOUT3(export, "V", vr, _RC)
+         call FILLOUT3(export, "T", tempxy, _RC)
+         call FILLOUT3(export, "Q", qv, _RC)
+         call FILLOUT3(export, "PL", pl, _RC)
+         call FILLOUT3(export, "PLE", vars%pe, _RC)
+         call FILLOUT3(export, "PLK", plk, _RC)
+         call FILLOUT3(export, "PKE", pke, _RC)
+         call FILLOUT3(export, "THV", thv, _RC)
+         call FILLOUT3(export, "PT", vars%pt, _RC)
+         call FILLOUT3(export, "PE", vars%pe, _RC)
 
-         call MAPL_GetPointer(export,temp3d,'TH',rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp3d, "TH", _RC)
          if(associated(temp3d)) temp3d = (tempxy)*(p00/(0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1))))**kappa
 
 #ifdef SKIP_TRACERS
          do itracer=1,ntracers
             write(myTracer, "('Q',i5.5)") itracer-1
-            call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
-            VERIFY_(STATUS)
-            if((associated(temp3d)) .and. (STATE%GRID%NQ>=itracer)) then
+            call MAPL_GetPointer(export, temp3D, TRIM(myTracer), _RC)
+            if((associated(temp3d)) .and. (state%grid%NQ>=itracer)) then
                if (state%vars%tracer(itracer)%is_r4) then
                   temp3d = state%vars%tracer(itracer)%content_r4
                else
@@ -4050,322 +4003,233 @@ contains
          enddo
          zle(:,:,:) = zle(:,:,:)/grav
 
-         call FILLOUT3 (export, 'ZLE', zle, rc=status); VERIFY_(STATUS)
+         call FILLOUT3(export, "ZLE", zle, _RC)
 
          ! Compute Mid-Layer Heights
-         call MAPL_GetPointer(export,temp3d,'ZL',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp3d, "ZL", _RC)
          if(associated(temp3d)) temp3d = 0.5*( zle(:,:,2:) + zle(:,:,:km) )
 
-
          ! Fill Single Level Variables
-         call MAPL_GetPointer(export,temp2d,'Z700',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "Z700", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,zle*grav,logpe,log(70000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, zle*grav, logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'Z500',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, 'Z500', _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,zle*grav,logpe,log(50000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, zle*grav, logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'Z300',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, 'Z300', _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,zle*grav,logpe,log(30000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, zle*grav, logpe, log(30000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'H100',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "H100", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,zle,logpe,log(10000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, zle, logpe, log(10000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'H200',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "H200", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,zle,logpe,log(20000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, zle, logpe, log(20000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'H250',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "H250", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,zle,logpe,log(25000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, zle, logpe, log(25000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'H300',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "H300", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,zle,logpe,log(30000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, zle, logpe, log(30000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'H500',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "H500", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,zle,logpe,log(50000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, zle, logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'H700',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "H700", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,zle,logpe,log(70000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, zle, logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'H850',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "H850", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,zle,logpe,log(85000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, zle,logpe, log(85000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'H1000',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "H1000", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,zle,logpe,log(100000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, zle, logpe, log(100000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'U50M',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "U50M", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,ur,-zle,-50., rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, ur, -zle, -50., _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'V50M',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "V50M", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,vr,-zle,-50., rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, vr, -zle, -50., _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'U100',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "U100", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,ur,logpe,log(10000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, ur, logpe, log(10000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'U200',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "U200", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,ur,logpe,log(20000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, ur, logpe, log(20000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'U250',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "U250", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,ur,logpe,log(25000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, ur, logpe, log(25000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'U300',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "U300", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,ur,logpe,log(30000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, ur, logpe, log(30000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'U500',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "U500", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,ur,logpe,log(50000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, ur, logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'U700',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "U700", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,ur,logpe,log(70000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, ur, logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'U850',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "U850", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,ur,logpe,log(85000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, ur, logpe, log(85000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'V100',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "V100", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,vr,logpe,log(10000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, vr, logpe, log(10000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'V200',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "V200", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,vr,logpe,log(20000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, vr, logpe, log(20000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'V250',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "V250", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,vr,logpe,log(25000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, vr, logpe, log(25000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'V300',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "V300", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,vr,logpe,log(30000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, vr, logpe, log(30000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'V500',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "V500", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,vr,logpe,log(50000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, vr, logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'V700',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "V700", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,vr,logpe,log(70000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, vr, logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'V850',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "V850", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,vr,logpe,log(85000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, vr, logpe, log(85000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'T100',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "T100", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,tempxy,logpe,log(10000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, tempxy, logpe, log(10000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'T200',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "T200", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,tempxy,logpe,log(20000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, tempxy, logpe, log(20000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'T250',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "T250", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,tempxy,logpe,log(25000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, tempxy, logpe, log(25000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'T300',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "T300", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,tempxy,logpe,log(30000.)  , rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, tempxy, logpe, log(30000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'T500',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "T500", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,tempxy,logpe,log(50000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, tempxy, logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'T700',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "T700", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,tempxy,logpe,log(70000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, tempxy, logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'T850',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "T850", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,tempxy,logpe,log(85000.)  ,  rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, tempxy, logpe, log(85000.), _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'Q100',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "Q100", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,qv,logpe,log(10000.)  ,  positive_definite=.true., rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, qv, logpe, log(10000.), positive_definite=.true., _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'Q200',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "Q200", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,qv,logpe,log(20000.)  ,  positive_definite=.true., rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, qv, logpe, log(20000.), positive_definite=.true., _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'Q250',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "Q250", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,qv,logpe,log(25000.)  ,  positive_definite=.true., rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, qv, logpe, log(25000.), positive_definite=.true., _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'Q300',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "Q300", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,qv,logpe,log(30000.)  ,  positive_definite=.true., rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, qv, logpe, log(30000.), positive_definite=.true., _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'Q500',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "Q500", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,qv,logpe,log(50000.)  ,  positive_definite=.true., rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, qv, logpe, log(50000.), positive_definite=.true., _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'Q700',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "Q700", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,qv,logpe,log(70000.)  ,  positive_definite=.true., rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, qv, logpe, log(70000.), positive_definite=.true., _RC)
          end if
 
-         call MAPL_GetPointer(export,temp2d,'Q850',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "Q850", _RC)
          if(associated(temp2d)) then
-            call VertInterp(temp2d,qv,logpe,log(85000.)  ,  positive_definite=.true., rc=status)
-            VERIFY_(STATUS)
+            call VertInterp(temp2d, qv, logpe, log(85000.), positive_definite=.true., _RC)
          end if
 
          ! Fill Model Top Level Variables
-         call MAPL_GetPointer(export,temp2d,'UTOP', rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "UTOP", _RC)
          if(associated(temp2d)) temp2d = ur(:,:,1)
 
-         call MAPL_GetPointer(export,temp2d,'VTOP', rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "VTOP", _RC)
          if(associated(temp2d)) temp2d = vr(:,:,1)
 
-         call MAPL_GetPointer(export,temp2d,'TTOP', rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "TTOP", _RC)
          if(associated(temp2d)) temp2d = tempxy(:,:,1)
 
-         call MAPL_GetPointer(export,temp2d,'DELPTOP', rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "DELPTOP", _RC)
          if(associated(temp2d)) temp2d = dp(:,:,1)
 
          ! Compute Surface Pressure
-         call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "PS", _RC)
          if(associated(temp2d)) temp2d=vars%pe(:,:,km+1)
 
          ! Get the height above the surface
@@ -4373,17 +4237,14 @@ contains
             zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
          enddo
 
-         call MAPL_GetPointer(export,temp3d,'ZLE0',rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp3d, "ZLE0", _RC)
          if(associated(temp3d)) temp3d = zle
 
-         call MAPL_GetPointer(export,temp3d,'ZL0' ,rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp3d, "ZL0", _RC)
          if(associated(temp3d)) temp3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
 
          ! Compute Vertically Averaged T,U
-         call MAPL_GetPointer(export,temp2d,'TAVE',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "TAVE", _RC)
          if(associated(temp2d)) then
             temp2d = 0.0
             do k=1,km
@@ -4392,8 +4253,7 @@ contains
             temp2d = temp2d / (vars%pe(:,:,km+1)-vars%pe(:,:,1))
          endif
 
-         call MAPL_GetPointer(export,temp2d,'UAVE',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "UAVE", _RC)
          if(associated(temp2d)) then
             temp2d = 0.0
             do k=1,km
@@ -4405,27 +4265,22 @@ contains
          ! Convert T to Tv
          tempxy = tempxy*(1.0+eps*qv)
 
-         call MAPL_GetPointer(export,temp3d,'TV',  rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export,temp3d, "TV", _RC)
          if(associated(temp3d)) temp3d=tempxy
 
          ! Compute Sea-Level Pressure
-         call MAPL_GetPointer(export,temp2d,'SLP'  ,rc=status)
-         VERIFY_(STATUS)
-         call MAPL_GetPointer(export,Ztemp1,'H1000',rc=status)
-         VERIFY_(STATUS)
-         call MAPL_GetPointer(export,Ztemp2,'H850' ,rc=status)
-         VERIFY_(STATUS)
-         call MAPL_GetPointer(export,Ztemp3,'H500' ,rc=status)
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(export, temp2d, "SLP", _RC)
+         call MAPL_GetPointer(export, Ztemp1, "H1000", _RC)
+         call MAPL_GetPointer(export, Ztemp2, "H850", _RC)
+         call MAPL_GetPointer(export, Ztemp3, "H500", _RC)
 
          if(associated(temp2d) .or. associated(ztemp1) &
               .or. associated(ztemp2) &
               .or. associated(ztemp3) ) then
-            ALLOCATE(  slp(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-            ALLOCATE(H1000(ifirstxy:ilastxy,jfirstxy:jlastxy) )
-            ALLOCATE(H850 (ifirstxy:ilastxy,jfirstxy:jlastxy) )
-            ALLOCATE(H500 (ifirstxy:ilastxy,jfirstxy:jlastxy) )
+            allocate(  slp(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+            allocate(H1000(ifirstxy:ilastxy,jfirstxy:jlastxy) )
+            allocate(H850 (ifirstxy:ilastxy,jfirstxy:jlastxy) )
+            allocate(H500 (ifirstxy:ilastxy,jfirstxy:jlastxy) )
             do j=jfirstxy,jlastxy
                do i=ifirstxy,ilastxy
                   call get_slp ( km,vars%pe (i,j,  km+1),phisxy(i,j),  slp(i,j), &
@@ -4445,55 +4300,56 @@ contains
             if(associated(ztemp1)) where( ztemp1.eq.MAPL_UNDEF ) ztemp1 = H1000
             if(associated(ztemp2)) where( ztemp2.eq.MAPL_UNDEF ) ztemp2 = H850
             if(associated(ztemp3)) where( ztemp3.eq.MAPL_UNDEF ) ztemp3 = H500
-            DEALLOCATE(slp,H1000,H850,H500)
+            deallocate(slp,H1000,H850,H500)
          end if
 
          ! Deallocate Memory
          if (doEnergetics) then
-            DEALLOCATE(  kenrg )
-            DEALLOCATE(  penrg )
-            DEALLOCATE(  tenrg )
-            DEALLOCATE( kenrg0 )
-            DEALLOCATE( penrg0 )
-            DEALLOCATE( tenrg0 )
+            deallocate(  kenrg )
+            deallocate(  penrg )
+            deallocate(  tenrg )
+            deallocate( kenrg0 )
+            deallocate( penrg0 )
+            deallocate( tenrg0 )
          endif
 
-         DEALLOCATE(  tmp3d )
+         deallocate(  tmp3d )
 
-         DEALLOCATE( phisxy )
+         deallocate( phisxy )
 
-         DEALLOCATE(     ua )
-         DEALLOCATE(     va )
-         DEALLOCATE(     uc )
-         DEALLOCATE(     vc )
-         DEALLOCATE(     ur )
-         DEALLOCATE(     vr )
-         DEALLOCATE(     qv )
-         DEALLOCATE(     pl )
-         DEALLOCATE(     dp )
-         DEALLOCATE( tempxy )
+         deallocate(     ua )
+         deallocate(     va )
+         deallocate(     uc )
+         deallocate(     vc )
+         deallocate(     ur )
+         deallocate(     vr )
+         deallocate(     qv )
+         deallocate(     pl )
+         deallocate(     dp )
+         deallocate( tempxy )
 
-         DEALLOCATE(    thv )
-         DEALLOCATE(    plk )
-         DEALLOCATE(    pke )
-         DEALLOCATE(  logpl )
-         DEALLOCATE(  logpe )
-         DEALLOCATE(  logps )
-         DEALLOCATE(    zle )
-         DEALLOCATE( dthdtphyint1 )
-         DEALLOCATE( dthdtphyint2 )
+         deallocate(    thv )
+         deallocate(    plk )
+         deallocate(    pke )
+         deallocate(  logpl )
+         deallocate(  logpe )
+         deallocate(  logps )
+         deallocate(    zle )
+         deallocate( dthdtphyint1 )
+         deallocate( dthdtphyint2 )
 
          call freeTracers(state)
 
       end if ! .not. SW_DYNAMICS
 
-      call MAPL_TimerOff(GENSTATE,"RUN2")
-      call MAPL_TimerOff(GENSTATE,"TOTAL")
+      ! call MAPL_TimerOff(GENSTATE,"RUN2")
+      ! call MAPL_TimerOff(GENSTATE,"TOTAL")
 
+      call logger%info("RunAddIncs:: ...complete")
       _RETURN(_SUCCESS)
    end subroutine RunAddIncs
 
-   subroutine ADD_INCS ( MAPL,STATE,import,DT,IS_WEIGHTED,RC )
+   subroutine ADD_INCS(esmfgrid, state, import, DT, is_weighted, rc)
 
       use fms_mod, only: set_domain, nullify_domain
       use fv_diagnostics_mod, only: prt_maxmin
@@ -4501,69 +4357,57 @@ contains
       use fv_update_phys_mod, only: fv_update_phys
 
       !INPUT PARAMETERS:
-      type (MAPL_MetaComp)                   :: MAPL
-      type(DynState), pointer                :: STATE
-      type(ESMF_State),       intent(INOUT)  :: import
-      real(FVPRC),            intent(IN   )  :: DT
-      integer,  optional,     intent(OUT  )  :: RC
-      logical,  optional,     intent(IN   )  :: is_weighted
+      type(ESMF_Grid), intent(in) :: esmfgrid
+      type(DynState), pointer :: state
+      type(ESMF_State), intent(inout) :: import
+      real(FVPRC), intent(in) :: DT
+      logical, optional, intent(in) :: is_weighted
+      integer, optional, intent(out) :: rc
 
       !DESCRIPTION:  This routine adds the tendencies to the state,
       !              weighted appropriately by the time step.  Temperature
       !              tendencies are pressure weighted (ie., DELP*DT/Dt).
       !              All tendencies are on the A-grid, and have an XY decomposition.
 
-      integer               :: status
       logical               :: is_weighted_
 
-      integer               :: II, JJ, I, J, L
-      integer               :: is ,ie , js ,je , km
-      integer               :: isd,ied, jsd,jed
+      integer :: II, JJ, I, J, L
+      integer :: is, ie, js, je, km
+      integer :: isd, ied, jsd, jed
       real(r4), allocatable :: fvQOLD(:,:,:), QTEND(:,:,:)
-      real(r8), allocatable :: DPNEW(:,:,:),DPOLD(:,:,:)
-
-      real(REAL8), allocatable :: tend_ua(:,:,:), tend_va(:,:,:)
-      real(REAL8), allocatable :: tend_un(:,:,:), tend_vn(:,:,:)
-
-      real(FVPRC), allocatable :: u_dt(:,:,:), v_dt(:,:,:), t_dt(:,:,:)
-
       real(r4), pointer :: tend(:,:,:)
-
-      real(r4), pointer, dimension(:,:)   :: LONS
-      real(r4), pointer, dimension(:,:)   :: LATS
-
-      type(DynTracers)      :: qqq       ! Specific Humidity
+      real(r4), pointer, dimension(:,:) :: lons, lats
+      real(r8), allocatable :: DPNEW(:,:,:), DPOLD(:,:,:)
+      real(r8), allocatable :: tend_ua(:,:,:), tend_va(:,:,:)
+      real(r8), allocatable :: tend_un(:,:,:), tend_vn(:,:,:)
+      real(FVPRC), allocatable :: u_dt(:,:,:), v_dt(:,:,:), t_dt(:,:,:)
       real(FVPRC), allocatable :: Q(:,:,:,:), CVM(:,:,:)
+
+      type(DynTracers) :: qqq       ! Specific Humidity
       integer :: n, nwat_tracers, nwat, sphum, liq_wat, ice_wat, rainwat, snowwat, graupel
       real, parameter:: c_ice = 1972.            !< heat capacity of ice at -15.C
       real, parameter:: c_liq = 4.1855e+3        !< GFS: heat capacity of water at 0C
       real, parameter:: c_vap = MAPL_CPVAP       !< 1846.
       real, parameter:: c_air = MAPL_CP
-
-      character(len=ESMF_MAXSTR)         :: IAm="ADD_INCS"
       real(FVPRC) :: fac
+      type(time_type) :: Time_Nudge
+      integer :: status
 
-      type (time_type) :: Time_Nudge
-
+      is_weighted_ = .true.
       if(present(is_weighted)) then
          is_weighted_ = is_weighted
-      else
-         is_weighted_ = .true.
-      endif
+      end if
 
-      is = state%grid%is
-      ie = state%grid%ie
-      js = state%grid%js
-      je = state%grid%je
+      is = state%grid%is; ie = state%grid%ie
+      js = state%grid%js; je = state%grid%je
       km = state%grid%npz
 
-      isd = state%grid%isd
-      ied = state%grid%ied
-      jsd = state%grid%jsd
-      jed = state%grid%jed
+      isd = state%grid%isd; ied = state%grid%ied
+      jsd = state%grid%jsd; jed = state%grid%jed
 
-      call MAPL_Get( MAPL, LONS=LONS, LATS=LATS, RC=STATUS )
-      VERIFY_(STATUS)
+      ! call MAPL_Get( MAPL, LONS=LONS, LATS=LATS, RC=STATUS )
+      ! VERIFY_(STATUS)
+      call MAPL_GridGet(esmfgrid, latitudes=lats, longitudes=lons, _RC)
 
       ! **********************************************************************
       ! ****  Use QV from FV3 init when coldstarting idealized cases      ****
@@ -4573,7 +4417,7 @@ contains
       nwat = state%vars%nwat
       nwat_tracers = 0
       if ((nwat==0) .AND. (.not. ADIABATIC)) then
-         do n=1,STATE%GRID%NQ
+         do n=1,state%grid%NQ
             if (TRIM(state%vars%tracer(n)%tname) == 'Q'       ) nwat_tracers = nwat_tracers + 1
             if (TRIM(state%vars%tracer(n)%tname) == 'QLCN'    ) nwat_tracers = nwat_tracers + 1
             if (TRIM(state%vars%tracer(n)%tname) == 'QLLS'    ) nwat_tracers = nwat_tracers + 1
@@ -4583,13 +4427,13 @@ contains
          ! We must have these first 5 at a minimum
          _ASSERT(nwat_tracers == 5, 'expecting 5 water species: Q QLCN QLLS QICN QILS')
          ! Check for QRAIN, QSNOW, QGRAUPEL
-         do n=1,STATE%GRID%NQ
+         do n=1,state%grid%NQ
             if (TRIM(state%vars%tracer(n)%tname) == 'QRAIN'   ) nwat_tracers = nwat_tracers + 1
             if (TRIM(state%vars%tracer(n)%tname) == 'QSNOW'   ) nwat_tracers = nwat_tracers + 1
             if (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL') nwat_tracers = nwat_tracers + 1
          enddo
-         if (nwat_tracers >= 5) nwat = 3 ! STATE has QV, QLIQ, QICE
-         if (nwat_tracers == 8) nwat = 6 ! STATE has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
+         if (nwat_tracers >= 5) nwat = 3 ! state has QV, QLIQ, QICE
+         if (nwat_tracers == 8) nwat = 6 ! state has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
       endif
       if (.not. ADIABATIC) then
          _ASSERT(nwat >= 1, 'expecting water species (nwat) to match')
@@ -4620,10 +4464,10 @@ contains
       end select
 
       if (nwat >= 1) then
-         ALLOCATE(   Q(is:ie,js:je,1:km,nwat) )
-         ALLOCATE( CVM(is:ie,js:je,1:km) )
+         allocate(   Q(is:ie,js:je,1:km,nwat) )
+         allocate( CVM(is:ie,js:je,1:km) )
          Q(:,:,:,:) = 0.0
-         call PULL_Q ( STATE, import, qqq, NXQ, InFieldName='Q', RC=rc )
+         call PULL_Q ( state, import, qqq, NXQ, InFieldName='Q', RC=rc )
          if (DYN_COLDSTART .and. overwrite_Q .and. (.not. ADIABATIC)) then
             ! USE Q computed by FV3
             call getQ(Q(:,:,:,sphum), 'Q')
@@ -4647,26 +4491,26 @@ contains
       endif
       if (nwat >= 3) then
          ! Grab QLIQ from imports
-         call PULL_Q ( STATE, import, qqq, NXQ, InFieldName='QLLS', RC=rc )
+         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QLLS', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,liq_wat))==size(qqq%content_r4)) Q(:,:,:,liq_wat) = Q(:,:,:,liq_wat) + qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:,:,:,liq_wat))==size(qqq%content)) Q(:,:,:,liq_wat) = Q(:,:,:,liq_wat) + qqq%content
          endif
-         call PULL_Q ( STATE, import, qqq, NXQ, InFieldName='QLCN', RC=rc )
+         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QLCN', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,liq_wat))==size(qqq%content_r4)) Q(:,:,:,liq_wat) = Q(:,:,:,liq_wat) + qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:,:,:,liq_wat))==size(qqq%content)) Q(:,:,:,liq_wat) = Q(:,:,:,liq_wat) + qqq%content
          endif
          ! Grab QICE from imports
-         call PULL_Q ( STATE, import, qqq, NXQ, InFieldName='QILS', RC=rc )
+         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QILS', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,ice_wat))==size(qqq%content_r4)) Q(:,:,:,ice_wat) = Q(:,:,:,ice_wat) + qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:,:,:,ice_wat))==size(qqq%content)) Q(:,:,:,ice_wat) = Q(:,:,:,ice_wat) + qqq%content
          endif
-         call PULL_Q ( STATE, import, qqq, NXQ, InFieldName='QICN', RC=rc )
+         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QICN', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,ice_wat))==size(qqq%content_r4)) Q(:,:,:,ice_wat) = Q(:,:,:,ice_wat) + qqq%content_r4
          elseif (associated(qqq%content)) then
@@ -4675,21 +4519,21 @@ contains
       endif
       if (nwat >= 6) then
          ! Grab RAIN from imports
-         call PULL_Q ( STATE, import, qqq, NXQ, InFieldName='QRAIN', RC=rc )
+         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QRAIN', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,rainwat))==size(qqq%content_r4)) Q(:,:,:,rainwat) = qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:,:,:,rainwat))==size(qqq%content)) Q(:,:,:,rainwat) = qqq%content
          endif
          ! Grab SNOW from imports
-         call PULL_Q ( STATE, import, qqq, NXQ, InFieldName='QSNOW', RC=rc )
+         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QSNOW', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,snowwat))==size(qqq%content_r4)) Q(:,:,:,snowwat) = qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:,:,:,snowwat))==size(qqq%content)) Q(:,:,:,snowwat) = qqq%content
          endif
          ! Grab GRAUPEL from imports
-         call PULL_Q ( STATE, import, qqq, NXQ, InFieldName='QGRAUPEL', RC=rc )
+         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QGRAUPEL', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,graupel))==size(qqq%content_r4)) Q(:,:,:,graupel) = qqq%content_r4
          elseif (associated(qqq%content)) then
@@ -4705,44 +4549,39 @@ contains
          ! ****        while import Tendencies are on the A-Grid             ****
          ! **********************************************************************
 
-         ALLOCATE( tend_ua(is:ie  ,js:je  ,km) )
-         ALLOCATE( tend_va(is:ie  ,js:je  ,km) )
-         ALLOCATE( tend_un(is:ie  ,js:je+1,km) )
-         ALLOCATE( tend_vn(is:ie+1,js:je  ,km) )
+         allocate( tend_ua(is:ie  ,js:je  ,km) )
+         allocate( tend_va(is:ie  ,js:je  ,km) )
+         allocate( tend_un(is:ie  ,js:je+1,km) )
+         allocate( tend_vn(is:ie+1,js:je  ,km) )
 
-         call ESMFL_StateGetPointerToData ( import,TEND,'DUDT',RC=STATUS )
-         VERIFY_(STATUS)
-
+         call MAPL_GetPointer(import, TEND, "DUDT", _RC)
          tend_ua(is:ie,js:je,1:km) = tend
 
-         call ESMFL_StateGetPointerToData ( import,TEND,'DVDT',RC=STATUS )
-         VERIFY_(STATUS)
-
+         call MAPL_GetPointer(import, TEND, "DVDT", _RC)
          tend_va(is:ie,js:je,1:km) = tend
 
          !if (.not. HYDROSTATIC ) then
          !  call ESMFL_StateGetPointerToData ( import,TEND,'DWDT',RC=STATUS )
          !  VERIFY_(STATUS)
-         !  STATE%VARS%W = STATE%VARS%W + DT*TEND(is:ie,js:je,1:km)
+         !  state%vars%W = state%vars%W + DT*TEND(is:ie,js:je,1:km)
          !endif
 
          ! Put the wind tendencies on the Native Dynamics grid
-         call Agrid_To_Native( tend_ua, tend_va, tend_un, tend_vn, &
-              wind_increment_limiter = 800.d0/86400.d0 )
+         call Agrid_To_Native(tend_ua, tend_va, tend_un, tend_vn, wind_increment_limiter=800.d0/86400.d0)
 
 
          ! Add the wind tendencies to the control variables
-         STATE%VARS%U = STATE%VARS%U + DT*TEND_UN(is:ie,js:je,1:km)
-         STATE%VARS%V = STATE%VARS%V + DT*TEND_VN(is:ie,js:je,1:km)
+         state%vars%U = state%vars%U + DT*TEND_UN(is:ie,js:je,1:km)
+         state%vars%V = state%vars%V + DT*TEND_VN(is:ie,js:je,1:km)
 
-         DEALLOCATE( tend_ua )
-         DEALLOCATE( tend_va )
+         deallocate( tend_ua )
+         deallocate( tend_va )
 
          ! **********************************************************************
          ! ****           Compute Old Pressure Thickness                     ****
          ! **********************************************************************
 
-         ALLOCATE( DPOLD(is:ie,js:je,km) )
+         allocate( DPOLD(is:ie,js:je,km) )
 
          if(is_weighted_) then
             do k=1,km
@@ -4756,16 +4595,14 @@ contains
          ! ****                     Update Edge Pressures                    ****
          ! **********************************************************************
 
-         call ESMFL_StateGetPointerToData ( import,TEND,'DPEDT',RC=STATUS )
-         VERIFY_(STATUS)
-
-         STATE%VARS%PE = STATE%VARS%PE + DT*TEND
+         call MAPL_GetPointer(import, TEND, "DPEDT", _RC)
+         state%vars%PE = state%vars%PE + DT*TEND
 
          ! **********************************************************************
          ! ****           Compute New Pressure Thickness                     ****
          ! **********************************************************************
 
-         ALLOCATE( DPNEW(is:ie,js:je,km) )
+         allocate( DPNEW(is:ie,js:je,km) )
 
          if(is_weighted_) then
             do k=1,km
@@ -4783,11 +4620,10 @@ contains
          ! ****                           b) D/Dt (T*DELP), IS_WEIGHTED=.T. ****
          ! *********************************************************************
 
-         call ESMFL_StateGetPointerToData ( import,TEND,'DTDT',RC=STATUS )
-         VERIFY_(STATUS)
+         call MAPL_GetPointer(import, TEND, "DTDT", _RC)
 
          !if (DYN_DEBUG) then
-         !   call prt_maxmin('AI PT1', STATE%VARS%PT ,  is, ie, js, je, 0, km, 1.d00, MAPL_AM_I_ROOT())
+         !   call prt_maxmin('AI PT1', state%vars%PT ,  is, ie, js, je, 0, km, 1.d00, MAPL_AM_I_ROOT())
          !endif
 
          select case (nwat)
@@ -4807,46 +4643,46 @@ contains
          end select
 
          ! Make previous PT into just T
-         STATE%VARS%PT = STATE%VARS%PT*STATE%VARS%PKZ
+         state%vars%PT = state%vars%PT*state%vars%PKZ
 
          if (.not. HYDROSTATIC ) then
             ! remove old T from DZ
-            STATE%VARS%DZ = STATE%VARS%DZ / STATE%VARS%PT
+            state%vars%DZ = state%vars%DZ / state%vars%PT
 
             ! Update T
-            STATE%VARS%PT =  STATE%VARS%PT                         *DPOLD
-            STATE%VARS%PT = (STATE%VARS%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW
+            state%vars%PT =  state%vars%PT                         *DPOLD
+            state%vars%PT = (state%vars%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW
 
             ! update DZ with new T
-            STATE%VARS%DZ = STATE%VARS%DZ * STATE%VARS%PT
+            state%vars%DZ = state%vars%DZ * state%vars%PT
          else
             ! Update T
-            STATE%VARS%PT =  STATE%VARS%PT                         *DPOLD
-            STATE%VARS%PT = (STATE%VARS%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW
+            state%vars%PT =  state%vars%PT                         *DPOLD
+            state%vars%PT = (state%vars%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW
          endif
 
          if (DEBUG_TQ_ERRORS) then
             do L=1,KM
                do J=js,je
                   do I=is,ie
-                     if ( (STATE%VARS%PT(I,J,L) > 333.0) .OR. (STATE%VARS%PT(I,J,L)/=STATE%VARS%PT(I,J,L)) .OR. &
+                     if ( (state%vars%PT(I,J,L) > 333.0) .OR. (state%vars%PT(I,J,L)/=state%vars%PT(I,J,L)) .OR. &
                           (Q(I,J,L,sphum  ) < 0.0) .OR. (Q(I,J,L,sphum  )/=Q(I,J,L,sphum  )) .OR. &
                           (Q(I,J,L,liq_wat) < 0.0) .OR. (Q(I,J,L,liq_wat)/=Q(I,J,L,liq_wat)) .OR. &
                           (Q(I,J,L,ice_wat) < 0.0) .OR. (Q(I,J,L,ice_wat)/=Q(I,J,L,ice_wat)) .OR. &
                           (Q(I,J,L,rainwat) < 0.0) .OR. (Q(I,J,L,rainwat)/=Q(I,J,L,rainwat)) .OR. &
                           (Q(I,J,L,snowwat) < 0.0) .OR. (Q(I,J,L,snowwat)/=Q(I,J,L,snowwat)) .OR. &
                           (Q(I,J,L,graupel) < 0.0) .OR. (Q(I,J,L,graupel)/=Q(I,J,L,graupel)) ) then
-                        print *, "T or Q  spike detected : ", STATE%VARS%PT(I,J,L)
+                        print *, "T or Q  spike detected : ", state%vars%PT(I,J,L)
                         print *, "  Temp  ANA|PHY  Increment : ", (DT*TEND(I,J,L)*(MAPL_CP/CVM(I,J,L)))/DPNEW(I,J,L)
                         print *, "    IN ADD_INCS inside DYN   "
                         II=I-is+1
                         JJ=J-js+1
                         print *, "  Latitude       =", LATS(II,JJ)*180.0/MAPL_PI
                         print *, "  Longitude      =", LONS(II,JJ)*180.0/MAPL_PI
-                        print *, "  Pressure (mb)  =", 0.5*(STATE%VARS%PE(I,J,L+1)+STATE%VARS%PE(I,J,L))/100.0
+                        print *, "  Pressure (mb)  =", 0.5*(state%vars%PE(I,J,L+1)+state%vars%PE(I,J,L))/100.0
 
-                        print *, "  UWND =", STATE%VARS%U(I,J,L), " UINC =", DT*TEND_UN(I,J,L)
-                        print *, "  VWND =", STATE%VARS%V(I,J,L), " VINC =", DT*TEND_VN(I,J,L)
+                        print *, "  UWND =", state%vars%U(I,J,L), " UINC =", DT*TEND_UN(I,J,L)
+                        print *, "  VWND =", state%vars%V(I,J,L), " VINC =", DT*TEND_VN(I,J,L)
                         if (nwat >= 6) then
                            print *, "  QV=", Q(I,J,L,sphum  ), "  QL=", Q(I,J,L,liq_wat), "  QI=", Q(I,J,L,ice_wat)
                            print *, "  QR=", Q(I,J,L,rainwat), "  QS=", Q(I,J,L,snowwat), "  QG=", Q(I,J,L,graupel)
@@ -4857,30 +4693,30 @@ contains
             end do ! LM loop
          endif
 
-         DEALLOCATE( tend_un )
-         DEALLOCATE( tend_vn )
+         deallocate( tend_un )
+         deallocate( tend_vn )
 
 
          ! Update PKZ from hydrostatic pressures
          !  This isn't entirely necessary, FV3 overwrites this in fv_dynamics
          !  but we have to get back to PT here
-         !!   call getPKZ(STATE%VARS%PKZ,STATE%VARS%PT,Q,STATE%VARS%PE,STATE%VARS%DZ,HYDROSTATIC)
-         call getPKZ(STATE%VARS%PKZ,STATE%VARS%PE)
+         !!   call getPKZ(state%vars%PKZ,state%vars%PT,Q,state%vars%PE,state%vars%DZ,HYDROSTATIC)
+         call getPKZ(state%vars%PKZ,state%vars%PE)
 
          ! Make T back into PT
-         STATE%VARS%PT = STATE%VARS%PT/STATE%VARS%PKZ
+         state%vars%PT = state%vars%PT/state%vars%PKZ
 
          !if (DYN_DEBUG) then
-         !call prt_maxmin('AI PT2', STATE%VARS%PT ,  is, ie, js, je, 0, km, 1.d00, MAPL_AM_I_ROOT())
+         !call prt_maxmin('AI PT2', state%vars%PT ,  is, ie, js, je, 0, km, 1.d00, MAPL_AM_I_ROOT())
          !endif
 
-         DEALLOCATE (DPNEW)
-         DEALLOCATE (DPOLD)
+         deallocate (DPNEW)
+         deallocate (DPOLD)
 
       endif ! .not. Adiabatic
 
-      if (ALLOCATED(Q  )) DEALLOCATE( Q   )
-      if (ALLOCATED(CVM)) DEALLOCATE( CVM )
+      if (allocateD(Q  )) deallocate( Q   )
+      if (allocateD(CVM)) deallocate( CVM )
 
       return
 
@@ -4922,7 +4758,7 @@ contains
      real(r8),           intent(IN   ) :: V(:,:)
      integer, optional,  intent(  out) :: rc
 
-     real(kind=4), pointer      :: CPL(:,:)
+     real(r4), pointer      :: CPL(:,:)
      integer                    :: status
      character(len=ESMF_MAXSTR) :: IAm="Fillout2"
 
@@ -5018,7 +4854,7 @@ contains
       !EOP
 
       type (DYN_wrap) :: wrap
-      type (DynState), pointer  :: STATE
+      type (DynState), pointer  :: state
 
       character(len=ESMF_MAXSTR)        :: IAm
       character(len=ESMF_MAXSTR)        :: comp_name
@@ -5045,7 +4881,7 @@ contains
 
       state => wrap%dyn_state
 
-      call DynFinalize( STATE )
+      call DynFinalize( state )
 
       ! Call Generic Finalize
       call MAPL_TimerOff(MAPL,"FINALIZE")
@@ -5288,12 +5124,12 @@ contains
 
       U = 0.0
 
-      ALLOCATE( PS(is:ie,js:je) )
+      allocate( PS(is:ie,js:je) )
 
       call MAPL_GridCompGetResource(gc, "IM", IM, default=0, _RC)
       call MAPL_GridCompGetResource(gc, "JM", JM, default=0, _RC)
 
-      if (KM<=2) then   ! Shallow Water
+      if (KM<=2) then ! Shallow Water
 
          call MAPL_GridCompGetResource(gc, "CASE_ID", case_id, default=1, _RC)
          DYN_CASE = case_id
@@ -5310,7 +5146,7 @@ contains
             enddo
          enddo
 
-      else              ! 3-D Baroclinic
+      else ! 3-D Baroclinic
 
          U(is:ie,js:je,KE) = .001*abs(lats(:,:))
          V = 0.0
@@ -6027,7 +5863,7 @@ contains
       call MAPL_FieldBundleAdd(bundle, field, _RC)
 
       if (nq == 1) then
-         allocate(state%VARS%tracer(nq), _STAT)
+         allocate(state%vars%tracer(nq), _STAT)
          call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
          state%vars%tracer(nq)%content => ptr
          state%vars%tracer(nq)%is_r4 = .false.
@@ -6072,7 +5908,7 @@ contains
       call MAPL_FieldBundleAdd(bundle, field, _RC)
 
       if (NQ == 1) then
-         allocate(state%VARS%tracer(nq), _STAT)
+         allocate(state%vars%tracer(nq), _STAT)
          call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
          state%vars%tracer(nq)%content_r4 => ptr
          state%vars%tracer(nq)%is_r4 = .true.
@@ -6092,11 +5928,11 @@ contains
    end subroutine addTracer_r4
 
    subroutine freeTracers(state)
-      type (DynState) :: STATE
+      type (DynState) :: state
 
-      if (associated(STATE%VARS%tracer)) then
-         DEALLOCATE( STATE%VARS%tracer)   ! Comment out to output tracer to checkpoint file
-         NULLIFY( STATE%VARS%tracer)
+      if (associated(state%vars%tracer)) then
+         deallocate( state%vars%tracer)   ! Comment out to output tracer to checkpoint file
+         NULLIFY( state%vars%tracer)
       end if
 
       return
