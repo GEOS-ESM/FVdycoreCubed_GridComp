@@ -15,7 +15,7 @@ module FVdycoreCubed_GridComp
 
    !USES:
    use ESMF
-   use mapl_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY
+   use mapl_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return
 
    use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
@@ -466,7 +466,7 @@ contains
       real(r4), pointer :: temp2d(:,:)
 
       real(r8), pointer ::  ak(:), bk(:)
-      real(r4), pointer ::  ak4(:), bk4(:)
+      real(r4), pointer ::  ak4(:), bk4(:) ! exports are 32-bit
       real(r8), pointer ::  ud(:,:,:), vd(:,:,:)
       real(r8), pointer ::  pe(:,:,:), pt(:,:,:), pk(:,:,:)
       real(r8), allocatable ::  ur(:,:,:), vr(:,:,:)
@@ -788,55 +788,36 @@ contains
       real(r8),     allocatable ::   udtmp(:,:,:)
       real(r8),     allocatable ::   vdtmp(:,:,:)
 
-      character(len=ESMF_MAXSTR), ALLOCATABLE       :: NAMES (:)
-      character(len=ESMF_MAXSTR), ALLOCATABLE       :: NAMES0(:)
+      character(len=ESMF_MAXSTR), allocatable :: names(:), names0(:)
       character(len=ESMF_MAXSTR) :: STRING
       character(len=:), allocatable :: ReplayMode, ReplayFile, ReplayType
       character(len=:), allocatable :: cremap,tremap
-      character(len=:), allocatable :: uname,vname,tname,qname,psname,dpname,o3name,rgrid,tvar
+      character(len=:), allocatable :: uname, vname, tname, qname, psname, dpname, o3name, rgrid, tvar
 
       type(MAPL_SunOrbit) :: ORBIT
       real(r4), pointer :: lats(:,:), lons(:,:)
-      real(r4), allocatable  ::  ZTH(:,:)
-      real(r4), allocatable  ::  SLR(:,:)
+      real(r4), allocatable :: ZTH(:,:), SLR(:,:)
 
-      real                  :: rc_blend_p_above
-      real                  :: rc_blend_p_below
-      real                  :: sclinc
-      integer               :: rc_blend
-
-      real                  :: HGT_SURFACE
+      real :: rc_blend_p_above, rc_blend_p_below, sclinc
+      integer :: rc_blend
+      real :: HGT_SURFACE
 
       character(len=:), allocatable :: ANA_IS_WEIGHTED
-      logical                    ::     is_weighted
+      logical :: is_weighted
 
-      type(DynTracers)            :: qqq       ! Specific Humidity
-      type(DynTracers)            :: ooo       ! ox
-      logical LCONSV, LFILL
-      integer  CONSV,  FILL
-      integer nx_ana, ny_ana
+      type(DynTracers) :: qqq       ! Specific Humidity
+      type(DynTracers) :: ooo       ! ox
+      logical :: LCONSV, LFILL
+      integer :: CONSV,  FILL, nx_ana, ny_ana
 
-      logical, save                       :: firstime=.true.
-      logical                             :: adjustTracers
-      type(ESMF_Alarm)                    :: predictorAlarm
-      type(ESMF_Grid)                     :: bgrid
-      integer                             :: pos
-      integer                             :: nqt
-      logical                             :: tend
-      logical                             :: exclude
-      character(len=ESMF_MAXSTR)          :: tmpstring
-      character(len=ESMF_MAXSTR)          :: fieldname
-      character(len=:), allocatable :: adjustTracerMode, xlist(:)
+      logical, save :: firstime = .true.
+      logical :: adjustTracers, tend, exclude, isPresent, doEnergetics, doTropvars
+      integer :: pos, nqt, FV3_STANDALONE, itracer
+      type(ESMF_Alarm) :: predictorAlarm
+      type(ESMF_Grid) :: bgrid
+      character(len=ESMF_MAXSTR) :: tmpstring, fieldname, myTracer
       character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
-      logical                             :: isPresent
-
-      logical                             :: doEnergetics
-      logical                             :: doTropvars
-
-      integer :: FV3_STANDALONE
-
-      character(len=ESMF_MAXSTR) :: myTracer
-      integer :: itracer
+      character(len=:), allocatable :: adjustTracerMode, xlist(:)
       real(kind=r8) :: t1, t2, dyn_run_timer
       class(logger_t), pointer :: logger
 
@@ -1056,11 +1037,11 @@ contains
       call ESMF_FieldBundleGet(bundle, fieldCount=NQ, _RC)
 
       if (NQ > 0) then
-         allocate(NAMES(NQ), _STAT)
-         call ESMF_FieldBundleGet(bundle, itemorderflag=ESMF_ITEMORDER_ADDORDER, fieldNameList=NAMES, _RC)
+         allocate(names(NQ), _STAT)
+         call ESMF_FieldBundleGet(bundle, itemorderflag=ESMF_ITEMORDER_ADDORDER, fieldNameList=names, _RC)
          if( .not.allocated(names0) ) then
-            allocate(NAMES0(NQ), _STAT)
-            NAMES0 = NAMES
+            allocate(names0(NQ), _STAT)
+            names0 = names
          endif
       endif
 
@@ -1743,7 +1724,6 @@ contains
       !    call MAPL_TimerOff(MAPL,"-DYN_ANA")
       ! endif
 
-
       ! call MAPL_TimerOn(MAPL,"-DYN_PROLOGUE")
       ! Create FV Thermodynamic Variables
       tempxy = vars%pt * vars%pkz      ! Compute Dry Temperature
@@ -1764,9 +1744,9 @@ contains
       call FILLOUT3(export, "PLE_DYN_IN", vars%pe, _RC)
 
       ! Initialize 3-D Tracer Dynamics Tendencies
-      call MAPL_GetPointer( export,dqldt,"DQLDTDYN", _RC)
-      call MAPL_GetPointer( export,dqidt,"DQIDTDYN", _RC)
-      call MAPL_GetPointer( export,doxdt,"DOXDTDYN", _RC)
+      call MAPL_GetPointer(export, dqldt, "DQLDTDYN", _RC)
+      call MAPL_GetPointer(export, dqidt, "DQIDTDYN", _RC)
+      call MAPL_GetPointer(export, doxdt, "DOXDTDYN", _RC)
 
       if (allocated(names)) then
 
@@ -2111,7 +2091,8 @@ contains
          call FILLOUT3(export, 'DTDTDYN'   , dtdt , _RC)
          call FILLOUT3(export, 'DQVDTDYN'  , dqdt , _RC)
          call FILLOUT3(export, 'DDELPDTDYN', ddpdt, _RC)
-         call FILLOUT3(export, 'DPLEDTDYN' , dpedt, _RC)
+         ! pchakrab - TODO: figure out the issue with DPLEDTDYN
+         ! call FILLOUT3(export, 'DPLEDTDYN' , dpedt, _RC)
 
          ! fill pressure exports (PLE0: Before) & (PLE1: After) from FV3
          call FILLOUT3r8(export, 'PLE0', pe0, _RC)
@@ -4684,51 +4665,49 @@ contains
 
    end subroutine ADD_INCS
 
-   subroutine FILLOUT3r8(export, name, V, RC)
-      type (ESMF_State),  intent(inout) :: export
-      character(len=*),   intent(IN   ) :: name
-      real(r8),           intent(IN   ) :: V(:,:,:)
-      integer, optional,  intent(  out) :: rc
+   subroutine FILLOUT3r8(export, name, v, rc)
+      type(ESMF_State), intent(inout) :: export
+      character(len=*), intent(in) :: name
+      real(r8), intent(in) :: v(:,:,:)
+      integer, optional, intent(out) :: rc
 
-      real(r8), pointer          :: CPL(:,:,:)
-      integer                    :: status
-      character(len=ESMF_MAXSTR) :: IAm="Fillout3r8"
+      real(r8), pointer :: cpl(:,:,:)
+      integer :: status
 
-      call MAPL_GetPointer(export, cpl, name, RC=STATUS)
-      VERIFY_(STATUS)
-      if(associated(cpl)) cpl=v
+      call MAPL_GetPointer(export, cpl, name, _RC)
+      if(associated(cpl)) cpl = v
+
+      _RETURN(_SUCCESS)
    end subroutine FILLOUT3r8
 
-   subroutine FILLOUT3(export, name, V, RC)
-      type (ESMF_State),  intent(inout) :: export
-      character(len=*),   intent(IN   ) :: name
-      real(r8),           intent(IN   ) :: V(:,:,:)
-      integer, optional,  intent(  out) :: rc
+   subroutine FILLOUT3(export, name, v, rc)
+      type(ESMF_State), intent(inout) :: export
+      character(len=*), intent(in) :: name
+      real(r8), intent(in) :: v(:,:,:)
+      integer, optional, intent(out) :: rc
 
-      real(r4), pointer          :: CPL(:,:,:)
-      integer                    :: status
-      character(len=ESMF_MAXSTR) :: IAm="Fillout3"
+      real(r4), pointer :: cpl(:,:,:)
+      integer :: status
 
-      call MAPL_GetPointer(export, cpl, name, RC=STATUS)
-      VERIFY_(STATUS)
-      if(associated(cpl)) cpl=v
+      call MAPL_GetPointer(export, cpl, name, _RC)
+      if(associated(cpl)) cpl = v
+
+      _RETURN(_SUCCESS)
    end subroutine FILLOUT3
 
-   subroutine FILLOUT2(export, name, V, rc)
-     type (ESMF_State),  intent(inout) :: export
-     character(len=*),   intent(IN   ) :: name
-     real(r8),           intent(IN   ) :: V(:,:)
-     integer, optional,  intent(  out) :: rc
+   subroutine FILLOUT2(export, name, v, rc)
+     type(ESMF_State), intent(inout) :: export
+     character(len=*), intent(in) :: name
+     real(r8), intent(in) :: v(:,:)
+     integer, optional, intent(out) :: rc
 
-     real(r4), pointer      :: CPL(:,:)
-     integer                    :: status
-     character(len=ESMF_MAXSTR) :: IAm="Fillout2"
+     real(r4), pointer :: cpl(:,:)
+     integer :: status
 
-     call MAPL_GetPointer(export, cpl, name, RC=STATUS)
-     VERIFY_(STATUS)
-     if(associated(cpl)) cpl=v
+     call MAPL_GetPointer(export, cpl, name, _RC)
+     if(associated(cpl)) cpl = v
 
-     return
+      _RETURN(_SUCCESS)
    end subroutine FILLOUT2
 
    subroutine Energetics (ua,va,thv,ple,delp,pk,phiS,keint,peint,teint,ke,cpt,gze)

@@ -743,12 +743,12 @@ contains
 
       real :: rPRS
       real(REAL8) :: DT
-      real(REAL8), dimension(:), pointer     :: AK1 => null(), AK => null()
-      real(REAL8), dimension(:), pointer     :: BK1 => null(), BK => null()
+      real(REAL8), dimension(:), pointer :: AK1 => null(), AK => null()
+      real(REAL8), dimension(:), pointer :: BK1 => null(), BK => null()
       real(REAL8), dimension(:,:,:), pointer :: U => null()
       real(REAL8), dimension(:,:,:), pointer :: V => null()
       real(REAL8), dimension(:,:,:), pointer :: PT => null()
-      real(REAL8), dimension(:,:,:), pointer :: PE1 => null(), PE => null()
+      real(REAL8), dimension(:,:,:), pointer :: PE => null()
       real(REAL8), dimension(:,:,:), pointer :: PKZ => null()
       real(REAL8), dimension(:,:,:), pointer :: DZ => null()
       real(REAL8), dimension(:,:,:), pointer :: W => null()
@@ -805,19 +805,16 @@ contains
       call MAPL_GetPointer(internal, u, "U", _RC) ! A-Grid U Wind
       call MAPL_GetPointer(internal, v, "V", _RC)
       call MAPL_GetPointer(internal, pt, "PT", _RC)
-      call MAPL_GetPointer(internal, pe1, "PE", _RC) ! 1-based
+      call MAPL_GetPointer(internal, pe, "PE", _RC) ! 1-based
       call MAPL_GetPointer(internal, pkz, "PKZ", _RC)
       call MAPL_GetPointer(internal, dz, "DZ", _RC)
       call MAPL_GetPointer(internal, w, "W", _RC)
+      ! Ak and BK are expected to be 0-based
       block
-         integer :: is, ie, js, je, ks, ke, km
-         is = lbound(u,1); ie = ubound(u,1)
-         js = lbound(u,2); je = ubound(u,2)
-         ks = lbound(u,3); ke = ubound(u,3)
-         km = ke-ks+1
+         integer :: km
+         km = size(ak1) - 1
          ak(0:km) => ak1(1:km+1)
          bk(0:km) => bk1(1:km+1)
-         pe(is:ie, js:je, 0:km) => pe1(is:ie, js:je, 1:km+1)
       end block
 
       call CREATE_VARS( &
