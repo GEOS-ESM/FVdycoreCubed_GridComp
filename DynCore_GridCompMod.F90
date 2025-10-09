@@ -17,19 +17,14 @@ module FVdycoreCubed_GridComp
    use ESMF
    use mapl_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY
 
-   use ESMFL_Mod, only: ESMFL_StateGetPointerToData, ESMFL_BundleGetPointerToData, MAPL_AreaMean
    use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
    use MAPL_Constants, only: MAPL_VectorField, MAPL_BundleItem
    use MAPL_Constants, only: MAPL_RestartSkip, MAPL_RestartRequired, MAPL_InitialRestart
-   ! use MAPL_Constants, only: MAPL_VLocationCenter, MAPL_VLocationEdge, MAPL_VLocationNone
-   use MAPL_Constants, only: MAPL_DimsHorzVert, MAPL_DimsHorzOnly, MAPL_DimsVertOnly
 
-   use MAPL_GenericMod, only: MAPL_MetaComp, MAPL_TimerAdd, MAPL_TimerOn
-   use MAPL_GenericMod, only: MAPL_TimerAdd, MAPL_TimerOn, MAPL_TimerOff
-   use MAPL_GenericMod, only: MAPL_GenericFinalize
-   use MAPL_GenericMod, only: MAPL_GetObjectFromGC, MAPL_GetResource, MAPL_GridCreate, MAPL_Get
-   ! use MAPL_GenericMod, only: MAPL_AddImportSpec, MAPL_AddExportSpec, MAPL_AddInternalSpec
+   use ESMFL_Mod, only: ESMFL_StateGetPointerToData, ESMFL_BundleGetPointerToData, MAPL_AreaMean
+
+   use MAPL_GenericMod, only: MAPL_TimerAdd
    use MAPL_AbstractRegridderMod, only: AbstractRegridder
    use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
    use MAPL_BaseMod, only: MAPL_AttributeSet, MAPL_FieldBundleAdd
@@ -41,13 +36,14 @@ module FVdycoreCubed_GridComp
    use MAPL_MemUtilsMod, only: MAPL_MemUtilsWrite
    use MAPL_FieldPointerUtilities, only: MAPL_FieldDestroy
    use MAPL_MaxMinMod, only: MAPL_MaxMin
-   use MAPL_CommsMod, only: MAPL_AM_I_ROOT, ArrayGather
+   use MAPL_CommsMod, only: MAPL_AM_I_ROOT, MAPL_ArrayGather => ArrayGather
 
    use FileIOSharedMod, only: WRITE_PARALLEL
 
    use mapl3g_generic, only: MAPL_GridCompGet, MAPL_GridCompGetResource
    use mapl3g_generic, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
    use mapl3g_generic, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_FIELDBUNDLE
+   use mapl3g_generic, only: MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState
    use mapl3g_VerticalStaggerLoc, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
    use mapl3g_Geom_API, only: MAPL_GridGet
    use mapl3g_State_API, only: MAPL_StateGetPointer
@@ -306,6 +302,8 @@ module FVdycoreCubed_GridComp
 
    logical :: DO_ADD_INCS = .true.
 
+   character(*), parameter :: PRIVATE_STATE = "DYN_STATE"
+
 contains
 
    !BOP
@@ -346,8 +344,7 @@ contains
       !DESCRIPTION: Set services (register) for the FVCAM Dynamical Core GridComp
       !EOP
 
-      type(DynState), pointer :: dyn_internal_state
-      type(DYN_wrap) :: wrap
+      type(DynState), pointer :: self
       character(len=:), allocatable :: layout_file
       character(len=ESMF_MAXSTR) :: myTracer
       class(logger_t), pointer :: logger
@@ -357,9 +354,7 @@ contains
       call logger%info("SetServices:: starting...")
 
       ! Wrap gridcomp's private state and store it in gc
-      allocate(dyn_internal_state, _STAT)
-      wrap%dyn_state => dyn_internal_state
-      call ESMF_UserCompSetInternalState(gc, 'DYNstate', wrap, _RC)
+      _SET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE)
 
 #include "DynCore_Import___.h"
 #include "DynCore_Export___.h"
@@ -461,9 +456,7 @@ contains
       type(ESMF_Clock) :: clock  ! the clock
       integer, intent(out) :: rc ! Error code, 0 all is well, error otherwise
 
-      type(DYN_wrap) :: wrap
-      type(DynState), pointer :: state
-      type(DynGrid), pointer :: DycoreGrid
+      type(DynState), pointer :: self
 
       type(ESMF_Field) :: field
       type(ESMF_State) :: internal
@@ -499,10 +492,7 @@ contains
       ! call MAPL_TimerOn(MAPL, "INITIALIZE")
 
       ! Get the private state
-      call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, _RC)
-      state => wrap%dyn_state
-
-      DycoreGrid  => state%grid ! direct handle to grid
+      _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
 
       call MAPL_GridCompGetResource(gc, "LAYOUT", layout_file, default="fvcore_layout.rc", _RC)
       call MAPL_GridCompGetResource(gc, "DO_ADD_INCS", DO_ADD_INCS, default=DO_ADD_INCS, _RC)
@@ -517,7 +507,7 @@ contains
       call MAPL_GridCompGetInternalState(gc, internal, _RC)
 
       ! call MAPL_TimerOn(MAPL, "-DYN_INIT")
-      call DynInit(state, clock, import, gc, _RC)
+      call DynInit(self, clock, import, gc, _RC)
       ! call MAPL_TimerOff(MAPL, "-DYN_INIT")
 
       ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
@@ -542,11 +532,11 @@ contains
       call MAPL_GetPointer(export, t, "T", ALLOC=.true., _RC)
 
       ! Create A-Grid Winds
-      ifirst = state%grid%is
-      ilast  = state%grid%ie
-      jfirst = state%grid%js
-      jlast  = state%grid%je
-      km     = state%grid%npz
+      ifirst = self%grid%is
+      ilast  = self%grid%ie
+      jfirst = self%grid%js
+      jlast  = self%grid%je
+      km     = self%grid%npz
 
       allocate(ur(ifirst:ilast,jfirst:jlast,km))
       allocate(vr(ifirst:ilast,jfirst:jlast,km))
@@ -559,13 +549,13 @@ contains
 
       ! Fill Grid-Cell Area Delta-X/Y
       call MAPL_GetPointer(export, temp2d, "DXC", ALLOC=.true., _RC)
-      temp2d = DycoreGrid%dxc
+      temp2d = self%grid%dxc
 
       call MAPL_GetPointer(export, temp2d, "DYC", ALLOC=.true., _RC)
-      temp2d = DycoreGrid%dyc
+      temp2d = self%grid%dyc
 
       call MAPL_GetPointer(export, temp2d, "AREA", ALLOC=.true., _RC)
-      temp2d = DycoreGrid%area
+      temp2d = self%grid%area
 
       ! ======================================================================
       !ALT: the next section addresses the problem when export variables have been
@@ -662,8 +652,9 @@ contains
 
       class(AbstractRegridder), pointer :: L2C, C2L
 
-      type(DYN_wrap) :: wrap
-      type(DynState), pointer :: state
+      ! type(DYN_wrap) :: wrap
+      ! type(DynState), pointer :: state
+      type(DynState), pointer :: self
       type(DynGrid), pointer :: grid
       type(DynVars), pointer :: vars
 
@@ -871,18 +862,17 @@ contains
       if( associated(temp2D) ) temp2d = lats
 
       ! Retrieve the pointer to the internal state
-      call ESMF_UserCompGetInternalState(gc, "DYNstate", wrap, _RC)
-      state => wrap%dyn_state
+      _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
 
-      vars => state%vars ! direct handle to control variables
-      grid => state%grid ! direct handle to grid
-      dt =  state%dt ! dynamics time step (large)
+      vars => self%vars ! direct handle to control variables
+      grid => self%grid ! direct handle to grid
+      dt =  self%dt ! dynamics time step (large)
 
       ifirstxy = grid%is; ilastxy  = grid%ie
       jfirstxy = grid%js; jlastxy  = grid%je
       im = grid%npx; jm = grid%npy; km = grid%npz
 
-      is_ringing = ESMF_AlarmIsRinging(state%ALARMS(TIME_TO_RUN), _RC)
+      is_ringing = ESMF_AlarmIsRinging(self%ALARMS(TIME_TO_RUN), _RC)
       if (.not. is_ringing) return
 
       ! Allocate Arrays
@@ -1088,7 +1078,7 @@ contains
       phisxy = real(phis,kind=r8)
 
       ! Get tracers from import State (Note: Contains Updates from Analysis)
-      call PULL_Q (state, import, qqq, NXQ, _RC)
+      call PULL_Q (self, import, qqq, NXQ, _RC)
 
       !-----------------------------
       ! end of fewer_tracers-section
@@ -1274,38 +1264,38 @@ contains
          QG = 0.0
          do N = 1,size(names)
             if( trim(names(N)).eq."QLCN" .or. trim(names(N)).eq."QLLS" ) then
-               if( state%vars%tracer(N)%is_r4 ) then
-                  QL = QL + state%vars%tracer(N)%content_r4
+               if( self%vars%tracer(N)%is_r4 ) then
+                  QL = QL + self%vars%tracer(N)%content_r4
                else
-                  QL = QL + state%vars%tracer(N)%content
+                  QL = QL + self%vars%tracer(N)%content
                endif
             endif
             if( trim(names(N)).eq."QICN" .or. trim(names(N)).eq."QILS" ) then
-               if( state%vars%tracer(N)%is_r4 ) then
-                  QI = QI + state%vars%tracer(N)%content_r4
+               if( self%vars%tracer(N)%is_r4 ) then
+                  QI = QI + self%vars%tracer(N)%content_r4
                else
-                  QI = QI + state%vars%tracer(N)%content
+                  QI = QI + self%vars%tracer(N)%content
                endif
             endif
             if( trim(names(N)).eq."QRAIN" ) then
-               if( state%vars%tracer(N)%is_r4 ) then
-                  QR = state%vars%tracer(N)%content_r4
+               if( self%vars%tracer(N)%is_r4 ) then
+                  QR = self%vars%tracer(N)%content_r4
                else
-                  QR = state%vars%tracer(N)%content
+                  QR = self%vars%tracer(N)%content
                endif
             endif
             if( trim(names(N)).eq."QSNOW" ) then
-               if( state%vars%tracer(N)%is_r4 ) then
-                  QS = state%vars%tracer(N)%content_r4
+               if( self%vars%tracer(N)%is_r4 ) then
+                  QS = self%vars%tracer(N)%content_r4
                else
-                  QS = state%vars%tracer(N)%content
+                  QS = self%vars%tracer(N)%content
                endif
             endif
             if( trim(names(N)).eq."QGRAUPEL" ) then
-               if( state%vars%tracer(N)%is_r4 ) then
-                  QG = state%vars%tracer(N)%content_r4
+               if( self%vars%tracer(N)%is_r4 ) then
+                  QG = self%vars%tracer(N)%content_r4
                else
-                  QG = state%vars%tracer(N)%content
+                  QG = self%vars%tracer(N)%content
                endif
             endif
          enddo
@@ -1376,10 +1366,10 @@ contains
             do N = 1,size(names)
                if( trim(names(N)).eq."QLCN" .or. trim(names(N)).eq."QLLS" ) then
                   do k=1,km
-                     if( state%vars%tracer(N)%is_r4 ) then
-                        dqldtanaint1 = dqldtanaint1 + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
+                     if( self%vars%tracer(N)%is_r4 ) then
+                        dqldtanaint1 = dqldtanaint1 + self%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                      else
-                        dqldtanaint1 = dqldtanaint1 + state%vars%tracer(N)%content   (:,:,k)*delp(:,:,k)
+                        dqldtanaint1 = dqldtanaint1 + self%vars%tracer(N)%content   (:,:,k)*delp(:,:,k)
                      endif
                   enddo
                endif
@@ -1398,10 +1388,10 @@ contains
             do N = 1,size(names)
                if( trim(names(N)).eq."QICN" .or. trim(names(N)).eq."QILS" ) then
                   do k=1,km
-                     if( state%vars%tracer(N)%is_r4 ) then
-                        dqidtanaint1 = dqidtanaint1 + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
+                     if( self%vars%tracer(N)%is_r4 ) then
+                        dqidtanaint1 = dqidtanaint1 + self%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                      else
-                        dqidtanaint1 = dqidtanaint1 + state%vars%tracer(N)%content   (:,:,k)*delp(:,:,k)
+                        dqidtanaint1 = dqidtanaint1 + self%vars%tracer(N)%content   (:,:,k)*delp(:,:,k)
                      endif
                   enddo
                endif
@@ -1445,9 +1435,9 @@ contains
          ! Add Analysis Tendencies
          delpold = delp ! Old Pressure Thickness
 
-         call ADD_INCS(esmfgrid, state, import, DT, is_weighted=is_weighted)
+         call ADD_INCS(esmfgrid, self, import, DT, is_weighted=is_weighted)
 
-         if (DYN_DEBUG) call DEBUG_FV_STATE("ANA ADD_INCS", state)
+         if (DYN_DEBUG) call DEBUG_FV_STATE("ANA ADD_INCS", self)
 
          delp = vars%pe(:,:,2:)-vars%pe(:,:,:km)   ! Updated Pressure Thickness
 
@@ -1455,16 +1445,16 @@ contains
          if ((.not. ADIABATIC)) then
             do n=1,NQ
                qsum1(:,:) = 0.0_r8
-               if( state%vars%TRACER(N)%IS_R4 ) then
+               if( self%vars%TRACER(N)%IS_R4 ) then
                   do k=1,km
                      where( delp(:,:,k).ne.delpold(:,:,k) )
-                        qsum1(:,:) = qsum1(:,:) + state%vars%tracer(n)%content_r4(:,:,k)*delpold(:,:,k)
+                        qsum1(:,:) = qsum1(:,:) + self%vars%tracer(n)%content_r4(:,:,k)*delpold(:,:,k)
                      end where
                   enddo
                else
                   do k=1,km
                      where( delp(:,:,k).ne.delpold(:,:,k) )
-                        qsum1(:,:) = qsum1(:,:) + state%vars%tracer(n)%content   (:,:,k)*delpold(:,:,k)
+                        qsum1(:,:) = qsum1(:,:) + self%vars%tracer(n)%content   (:,:,k)*delpold(:,:,k)
                      end where
                   enddo
                endif
@@ -1490,10 +1480,10 @@ contains
                     (trim(names(n)).ne."QRAIN") .and. &
                     (trim(names(n)).ne."QSNOW") .and. &
                     (trim(names(n)).ne."QGRAUPEL") ) then
-                  if( state%vars%TRACER(N)%IS_R4 ) then
-                     state%vars%tracer(n)%content_r4 = state%vars%tracer(n)%content_r4 * ( QDNEW/QDOLD )
+                  if( self%vars%TRACER(N)%IS_R4 ) then
+                     self%vars%tracer(n)%content_r4 = self%vars%tracer(n)%content_r4 * ( QDNEW/QDOLD )
                   else
-                     state%vars%tracer(n)%content    = state%vars%tracer(n)%content    * ( QDNEW/QDOLD )
+                     self%vars%tracer(n)%content    = self%vars%tracer(n)%content    * ( QDNEW/QDOLD )
                   endif
                endif
             enddo
@@ -1503,16 +1493,16 @@ contains
          if ((.not. ADIABATIC)) then
             do n=1,NQ
                qsum1(:,:) = 0.0_r8
-               if( state%vars%TRACER(N)%IS_R4 ) then
+               if( self%vars%TRACER(N)%IS_R4 ) then
                   do k=1,km
                      where( delp(:,:,k).ne.delpold(:,:,k) )
-                        qsum1(:,:) = qsum1(:,:) + state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
+                        qsum1(:,:) = qsum1(:,:) + self%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                      end where
                   enddo
                else
                   do k=1,km
                      where( delp(:,:,k).ne.delpold(:,:,k) )
-                        qsum1(:,:) = qsum1(:,:) + state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
+                        qsum1(:,:) = qsum1(:,:) + self%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
                      end where
                   enddo
                endif
@@ -1547,16 +1537,16 @@ contains
                   endif
                   ! IF (MAPL_AM_I_ROOT()) print *, trim(names(n))," ratio is: ",trsum2(n)
 
-                  if( state%vars%TRACER(N)%IS_R4 ) then
+                  if( self%vars%TRACER(N)%IS_R4 ) then
                      do k=1,km
                         where( delp(:,:,k).ne.delpold(:,:,k) )
-                           state%vars%tracer(n)%content_r4(:,:,k) = state%vars%tracer(n)%content_r4(:,:,k) * trsum2(n)
+                           self%vars%tracer(n)%content_r4(:,:,k) = self%vars%tracer(n)%content_r4(:,:,k) * trsum2(n)
                         end where
                      enddo
                   else
                      do k=1,km
                         where( delp(:,:,k).ne.delpold(:,:,k) )
-                           state%vars%tracer(n)%content   (:,:,k) = state%vars%tracer(n)%content   (:,:,k) * trsum2(n)
+                           self%vars%tracer(n)%content   (:,:,k) = self%vars%tracer(n)%content   (:,:,k) * trsum2(n)
                         end where
                      enddo
                   endif
@@ -1656,10 +1646,10 @@ contains
                if( trim(names(N)).eq."QLCN" .or. &
                     trim(names(N)).eq."QLLS" ) then
                   do k=1,km
-                     if( state%vars%tracer(N)%is_r4 ) then
-                        dqldtanaint2 = dqldtanaint2 + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
+                     if( self%vars%tracer(N)%is_r4 ) then
+                        dqldtanaint2 = dqldtanaint2 + self%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                      else
-                        dqldtanaint2 = dqldtanaint2 + state%vars%tracer(N)%content   (:,:,k)*delp(:,:,k)
+                        dqldtanaint2 = dqldtanaint2 + self%vars%tracer(N)%content   (:,:,k)*delp(:,:,k)
                      endif
                   enddo
                endif
@@ -1677,10 +1667,10 @@ contains
                if( trim(names(N)).eq."QICN" .or. &
                     trim(names(N)).eq."QILS" ) then
                   do k=1,km
-                     if( state%vars%tracer(N)%is_r4 ) then
-                        dqidtanaint2 = dqidtanaint2 + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
+                     if( self%vars%tracer(N)%is_r4 ) then
+                        dqidtanaint2 = dqidtanaint2 + self%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                      else
-                        dqidtanaint2 = dqidtanaint2 + state%vars%tracer(N)%content   (:,:,k)*delp(:,:,k)
+                        dqidtanaint2 = dqidtanaint2 + self%vars%tracer(N)%content   (:,:,k)*delp(:,:,k)
                      endif
                   enddo
                endif
@@ -1793,12 +1783,12 @@ contains
             do k = 1,size(names)
                if( trim(names(k)).eq."QLCN" .or. &
                     trim(names(k)).eq."QLLS" ) then
-                  if( state%vars%tracer(k)%is_r4 ) then
-                     if (size(dqldt)==size(state%vars%tracer(k)%content_r4)) &
-                          dqldt = dqldt - state%vars%tracer(k)%content_r4
+                  if( self%vars%tracer(k)%is_r4 ) then
+                     if (size(dqldt)==size(self%vars%tracer(k)%content_r4)) &
+                          dqldt = dqldt - self%vars%tracer(k)%content_r4
                   else
-                     if (size(dqldt)==size(state%vars%tracer(k)%content)) &
-                          dqldt = dqldt - state%vars%tracer(k)%content
+                     if (size(dqldt)==size(self%vars%tracer(k)%content)) &
+                          dqldt = dqldt - self%vars%tracer(k)%content
                   endif
                endif
             enddo
@@ -1809,12 +1799,12 @@ contains
             do k = 1,size(names)
                if( trim(names(k)).eq."QICN" .or. &
                     trim(names(k)).eq."QILS" ) then
-                  if( state%vars%tracer(k)%is_r4 ) then
-                     if (size(dqidt)==size(state%vars%tracer(k)%content_r4)) &
-                          dqidt = dqidt - state%vars%tracer(k)%content_r4
+                  if( self%vars%tracer(k)%is_r4 ) then
+                     if (size(dqidt)==size(self%vars%tracer(k)%content_r4)) &
+                          dqidt = dqidt - self%vars%tracer(k)%content_r4
                   else
-                     if (size(dqidt)==size(state%vars%tracer(k)%content)) &
-                          dqidt = dqidt - state%vars%tracer(k)%content
+                     if (size(dqidt)==size(self%vars%tracer(k)%content)) &
+                          dqidt = dqidt - self%vars%tracer(k)%content
                   endif
                endif
             enddo
@@ -1826,12 +1816,12 @@ contains
                pos = index(names(k),"::")
                if(pos > 0) then
                   if( (names(k)(pos+2:))=="OX" ) then
-                     if( state%vars%tracer(k)%is_r4 ) then
-                        if (size(doxdt)==size(state%vars%tracer(k)%content_r4)) &
-                             doxdt = doxdt - state%vars%tracer(k)%content_r4
+                     if( self%vars%tracer(k)%is_r4 ) then
+                        if (size(doxdt)==size(self%vars%tracer(k)%content_r4)) &
+                             doxdt = doxdt - self%vars%tracer(k)%content_r4
                      else
-                        if (size(doxdt)==size(state%vars%tracer(k)%content)) &
-                             doxdt = doxdt - state%vars%tracer(k)%content
+                        if (size(doxdt)==size(self%vars%tracer(k)%content)) &
+                             doxdt = doxdt - self%vars%tracer(k)%content
                      endif
                   endif
                endif
@@ -1854,13 +1844,13 @@ contains
          do N = 1,size(names)
             if( trim(names(N)).eq."QLCN" .or. &
                  trim(names(N)).eq."QLLS" ) then
-               if( state%vars%tracer(N)%is_r4 ) then
+               if( self%vars%tracer(N)%is_r4 ) then
                   do k=1,km
-                     temp2d = temp2d - state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
+                     temp2d = temp2d - self%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                   enddo
                else
                   do k=1,km
-                     temp2d = temp2d - state%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
+                     temp2d = temp2d - self%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
                   enddo
                endif
             endif
@@ -1873,13 +1863,13 @@ contains
          do N = 1,size(names)
             if( trim(names(N)).eq."QICN" .or. &
                  trim(names(N)).eq."QILS" ) then
-               if( state%vars%tracer(N)%is_r4 ) then
+               if( self%vars%tracer(N)%is_r4 ) then
                   do k=1,km
-                     temp2d = temp2d - state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
+                     temp2d = temp2d - self%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                   enddo
                else
                   do k=1,km
-                     temp2d = temp2d - state%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
+                     temp2d = temp2d - self%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
                   enddo
                endif
             endif
@@ -1893,13 +1883,13 @@ contains
             pos = index(names(N),"::")
             if(pos > 0) then
                if( (names(N)(pos+2:))=="OX" ) then
-                  if( state%vars%tracer(N)%is_r4 ) then
+                  if( self%vars%tracer(N)%is_r4 ) then
                      do k=1,km
-                        temp2d = temp2d - state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
+                        temp2d = temp2d - self%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                      enddo
                   else
                      do k=1,km
-                        temp2d = temp2d - state%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
+                        temp2d = temp2d - self%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
                      enddo
                   endif
                endif
@@ -1936,7 +1926,7 @@ contains
 
       ! call MAPL_TimerOn(MAPL, "-DYN_CORE")
       t1 = MPI_Wtime(status)
-      call DynRun(state, export, clock, gc, PLE0=pe0, _RC)
+      call DynRun(self, export, clock, gc, PLE0=pe0, _RC)
       t2 = MPI_Wtime(status)
       dyn_run_timer = t2-t1
       ! call MAPL_TimerOff(MAPL, "-DYN_CORE")
@@ -1980,7 +1970,7 @@ contains
       else               ! .not. SW_DYNAMICS
 
          ! Load Local Variable with Vapor Specific Humidity
-         if ((.not. ADIABATIC) .and. (state%grid%NQ > 0)) then
+         if ((.not. ADIABATIC) .and. (self%grid%NQ > 0)) then
             if ( qqq%is_r4 ) then
                if (size(qv)==size(qqq%content_r4)) qv = qqq%content_r4
             else
@@ -2181,10 +2171,10 @@ contains
             write(myTracer, "('Q',i5.5)") itracer-1
             call MAPL_GetPointer(export, temp3D, TRIM(myTracer), _RC)
             if((associated(temp3d)) .and. (NQ>=itracer)) then
-               if (state%vars%tracer(itracer)%is_r4) then
-                  temp3d = state%vars%tracer(itracer)%content_r4
+               if (self%vars%tracer(itracer)%is_r4) then
+                  temp3d = self%vars%tracer(itracer)%content_r4
                else
-                  temp3d = state%vars%tracer(itracer)%content
+                  temp3d = self%vars%tracer(itracer)%content
                endif
             endif
          enddo
@@ -2215,12 +2205,12 @@ contains
                     trim(names(k)).eq.'QILS' .or. &
                     trim(names(k)).eq.'QICN' .or. &
                     trim(names(k)).eq.'QLLS' ) then
-                  if( state%vars%tracer(k)%is_r4 ) then
-                     if (size(dqldt)==size(state%vars%tracer(k)%content_r4)) &
-                          qctmp = qctmp + state%vars%tracer(k)%content_r4
+                  if( self%vars%tracer(k)%is_r4 ) then
+                     if (size(dqldt)==size(self%vars%tracer(k)%content_r4)) &
+                          qctmp = qctmp + self%vars%tracer(k)%content_r4
                   else
-                     if (size(dqldt)==size(state%vars%tracer(k)%content)) &
-                          qctmp = qctmp + state%vars%tracer(k)%content
+                     if (size(dqldt)==size(self%vars%tracer(k)%content)) &
+                          qctmp = qctmp + self%vars%tracer(k)%content
                   endif
                endif
             enddo
@@ -2230,10 +2220,10 @@ contains
             do N = 1,size(names)
                if( trim(names(N)).eq.'QLCN' .or. &
                     trim(names(N)).eq.'QLLS' ) then
-                  if( state%vars%tracer(N)%is_r4 ) then
-                     dqldt = dqldt + state%vars%tracer(N)%content_r4
+                  if( self%vars%tracer(N)%is_r4 ) then
+                     dqldt = dqldt + self%vars%tracer(N)%content_r4
                   else
-                     dqldt = dqldt + state%vars%tracer(N)%content
+                     dqldt = dqldt + self%vars%tracer(N)%content
                   endif
                endif
             enddo
@@ -2244,10 +2234,10 @@ contains
             do N = 1,size(names)
                if( trim(names(N)).eq.'QICN' .or. &
                     trim(names(N)).eq.'QILS' ) then
-                  if( state%vars%tracer(N)%is_r4 ) then
-                     dqidt = dqidt + state%vars%tracer(N)%content_r4
+                  if( self%vars%tracer(N)%is_r4 ) then
+                     dqidt = dqidt + self%vars%tracer(N)%content_r4
                   else
-                     dqidt = dqidt + state%vars%tracer(N)%content
+                     dqidt = dqidt + self%vars%tracer(N)%content
                   endif
                endif
             enddo
@@ -2259,10 +2249,10 @@ contains
                pos = index(names(N),'::')
                if(pos > 0) then
                   if( (names(N)(pos+2:))=='OX' ) then
-                     if( state%vars%tracer(N)%is_r4 ) then
-                        doxdt = doxdt + state%vars%tracer(N)%content_r4
+                     if( self%vars%tracer(N)%is_r4 ) then
+                        doxdt = doxdt + self%vars%tracer(N)%content_r4
                      else
-                        doxdt = doxdt + state%vars%tracer(N)%content
+                        doxdt = doxdt + self%vars%tracer(N)%content
                      endif
                   endif
                endif
@@ -2284,13 +2274,13 @@ contains
             do N = 1,size(names)
                if( trim(names(N)).eq.'QLCN' .or. &
                     trim(names(N)).eq.'QLLS' ) then
-                  if( state%vars%tracer(N)%is_r4 ) then
+                  if( self%vars%tracer(N)%is_r4 ) then
                      do k=1,km
-                        temp2d = temp2d + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
+                        temp2d = temp2d + self%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                      enddo
                   else
                      do k=1,km
-                        temp2d = temp2d + state%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
+                        temp2d = temp2d + self%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
                      enddo
                   endif
                endif
@@ -2303,13 +2293,13 @@ contains
             do N = 1,size(names)
                if( trim(names(N)).eq.'QICN' .or. &
                     trim(names(N)).eq.'QILS' ) then
-                  if( state%vars%tracer(N)%is_r4 ) then
+                  if( self%vars%tracer(N)%is_r4 ) then
                      do k=1,km
-                        temp2d = temp2d + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
+                        temp2d = temp2d + self%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                      enddo
                   else
                      do k=1,km
-                        temp2d = temp2d + state%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
+                        temp2d = temp2d + self%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
                      enddo
                   endif
                endif
@@ -2323,13 +2313,13 @@ contains
                pos = index(names(N),'::')
                if(pos > 0) then
                   if( (names(N)(pos+2:))=='OX' ) then
-                     if( state%vars%tracer(N)%is_r4 ) then
+                     if( self%vars%tracer(N)%is_r4 ) then
                         do k=1,km
-                           temp2d = temp2d + state%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
+                           temp2d = temp2d + self%vars%tracer(N)%content_r4(:,:,k)*delp(:,:,k)
                         enddo
                      else
                         do k=1,km
-                           temp2d = temp2d + state%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
+                           temp2d = temp2d + self%vars%tracer(N)%content(:,:,k)*delp(:,:,k)
                         enddo
                      endif
                   endif
@@ -2437,10 +2427,10 @@ contains
                if( trim(names(n)).eq.'QLCN' .or. &
                     trim(names(n)).eq.'QLLS' ) then
                   do k=1,km
-                     if( state%vars%tracer(n)%is_r4 ) then
-                        temp2d = temp2d + ur(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
+                     if( self%vars%tracer(n)%is_r4 ) then
+                        temp2d = temp2d + ur(:,:,k)*self%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                      else
-                        temp2d = temp2d + ur(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
+                        temp2d = temp2d + ur(:,:,k)*self%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
                      endif
                   enddo
                endif
@@ -2455,10 +2445,10 @@ contains
                if( trim(names(n)).eq.'QLCN' .or. &
                     trim(names(n)).eq.'QLLS' ) then
                   do k=1,km
-                     if( state%vars%tracer(n)%is_r4 ) then
-                        temp2d = temp2d + vr(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
+                     if( self%vars%tracer(n)%is_r4 ) then
+                        temp2d = temp2d + vr(:,:,k)*self%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                      else
-                        temp2d = temp2d + vr(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
+                        temp2d = temp2d + vr(:,:,k)*self%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
                      endif
                   enddo
                endif
@@ -2474,10 +2464,10 @@ contains
                if( trim(names(n)).eq.'QICN' .or. &
                     trim(names(n)).eq.'QILS' ) then
                   do k=1,km
-                     if( state%vars%tracer(n)%is_r4 ) then
-                        temp2d = temp2d + ur(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
+                     if( self%vars%tracer(n)%is_r4 ) then
+                        temp2d = temp2d + ur(:,:,k)*self%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                      else
-                        temp2d = temp2d + ur(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
+                        temp2d = temp2d + ur(:,:,k)*self%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
                      endif
                   enddo
                endif
@@ -2492,10 +2482,10 @@ contains
                if( trim(names(n)).eq.'QICN' .or. &
                     trim(names(n)).eq.'QILS' ) then
                   do k=1,km
-                     if( state%vars%tracer(n)%is_r4 ) then
-                        temp2d = temp2d + vr(:,:,k)*state%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
+                     if( self%vars%tracer(n)%is_r4 ) then
+                        temp2d = temp2d + vr(:,:,k)*self%vars%tracer(n)%content_r4(:,:,k)*delp(:,:,k)
                      else
-                        temp2d = temp2d + vr(:,:,k)*state%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
+                        temp2d = temp2d + vr(:,:,k)*self%vars%tracer(n)%content   (:,:,k)*delp(:,:,k)
                      endif
                   enddo
                endif
@@ -2831,7 +2821,7 @@ contains
       if (allocated(names)) deallocate( names  )
       if (allocated(names0)) deallocate( names0  )
 
-      call freeTracers(state)
+      call freeTracers(self)
 
       ! call MAPL_TimerOff(MAPL, "RUN")
       ! call MAPL_TimerOff(MAPL, "TOTAL")
@@ -3619,92 +3609,75 @@ contains
 
    end subroutine Run
 
-   subroutine PULL_Q(state, import, QQQ, iNXQ, InFieldName, RC)
+   subroutine PULL_Q(self, import, QQQ, iNXQ, InFieldName, rc)
+      type(DynState) :: self
+      type(ESMF_State) :: import
+      type(DynTracers) :: QQQ ! Specific Humidity
+      integer, intent(in) :: iNXQ
+      character(len=*), optional, intent(in) :: InFieldName
+      integer, optional, intent(out) :: rc
 
-      type (DynState)        :: state
-      type (ESMF_State)              :: import
-      type (DynTracers)               :: QQQ       ! Specific Humidity
-      integer,           intent(IN)  :: iNXQ
-      character(len=*), optional, intent(IN) :: InFieldName
-      integer, optional, intent(OUT) :: RC
-
-      integer                          :: STATUS
-      character(len=ESMF_MAXSTR)       :: IAm="Pull_Q"
-      character(len=ESMF_MAXSTR)       :: FIELDNAME, QFieldName
-      type (ESMF_FieldBundle)          :: BUNDLE
-      type (ESMF_Field)                :: field
-      type (ESMF_Array)                :: array
-      type (ESMF_TypeKind_Flag)        :: kind
-      real(r4),              pointer   :: ptr_r4(:,:,:)
-      real(r8),              pointer   :: ptr_r8(:,:,:)
-      integer                          :: N,NQ
-      integer                          :: i1,in,j1,jn,im,jm,km
-
+      character(len=ESMF_MAXSTR) :: fieldname, QFieldName
+      type(ESMF_FieldBundle) :: bundle
+      type(ESMF_Field) :: field
+      type(ESMF_Array) :: array
+      type(ESMF_TypeKind_Flag) :: kind
+      real(r4), pointer :: ptr_r4(:,:,:)
+      real(r8), pointer :: ptr_r8(:,:,:)
+      integer :: N,NQ
+      integer :: i1, in, j1, jn, im, jm, km
+      integer :: status
 
       QFieldName = "Q"
       if (present(InFieldName)) QFieldName=InFieldName
 
-      i1 = state%grid%is
-      in = state%grid%ie
-      j1 = state%grid%js
-      jn = state%grid%je
-      im = state%grid%npx
-      jm = state%grid%npy
-      km = state%grid%npz
+      i1 = self%grid%is
+      in = self%grid%ie
+      j1 = self%grid%js
+      jn = self%grid%je
+      im = self%grid%npx
+      jm = self%grid%npy
+      km = self%grid%npz
 
-      BUNDLE = bundleAdv
+      bundle = BundleAdv
 
       ! Count the friendlies
-      call ESMF_FieldBundleGet(BUNDLE, fieldCount=NQ, RC=STATUS)
-      VERIFY_(STATUS)
+      call ESMF_FieldBundleGet(bundle, fieldCount=NQ, _RC)
 
       NQ = NQ + iNXQ
-      state%grid%NQ = NQ       ! grid%NQ is now the "official" NQ
+      self%grid%NQ = NQ ! grid%NQ is now the "official" NQ
 
       ! Tracer pointer array
-      IF( ASSOCIATED( state%vars%tracer ) ) then
-         call freeTracers(state)
-      ENDIF
+      if (associated(self%vars%tracer) ) then
+         call freeTracers(self)
+      end if
 
-      ALLOCATE(state%vars%tracer(nq), STAT=STATUS)
-      VERIFY_(STATUS)
+      allocate(self%vars%tracer(nq), _STAT)
 
-      DO n = 1, NQ-iNXQ
-         call ESMF_FieldBundleGet(bundle, fieldIndex=n, field=field, rc=status)
-         VERIFY_(STATUS)
-         call ESMF_FieldGet(FIELD, Array=Array, name=fieldname, RC=STATUS)
-         VERIFY_(STATUS)
-         call ESMF_ArrayGet(array,typekind=kind,rc=status)
-         VERIFY_(STATUS)
-
-         state%vars%TRACER(N)%IS_R4  = (kind == ESMF_TYPEKIND_R4)   ! Is real*4?
-
-         state%vars%TRACER(N)%TNAME = fieldname
-
-         if ( state%vars%TRACER(N)%IS_R4 ) then
-            call ESMF_ArrayGet(array, localDE=0, farrayptr=ptr_r4, rc=status)
-            VERIFY_(STATUS)
-            state%vars%tracer(n)%content_r4 => MAPL_RemapBounds(PTR_R4, i1,in,j1,jn, &
-                 1, km)
+      do n = 1, NQ-iNXQ
+         call ESMF_FieldBundleGet(bundle, fieldIndex=n, field=field, _RC)
+         call ESMF_FieldGet(field, Array=Array, name=fieldname, _RC)
+         call ESMF_ArrayGet(array, typekind=kind, _RC)
+         self%vars%TRACER(N)%IS_R4  = (kind == ESMF_TYPEKIND_R4)   ! Is real*4?
+         self%vars%TRACER(N)%TNAME = fieldname
+         if ( self%vars%TRACER(N)%IS_R4 ) then
+            call ESMF_ArrayGet(array, localDE=0, farrayptr=ptr_r4, _RC)
+            self%vars%tracer(n)%content_r4 => MAPL_RemapBounds(ptr_r4, i1, in, j1, jn, 1, km)
             if (fieldname == QFieldName) then
                qqq%is_r4 = .true.
-               qqq%content_r4 => state%vars%tracer(n)%content_r4
+               qqq%content_r4 => self%vars%tracer(n)%content_r4
             end if
-
          else
-
-            call ESMF_ArrayGet(array, localDE=0, farrayptr=ptr_r8, rc=status)
-            VERIFY_(STATUS)
-
-            state%vars%tracer(n)%content => PTR_R8
+            call ESMF_ArrayGet(array, localDE=0, farrayptr=ptr_r8, _RC)
+            self%vars%tracer(n)%content => ptr_r8
             if (fieldname == QFieldName) then
                qqq%is_r4   = .false.
-               qqq%content => state%vars%tracer(n)%content
+               qqq%content => self%vars%tracer(n)%content
             end if
-
          endif
-      END DO
+      end do
 
+      _RETURN(_SUCCESS)
    end subroutine PULL_Q
 
    !BOP
@@ -3727,8 +3700,7 @@ contains
       integer, intent(out) :: rc
       !EOP
 
-      type(DYN_wrap) :: wrap
-      type(DynState), pointer :: state
+      type(DynState), pointer :: self
       type(DynGrid), pointer :: grid
       type(DynVars), pointer :: vars
       type(DynTracers) :: qqq                ! Specific Humidity
@@ -3793,12 +3765,11 @@ contains
       ! call MAPL_TimerOn(GENSTATE,"RUN2")
 
       ! Retrieve the pointer to the internal state
-      call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, _RC)
-      state => wrap%dyn_state
-
-      vars => state%vars ! direct handle to control variables
-      grid => state%grid ! direct handle to grid
-      dt = state%dt      ! dynamics time step (large)
+      _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
+      
+      vars => self%vars ! direct handle to control variables
+      grid => self%grid ! direct handle to grid
+      dt = self%dt      ! dynamics time step (large)
 
       ifirstxy = grid%is; ilastxy  = grid%ie
       jfirstxy = grid%js; jlastxy  = grid%je
@@ -3861,8 +3832,8 @@ contains
          ! Load Specific Humidity
          call MAPL_GetPointer(export, QOLD, 'Q', _RC)
 
-         call PULL_Q(state, import, qqq, iNXQ, _RC)
-         if ((.not. ADIABATIC) .and. (state%grid%NQ > 0)) then
+         call PULL_Q(self, import, qqq, iNXQ, _RC)
+         if ((.not. ADIABATIC) .and. (self%grid%NQ > 0)) then
             if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
                if (size(qv)==size(qqq%content_r4)) qv = qqq%content_r4
             elseif (associated(qqq%content)) then
@@ -3896,11 +3867,10 @@ contains
 
          ! Add Diabatic Forcing to State Variables
          ! call MAPL_TimerOn (GENSTATE,"PHYS_ADD_INCS")
-         call ADD_INCS(esmfgrid, state, import, DT)
+         call ADD_INCS(esmfgrid, self, import, DT)
          ! call MAPL_TimerOff(GENSTATE,"PHYS_ADD_INCS")
 
-
-         if (DYN_DEBUG) call DEBUG_FV_STATE('PHYSICS ADD_INCS',state)
+         if (DYN_DEBUG) call DEBUG_FV_STATE('PHYSICS ADD_INCS', self)
 
          ! Update Mid-Layer Pressure and Pressure Thickness
          dp = ( vars%pe(:,:,2:) - vars%pe (:,:,:km) )
@@ -3986,11 +3956,11 @@ contains
          do itracer=1,ntracers
             write(myTracer, "('Q',i5.5)") itracer-1
             call MAPL_GetPointer(export, temp3D, TRIM(myTracer), _RC)
-            if((associated(temp3d)) .and. (state%grid%NQ>=itracer)) then
-               if (state%vars%tracer(itracer)%is_r4) then
-                  temp3d = state%vars%tracer(itracer)%content_r4
+            if((associated(temp3d)) .and. (self%grid%NQ>=itracer)) then
+               if (self%vars%tracer(itracer)%is_r4) then
+                  temp3d = self%vars%tracer(itracer)%content_r4
                else
-                  temp3d = state%vars%tracer(itracer)%content
+                  temp3d = self%vars%tracer(itracer)%content
                endif
             endif
          enddo
@@ -4338,7 +4308,7 @@ contains
          deallocate( dthdtphyint1 )
          deallocate( dthdtphyint2 )
 
-         call freeTracers(state)
+         call freeTracers(self)
 
       end if ! .not. SW_DYNAMICS
 
@@ -4349,7 +4319,7 @@ contains
       _RETURN(_SUCCESS)
    end subroutine RunAddIncs
 
-   subroutine ADD_INCS(esmfgrid, state, import, DT, is_weighted, rc)
+   subroutine ADD_INCS(esmfgrid, self, import, DT, is_weighted, rc)
 
       use fms_mod, only: set_domain, nullify_domain
       use fv_diagnostics_mod, only: prt_maxmin
@@ -4358,7 +4328,7 @@ contains
 
       !INPUT PARAMETERS:
       type(ESMF_Grid), intent(in) :: esmfgrid
-      type(DynState), pointer :: state
+      type(DynState), pointer :: self
       type(ESMF_State), intent(inout) :: import
       real(FVPRC), intent(in) :: DT
       logical, optional, intent(in) :: is_weighted
@@ -4398,12 +4368,12 @@ contains
          is_weighted_ = is_weighted
       end if
 
-      is = state%grid%is; ie = state%grid%ie
-      js = state%grid%js; je = state%grid%je
-      km = state%grid%npz
+      is = self%grid%is; ie = self%grid%ie
+      js = self%grid%js; je = self%grid%je
+      km = self%grid%npz
 
-      isd = state%grid%isd; ied = state%grid%ied
-      jsd = state%grid%jsd; jed = state%grid%jed
+      isd = self%grid%isd; ied = self%grid%ied
+      jsd = self%grid%jsd; jed = self%grid%jed
 
       ! call MAPL_Get( MAPL, LONS=LONS, LATS=LATS, RC=STATUS )
       ! VERIFY_(STATUS)
@@ -4414,23 +4384,23 @@ contains
       ! **********************************************************************
 
       ! Determine how many water species we have
-      nwat = state%vars%nwat
+      nwat = self%vars%nwat
       nwat_tracers = 0
       if ((nwat==0) .AND. (.not. ADIABATIC)) then
-         do n=1,state%grid%NQ
-            if (TRIM(state%vars%tracer(n)%tname) == 'Q'       ) nwat_tracers = nwat_tracers + 1
-            if (TRIM(state%vars%tracer(n)%tname) == 'QLCN'    ) nwat_tracers = nwat_tracers + 1
-            if (TRIM(state%vars%tracer(n)%tname) == 'QLLS'    ) nwat_tracers = nwat_tracers + 1
-            if (TRIM(state%vars%tracer(n)%tname) == 'QICN'    ) nwat_tracers = nwat_tracers + 1
-            if (TRIM(state%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
+         do n=1,self%grid%NQ
+            if (TRIM(self%vars%tracer(n)%tname) == 'Q'       ) nwat_tracers = nwat_tracers + 1
+            if (TRIM(self%vars%tracer(n)%tname) == 'QLCN'    ) nwat_tracers = nwat_tracers + 1
+            if (TRIM(self%vars%tracer(n)%tname) == 'QLLS'    ) nwat_tracers = nwat_tracers + 1
+            if (TRIM(self%vars%tracer(n)%tname) == 'QICN'    ) nwat_tracers = nwat_tracers + 1
+            if (TRIM(self%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
          enddo
          ! We must have these first 5 at a minimum
          _ASSERT(nwat_tracers == 5, 'expecting 5 water species: Q QLCN QLLS QICN QILS')
          ! Check for QRAIN, QSNOW, QGRAUPEL
-         do n=1,state%grid%NQ
-            if (TRIM(state%vars%tracer(n)%tname) == 'QRAIN'   ) nwat_tracers = nwat_tracers + 1
-            if (TRIM(state%vars%tracer(n)%tname) == 'QSNOW'   ) nwat_tracers = nwat_tracers + 1
-            if (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL') nwat_tracers = nwat_tracers + 1
+         do n=1,self%grid%NQ
+            if (TRIM(self%vars%tracer(n)%tname) == 'QRAIN'   ) nwat_tracers = nwat_tracers + 1
+            if (TRIM(self%vars%tracer(n)%tname) == 'QSNOW'   ) nwat_tracers = nwat_tracers + 1
+            if (TRIM(self%vars%tracer(n)%tname) == 'QGRAUPEL') nwat_tracers = nwat_tracers + 1
          enddo
          if (nwat_tracers >= 5) nwat = 3 ! state has QV, QLIQ, QICE
          if (nwat_tracers == 8) nwat = 6 ! state has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
@@ -4467,7 +4437,7 @@ contains
          allocate(   Q(is:ie,js:je,1:km,nwat) )
          allocate( CVM(is:ie,js:je,1:km) )
          Q(:,:,:,:) = 0.0
-         call PULL_Q ( state, import, qqq, NXQ, InFieldName='Q', RC=rc )
+         call PULL_Q(self, import, qqq, NXQ, InFieldName='Q', RC=rc )
          if (DYN_COLDSTART .and. overwrite_Q .and. (.not. ADIABATIC)) then
             ! USE Q computed by FV3
             call getQ(Q(:,:,:,sphum), 'Q')
@@ -4491,26 +4461,26 @@ contains
       endif
       if (nwat >= 3) then
          ! Grab QLIQ from imports
-         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QLLS', RC=rc )
+         call PULL_Q(self, import, qqq, NXQ, InFieldName='QLLS', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,liq_wat))==size(qqq%content_r4)) Q(:,:,:,liq_wat) = Q(:,:,:,liq_wat) + qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:,:,:,liq_wat))==size(qqq%content)) Q(:,:,:,liq_wat) = Q(:,:,:,liq_wat) + qqq%content
          endif
-         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QLCN', RC=rc )
+         call PULL_Q(self, import, qqq, NXQ, InFieldName='QLCN', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,liq_wat))==size(qqq%content_r4)) Q(:,:,:,liq_wat) = Q(:,:,:,liq_wat) + qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:,:,:,liq_wat))==size(qqq%content)) Q(:,:,:,liq_wat) = Q(:,:,:,liq_wat) + qqq%content
          endif
          ! Grab QICE from imports
-         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QILS', RC=rc )
+         call PULL_Q(self, import, qqq, NXQ, InFieldName='QILS', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,ice_wat))==size(qqq%content_r4)) Q(:,:,:,ice_wat) = Q(:,:,:,ice_wat) + qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:,:,:,ice_wat))==size(qqq%content)) Q(:,:,:,ice_wat) = Q(:,:,:,ice_wat) + qqq%content
          endif
-         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QICN', RC=rc )
+         call PULL_Q(self, import, qqq, NXQ, InFieldName='QICN', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,ice_wat))==size(qqq%content_r4)) Q(:,:,:,ice_wat) = Q(:,:,:,ice_wat) + qqq%content_r4
          elseif (associated(qqq%content)) then
@@ -4519,21 +4489,21 @@ contains
       endif
       if (nwat >= 6) then
          ! Grab RAIN from imports
-         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QRAIN', RC=rc )
+         call PULL_Q(self, import, qqq, NXQ, InFieldName='QRAIN', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,rainwat))==size(qqq%content_r4)) Q(:,:,:,rainwat) = qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:,:,:,rainwat))==size(qqq%content)) Q(:,:,:,rainwat) = qqq%content
          endif
          ! Grab SNOW from imports
-         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QSNOW', RC=rc )
+         call PULL_Q(self, import, qqq, NXQ, InFieldName='QSNOW', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,snowwat))==size(qqq%content_r4)) Q(:,:,:,snowwat) = qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:,:,:,snowwat))==size(qqq%content)) Q(:,:,:,snowwat) = qqq%content
          endif
          ! Grab GRAUPEL from imports
-         call PULL_Q ( state, import, qqq, NXQ, InFieldName='QGRAUPEL', RC=rc )
+         call PULL_Q(self, import, qqq, NXQ, InFieldName='QGRAUPEL', RC=rc )
          if ( (qqq%is_r4) .and. (associated(qqq%content_r4)) ) then
             if (size(Q(:,:,:,graupel))==size(qqq%content_r4)) Q(:,:,:,graupel) = qqq%content_r4
          elseif (associated(qqq%content)) then
@@ -4563,7 +4533,7 @@ contains
          !if (.not. HYDROSTATIC ) then
          !  call ESMFL_StateGetPointerToData ( import,TEND,'DWDT',RC=STATUS )
          !  VERIFY_(STATUS)
-         !  state%vars%W = state%vars%W + DT*TEND(is:ie,js:je,1:km)
+         !  self%vars%W = self%vars%W + DT*TEND(is:ie,js:je,1:km)
          !endif
 
          ! Put the wind tendencies on the Native Dynamics grid
@@ -4571,8 +4541,8 @@ contains
 
 
          ! Add the wind tendencies to the control variables
-         state%vars%U = state%vars%U + DT*TEND_UN(is:ie,js:je,1:km)
-         state%vars%V = state%vars%V + DT*TEND_VN(is:ie,js:je,1:km)
+         self%vars%U = self%vars%U + DT*TEND_UN(is:ie,js:je,1:km)
+         self%vars%V = self%vars%V + DT*TEND_VN(is:ie,js:je,1:km)
 
          deallocate( tend_ua )
          deallocate( tend_va )
@@ -4585,7 +4555,7 @@ contains
 
          if(is_weighted_) then
             do k=1,km
-               DPOLD(:,:,k) = ( state%vars%pe(:,:,k+1)-state%vars%pe(:,:,k) )
+               DPOLD(:,:,k) = ( self%vars%pe(:,:,k+1)-self%vars%pe(:,:,k) )
             enddo
          else
             DPOLD = 1.0
@@ -4596,7 +4566,7 @@ contains
          ! **********************************************************************
 
          call MAPL_GetPointer(import, TEND, "DPEDT", _RC)
-         state%vars%PE = state%vars%PE + DT*TEND
+         self%vars%PE = self%vars%PE + DT*TEND
 
          ! **********************************************************************
          ! ****           Compute New Pressure Thickness                     ****
@@ -4606,7 +4576,7 @@ contains
 
          if(is_weighted_) then
             do k=1,km
-               DPNEW(:,:,k) = ( state%vars%pe(:,:,k+1)-state%vars%pe(:,:,k) )
+               DPNEW(:,:,k) = ( self%vars%pe(:,:,k+1)-self%vars%pe(:,:,k) )
             enddo
          else
             DPNEW = 1.0
@@ -4623,7 +4593,7 @@ contains
          call MAPL_GetPointer(import, TEND, "DTDT", _RC)
 
          !if (DYN_DEBUG) then
-         !   call prt_maxmin('AI PT1', state%vars%PT ,  is, ie, js, je, 0, km, 1.d00, MAPL_AM_I_ROOT())
+         !   call prt_maxmin('AI PT1', self%vars%PT ,  is, ie, js, je, 0, km, 1.d00, MAPL_AM_I_ROOT())
          !endif
 
          select case (nwat)
@@ -4643,46 +4613,46 @@ contains
          end select
 
          ! Make previous PT into just T
-         state%vars%PT = state%vars%PT*state%vars%PKZ
+         self%vars%PT = self%vars%PT*self%vars%PKZ
 
          if (.not. HYDROSTATIC ) then
             ! remove old T from DZ
-            state%vars%DZ = state%vars%DZ / state%vars%PT
+            self%vars%DZ = self%vars%DZ / self%vars%PT
 
             ! Update T
-            state%vars%PT =  state%vars%PT                         *DPOLD
-            state%vars%PT = (state%vars%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW
+            self%vars%PT =  self%vars%PT                         *DPOLD
+            self%vars%PT = (self%vars%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW
 
             ! update DZ with new T
-            state%vars%DZ = state%vars%DZ * state%vars%PT
+            self%vars%DZ = self%vars%DZ * self%vars%PT
          else
             ! Update T
-            state%vars%PT =  state%vars%PT                         *DPOLD
-            state%vars%PT = (state%vars%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW
+            self%vars%PT =  self%vars%PT                         *DPOLD
+            self%vars%PT = (self%vars%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW
          endif
 
          if (DEBUG_TQ_ERRORS) then
             do L=1,KM
                do J=js,je
                   do I=is,ie
-                     if ( (state%vars%PT(I,J,L) > 333.0) .OR. (state%vars%PT(I,J,L)/=state%vars%PT(I,J,L)) .OR. &
+                     if ( (self%vars%PT(I,J,L) > 333.0) .OR. (self%vars%PT(I,J,L)/=self%vars%PT(I,J,L)) .OR. &
                           (Q(I,J,L,sphum  ) < 0.0) .OR. (Q(I,J,L,sphum  )/=Q(I,J,L,sphum  )) .OR. &
                           (Q(I,J,L,liq_wat) < 0.0) .OR. (Q(I,J,L,liq_wat)/=Q(I,J,L,liq_wat)) .OR. &
                           (Q(I,J,L,ice_wat) < 0.0) .OR. (Q(I,J,L,ice_wat)/=Q(I,J,L,ice_wat)) .OR. &
                           (Q(I,J,L,rainwat) < 0.0) .OR. (Q(I,J,L,rainwat)/=Q(I,J,L,rainwat)) .OR. &
                           (Q(I,J,L,snowwat) < 0.0) .OR. (Q(I,J,L,snowwat)/=Q(I,J,L,snowwat)) .OR. &
                           (Q(I,J,L,graupel) < 0.0) .OR. (Q(I,J,L,graupel)/=Q(I,J,L,graupel)) ) then
-                        print *, "T or Q  spike detected : ", state%vars%PT(I,J,L)
+                        print *, "T or Q  spike detected : ", self%vars%PT(I,J,L)
                         print *, "  Temp  ANA|PHY  Increment : ", (DT*TEND(I,J,L)*(MAPL_CP/CVM(I,J,L)))/DPNEW(I,J,L)
                         print *, "    IN ADD_INCS inside DYN   "
                         II=I-is+1
                         JJ=J-js+1
                         print *, "  Latitude       =", LATS(II,JJ)*180.0/MAPL_PI
                         print *, "  Longitude      =", LONS(II,JJ)*180.0/MAPL_PI
-                        print *, "  Pressure (mb)  =", 0.5*(state%vars%PE(I,J,L+1)+state%vars%PE(I,J,L))/100.0
+                        print *, "  Pressure (mb)  =", 0.5*(self%vars%PE(I,J,L+1)+self%vars%PE(I,J,L))/100.0
 
-                        print *, "  UWND =", state%vars%U(I,J,L), " UINC =", DT*TEND_UN(I,J,L)
-                        print *, "  VWND =", state%vars%V(I,J,L), " VINC =", DT*TEND_VN(I,J,L)
+                        print *, "  UWND =", self%vars%U(I,J,L), " UINC =", DT*TEND_UN(I,J,L)
+                        print *, "  VWND =", self%vars%V(I,J,L), " VINC =", DT*TEND_VN(I,J,L)
                         if (nwat >= 6) then
                            print *, "  QV=", Q(I,J,L,sphum  ), "  QL=", Q(I,J,L,liq_wat), "  QI=", Q(I,J,L,ice_wat)
                            print *, "  QR=", Q(I,J,L,rainwat), "  QS=", Q(I,J,L,snowwat), "  QG=", Q(I,J,L,graupel)
@@ -4700,14 +4670,14 @@ contains
          ! Update PKZ from hydrostatic pressures
          !  This isn't entirely necessary, FV3 overwrites this in fv_dynamics
          !  but we have to get back to PT here
-         !!   call getPKZ(state%vars%PKZ,state%vars%PT,Q,state%vars%PE,state%vars%DZ,HYDROSTATIC)
-         call getPKZ(state%vars%PKZ,state%vars%PE)
+         !!   call getPKZ(self%vars%PKZ,self%vars%PT,Q,self%vars%PE,self%vars%DZ,HYDROSTATIC)
+         call getPKZ(self%vars%PKZ,self%vars%PE)
 
          ! Make T back into PT
-         state%vars%PT = state%vars%PT/state%vars%PKZ
+         self%vars%PT = self%vars%PT/self%vars%PKZ
 
          !if (DYN_DEBUG) then
-         !call prt_maxmin('AI PT2', state%vars%PT ,  is, ie, js, je, 0, km, 1.d00, MAPL_AM_I_ROOT())
+         !call prt_maxmin('AI PT2', self%vars%PT ,  is, ie, js, je, 0, km, 1.d00, MAPL_AM_I_ROOT())
          !endif
 
          deallocate (DPNEW)
@@ -4844,63 +4814,36 @@ contains
 
    !INTERFACE:
    subroutine Finalize(gc, import, export, clock, rc)
-
       !ARGUMENTS:
-      type (ESMF_GridComp) :: gc
-      type (ESMF_State) :: import
-      type (ESMF_State) :: export
-      type (ESMF_Clock) :: clock
+      type(ESMF_GridComp) :: gc
+      type(ESMF_State) :: import
+      type(ESMF_State) :: export
+      type(ESMF_Clock) :: clock
       integer, intent(out) :: rc
       !EOP
 
-      type (DYN_wrap) :: wrap
+      type(DYN_wrap) :: wrap
       type (DynState), pointer  :: state
+      integer :: status
+      class(logger_t), pointer :: logger
 
-      character(len=ESMF_MAXSTR)        :: IAm
-      character(len=ESMF_MAXSTR)        :: comp_name
-      integer                           :: status
+      call MAPL_GridCompGet(gc, logger=logger, _RC)
+      call logger%info("Finalize:: starting...")
 
-      type (MAPL_MetaComp),     pointer :: MAPL
-      type (ESMF_Config)                :: cf
-
-      Iam = "Finalize"
-      call ESMF_GridCompGet( gc, name=comp_name, config=cf, RC=STATUS )
-      VERIFY_(STATUS)
-      Iam = trim(comp_name) // Iam
+      ! call MAPL_TimerOn(MAPL,"TOTAL")
+      ! call MAPL_TimerOn(MAPL,"FINALIZE")
 
       ! Retrieve the pointer to the state
-      call MAPL_GetObjectFromGC (gc, MAPL,  RC=STATUS )
-      VERIFY_(STATUS)
-
-      call MAPL_TimerOn(MAPL,"TOTAL")
-      call MAPL_TimerOn(MAPL,"FINALIZE")
-
-      ! Retrieve the pointer to the state
-      call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, status)
-      VERIFY_(STATUS)
-
+      call ESMF_UserCompGetInternalState(gc, 'DYN_STATE', wrap, _RC)
       state => wrap%dyn_state
 
       call DynFinalize( state )
 
-      ! Call Generic Finalize
-      call MAPL_TimerOff(MAPL,"FINALIZE")
-      call MAPL_TimerOff(MAPL,"TOTAL")
+      ! call MAPL_TimerOff(MAPL,"FINALIZE")
+      ! call MAPL_TimerOff(MAPL,"TOTAL")
 
-      call MAPL_GenericFinalize ( gc, import, export, clock,  RC=STATUS)
-      VERIFY_(STATUS)
-
+      call logger%info("Finalize:: ...complete")
       _RETURN(_SUCCESS)
-
-   contains
-
-      subroutine PRINT_TIMES(TIMES,DAYS)
-         integer(kind=8), intent(INOUT) :: TIMES(:,:)
-         real(r8),        intent(IN   ) :: DAYS
-         TIMES = 0
-         return
-      end subroutine PRINT_TIMES
-
    end subroutine FINALIZE
 
    subroutine get_slp ( km,ps,phis,slp,pe,pk,tv,H1000,H850,H500)
@@ -5091,7 +5034,7 @@ contains
       real(REAL8), parameter :: r0_6=0.6
       real(REAL8), parameter :: r1_0=1.0
 
-      call ESMF_UserCompGetInternalState(gc, 'DYNstate', wrap, _RC)
+      call ESMF_UserCompGetInternalState(gc, 'DYN_STATE', wrap, _RC)
       state => wrap%dyn_state
       grid  => state%grid ! direct handle to grid
 
@@ -5961,7 +5904,7 @@ contains
 
       !call write_parallel('GlobalSUm')
       locArr(:,:) = arr(:,:)
-      call ArrayGather(locArr, glbArr, grid%grid)
+      call MAPL_ArrayGather(locArr, glbArr, grid%grid)
       arr_global(:,:) = glbArr
 
       IF (MAPL_AM_I_ROOT()) Then
@@ -6004,7 +5947,7 @@ contains
 
       ! call write_parallel('GlobalSUm')
       locArr(:,:) = arr(:,:)
-      call ArrayGather(locArr, glbArr, grid%grid)
+      call MAPL_ArrayGather(locArr, glbArr, grid%grid)
       arr_global(:,:) = glbArr
 
       IF (MAPL_AM_I_ROOT()) Then
@@ -6057,7 +6000,7 @@ contains
       ! call write_parallel('GlobalSUm')
       do k=kstrt,kend
          locArr(:,:) = arr(:,:,k)
-         call ArrayGather(locArr, arr_global(:,:,k), grid%grid)
+         call MAPL_ArrayGather(locArr, arr_global(:,:,k), grid%grid)
       enddo
 
       IF (amIRoot) Then
@@ -6119,7 +6062,7 @@ contains
 
       do k=kstrt,kend
          locArr(:,:) = arr(:,:,k)
-         call ArrayGather(locArr, glbArr, grid%grid)
+         call MAPL_ArrayGather(locArr, glbArr, grid%grid)
          if (amIRoot) then
             arr_global(:,:,k) = glbArr
          end if
@@ -6141,12 +6084,12 @@ contains
          gsum_p = 0
          do k=kstrt,kend
             locArr(:,:) = arr(:,:,k)*grid%area(:,:)*delp(:,:,k)
-            call ArrayGather(locArr, glbArr, grid%grid)
+            call MAPL_ArrayGather(locArr, glbArr, grid%grid)
             if (amIRoot) then
                arr_global(:,:,k) = glbArr
             end if
             locArr(:,:) = delp(:,:,k)
-            call ArrayGather(locArr, glbArr, grid%grid)
+            call MAPL_ArrayGather(locArr, glbArr, grid%grid)
             if (amIRoot) then
                gsum_p = gsum_p + SUM(SUM(glbArr,DIM=1),DIM=1)
             end if
