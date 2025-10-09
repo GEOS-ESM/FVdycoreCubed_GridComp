@@ -282,12 +282,6 @@ module FVdycoreCubed_GridComp
    integer, parameter :: ntracers=11
    integer, parameter :: plevs(5) = [850, 700, 600, 500, 300]
 
-   ! Wrapper for extracting internal state
-
-   type dyn_wrap
-      type(DynState), pointer :: dyn_state
-   end type dyn_wrap
-
    interface addTracer
       module procedure addTracer_r4
       module procedure addTracer_r8
@@ -652,21 +646,19 @@ contains
 
       class(AbstractRegridder), pointer :: L2C, C2L
 
-      ! type(DYN_wrap) :: wrap
-      ! type(DynState), pointer :: state
       type(DynState), pointer :: self
       type(DynGrid), pointer :: grid
       type(DynVars), pointer :: vars
 
-      integer  :: NQ
-      integer  :: IM, JM, KM
-      integer  :: NKE, NPHI
-      integer  :: NUMVARS
-      integer  :: ifirstxy, ilastxy, jfirstxy, jlastxy
-      integer  :: kend, i, j, K, L, n
-      integer  :: im_replay,jm_replay
+      integer :: NQ
+      integer :: IM, JM, KM
+      integer :: NKE, NPHI
+      integer :: NUMVARS
+      integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
+      integer :: kend, i, j, K, L, n
+      integer :: im_replay,jm_replay
       logical, parameter :: convt = .false. ! Until this is run with full physics
-      logical  :: is_shutoff, is_ringing
+      logical :: is_shutoff, is_ringing
 
       real(r8),     pointer :: phisxy(:,:)
       real(kind=4), pointer ::   phis(:,:)
@@ -4822,8 +4814,7 @@ contains
       integer, intent(out) :: rc
       !EOP
 
-      type(DYN_wrap) :: wrap
-      type (DynState), pointer  :: state
+      type (DynState), pointer :: self
       integer :: status
       class(logger_t), pointer :: logger
 
@@ -4834,10 +4825,9 @@ contains
       ! call MAPL_TimerOn(MAPL,"FINALIZE")
 
       ! Retrieve the pointer to the state
-      call ESMF_UserCompGetInternalState(gc, 'DYN_STATE', wrap, _RC)
-      state => wrap%dyn_state
+      _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
 
-      call DynFinalize( state )
+      call DynFinalize(self)
 
       ! call MAPL_TimerOff(MAPL,"FINALIZE")
       ! call MAPL_TimerOff(MAPL,"TOTAL")
@@ -5013,8 +5003,7 @@ contains
       real(REAL8) :: ptop, pint
       real(REAL8), allocatable :: PS(:,:)
 
-      type(DYN_wrap) :: wrap
-      type(DynState), pointer :: state
+      type(DynState), pointer :: self
       type(DynGrid),  pointer :: grid
 
       logical :: perturb
@@ -5034,9 +5023,8 @@ contains
       real(REAL8), parameter :: r0_6=0.6
       real(REAL8), parameter :: r1_0=1.0
 
-      call ESMF_UserCompGetInternalState(gc, 'DYN_STATE', wrap, _RC)
-      state => wrap%dyn_state
-      grid  => state%grid ! direct handle to grid
+      _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
+      grid  => self%grid ! direct handle to grid
 
       call MAPL_GridCompGetResource(gc, "T0", T0, default=273., _RC)
       call MAPL_GridCompGetInternalState(gc, internal, _RC)
@@ -5384,14 +5372,14 @@ contains
             allocate(tracer(is:ie, js:je, 1:KM), _STAT)
             tracer(:,:,:)  = 0.0
             fieldname = 'Q'
-            call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
+            call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
 
             if (case_tracers /= 1234) then
 
                do n=1,case_tracers
                   tracer(:,:,:) = 0.0
                   write(fieldname, "('Q',i3.3)") n
-                  call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
+                  call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
                enddo
 
             else
@@ -5412,7 +5400,7 @@ contains
                   enddo
                enddo
                fieldname = 'Q1'
-               call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
+               call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
 
                !-------------------
                !     tracer q2
@@ -5429,7 +5417,7 @@ contains
                   enddo
                enddo
                fieldname = 'Q2'
-               call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
+               call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
 
                !-------------------
                !     tracer q3
@@ -5446,14 +5434,14 @@ contains
                   enddo
                enddo
                fieldname = 'Q3'
-               call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
+               call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
 
                !-------------------
                !     tracer q4
                !-------------------
                tracer(:,:,:)  = 1.0_r4
                fieldname = 'Q4'
-               call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
+               call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
 
                !-------------------
                !     tracer q5
@@ -5461,7 +5449,7 @@ contains
                if (allocated(Q5)) then
                   tracer(:,:,:)  = Q5(:,:,:)
                   fieldname = 'Q5'
-                  call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
+                  call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
                   deallocate(Q5, _STAT)
                endif
 
@@ -5471,7 +5459,7 @@ contains
                if (allocated(Q6)) then
                   tracer(:,:,:)  = Q6(:,:,:)
                   fieldname = 'Q6'
-                  call addTracer(state, tradv_bundle, tracer, esmfgrid, fieldname)
+                  call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
                   deallocate(Q6, _STAT)
                endif
 
@@ -5780,8 +5768,8 @@ contains
    end subroutine set_eta
 #endif
 
-   subroutine addTracer_r8(state, bundle, var, grid, fieldname)
-      type(DynState), pointer :: state
+   subroutine addTracer_r8(self, bundle, var, grid, fieldname)
+      type(DynState), pointer :: self
       type(ESMF_FieldBundle) :: bundle
       real(r8), pointer :: var(:, :, :)
       type(ESMF_Grid) :: grid
@@ -5806,27 +5794,27 @@ contains
       call MAPL_FieldBundleAdd(bundle, field, _RC)
 
       if (nq == 1) then
-         allocate(state%vars%tracer(nq), _STAT)
+         allocate(self%vars%tracer(nq), _STAT)
          call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
-         state%vars%tracer(nq)%content => ptr
-         state%vars%tracer(nq)%is_r4 = .false.
+         self%vars%tracer(nq)%content => ptr
+         self%vars%tracer(nq)%is_r4 = .false.
       else
          allocate(t(nq))
-         t(1:nq-1) = state%vars%tracer
-         deallocate(state%vars%tracer)
-         state%vars%tracer => t
+         t(1:nq-1) = self%vars%tracer
+         deallocate(self%vars%tracer)
+         self%vars%tracer => t
          call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
-         state%vars%tracer(nq)%content => ptr
-         state%vars%tracer(nq  )%is_r4 = .false.
+         self%vars%tracer(nq)%content => ptr
+         self%vars%tracer(nq  )%is_r4 = .false.
       endif
 
-      state%grid%nq = nq
+      self%grid%nq = nq
 
       _RETURN(_SUCCESS)
    end subroutine addTracer_r8
 
-   subroutine addTracer_r4(state, bundle, var, grid, fieldname)
-      type(DynState), pointer :: state
+   subroutine addTracer_r4(self, bundle, var, grid, fieldname)
+      type(DynState), pointer :: self
       type(ESMF_FieldBundle) :: bundle
       real(r4), pointer :: var(:, :, :)
       type(ESMF_Grid) :: grid
@@ -5851,31 +5839,31 @@ contains
       call MAPL_FieldBundleAdd(bundle, field, _RC)
 
       if (NQ == 1) then
-         allocate(state%vars%tracer(nq), _STAT)
+         allocate(self%vars%tracer(nq), _STAT)
          call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
-         state%vars%tracer(nq)%content_r4 => ptr
-         state%vars%tracer(nq)%is_r4 = .true.
+         self%vars%tracer(nq)%content_r4 => ptr
+         self%vars%tracer(nq)%is_r4 = .true.
       else
          allocate(t(nq))
-         t(1:nq-1) = state%vars%tracer
-         deallocate(state%vars%tracer)
-         state%vars%tracer => t
+         t(1:nq-1) = self%vars%tracer
+         deallocate(self%vars%tracer)
+         self%vars%tracer => t
          call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
-         state%vars%tracer(nq)%content_r4 => ptr
-         state%vars%tracer(nq  )%is_r4 = .true.
+         self%vars%tracer(nq)%content_r4 => ptr
+         self%vars%tracer(nq  )%is_r4 = .true.
       endif
 
-      state%grid%nq = nq
+      self%grid%nq = nq
 
       _RETURN(_SUCCESS)
    end subroutine addTracer_r4
 
-   subroutine freeTracers(state)
-      type (DynState) :: state
+   subroutine freeTracers(self)
+      type (DynState) :: self
 
-      if (associated(state%vars%tracer)) then
-         deallocate( state%vars%tracer)   ! Comment out to output tracer to checkpoint file
-         NULLIFY( state%vars%tracer)
+      if (associated(self%vars%tracer)) then
+         deallocate( self%vars%tracer)   ! Comment out to output tracer to checkpoint file
+         NULLIFY(self%vars%tracer)
       end if
 
       return
