@@ -21,14 +21,14 @@ module FVdycoreCubed_GridComp
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
    use MAPL_Constants, only: MAPL_VectorField, MAPL_BundleItem
    use MAPL_Constants, only: MAPL_RestartSkip, MAPL_RestartRequired, MAPL_InitialRestart
+   use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
    use ESMFL_Mod, only: ESMFL_StateGetPointerToData, ESMFL_BundleGetPointerToData, MAPL_AreaMean
 
    use MAPL_GenericMod, only: MAPL_TimerAdd
    use MAPL_AbstractRegridderMod, only: AbstractRegridder
    use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
-   use MAPL_BaseMod, only: MAPL_AttributeSet, MAPL_FieldBundleAdd
-   use MAPL_BaseMod, only: MAPL_UNDEF, MAPL_RemapBounds
+   use MAPL_BaseMod, only: MAPL_AttributeSet, MAPL_RemapBounds
    use MAPL_GridManagerMod, only: grid_manager
    use MAPL_RegridderManagerMod, only: regridder_manager
    use MAPL_RegridMethods, only: REGRID_METHOD_BILINEAR
@@ -47,6 +47,8 @@ module FVdycoreCubed_GridComp
    use mapl3g_VerticalStaggerLoc, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
    use mapl3g_Geom_API, only: MAPL_GridGet
    use mapl3g_State_API, only: MAPL_StateGetPointer
+   use mapl3g_Field_API, only: MAPL_FieldCreate
+   use mapl3g_FieldBundle_API, only: MAPL_FieldBundleAdd
    use pflogger, only: logger_t => logger
 
    use m_set_eta, only: set_eta
@@ -581,7 +583,7 @@ contains
          call ESMF_FieldBundleGet(tradv, fieldCount=numTracers, _RC)
          do i=1,numTracers
             call ESMF_FieldBundleGet(tradv, fieldIndex=i, field=field, _RC)
-            call MAPL_FieldBundleAdd(tradvex, field, _RC)
+            call MAPL_FieldBundleAdd(tradvex, [field], _RC)
          enddo
       end if
 
@@ -995,8 +997,10 @@ contains
                     (trim(fieldname) /= "QRAIN"   ) .and. &
                     (trim(fieldname) /= "QSNOW"   ) .and. &
                     (trim(fieldname) /= "QGRAUPEL") ) then
-                  write(STRING,"(A,A)") "FV3+ADV is excluding ", trim(fieldname)
-                  call WRITE_PARALLEL(trim(STRING))
+                  ! write(STRING,"(A,A)") "FV3+ADV is excluding ", trim(fieldname)
+                  ! call WRITE_PARALLEL(trim(STRING))
+                  call logger%info("Run:: FV3+ADV is excluding %s", trim(fieldname))
+
                   n = n + 1
                   if (n > size(xlist)) then
                      allocate(biggerlist(2*n), _STAT)
@@ -1014,7 +1018,7 @@ contains
                   end if
                end do
                if (.not. exclude) then
-                  call MAPL_FieldBundleAdd(BundleAdv, field, _RC)
+                  call MAPL_FieldBundleAdd(BundleAdv, [field], _RC)
                end if
             end do
 
@@ -1434,7 +1438,7 @@ contains
                where( qsum1.ne.0.0_r8 )
                   qsum2 = qsum1
                elsewhere
-                  qsum2 = MAPL_UNDEF
+                  qsum2 = MAPL_UNDEFINED_REAL
                end where
                call MAPL_AreaMean(TRSUM1(n), qsum2, area, esmfgrid, _RC)
             enddo
@@ -1482,7 +1486,7 @@ contains
                where( qsum1.ne.0.0_r8 )
                   qsum2 = qsum1
                elsewhere
-                  qsum2 = MAPL_UNDEF
+                  qsum2 = MAPL_UNDEFINED_REAL
                end where
                call MAPL_AreaMean(TRSUM2(n), qsum2, area, esmfgrid, _RC)
             enddo
@@ -1502,8 +1506,8 @@ contains
                     (trim(names(n)).ne."QSNOW") .and. &
                     (trim(names(n)).ne."QGRAUPEL")       ) then
 
-                  if( real(trsum1(n),kind=4).ne.MAPL_UNDEF .and. &
-                       real(trsum2(n),kind=4).ne.MAPL_UNDEF       ) then
+                  if(  real(trsum1(n),kind=4) .ne. MAPL_UNDEFINED_REAL .and. &
+                       real(trsum2(n),kind=4) .ne. MAPL_UNDEFINED_REAL) then
                      trsum2(n) = real( trsum1(n)/trsum2(n),kind=4)
                   else
                      trsum2(n) = 1.0d0
@@ -2019,7 +2023,7 @@ contains
                kend = km
                do j=jfirstxy,jlastxy
                   do i=ifirstxy,ilastxy
-                     if (tropp3(i,j) .NE. MAPL_UNDEF) then
+                     if (tropp3(i,j) .ne. MAPL_UNDEFINED_REAL) then
                         kend = 1
                         do while (vars%pe(i,j,kend).LE.tropp3(i,j))
                            kend = kend+1
@@ -2898,6 +2902,8 @@ contains
          integer, parameter :: iapproach=2 ! handle pressure more carefully
          logical :: do_remap, remap_all_tracers
 
+         call logger%info("Run::dump_n_splash_:: Starting...")
+
          do_remap = (cremap=="yes" .or. cremap=="YES")
          remap_all_tracers = (tremap=="yes" .or. tremap=="YES")
          nq3d=2 ! this routine only updates QV and OX
@@ -2931,9 +2937,7 @@ contains
             ana_u = vars%u(grid%is:grid%ie,grid%js:grid%je,1:km)
             ana_v = vars%v(grid%is:grid%ie,grid%js:grid%je,1:km)
          else if(iwind==1) then
-            status=1
-            call WRITE_PARALLEL('cannot handle single wind component')
-            _VERIFY(STATUS)
+            _FAIL("cannot handle single wind component")
          else if (iwind==2) then
 #ifdef INC_WINDS
             if (iapproach==1) then
@@ -2941,11 +2945,11 @@ contains
                allocate(cubeTEMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
                allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
 #ifdef SCALAR_WINDS
-               call WRITE_PARALLEL('Replaying winds as scalars')
+               call logger%info("Run::dump_n_splash_:: Replaying winds as scalars")
                call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
                call l2c%regrid(YTMP3d, cubeVTMP3D, _RC)
 #else
-               call WRITE_PARALLEL('Replaying winds')
+               call logger%info("Run::dump_n_splash_:: Replaying winds")
                call l2c%regrid(XTMP3d, YTMP3d, cubeTEMP3d, cubeVTMP3d, rc=status)
 #endif /* SCALAR_WINDS */
                allocate( UAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
@@ -2978,7 +2982,7 @@ contains
                UAtmpR4 = XTMP3d-UAtmpR4
                UAtmpR4 = VTMP3d-VAtmpR4
                ! convert the lat-lon A-grid wind increment back to the cubed
-               call WRITE_PARALLEL('Replaying winds')
+               call logger%info("Run::dump_n_splash_:: Replaying winds")
                call l2c%regrid(UAtmpR4, VAtmpR4, cubeTEMP3d, cubeVTMP3d, _RC)
                ! convert cubed wind increment to D-grid
                allocate( UDtmp(grid%is:grid%ie  ,grid%js:grid%je+1,km) )
@@ -3009,7 +3013,7 @@ contains
          ! PE or PS
          if( trim(dpname).ne.'NULL' ) then
             call ESMFL_BundleGetPointerToData(ana_bundle, trim(dpname), XTMP3d, _RC)
-            call WRITE_PARALLEL('Replaying '//trim(dpname))
+            call logger%info("Run::dump_n_splash_:: Replaying "//trim(dpname))
             if ( iapproach == 1 ) then ! convert lat-lon delp to cubed and proceed
                allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
                call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
@@ -3047,7 +3051,7 @@ contains
          else
             if( trim(psname).ne.'NULL' ) then
                call ESMFL_BundleGetPointerToData(ana_bundle, trim(psname), XTMP2D, _RC)
-               call WRITE_PARALLEL('Replaying '//trim(psname))
+               call logger%info("Run::dump_n_splash_:: Replaying "//trim(psname))
                allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
                allocate(     aux3D(size(XTMP2d ,1),size(XTMP2d ,2),1))
                if ( iapproach == 1 ) then ! convert lat-lon delp to cubed and proceed
@@ -3128,7 +3132,7 @@ contains
             call ESMFL_BundleGetPointerToData(ana_bundle, trim(qname), XTMP3d, _RC)
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
-            call WRITE_PARALLEL('Replaying '//trim(qname))
+            call logger%info("Run::dump_n_splash_:: Replaying "//trim(qname))
             if( qqq%is_r4 ) then
                qqq%content_r4 = max(0.,cubeTEMP3D)
             else
@@ -3147,7 +3151,7 @@ contains
             call ESMFL_BundleGetPointerToData(ana_bundle, trim(tname), XTMP3d, _RC)
             allocate(cubeTEMP3D(size(ana_thv,1),size(ana_thv,2),km))
             call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
-            call WRITE_PARALLEL('Replaying '//trim(tname)// '; treated as '//trim(tvar))
+            call logger%info("Run::dump_n_splash_:: Replaying "//trim(tname)// '; treated as '//trim(tvar))
             if( trim(tvar).eq.'THETAV' ) ana_thv = cubeTEMP3D
             if( trim(tvar).eq.'TV'     ) ana_thv = cubeTEMP3D/ana_pkz
             if( trim(tvar).eq.'THETA' .or. &
@@ -3180,7 +3184,8 @@ contains
          deallocate( ana_pkxy    )
          deallocate( ana_thv     )
 
-         call WRITE_PARALLEL('Dump_n_Splash Replay Done')
+         call logger%info("Run::dump_n_splash_:: ...complete")
+
       end subroutine dump_n_splash_
 
       subroutine incremental_
@@ -3223,11 +3228,9 @@ contains
               trim(o3name).ne.'NULL'.and. &
               trim(tname ).ne.'NULL'.and.trim(qname ).ne.'NULL'
          if(.not.allhere) then
-            call WRITE_PARALLEL('Not all varibles needed for replay are available')
-            status = 999
-            _VERIFY(status)
+            _FAIL("Not all varibles needed for replay are available")
          endif
-         call WRITE_PARALLEL('Starting incremental replay')
+         call logger%info("Run::incremental_:: Starting...")
 
          ! U
          iwind=0
@@ -4240,9 +4243,9 @@ contains
 #endif
 
             if(associated(temp2d)) temp2d = slp
-            if(associated(ztemp1)) where( ztemp1.eq.MAPL_UNDEF ) ztemp1 = H1000
-            if(associated(ztemp2)) where( ztemp2.eq.MAPL_UNDEF ) ztemp2 = H850
-            if(associated(ztemp3)) where( ztemp3.eq.MAPL_UNDEF ) ztemp3 = H500
+            if(associated(ztemp1)) where( ztemp1.eq.MAPL_UNDEFINED_REAL ) ztemp1 = H1000
+            if(associated(ztemp2)) where( ztemp2.eq.MAPL_UNDEFINED_REAL ) ztemp2 = H850
+            if(associated(ztemp3)) where( ztemp3.eq.MAPL_UNDEFINED_REAL ) ztemp3 = H500
             deallocate(slp,H1000,H850,H500)
          end if
 
@@ -4890,7 +4893,7 @@ contains
 
       _ASSERT(edge .or. size(v3,3)==km,'needs informative message')
 
-      v2   = MAPL_UNDEF
+      v2 = MAPL_UNDEFINED_REAL
 
       if(EDGE) then
          pb   = ple(:,:,km+1)
@@ -4970,9 +4973,9 @@ contains
       real(REAL4), pointer :: lons(:,:), lats(:,:)
 
       integer :: i, j, k, n, L
-      ! integer :: IS, IE, JS, JE, KS, KE, IM, JM, KM, LS
       integer :: is, ie, js, je, ks, ke, im, jm, km, ls
       integer :: case_id, case_rotation, case_tracers
+      integer :: num_levels
 
       real :: T0
       real(REAL8) :: dummy_1, dummy_2, dummy_3, dummy_4, dummy_5, dummy_6
@@ -4995,10 +4998,10 @@ contains
       real(REAL4), pointer :: tracer(:,:,:)
       real(REAL8), allocatable :: Q5(:,:,:)
       real(REAL8), allocatable :: Q6(:,:,:)
+      type(ESMF_Geom) :: geom
       type(ESMF_Grid) :: esmfgrid
       type(ESMF_FieldBundle) :: tradv_bundle
-      character(len=ESMF_MAXSTR) :: fieldname
-      character(len=ESMF_MAXSTR) :: string
+      character(len=ESMF_MAXSTR) :: fieldname, string
       real(REAL8), parameter :: r0_6=0.6
       real(REAL8), parameter :: r1_0=1.0
 
@@ -5007,9 +5010,9 @@ contains
 
       call MAPL_GridCompGetResource(gc, "T0", T0, default=273., _RC)
       call MAPL_GridCompGetInternalState(gc, internal, _RC)
+
       call MAPL_GridCompGet(gc, grid=esmfgrid, _RC)
       call MAPL_GridGet(esmfgrid, latitudes=lats, longitudes=lons, _RC)
-
       if (FV_Atm(1)%flagstruct%grid_type == 4) then
          ! Doubly-Period setup based on first LAT/LON coordinate
          lons(:,:) =  0.0
@@ -5346,19 +5349,19 @@ contains
          ! Parse Tracers
          if (FV3_STANDALONE /= 0) then
             call ESMF_StateGet(import, "TRADV", tradv_bundle, _RC)
-            call MAPL_GridCompGet(gc, grid=esmfgrid, _RC)
+            call MAPL_GridCompGet(gc, geom=geom, num_levels=num_levels, _RC)
 
             allocate(tracer(is:ie, js:je, 1:KM), _STAT)
             tracer(:,:,:)  = 0.0
             fieldname = 'Q'
-            call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
+            call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
 
             if (case_tracers /= 1234) then
 
                do n=1,case_tracers
                   tracer(:,:,:) = 0.0
                   write(fieldname, "('Q',i3.3)") n
-                  call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
+                  call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
                enddo
 
             else
@@ -5379,7 +5382,7 @@ contains
                   enddo
                enddo
                fieldname = 'Q1'
-               call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
+               call addTracer(self, tradv_bundle, tracer, geom, num_Levels, fieldname)
 
                !-------------------
                !     tracer q2
@@ -5396,7 +5399,7 @@ contains
                   enddo
                enddo
                fieldname = 'Q2'
-               call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
+               call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
 
                !-------------------
                !     tracer q3
@@ -5413,14 +5416,14 @@ contains
                   enddo
                enddo
                fieldname = 'Q3'
-               call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
+               call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
 
                !-------------------
                !     tracer q4
                !-------------------
                tracer(:,:,:)  = 1.0_r4
                fieldname = 'Q4'
-               call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
+               call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
 
                !-------------------
                !     tracer q5
@@ -5428,7 +5431,7 @@ contains
                if (allocated(Q5)) then
                   tracer(:,:,:)  = Q5(:,:,:)
                   fieldname = 'Q5'
-                  call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
+                  call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
                   deallocate(Q5, _STAT)
                endif
 
@@ -5438,7 +5441,7 @@ contains
                if (allocated(Q6)) then
                   tracer(:,:,:)  = Q6(:,:,:)
                   fieldname = 'Q6'
-                  call addTracer(self, tradv_bundle, tracer, esmfgrid, fieldname)
+                  call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
                   deallocate(Q6, _STAT)
                endif
 
@@ -5747,34 +5750,37 @@ contains
    end subroutine set_eta
 #endif
 
-   subroutine addTracer_r8(self, bundle, var, grid, fieldname)
+   subroutine addTracer_r8(self, bundle, var, geom, num_levels, fieldname, rc)
       type(DynState), pointer :: self
       type(ESMF_FieldBundle) :: bundle
-      real(r8), pointer :: var(:, :, :)
-      type(ESMF_Grid) :: grid
-      type(ESMF_DistGrid) :: dist_grid
-      character(len=ESMF_MAXSTR) :: fieldname
+      real(r8), pointer :: var(:,:,:)
+      type(ESMF_Geom), intent(in) :: geom
+      integer, intent(in) :: num_levels
+      character(len=*), intent(in) :: fieldname
+      integer, optional, intent(out) :: rc
 
-      integer :: nq,rc,status
+      integer :: nq, status
       type(DynTracers), pointer :: t(:)
       type(ESMF_Field) :: field
-      real(r8), pointer :: ptr(:, :, :)
+      real(r8), pointer :: ptr(:,:,:)
 
-      call ESMF_GridGet(grid, distGrid=dist_grid, _RC)
       call ESMF_FieldBundleGet(bundle, fieldCount=nq, _RC)
-
       nq = nq + 1
 
-      field = ESMF_FieldCreate(grid, var, datacopyflag=ESMF_DATACOPY_VALUE, name=fieldname, _RC)
-      ! pchakrab - TODO: Need to replace MAPL_VLocationCenter with VERTICAL_STAGGER_CENTER
-      ! pchakrab - TODO: need a replacement for MAPL_DimsHorzVert
-      ! call ESMF_AttributeSet(field, name='VLOCATION', value=MAPL_VLocationCenter, _RC)
-      ! call ESMF_AttributeSet(field, name='DIMS', value=MAPL_DimsHorzVert, rc=status)
-      call MAPL_FieldBundleAdd(bundle, field, _RC)
+      field = MAPL_FieldCreate( &
+           geom, typekind=ESMF_TYPEKIND_R8, &
+           name=fieldname, &
+           num_levels=num_levels, &
+           vert_staggerloc=VERTICAL_STAGGER_CENTER, &
+           units="unknown_units", &
+           standard_name="unknown_standard_name", &
+           long_name="unknown_long_name", _RC)
+      call ESMF_FieldGet(field, localDE=0, farrayPtr=ptr, _RC)
+      ptr = var
+      call MAPL_FieldBundleAdd(bundle, [field], _RC)
 
       if (nq == 1) then
          allocate(self%vars%tracer(nq), _STAT)
-         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
          self%vars%tracer(nq)%content => ptr
          self%vars%tracer(nq)%is_r4 = .false.
       else
@@ -5782,9 +5788,8 @@ contains
          t(1:nq-1) = self%vars%tracer
          deallocate(self%vars%tracer)
          self%vars%tracer => t
-         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
          self%vars%tracer(nq)%content => ptr
-         self%vars%tracer(nq  )%is_r4 = .false.
+         self%vars%tracer(nq)%is_r4 = .false.
       endif
 
       self%grid%nq = nq
@@ -5792,34 +5797,37 @@ contains
       _RETURN(_SUCCESS)
    end subroutine addTracer_r8
 
-   subroutine addTracer_r4(self, bundle, var, grid, fieldname)
+   subroutine addTracer_r4(self, bundle, var, geom, num_levels, fieldname, rc)
       type(DynState), pointer :: self
       type(ESMF_FieldBundle) :: bundle
-      real(r4), pointer :: var(:, :, :)
-      type(ESMF_Grid) :: grid
-      type(ESMF_DistGrid) :: dist_grid
-      character(len=ESMF_MAXSTR) :: fieldname
+      real(r4), pointer :: var(:,:,:)
+      type(ESMF_Geom), intent(in) :: geom
+      integer, intent(in) :: num_levels
+      character(len=*), intent(in) :: fieldname
+      integer, optional, intent(out) :: rc
 
-      integer :: nq,rc,status
+      integer :: nq, status
       type(DynTracers), pointer :: t(:)
       type(ESMF_Field) :: field
       real(r4), pointer :: ptr(:, :, :)
 
-      call ESMF_GridGet(grid, distGrid=dist_grid, _RC)
-      call ESMF_FieldBundleGet(bundle, fieldCount=NQ, _RC)
-
+      call ESMF_FieldBundleGet(bundle, fieldCount=nq, _RC)
       nq = nq + 1
 
-      field = ESMF_FieldCreate(grid, var, datacopyflag=ESMF_DATACOPY_VALUE, name=fieldname, _RC)
-      ! pchakrab - TODO: Need to replace MAPL_VLocationCenter with VERTICAL_STAGGER_CENTER
-      ! pchakrab - TODO: need a replacement for MAPL_DimsHorzVert
-      ! call ESMF_AttributeSet(field, name='VLOCATION', value=MAPL_VLocationCenter, _RC)
-      ! call ESMF_AttributeSet(field, name='DIMS', value=MAPL_DimsHorzVert, _RC)
-      call MAPL_FieldBundleAdd(bundle, field, _RC)
+      field = MAPL_FieldCreate( &
+           geom, typekind=ESMF_TYPEKIND_R4, &
+           name=fieldname, &
+           num_levels=num_levels, &
+           vert_staggerloc=VERTICAL_STAGGER_CENTER, &
+           units="unknown_units", &
+           standard_name="unknown_standard_name", &
+           long_name="unknown_long_name", _RC)
+      call ESMF_FieldGet(field, localDE=0, farrayPtr=ptr, _RC)
+      ptr = var
+      call MAPL_FieldBundleAdd(bundle, [field], _RC)
 
-      if (NQ == 1) then
+      if (nq == 1) then
          allocate(self%vars%tracer(nq), _STAT)
-         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
          self%vars%tracer(nq)%content_r4 => ptr
          self%vars%tracer(nq)%is_r4 = .true.
       else
@@ -5827,9 +5835,8 @@ contains
          t(1:nq-1) = self%vars%tracer
          deallocate(self%vars%tracer)
          self%vars%tracer => t
-         call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
          self%vars%tracer(nq)%content_r4 => ptr
-         self%vars%tracer(nq  )%is_r4 = .true.
+         self%vars%tracer(nq)%is_r4 = .true.
       endif
 
       self%grid%nq = nq
