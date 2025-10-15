@@ -111,24 +111,17 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
     SRCS ${srcs}
     SUBCOMPONENTS fvdycore
     DEPENDENCIES ${dependencies}
-    DEPENDENCIES ${GFDL}
+    DEPENDENCIES FMS::fms
     DEPENDENCIES geos_gtfv3_interface_py) # Make the main library depend on the Python library
 else ()
   esma_add_library (${this}
     SRCS ${srcs}
     SUBCOMPONENTS fvdycore
     DEPENDENCIES ${dependencies}
-    DEPENDENCIES ${GFDL})
+    DEPENDENCIES FMS::fms)
 endif ()
 
-if (FV_PRECISION STREQUAL R4)
-  set (GFDL FMS::fms_r4)
-elseif (FV_PRECISION STREQUAL R4R8) # FV is R4 but FMS is R8
-  get_target_property (extra_incs FMS::fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
-  target_include_directories(${this} PRIVATE $<BUILD_INTERFACE:${extra_incs}>)
-  set (GFDL FMS::fms_r8)
-elseif (FV_PRECISION STREQUAL R8)
-  set (GFDL FMS::fms_r8)
+if (FV_PRECISION STREQUAL R8)
   string(REPLACE " " ";" tmp ${FREAL8})
   foreach(flag ${tmp})
     target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
@@ -136,8 +129,6 @@ elseif (FV_PRECISION STREQUAL R8)
 endif ()
 
 if (FV_PRECISION MATCHES R4)
-  target_compile_definitions (${this} PRIVATE -DSINGLE_FV -DOVERLOAD_R4)
-elseif (FV_PRECISION MATCHES R4R8) # FV is R4 but FMS is R8
   target_compile_definitions (${this} PRIVATE -DSINGLE_FV -DOVERLOAD_R4)
 endif ()
 

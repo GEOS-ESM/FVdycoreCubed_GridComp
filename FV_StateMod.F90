@@ -604,42 +604,42 @@ contains
           FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1120) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  90.0 )
           FV_Atm(1)%flagstruct%tau = 2.5
           FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
           FV_Atm(1)%flagstruct%tau = 2.0
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0  )
           FV_Atm(1)%flagstruct%tau = 1.5
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
           FV_Atm(1)%flagstruct%tau = 1.0
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.5   )
           FV_Atm(1)%flagstruct%tau = 1.0
           FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 10800) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
+          FV_Atm(1)%flagstruct%hydrostatic = .false.
                                                     FV_Atm(1)%flagstruct%k_split = CEILING(DT/  4.6875 )
           if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  3.25   )
           FV_Atm(1)%flagstruct%tau = 1.0
@@ -668,7 +668,7 @@ contains
       FV_Atm(1)%flagstruct%a_imp = 1.0
      ! dz_min is a NH delta-z limiter increasing may improve stability
       FV_Atm(1)%flagstruct%dz_min = 2.0
-     ! p_fac is a NH pressure fraction limiter near model top (0:0.25) 
+     ! p_fac is a NH pressure fraction limiter near model top (0:0.25)
       FV_Atm(1)%flagstruct%p_fac = 0.05
      ! General defaults
       FV_Atm(1)%flagstruct%make_nh = .false.
@@ -4037,7 +4037,11 @@ subroutine fv_getDivergence(uc, vc, divg)
 end subroutine fv_getDivergence
 
 subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
+#if defined (SINGLE_FV)
+   use constantsr4_mod, only: fms_grav=>grav
+#else
    use constants_mod, only: fms_grav=>grav
+#endif
 ! made this REAL4
    real(REAL4), intent(OUT) ::  uh25(:,:)
    real(REAL4), intent(OUT) ::  uh03(:,:)

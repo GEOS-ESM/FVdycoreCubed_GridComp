@@ -1,7 +1,11 @@
       PROGRAM CreateTopography
 
       use ESMF
-      use constants_mod,  only: pi, grav
+#if defined (SINGLE_FV)
+      use constantsr4_mod, only: pi, grav
+#else
+      use constants_mod, only: pi, grav
+#endif
 
 ! Shared Utilities
       use fms_mod,        only: fms_init, fms_end

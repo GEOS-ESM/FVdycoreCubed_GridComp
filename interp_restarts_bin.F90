@@ -21,7 +21,12 @@ program interp_restarts
    use fv_regridding_utils
    use fv_grid_utils_mod, only: ptop_min
    use init_hydro_mod, only: p_var
-   use constants_mod,  only: pi, omega, grav, kappa, rdgas, rvgas, cp_air
+#if defined (SINGLE_FV)
+   use constantsr4_mod,    &
+#else
+   use constants_mod,      &
+#endif
+                       only: pi, omega, grav, kappa, rdgas, rvgas, cp_air
    use fv_diagnostics_mod,only: prt_maxmin
 ! use fv_eta_mod,     only: set_eta
    use m_set_eta,     only: set_eta
