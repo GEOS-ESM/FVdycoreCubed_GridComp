@@ -17,6 +17,7 @@ module FV_StateMod
 
    use mapl3g_generic, only: MAPL_GridCompGetResource, MAPL_GridCompGet, MAPL_GridCompGetInternalState
    use mapl3g_Geom_API, only: MAPL_GridGet
+   use mapl3g_State_API, only: MAPL_StateGetPointer
 #endif
    use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
    use MAPL_ConstantsMod, only: MAPL_KAPPA, MAPL_PI_R8, MAPL_ALHL, MAPL_PSDRY, MAPL_OMEGA
@@ -800,15 +801,15 @@ contains
 
       ! Get pointers to internal state vars
       call MAPL_GridCompGetInternalState(gc, internal, _RC)
-      call MAPL_GetPointer(internal, ak1, "AK", _RC) ! 1-based
-      call MAPL_GetPointer(internal, bk1, "BK", _RC) ! 1-based
-      call MAPL_GetPointer(internal, u, "U", _RC) ! A-Grid U Wind
-      call MAPL_GetPointer(internal, v, "V", _RC)
-      call MAPL_GetPointer(internal, pt, "PT", _RC)
-      call MAPL_GetPointer(internal, pe, "PE", _RC) ! 1-based
-      call MAPL_GetPointer(internal, pkz, "PKZ", _RC)
-      call MAPL_GetPointer(internal, dz, "DZ", _RC)
-      call MAPL_GetPointer(internal, w, "W", _RC)
+      call MAPL_StateGetPointer(internal, ak1, "AK", _RC) ! 1-based
+      call MAPL_StateGetPointer(internal, bk1, "BK", _RC) ! 1-based
+      call MAPL_StateGetPointer(internal, u, "U", _RC) ! A-Grid U Wind
+      call MAPL_StateGetPointer(internal, v, "V", _RC)
+      call MAPL_StateGetPointer(internal, pt, "PT", _RC)
+      call MAPL_StateGetPointer(internal, pe, "PE", _RC) ! 1-based
+      call MAPL_StateGetPointer(internal, pkz, "PKZ", _RC)
+      call MAPL_StateGetPointer(internal, dz, "DZ", _RC)
+      call MAPL_StateGetPointer(internal, w, "W", _RC)
       ! Ak and BK are expected to be 0-based
       block
          integer :: km
@@ -927,13 +928,13 @@ contains
            enabled=.true., &
            sticky=.false., _RC)
 
-      call MAPL_GetPointer(import, phis, 'PHIS', _RC)
+      call MAPL_StateGetPointer(import, phis, 'PHIS', _RC)
 
       ! Set FV3 surface geopotential
       FV_Atm(1)%phis(isc:iec, jsc:jec) = real(phis, kind=REAL8)
       call mpp_update_domains(FV_Atm(1)%phis, FV_Atm(1)%domain, complete=.true.)
 
-      call MAPL_GetPointer(import, varflt, 'VARFLT', _RC)
+      call MAPL_StateGetPointer(import, varflt, 'VARFLT', _RC)
       FV_Atm(1)%varflt(isc:iec,jsc:jec) = varflt
 
       FV_Atm(1)%ak = ak
@@ -1884,15 +1885,15 @@ contains
          allocate ( vdt(isc:iec,jsc:jec,npz) )
          ! go from native D-Grid tendencies to A-grid rotated exports
          call fv_getAllWinds(u_dt, v_dt, ur=udt, vr=vdt)
-         call MAPL_GetPointer(export, ptr3d, "DUDT_RAY", _RC)
+         call MAPL_StateGetPointer(export, ptr3d, "DUDT_RAY", _RC)
          if( associated(ptr3d) ) ptr3d = udt
-         call MAPL_GetPointer(export, ptr3d, "DVDT_RAY", _RC)
+         call MAPL_StateGetPointer(export, ptr3d, "DVDT_RAY", _RC)
          if( associated(ptr3d) ) ptr3d = vdt
          deallocate ( udt )
          deallocate ( vdt )
-         call MAPL_GetPointer(export, ptr3d, "DTDT_RAY", _RC)
+         call MAPL_StateGetPointer(export, ptr3d, "DTDT_RAY", _RC)
          if( associated(ptr3d) ) ptr3d = t_dt
-         call MAPL_GetPointer(export, ptr3d, "DWDT_RAY", _RC)
+         call MAPL_StateGetPointer(export, ptr3d, "DWDT_RAY", _RC)
          if( associated(ptr3d) ) ptr3d = w_dt
 
          if ( FV_Atm(1)%flagstruct%fv_sg_adj > 0 ) then
@@ -1908,13 +1909,13 @@ contains
                  FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%flagstruct%hydrostatic, &
                  FV_Atm(1)%w, FV_Atm(1)%delz, u_dt, v_dt, t_dt, w_dt, &
                  FV_Atm(1)%flagstruct%n_zfilter)
-            call MAPL_GetPointer(export, ptr3d, "DUDTSUBZ", _RC)
+            call MAPL_StateGetPointer(export, ptr3d, "DUDTSUBZ", _RC)
             if( associated(ptr3d) ) ptr3d = u_dt
-            call MAPL_GetPointer(export, ptr3d, "DVDTSUBZ", _RC)
+            call MAPL_StateGetPointer(export, ptr3d, "DVDTSUBZ", _RC)
             if( associated(ptr3d) ) ptr3d = v_dt
-            call MAPL_GetPointer(export, ptr3d, "DTDTSUBZ", _RC)
+            call MAPL_StateGetPointer(export, ptr3d, "DTDTSUBZ", _RC)
             if( associated(ptr3d) ) ptr3d = t_dt
-            call MAPL_GetPointer(export, ptr3d, "DWDTSUBZ", _RC)
+            call MAPL_StateGetPointer(export, ptr3d, "DWDTSUBZ", _RC)
             if( associated(ptr3d) ) ptr3d = w_dt
          endif
          deallocate ( u_dt )

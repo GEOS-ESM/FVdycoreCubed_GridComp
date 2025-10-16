@@ -25,7 +25,7 @@ module FVdycoreCubed_GridComp
 
    use ESMFL_Mod, only: ESMFL_StateGetPointerToData, ESMFL_BundleGetPointerToData, MAPL_AreaMean
 
-   use MAPL_GenericMod, only: MAPL_TimerAdd
+   ! use MAPL_GenericMod, only: MAPL_TimerAdd
    use MAPL_AbstractRegridderMod, only: AbstractRegridder
    use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
    use MAPL_BaseMod, only: MAPL_AttributeSet, MAPL_RemapBounds
@@ -392,20 +392,20 @@ contains
       !     6 ints: YYYY MM DD H M S
       !     5 ints: I,J,K, KS (num true pressure levels), NQ (num tracers) headers
 
-      ! Set the Profiling timers
-      call MAPL_TimerAdd(gc, name="INITIALIZE", _RC)
-      call MAPL_TimerAdd(gc, name="RUN", _RC)
-      call MAPL_TimerAdd(gc, name="RUN2", _RC)
-      call MAPL_TimerAdd(gc, name="-DYN_INIT", _RC)
-      call MAPL_TimerAdd(gc, name="--FMS_INIT", _RC)
-      call MAPL_TimerAdd(gc, name="--FV_INIT", _RC)
-      call MAPL_TimerAdd(gc, name="-DYN_ANA", _RC)
-      call MAPL_TimerAdd(gc, name="-DYN_PROLOGUE", _RC)
-      call MAPL_TimerAdd(gc, name="-DYN_CORE", _RC)
-      call MAPL_TimerAdd(gc, name="-DYN_EPILOGUE", _RC)
-      call MAPL_TimerAdd(gc, name="--FV_DYNAMICS", _RC)
-      call MAPL_TimerAdd(gc, name="--MASS_FIX", _RC)
-      call MAPL_TimerAdd(gc, name="FINALIZE", _RC)
+      ! ! Set the Profiling timers
+      ! call MAPL_TimerAdd(gc, name="INITIALIZE", _RC)
+      ! call MAPL_TimerAdd(gc, name="RUN", _RC)
+      ! call MAPL_TimerAdd(gc, name="RUN2", _RC)
+      ! call MAPL_TimerAdd(gc, name="-DYN_INIT", _RC)
+      ! call MAPL_TimerAdd(gc, name="--FMS_INIT", _RC)
+      ! call MAPL_TimerAdd(gc, name="--FV_INIT", _RC)
+      ! call MAPL_TimerAdd(gc, name="-DYN_ANA", _RC)
+      ! call MAPL_TimerAdd(gc, name="-DYN_PROLOGUE", _RC)
+      ! call MAPL_TimerAdd(gc, name="-DYN_CORE", _RC)
+      ! call MAPL_TimerAdd(gc, name="-DYN_EPILOGUE", _RC)
+      ! call MAPL_TimerAdd(gc, name="--FV_DYNAMICS", _RC)
+      ! call MAPL_TimerAdd(gc, name="--MASS_FIX", _RC)
+      ! call MAPL_TimerAdd(gc, name="FINALIZE", _RC)
 
       ! Register services for this component
       call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Initialize,  Initialize, _RC)
@@ -507,25 +507,25 @@ contains
       ! call MAPL_TimerOff(MAPL, "-DYN_INIT")
 
       ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
-      call MAPL_GetPointer(export, ak4, "AK", _RC)
-      call MAPL_GetPointer(export, bk4, "BK", _RC)
-      call MAPL_GetPointer(internal, ak, "AK", _RC)
-      call MAPL_GetPointer(internal, bk, "BK", _RC)
-      call MAPL_GetPointer(export, pref, "PREF", ALLOC=.true., _RC)
+      call MAPL_StateGetPointer(export, ak4, "AK", _RC)
+      call MAPL_StateGetPointer(export, bk4, "BK", _RC)
+      call MAPL_StateGetPointer(internal, ak, "AK", _RC)
+      call MAPL_StateGetPointer(internal, bk, "BK", _RC)
+      call MAPL_GetPointer(export, pref, "PREF", alloc=.true., _RC)
       ak4 = ak
       bk4 = bk
       pref = ak + bk * P00
 
-      call MAPL_GetPointer(internal, ud, "U", _RC)
-      call MAPL_GetPointer(internal, vd, "V", _RC)
-      call MAPL_GetPointer(internal, pe, "PE", _RC)
-      call MAPL_GetPointer(internal, pt, "PT", _RC)
-      call MAPL_GetPointer(internal, pk, "PKZ", _RC)
+      call MAPL_StateGetPointer(internal, ud, "U", _RC)
+      call MAPL_StateGetPointer(internal, vd, "V", _RC)
+      call MAPL_StateGetPointer(internal, pe, "PE", _RC)
+      call MAPL_StateGetPointer(internal, pt, "PT", _RC)
+      call MAPL_StateGetPointer(internal, pk, "PKZ", _RC)
 
-      call MAPL_GetPointer(export, ple, "PLE", ALLOC=.true., _RC)
-      call MAPL_GetPointer(export, u, "U", ALLOC=.true., _RC)
-      call MAPL_GetPointer(export, v, "V", ALLOC=.true., _RC)
-      call MAPL_GetPointer(export, t, "T", ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, ple, "PLE", alloc=.true., _RC)
+      call MAPL_GetPointer(export, u, "U", alloc=.true., _RC)
+      call MAPL_GetPointer(export, v, "V", alloc=.true., _RC)
+      call MAPL_GetPointer(export, t, "T", alloc=.true., _RC)
 
       ! Create A-Grid Winds
       ifirst = self%grid%is
@@ -544,13 +544,13 @@ contains
       deallocate(ur, vr)
 
       ! Fill Grid-Cell Area Delta-X/Y
-      call MAPL_GetPointer(export, temp2d, "DXC", ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, temp2d, "DXC", alloc=.true., _RC)
       temp2d = self%grid%dxc
 
-      call MAPL_GetPointer(export, temp2d, "DYC", ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, temp2d, "DYC", alloc=.true., _RC)
       temp2d = self%grid%dyc
 
-      call MAPL_GetPointer(export, temp2d, "AREA", ALLOC=.true., _RC)
+      call MAPL_GetPointer(export, temp2d, "AREA", alloc=.true., _RC)
       temp2d = self%grid%area
 
       ! ======================================================================
@@ -561,6 +561,7 @@ contains
       !     would be to move the computation to phase 2 of Initialize and
       !     eliminate this section alltogether
       ! ======================================================================
+      ! pchakrab: TODO - do we need to port the following to MAPL3
       call ESMF_StateGet(export, "PREF", field, _RC)
       call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
 
@@ -831,9 +832,9 @@ contains
       ! call MAPL_TimerOn(MAPL, "RUN")
 
       call MAPL_GridGet(esmfgrid, longitudes=lons, latitudes=lats, _RC)
-      call MAPL_GetPointer(export, temp2d, "LONS", _RC)
+      call MAPL_StateGetPointer(export, temp2d, "LONS", _RC)
       if( associated(temp2D) ) temp2d = lons
-      call MAPL_GetPointer(export, temp2d, "LATS", _RC)
+      call MAPL_StateGetPointer(export, temp2d, "LATS", _RC)
       if( associated(temp2D) ) temp2d = lats
 
       ! Retrieve the pointer to the internal state
@@ -883,17 +884,17 @@ contains
       allocate(  dmdt(ifirstxy:ilastxy,jfirstxy:jlastxy     ))
 
       doEnergetics=.false.
-      call MAPL_GetPointer(export, temp2D, "KEANA", _RC)
+      call MAPL_StateGetPointer(export, temp2D, "KEANA", _RC)
       if(associated(temp2D)) doEnergetics=.true.
-      call MAPL_GetPointer(export, temp2D, "PEANA", _RC)
+      call MAPL_StateGetPointer(export, temp2D, "PEANA", _RC)
       if(associated(temp2D)) doEnergetics=.true.
-      call MAPL_GetPointer(export, temp2D, "TEANA", _RC)
+      call MAPL_StateGetPointer(export, temp2D, "TEANA", _RC)
       if(associated(temp2D)) doEnergetics=.true.
-      call MAPL_GetPointer(export, temp2D, "KEDYN", _RC)
+      call MAPL_StateGetPointer(export, temp2D, "KEDYN", _RC)
       if(associated(temp2D)) doEnergetics=.true.
-      call MAPL_GetPointer(export, temp2D, "PEDYN", _RC)
+      call MAPL_StateGetPointer(export, temp2D, "PEDYN", _RC)
       if(associated(temp2D)) doEnergetics=.true.
-      call MAPL_GetPointer(export, temp2D, "TEDYN", _RC)
+      call MAPL_StateGetPointer(export, temp2D, "TEDYN", _RC)
       if(associated(temp2D)) doEnergetics=.true.
       if (doEnergetics) then
          allocate( kedyn(ifirstxy:ilastxy,jfirstxy:jlastxy))
@@ -1050,7 +1051,7 @@ contains
       endif
 
       ! Surface Geopotential from import state
-      call MAPL_GetPointer(import, PHIS, "PHIS", _RC)
+      call MAPL_StateGetPointer(import, PHIS, "PHIS", _RC)
 
       phisxy = real(phis,kind=r8)
 
@@ -1226,13 +1227,13 @@ contains
          allocate(  qsold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
          allocate(  qgold(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
 
-         call MAPL_GetPointer(import, dqvana, "DQVANA", _RC)   ! Get QV Increment from Analysis
-         call MAPL_GetPointer(import, dqlana, "DQLANA", _RC)   ! Get QL Increment from Analysis
-         call MAPL_GetPointer(import, dqiana, "DQIANA", _RC)   ! Get QI Increment from Analysis
-         call MAPL_GetPointer(import, dqrana, "DQRANA", _RC)   ! Get QR Increment from Analysis
-         call MAPL_GetPointer(import, dqsana, "DQSANA", _RC)   ! Get QS Increment from Analysis
-         call MAPL_GetPointer(import, dqgana, "DQGANA", _RC)   ! Get QG Increment from Analysis
-         call MAPL_GetPointer(import, doxana, "DOXANA", _RC)   ! Get OX Increment from Analysis
+         call MAPL_StateGetPointer(import, dqvana, "DQVANA", _RC)   ! Get QV Increment from Analysis
+         call MAPL_StateGetPointer(import, dqlana, "DQLANA", _RC)   ! Get QL Increment from Analysis
+         call MAPL_StateGetPointer(import, dqiana, "DQIANA", _RC)   ! Get QI Increment from Analysis
+         call MAPL_StateGetPointer(import, dqrana, "DQRANA", _RC)   ! Get QR Increment from Analysis
+         call MAPL_StateGetPointer(import, dqsana, "DQSANA", _RC)   ! Get QS Increment from Analysis
+         call MAPL_StateGetPointer(import, dqgana, "DQGANA", _RC)   ! Get QG Increment from Analysis
+         call MAPL_StateGetPointer(import, doxana, "DOXANA", _RC)   ! Get OX Increment from Analysis
 
          QL = 0.0
          QI = 0.0
@@ -1295,23 +1296,23 @@ contains
          end if
 
          ! DUDTANA
-         call MAPL_GetPointer(export, dudtana, "DUDTANA", _RC)
+         call MAPL_StateGetPointer(export, dudtana, "DUDTANA", _RC)
          if( associated(dudtana) ) dudtana = ur
 
          ! DVDTANA
-         call MAPL_GetPointer(export, dvdtana, "DVDTANA", _RC)
+         call MAPL_StateGetPointer(export, dvdtana, "DVDTANA", _RC)
          if( associated(dvdtana) ) dvdtana = vr
 
          ! DTDTANA
-         call MAPL_GetPointer(export, dtdtana, "DTDTANA", _RC)
+         call MAPL_StateGetPointer(export, dtdtana, "DTDTANA", _RC)
          if( associated(dtdtana) ) dtdtana = vars%pt * vars%pkz
 
          ! DDELPDTANA
-         call MAPL_GetPointer(export, ddpdtana, "DDELPDTANA", _RC)
+         call MAPL_StateGetPointer(export, ddpdtana, "DDELPDTANA", _RC)
          if( associated(ddpdtana) ) ddpdtana = delp
 
          ! DTHVDTANAINT
-         call MAPL_GetPointer(export, temp2D, "DTHVDTANAINT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DTHVDTANAINT", _RC)
          if( associated(temp2D) ) then
             tempxy       = vars%pt*(1+eps*(qv-dqvana))   ! Set tempxy = TH*QVold (Before Analysis Update)
             ALLOCATE( dthdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
@@ -1323,7 +1324,7 @@ contains
          endif
 
          ! DQVDTANAINT
-         call MAPL_GetPointer(export, temp2D, "DQVDTANAINT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DQVDTANAINT", _RC)
          if( associated(temp2D) ) then
             ALLOCATE( dqvdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
             ALLOCATE( dqvdtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
@@ -1335,7 +1336,7 @@ contains
          endif
 
          ! DQLDTANAINT
-         call MAPL_GetPointer(export, temp2D, "DQLDTANAINT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DQLDTANAINT", _RC)
          if( associated(temp2D) ) then
             ALLOCATE( dqldtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
             ALLOCATE( dqldtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
@@ -1357,7 +1358,7 @@ contains
          endif
 
          ! DQIDTANAINT
-         call MAPL_GetPointer(export, temp2D, "DQIDTANAINT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DQIDTANAINT", _RC)
          if( associated(temp2D) ) then
             ALLOCATE( dqidtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
             ALLOCATE( dqidtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
@@ -1379,7 +1380,7 @@ contains
          endif
 
          ! DOXDTANAINT
-         call MAPL_GetPointer(export, temp2D, "DOXDTANAINT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DOXDTANAINT", _RC)
          if( associated(temp2D) ) then
             allocate( doxdtanaint1(ifirstxy:ilastxy,jfirstxy:jlastxy) )
             allocate( doxdtanaint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
@@ -1398,7 +1399,7 @@ contains
             QDOLD = 1.0 - (QVOLD+QLOLD+QIOLD)
             QDNEW = 1.0 - (QV   +QL   +QI   )
          endif
-         call MAPL_GetPointer(export, area, "AREA", _RC)
+         call MAPL_StateGetPointer(export, area, "AREA", _RC)
 
          allocate( trsum1(nq) )
          allocate( trsum2(nq) )
@@ -1557,7 +1558,7 @@ contains
          enddo
 
          ! Diagnostics After Analysis Increments are Added
-         call MAPL_GetPointer(export, temp2D, "DMDTANA", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DMDTANA", _RC)
          if( associated(temp2D) ) temp2D = ( (vars%pe(:,:,km+1)-vars%pe(:,:,1)) - dmdt )/(grav*dt)
 
          call getAllWinds(vars%u, vars%v, UC=uc0, VC=vc0, UR=ur, VR=vr)
@@ -1565,32 +1566,32 @@ contains
          dmdt = vars%pe(:,:,km+1)-vars%pe(:,:,1)     ! Psurf-Ptop
 
          ! DUDTANA
-         call MAPL_GetPointer(export, dudtana, "DUDTANA", _RC)
+         call MAPL_StateGetPointer(export, dudtana, "DUDTANA", _RC)
          if( associated(dudtana) ) then
             dudtana = (ur-dudtana)/dt
          endif
 
          ! DVDTANA
-         call MAPL_GetPointer(export, dvdtana, "DVDTANA", _RC)
+         call MAPL_StateGetPointer(export, dvdtana, "DVDTANA", _RC)
          if( associated(dvdtana) ) then
             dvdtana = (vr-dvdtana)/dt
          endif
 
          ! DTDTANA
-         call MAPL_GetPointer(export, dtdtana, "DTDTANA", _RC)
+         call MAPL_StateGetPointer(export, dtdtana, "DTDTANA", _RC)
          if( associated(dtdtana) ) then
             dtdtana = ((vars%pt*vars%pkz)-dtdtana)/dt
          endif
 
          ! DDELPDTANA
-         call MAPL_GetPointer(export, ddpdtana, "DDELPDTANA", _RC)
+         call MAPL_StateGetPointer(export, ddpdtana, "DDELPDTANA", _RC)
          if( associated(ddpdtana) ) then
             ddpdtana = (delp-ddpdtana)/dt
          endif
 
          ! DTHVDTANAINT
          ! ------------
-         call MAPL_GetPointer(export, temp2D, "DTHVDTANAINT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DTHVDTANAINT", _RC)
          if( associated(temp2D) ) then
             tempxy       = vars%pt*(1+eps*qv)   ! Set tempxy = TH*QVnew (After Analysis Update)
             dthdtanaint2 = 0.0
@@ -1603,7 +1604,7 @@ contains
          endif
 
          ! DQVDTANAINT
-         call MAPL_GetPointer(export, temp2D, "DQVDTANAINT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DQVDTANAINT", _RC)
          if( associated(temp2D) ) then
             tempxy       = qv         ! Set tempxy = QNEW (After Analysis Update)
             dqvdtanaint2 = 0.0
@@ -1616,7 +1617,7 @@ contains
          endif
 
          ! DQLDTANAINT
-         call MAPL_GetPointer(export, temp2D, "DQLDTANAINT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DQLDTANAINT", _RC)
          if( associated(temp2D) ) then
             dqldtanaint2 = 0.0
             do N = 1,size(names)
@@ -1637,7 +1638,7 @@ contains
          endif
 
          ! DQIDTANAINT
-         call MAPL_GetPointer(export, temp2D, "DQIDTANAINT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DQIDTANAINT", _RC)
          if( associated(temp2D) ) then
             dqidtanaint2 = 0.0
             do N = 1,size(names)
@@ -1658,7 +1659,7 @@ contains
          endif
 
          ! DOXDTANAINT
-         call MAPL_GetPointer(export, temp2D, "DOXDTANAINT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DOXDTANAINT", _RC)
          if( associated(temp2D) ) then
             tempxy       = ox         ! Set tempxy = OXnew (After Analysis Update)
             doxdtanaint2 = 0.0
@@ -1748,9 +1749,9 @@ contains
       call FILLOUT3(export, "PLE_DYN_IN", vars%pe, _RC)
 
       ! Initialize 3-D Tracer Dynamics Tendencies
-      call MAPL_GetPointer(export, dqldt, "DQLDTDYN", _RC)
-      call MAPL_GetPointer(export, dqidt, "DQIDTDYN", _RC)
-      call MAPL_GetPointer(export, doxdt, "DOXDTDYN", _RC)
+      call MAPL_StateGetPointer(export, dqldt, "DQLDTDYN", _RC)
+      call MAPL_StateGetPointer(export, dqidt, "DQIDTDYN", _RC)
+      call MAPL_StateGetPointer(export, doxdt, "DOXDTDYN", _RC)
 
       if (allocated(names)) then
 
@@ -1806,7 +1807,7 @@ contains
       endif
 
       ! Initialize 2-D Vertically Integrated Tracer Dynamics Tendencies
-      call MAPL_GetPointer(export, temp2D, "DQVDTDYNINT", _RC)
+      call MAPL_StateGetPointer(export, temp2D, "DQVDTDYNINT", _RC)
       if( associated(temp2D) ) then
          temp2d = 0.0
          do k=1,km
@@ -1814,7 +1815,7 @@ contains
          enddo
       endif
 
-      call MAPL_GetPointer(export, temp2D, "DQLDTDYNINT", _RC)
+      call MAPL_StateGetPointer(export, temp2D, "DQLDTDYNINT", _RC)
       if( associated(temp2D) ) then
          temp2d = 0.0
          do N = 1,size(names)
@@ -1833,7 +1834,7 @@ contains
          enddo
       endif
 
-      call MAPL_GetPointer(export, temp2D, "DQIDTDYNINT", _RC)
+      call MAPL_StateGetPointer(export, temp2D, "DQIDTDYNINT", _RC)
       if( associated(temp2D) ) then
          temp2d = 0.0
          do N = 1,size(names)
@@ -1852,7 +1853,7 @@ contains
          enddo
       endif
 
-      call MAPL_GetPointer(export, temp2D, "DOXDTDYNINT", _RC)
+      call MAPL_StateGetPointer(export, temp2D, "DOXDTDYNINT", _RC)
       if( associated(temp2D) ) then
          temp2d = 0.0
          do N = 1,size(names)
@@ -1909,9 +1910,9 @@ contains
 
       ! call MAPL_TimerOn(MAPL, "-DYN_EPILOGUE")
       ! Computational diagnostics
-      call MAPL_GetPointer(export, temp2d, "TIME_IN_DYN", _RC)
+      call MAPL_StateGetPointer(export, temp2d, "TIME_IN_DYN", _RC)
       if(associated(temp2d)) temp2d = dyn_run_timer
-      call MAPL_GetPointer(export, temp2d, "PID", _RC)
+      call MAPL_StateGetPointer(export, temp2d, "PID", _RC)
       if(associated(temp2d)) temp2d = 0 !WMP need to get from MAPL gid
 
       !#define DEBUG_WINDS
@@ -1926,10 +1927,10 @@ contains
 
       if (SW_DYNAMICS) then
 
-         call MAPL_GetPointer(export, temp2d, "PHIS", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "PHIS", _RC)
          if(associated(temp2d)) temp2d = phisxy
 
-         call MAPL_GetPointer(export, temp2d, "PS", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "PS", _RC)
          if(associated(temp2d)) temp2d =  vars%pe(:,:,km+1)/GRAV
 
          call getAllWinds(vars%u, vars%v, UA=ua, VA=va, UC=uc, VC=vc, UR=ur, VR=vr)
@@ -1961,7 +1962,7 @@ contains
          delp  = ( vars%pe(:,:,2:) - vars%pe(:,:,:km) )
          dthdt = ( vars%pt*(1.0+eps*qv)*delp-dthdt )/dt
 
-         call MAPL_GetPointer(export, temp2d, "DTHVDTDYNINT", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "DTHVDTDYNINT", _RC)
          if(associated(temp2d)) then
             qsum1 = 0.0
             do k=1,km
@@ -1984,22 +1985,22 @@ contains
 
          ! Compute absolute vorticity on the D grid
          call getEPV(vars%pt, vort, ua, va, epvxyz)
-         call MAPL_GetPointer(export, temp3D, "EPV", _RC)
+         call MAPL_StateGetPointer(export, temp3D, "EPV", _RC)
          if(associated(temp3d)) temp3d = epvxyz*(p00**kappa)
 
          ! Compute Tropopause Pressure, Temperature, and Moisture
          doTropvars=.false.
-         call MAPL_GetPointer(export, temp2D, "TROPP_THERMAL", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "TROPP_THERMAL", _RC)
          if(associated(temp2D)) doTropvars=.true.
-         call MAPL_GetPointer(export, temp2D, "TROPP_EPV", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "TROPP_EPV", _RC)
          if(associated(temp2D)) doTropvars=.true.
-         call MAPL_GetPointer(export, temp2D, "TROPP_BLENDED", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "TROPP_BLENDED", _RC)
          if(associated(temp2D)) doTropvars=.true.
-         call MAPL_GetPointer(export, temp2D, "TROPK_BLENDED", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "TROPK_BLENDED", _RC)
          if(associated(temp2D)) doTropvars=.true.
-         call MAPL_GetPointer(export, temp2D, "TROPT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "TROPT", _RC)
          if(associated(temp2D)) doTropvars=.true.
-         call MAPL_GetPointer(export, temp2D, "TROPQ", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "TROPQ", _RC)
          if(associated(temp2D)) doTropvars=.true.
 
          if (doTropvars) then
@@ -2018,7 +2019,7 @@ contains
                  tropp1,tropp2,tropp3,tropt,tropq          )
 
             ! get blended index
-            call MAPL_GetPointer(export, temp2D, 'TROPK_BLENDED', _RC)
+            call MAPL_StateGetPointer(export, temp2D, 'TROPK_BLENDED', _RC)
             if( associated(temp2D) ) then
                kend = km
                do j=jfirstxy,jlastxy
@@ -2039,19 +2040,19 @@ contains
                enddo
             endif
 
-            call MAPL_GetPointer(export, temp2D, 'TROPP_THERMAL', _RC)
+            call MAPL_StateGetPointer(export, temp2D, 'TROPP_THERMAL', _RC)
             if(associated(temp2D)) temp2D = tropp1
 
-            call MAPL_GetPointer(export, temp2D, 'TROPP_EPV', _RC)
+            call MAPL_StateGetPointer(export, temp2D, 'TROPP_EPV', _RC)
             if(associated(temp2D)) temp2D = tropp2
 
-            call MAPL_GetPointer(export, temp2D, 'TROPP_BLENDED', _RC)
+            call MAPL_StateGetPointer(export, temp2D, 'TROPP_BLENDED', _RC)
             if(associated(temp2D)) temp2D = tropp3
 
-            call MAPL_GetPointer(export, temp2D, 'TROPT', _RC)
+            call MAPL_StateGetPointer(export, temp2D, 'TROPT', _RC)
             if(associated(temp2D)) temp2D = tropt
 
-            call MAPL_GetPointer(export, temp2D, 'TROPQ', _RC)
+            call MAPL_StateGetPointer(export, temp2D, 'TROPQ', _RC)
             if(associated(temp2D)) temp2D = tropq
 
             deallocate( tropp1 )
@@ -2146,7 +2147,7 @@ contains
 #ifdef SKIP_TRACERS
          do itracer = 1, ntracers
             write(myTracer, "('Q',i5.5)") itracer-1
-            call MAPL_GetPointer(export, temp3D, TRIM(myTracer), _RC)
+            call MAPL_StateGetPointer(export, temp3D, TRIM(myTracer), _RC)
             if((associated(temp3d)) .and. (NQ>=itracer)) then
                if (self%vars%tracer(itracer)%is_r4) then
                   temp3d = self%vars%tracer(itracer)%content_r4
@@ -2157,23 +2158,23 @@ contains
          enddo
 #endif
 
-         call MAPL_GetPointer(export, temp3D, 'PV', _RC)
+         call MAPL_StateGetPointer(export, temp3D, 'PV', _RC)
          if(associated(temp3d)) temp3d = epvxyz/vars%pt
 
-         call MAPL_GetPointer(export, temp3D, 'S', _RC)
+         call MAPL_StateGetPointer(export, temp3D, 'S', _RC)
          if(associated(temp3d)) temp3d = tempxy*cp
 
-         call MAPL_GetPointer(export, temp3d, 'TH', _RC)
+         call MAPL_StateGetPointer(export, temp3d, 'TH', _RC)
          !   if(associated(temp3d)) temp3d = vars%pt*(p00**kappa)
          if(associated(temp3d)) then
             temp3d = (tempxy)*(p00/(0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1))))**kappa
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'DMDTDYN', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'DMDTDYN', _RC)
          if(associated(temp2d)) temp2d = dmdt
 
          ! Compute 3-D Tracer Dynamics Tendencies
-         call MAPL_GetPointer(export, qctmp, 'QC', _RC)
+         call MAPL_StateGetPointer(export, qctmp, 'QC', _RC)
 
          if( associated(qctmp) ) then
             qctmp = 0.0
@@ -2238,7 +2239,7 @@ contains
          endif
 
          ! Compute 2-D Vertically Integrated Tracer Dynamics Tendencies
-         call MAPL_GetPointer(export, temp2D, 'DQVDTDYNINT', _RC)
+         call MAPL_StateGetPointer(export, temp2D, 'DQVDTDYNINT', _RC)
          if( associated(temp2D) ) then
             do k=1,km
                temp2d = temp2d + qv(:,:,k)*delp(:,:,k)
@@ -2246,7 +2247,7 @@ contains
             temp2d = temp2d/(grav*dt)
          endif
 
-         call MAPL_GetPointer(export, temp2D, 'DQLDTDYNINT', _RC)
+         call MAPL_StateGetPointer(export, temp2D, 'DQLDTDYNINT', _RC)
          if( associated(temp2D) ) then
             do N = 1,size(names)
                if( trim(names(N)).eq.'QLCN' .or. &
@@ -2265,7 +2266,7 @@ contains
             temp2d = temp2d/(grav*dt)
          endif
 
-         call MAPL_GetPointer(export, temp2D, 'DQIDTDYNINT', _RC)
+         call MAPL_StateGetPointer(export, temp2D, 'DQIDTDYNINT', _RC)
          if( associated(temp2D) ) then
             do N = 1,size(names)
                if( trim(names(N)).eq.'QICN' .or. &
@@ -2284,7 +2285,7 @@ contains
             temp2d = temp2d/(grav*dt)
          endif
 
-         call MAPL_GetPointer(export, temp2D, 'DOXDTDYNINT', _RC)
+         call MAPL_StateGetPointer(export, temp2D, 'DOXDTDYNINT', _RC)
          if( associated(temp2D) ) then
             do N = 1,size(names)
                pos = index(names(N),'::')
@@ -2308,12 +2309,12 @@ contains
          ! Virtual temperature
          tempxy =  tempxy*(1.0+eps*qv)
 
-         call MAPL_GetPointer(export, temp3D, 'TV', _RC)
+         call MAPL_StateGetPointer(export, temp3D, 'TV', _RC)
          if(associated(temp3D)) temp3D = tempxy
 
          ! Fluxes: UCPT & VCPT
          !--------------------
-         call MAPL_GetPointer(export, temp2d, 'UCPT', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'UCPT', _RC)
          if(associated(temp2d)) then
             temp2d = 0.0
             do k=1,km
@@ -2322,7 +2323,7 @@ contains
             temp2d = temp2d*(cp/grav)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'VCPT', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'VCPT', _RC)
          if(associated(temp2d)) then
             temp2d = 0.0
             do k=1,km
@@ -2334,7 +2335,7 @@ contains
          ! Compute Energetics After Dycore
          tempxy = vars%pt*(1.0+eps*qv)  ! Convert TH to THV
 
-         call MAPL_GetPointer(export, temp3d, 'THV', _RC)
+         call MAPL_StateGetPointer(export, temp3d, 'THV', _RC)
          if(associated(temp3d)) temp3d = tempxy
 
          if (doEnergetics) then
@@ -2342,11 +2343,11 @@ contains
             kedyn   = (kenrg -kenrg0)/DT
             pedyn   = (penrg -penrg0)/DT
             tedyn   = (tenrg -tenrg0)/DT
-            call MAPL_GetPointer(export, temp2d, 'KEDYN', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'KEDYN', _RC)
             if(associated(temp2d)) temp2d = kedyn
-            call MAPL_GetPointer(export, temp2d, 'PEDYN', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'PEDYN', _RC)
             if(associated(temp2d)) temp2d = pedyn
-            call MAPL_GetPointer(export, temp2d, 'TEDYN', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'TEDYN', _RC)
             if(associated(temp2d)) temp2d = tedyn
          endif
 
@@ -2354,8 +2355,8 @@ contains
          call getOmega(omaxyz)
 
          ! Fluxes: UKE & VKE
-         call MAPL_GetPointer(export, tempu, 'UKE', _RC)
-         call MAPL_GetPointer(export, tempv, 'VKE', _RC)
+         call MAPL_StateGetPointer(export, tempu, 'UKE', _RC)
+         call MAPL_StateGetPointer(export, tempv, 'VKE', _RC)
 
          if(associated(tempu) .or. associated(tempv)) then
             tmp3d = 0.5*(ur**2 + vr**2)
@@ -2378,7 +2379,7 @@ contains
          end if
 
          ! Fluxes: UQV & VQV
-         call MAPL_GetPointer(export, temp2d, 'UQV', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'UQV', _RC)
          if(associated(temp2d)) then
             temp2d = 0.0
             do k=1,km
@@ -2387,7 +2388,7 @@ contains
             temp2d = temp2d / grav
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'VQV', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'VQV', _RC)
          if(associated(temp2d)) then
             temp2d = 0.0
             do k=1,km
@@ -2397,7 +2398,7 @@ contains
          end if
 
          ! Fluxes: UQL & VQL
-         call MAPL_GetPointer(export, temp2d, 'UQL', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'UQL', _RC)
          if(associated(temp2d)) then
             temp2d = 0.0
             do N = 1,size(names)
@@ -2415,7 +2416,7 @@ contains
             temp2d = temp2d / grav
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'VQL', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'VQL', _RC)
          if(associated(temp2d)) then
             temp2d = 0.0
             do N = 1,size(names)
@@ -2434,7 +2435,7 @@ contains
          end if
 
          ! Fluxes: UQI & VQI
-         call MAPL_GetPointer(export, temp2d, 'UQI', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'UQI', _RC)
          if(associated(temp2d)) then
             temp2d = 0.0
             do N = 1,size(names)
@@ -2452,7 +2453,7 @@ contains
             temp2d = temp2d / grav
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'VQI', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'VQI', _RC)
          if(associated(temp2d)) then
             temp2d = 0.0
             do N = 1,size(names)
@@ -2477,18 +2478,18 @@ contains
          enddo
          zle = zle/grav
 
-         call MAPL_GetPointer(export, temp3d, 'ZLE', _RC)
+         call MAPL_StateGetPointer(export, temp3d, 'ZLE', _RC)
          if(associated(temp3d)) temp3d = zle
 
-         call MAPL_GetPointer(export, temp3d, 'ZL', _RC)
+         call MAPL_StateGetPointer(export, temp3d, 'ZL', _RC)
          if(associated(temp3d)) temp3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
 
-         call MAPL_GetPointer(export, temp3d, 'S', _RC)
+         call MAPL_StateGetPointer(export, temp3d, 'S', _RC)
          if(associated(temp3d)) temp3d = temp3d + grav*(0.5*( zle(:,:,:km)+zle(:,:,2:) ))
 
          ! Fluxes: UPHI & VPHI
-         call MAPL_GetPointer(export, tempu, 'UPHI', _RC)
-         call MAPL_GetPointer(export, tempv, 'VPHI', _RC)
+         call MAPL_StateGetPointer(export, tempu, 'UPHI', _RC)
+         call MAPL_StateGetPointer(export, tempv, 'VPHI', _RC)
 
          if( associated(tempu).or.associated(tempv) ) zl = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
 
@@ -2512,7 +2513,7 @@ contains
          call MAPL_GridCompGetResource(gc, "HGT_SURFACE", HGT_SURFACE, default=HGT_SURFACE, _RC)
          if ( HGT_SURFACE .gt. 0.0 ) then
             ! Near surface height for surface
-            call MAPL_GetPointer(export, temp2d, 'DZ', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'DZ', _RC)
             if(associated(temp2d)) temp2d = HGT_SURFACE
 
             ! Get the height above the surface
@@ -2520,69 +2521,69 @@ contains
                zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
             enddo
 
-            call MAPL_GetPointer(export, temp2d, 'PS', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'PS', _RC)
             if(associated(temp2d)) temp2d =  vars%pe(:,:,km+1)
 
-            call MAPL_GetPointer(export, temp2d, 'US', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'US', _RC)
             if(associated(temp2d)) then
                call VertInterp(temp2d, ur, -zle, -HGT_SURFACE, _RC)
             end if
 
-            call MAPL_GetPointer(export, temp2d, 'VS', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'VS', _RC)
             if(associated(temp2d)) then
                call VertInterp(temp2d, vr, -zle, -HGT_SURFACE, _RC)
             end if
 
-            call MAPL_GetPointer(export, temp2d, 'TA', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'TA', _RC)
             if(associated(temp2d)) then
                tempxy  = vars%pt * vars%pkz
                call VertInterp(temp2d, tempxy, -zle, -HGT_SURFACE, _RC)
             end if
 
-            call MAPL_GetPointer(export, temp2d, 'QA', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'QA', _RC)
             if(associated(temp2d)) then
                call VertInterp(temp2d, qv, -zle, -HGT_SURFACE, positive_definite=.true., _RC)
             end if
 
-            call MAPL_GetPointer(export, temp2d, 'SPEED', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'SPEED', _RC)
             if(associated(temp2d)) then
                call VertInterp(temp2d, sqrt(ur**2 + vr**2), -zle, -HGT_SURFACE, _RC)
             end if
          else
             ! Fill Surface with Lowest Model Level Variables
-            call MAPL_GetPointer(export, temp2d, 'DZ', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'DZ', _RC)
             if(associated(temp2d)) temp2d = 0.5*( zle(:,:,km)-zle(:,:,km+1) )
 
-            call MAPL_GetPointer(export, temp2d, 'PS', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'PS', _RC)
             if(associated(temp2d)) temp2d = vars%pe(:,:,km+1)
 
-            call MAPL_GetPointer(export, temp2d, 'US', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'US', _RC)
             if(associated(temp2d)) temp2d = ur(:,:,km)
 
-            call MAPL_GetPointer(export, temp2d, 'VS', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'VS', _RC)
             if(associated(temp2d)) temp2d = vr(:,:,km)
 
-            call MAPL_GetPointer(export, temp2d, 'TA', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'TA', _RC)
             if(associated(temp2d)) then
                tempxy = vars%pt * vars%pkz
                temp2d = tempxy(:,:,km)
             endif
 
-            call MAPL_GetPointer(export, temp2d, 'QA', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'QA', _RC)
             if(associated(temp2d)) temp2d = qv(:,:,km)
 
-            call MAPL_GetPointer(export, temp2d, 'SPEED', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'SPEED', _RC)
             if(associated(temp2d)) temp2d = sqrt( ur(:,:,km)**2 + vr(:,:,km)**2 )
          endif
 
 
-         call MAPL_GetPointer(export, temp2d, 'WSPD_10M', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'WSPD_10M', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, sqrt(ur**2 + vr**2), -zle, -10.0, _RC)
          end if
 
          if (.not. HYDROSTATIC) then
-            call MAPL_GetPointer(export, temp2d, 'VVEL_UP_100_1000', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'VVEL_UP_100_1000', _RC)
             if(associated(temp2d)) then
                temp2d = vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,km)
                do k=km-1,1,-1
@@ -2596,7 +2597,7 @@ contains
                   enddo
                enddo
             end if
-            call MAPL_GetPointer(export, temp2d, 'VVEL_DN_100_1000', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'VVEL_DN_100_1000', _RC)
             if(associated(temp2d)) then
                temp2d = vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,km)
                do k=km-1,1,-1
@@ -2613,11 +2614,11 @@ contains
          end if
 
          ! Updraft Helicty Exports
-         call MAPL_GetPointer(export,  uh25, 'UH25', ALLOC=.TRUE., _RC)
-         call MAPL_GetPointer(export,  uh03, 'UH03', ALLOC=.TRUE., _RC)
-         call MAPL_GetPointer(export, srh01,'SRH01', ALLOC=.TRUE., _RC)
-         call MAPL_GetPointer(export, srh03,'SRH03', ALLOC=.TRUE., _RC)
-         call MAPL_GetPointer(export, srh25,'SRH25', ALLOC=.TRUE., _RC)
+         call MAPL_GetPointer(export,  uh25, 'UH25', alloc=.true., _RC)
+         call MAPL_GetPointer(export,  uh03, 'UH03', alloc=.true., _RC)
+         call MAPL_GetPointer(export, srh01,'SRH01', alloc=.true., _RC)
+         call MAPL_GetPointer(export, srh03,'SRH03', alloc=.true., _RC)
+         call MAPL_GetPointer(export, srh25,'SRH25', alloc=.true., _RC)
          ! Per WMP, this calculation is not useful if running hydrostatic
          if (.not. HYDROSTATIC) then
             if( associated( uh25) .or. associated( uh03) .or. &
@@ -2629,49 +2630,49 @@ contains
          ! Divergence Exports
          logpe = log(vars%pe)
 
-         call MAPL_GetPointer(export, temp3d, 'DIVG', _RC)
+         call MAPL_StateGetPointer(export, temp3d, 'DIVG', _RC)
          if(associated(temp3d)) temp3d = divg
 
-         call MAPL_GetPointer(export, temp2d, 'DIVG200', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'DIVG200', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, dble(divg), logpe, log(20000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'DIVG500', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'DIVG500', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, dble(divg), logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'DIVG700', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'DIVG700', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, dble(divg), logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'DIVG850', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'DIVG850', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, dble(divg), logpe, log(85000.), _RC)
          end if
 
          ! Vorticity Exports
-         call MAPL_GetPointer(export, temp3d, 'VORT', _RC)
+         call MAPL_StateGetPointer(export, temp3d, 'VORT', _RC)
          if(associated(temp3d)) temp3d = vort
 
-         call MAPL_GetPointer(export, temp2d, 'VORT200', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'VORT200', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, dble(vort), logpe, log(20000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'VORT500', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'VORT500', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, dble(vort), logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'VORT700', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'VORT700', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, dble(vort), logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'VORT850', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'VORT850', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, dble(vort), logpe, log(85000.), _RC)
          end if
@@ -2679,27 +2680,27 @@ contains
          ! Vertical Velocity Exports
          call FILLOUT3(export, 'OMEGA', omaxyz, _RC)
 
-         call MAPL_GetPointer(export, temp2d, 'OMEGA850', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'OMEGA850', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, omaxyz, logpe, log(85000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'OMEGA700', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'OMEGA700', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, omaxyz, logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'OMEGA500', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'OMEGA500', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, omaxyz, logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'OMEGA200', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'OMEGA200', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, omaxyz, logpe, log(20000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'OMEGA10', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'OMEGA10', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, omaxyz, logpe, log(1000.), _RC)
          end if
@@ -2709,22 +2710,22 @@ contains
             call FILLOUT3(export, 'DELZ', vars%dz(ifirstxy:ilastxy,jfirstxy:jlastxy,:), _RC)
             call FILLOUT3(export, 'W', vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:), _RC)
 
-            call MAPL_GetPointer(export, temp2d, 'W850', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'W850', _RC)
             if(associated(temp2d)) then
                call VertInterp(temp2d, vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:), logpe, log(85000.), _RC)
             end if
 
-            call MAPL_GetPointer(export, temp2d, 'W500', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'W500', _RC)
             if(associated(temp2d)) then
                call VertInterp(temp2d, vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:), logpe, log(50000.), _RC)
             end if
 
-            call MAPL_GetPointer(export, temp2d, 'W200', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'W200', _RC)
             if(associated(temp2d)) then
                call VertInterp(temp2d, vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:), logpe, log(20000.), _RC)
             end if
 
-            call MAPL_GetPointer(export, temp2d, 'W10', _RC)
+            call MAPL_StateGetPointer(export, temp2d, 'W10', _RC)
             if(associated(temp2d)) then
                call VertInterp(temp2d, vars%w(ifirstxy:ilastxy,jfirstxy:jlastxy,:), logpe, log(1000.), _RC)
             end if
@@ -3759,13 +3760,13 @@ contains
          allocate( dthdtphyint2(ifirstxy:ilastxy,jfirstxy:jlastxy) )
 
          doEnergetics=.false.
-         call MAPL_GetPointer(export, temp2D, "KE", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "KE", _RC)
          if(associated(temp2D)) doEnergetics=.true.
-         call MAPL_GetPointer(export, temp2D, "KEPHY", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "KEPHY", _RC)
          if(associated(temp2D)) doEnergetics=.true.
-         call MAPL_GetPointer(export, temp2D, "PEPHY", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "PEPHY", _RC)
          if(associated(temp2D)) doEnergetics=.true.
-         call MAPL_GetPointer(export, temp2D, "TEPHY", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "TEPHY", _RC)
          if(associated(temp2D)) doEnergetics=.true.
          if (doEnergetics) then
             allocate(  kenrg(ifirstxy:ilastxy,jfirstxy:jlastxy) )
@@ -3798,7 +3799,7 @@ contains
          allocate(  logpe(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
          allocate(    zle(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
 
-         call MAPL_GetPointer(import, PHIS, "PHIS", _RC)
+         call MAPL_StateGetPointer(import, PHIS, "PHIS", _RC)
 
          phisxy = real(phis,kind=r8)
 
@@ -3806,7 +3807,7 @@ contains
          dp = ( vars%pe(:,:,2:) - vars%pe (:,:,:km) )
 
          ! Load Specific Humidity
-         call MAPL_GetPointer(export, QOLD, 'Q', _RC)
+         call MAPL_StateGetPointer(export, QOLD, 'Q', _RC)
 
          call PULL_Q(self, import, qqq, iNXQ, _RC)
          if ((.not. ADIABATIC) .and. (self%grid%NQ > 0)) then
@@ -3833,7 +3834,7 @@ contains
          endif
 
          ! DTHVDTPHYINT
-         call MAPL_GetPointer(export, temp2D, "DTHVDTPHYINT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DTHVDTPHYINT", _RC)
          if( associated(temp2D) ) then
             dthdtphyint1 = 0.0
             do k=1,km
@@ -3874,7 +3875,7 @@ contains
 
          if (doEnergetics) then
             call Energetics(ur,vr,thv,vars%pe,dp,vars%pkz,phisxy,kenrg,penrg,tenrg)
-            call MAPL_GetPointer(export, temp2d, "KE", _RC)
+            call MAPL_StateGetPointer(export, temp2d, "KE", _RC)
             if(associated(temp2d)) temp2d = kenrg
             kenrg = (kenrg-kenrg0)/DT
             penrg = (penrg-penrg0)/DT
@@ -3885,7 +3886,7 @@ contains
          endif
 
          ! DTHVDTPHYINT
-         call MAPL_GetPointer(export, temp2D, "DTHVDTPHYINT", _RC)
+         call MAPL_StateGetPointer(export, temp2D, "DTHVDTPHYINT", _RC)
          if( associated(temp2D) ) then
             dthdtphyint2 = 0.0
             do k=1,km
@@ -3925,13 +3926,13 @@ contains
          call FILLOUT3(export, "PT", vars%pt, _RC)
          call FILLOUT3(export, "PE", vars%pe, _RC)
 
-         call MAPL_GetPointer(export, temp3d, "TH", _RC)
+         call MAPL_StateGetPointer(export, temp3d, "TH", _RC)
          if(associated(temp3d)) temp3d = (tempxy)*(p00/(0.5*(vars%pe(:,:,1:km)+vars%pe(:,:,2:km+1))))**kappa
 
 #ifdef SKIP_TRACERS
          do itracer=1,ntracers
             write(myTracer, "('Q',i5.5)") itracer-1
-            call MAPL_GetPointer(export, temp3D, TRIM(myTracer), _RC)
+            call MAPL_StateGetPointer(export, temp3D, TRIM(myTracer), _RC)
             if((associated(temp3d)) .and. (self%grid%NQ>=itracer)) then
                if (self%vars%tracer(itracer)%is_r4) then
                   temp3d = self%vars%tracer(itracer)%content_r4
@@ -3952,230 +3953,230 @@ contains
          call FILLOUT3(export, "ZLE", zle, _RC)
 
          ! Compute Mid-Layer Heights
-         call MAPL_GetPointer(export, temp3d, "ZL", _RC)
+         call MAPL_StateGetPointer(export, temp3d, "ZL", _RC)
          if(associated(temp3d)) temp3d = 0.5*( zle(:,:,2:) + zle(:,:,:km) )
 
          ! Fill Single Level Variables
-         call MAPL_GetPointer(export, temp2d, "Z700", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "Z700", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, zle*grav, logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'Z500', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'Z500', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, zle*grav, logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, 'Z300', _RC)
+         call MAPL_StateGetPointer(export, temp2d, 'Z300', _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, zle*grav, logpe, log(30000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "H100", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "H100", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, zle, logpe, log(10000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "H200", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "H200", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, zle, logpe, log(20000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "H250", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "H250", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, zle, logpe, log(25000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "H300", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "H300", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, zle, logpe, log(30000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "H500", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "H500", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, zle, logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "H700", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "H700", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, zle, logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "H850", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "H850", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, zle,logpe, log(85000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "H1000", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "H1000", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, zle, logpe, log(100000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "U50M", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "U50M", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, ur, -zle, -50., _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "V50M", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "V50M", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, vr, -zle, -50., _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "U100", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "U100", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, ur, logpe, log(10000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "U200", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "U200", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, ur, logpe, log(20000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "U250", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "U250", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, ur, logpe, log(25000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "U300", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "U300", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, ur, logpe, log(30000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "U500", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "U500", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, ur, logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "U700", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "U700", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, ur, logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "U850", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "U850", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, ur, logpe, log(85000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "V100", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "V100", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, vr, logpe, log(10000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "V200", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "V200", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, vr, logpe, log(20000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "V250", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "V250", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, vr, logpe, log(25000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "V300", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "V300", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, vr, logpe, log(30000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "V500", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "V500", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, vr, logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "V700", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "V700", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, vr, logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "V850", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "V850", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, vr, logpe, log(85000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "T100", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "T100", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, tempxy, logpe, log(10000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "T200", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "T200", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, tempxy, logpe, log(20000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "T250", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "T250", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, tempxy, logpe, log(25000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "T300", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "T300", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, tempxy, logpe, log(30000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "T500", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "T500", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, tempxy, logpe, log(50000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "T700", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "T700", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, tempxy, logpe, log(70000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "T850", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "T850", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, tempxy, logpe, log(85000.), _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "Q100", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "Q100", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, qv, logpe, log(10000.), positive_definite=.true., _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "Q200", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "Q200", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, qv, logpe, log(20000.), positive_definite=.true., _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "Q250", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "Q250", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, qv, logpe, log(25000.), positive_definite=.true., _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "Q300", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "Q300", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, qv, logpe, log(30000.), positive_definite=.true., _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "Q500", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "Q500", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, qv, logpe, log(50000.), positive_definite=.true., _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "Q700", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "Q700", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, qv, logpe, log(70000.), positive_definite=.true., _RC)
          end if
 
-         call MAPL_GetPointer(export, temp2d, "Q850", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "Q850", _RC)
          if(associated(temp2d)) then
             call VertInterp(temp2d, qv, logpe, log(85000.), positive_definite=.true., _RC)
          end if
 
          ! Fill Model Top Level Variables
-         call MAPL_GetPointer(export, temp2d, "UTOP", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "UTOP", _RC)
          if(associated(temp2d)) temp2d = ur(:,:,1)
 
-         call MAPL_GetPointer(export, temp2d, "VTOP", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "VTOP", _RC)
          if(associated(temp2d)) temp2d = vr(:,:,1)
 
-         call MAPL_GetPointer(export, temp2d, "TTOP", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "TTOP", _RC)
          if(associated(temp2d)) temp2d = tempxy(:,:,1)
 
-         call MAPL_GetPointer(export, temp2d, "DELPTOP", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "DELPTOP", _RC)
          if(associated(temp2d)) temp2d = dp(:,:,1)
 
          ! Compute Surface Pressure
-         call MAPL_GetPointer(export, temp2d, "PS", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "PS", _RC)
          if(associated(temp2d)) temp2d=vars%pe(:,:,km+1)
 
          ! Get the height above the surface
@@ -4183,14 +4184,14 @@ contains
             zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
          enddo
 
-         call MAPL_GetPointer(export, temp3d, "ZLE0", _RC)
+         call MAPL_StateGetPointer(export, temp3d, "ZLE0", _RC)
          if(associated(temp3d)) temp3d = zle
 
-         call MAPL_GetPointer(export, temp3d, "ZL0", _RC)
+         call MAPL_StateGetPointer(export, temp3d, "ZL0", _RC)
          if(associated(temp3d)) temp3d = 0.5*( zle(:,:,:km)+zle(:,:,2:) )
 
          ! Compute Vertically Averaged T,U
-         call MAPL_GetPointer(export, temp2d, "TAVE", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "TAVE", _RC)
          if(associated(temp2d)) then
             temp2d = 0.0
             do k=1,km
@@ -4199,7 +4200,7 @@ contains
             temp2d = temp2d / (vars%pe(:,:,km+1)-vars%pe(:,:,1))
          endif
 
-         call MAPL_GetPointer(export, temp2d, "UAVE", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "UAVE", _RC)
          if(associated(temp2d)) then
             temp2d = 0.0
             do k=1,km
@@ -4211,14 +4212,14 @@ contains
          ! Convert T to Tv
          tempxy = tempxy*(1.0+eps*qv)
 
-         call MAPL_GetPointer(export,temp3d, "TV", _RC)
+         call MAPL_StateGetPointer(export,temp3d, "TV", _RC)
          if(associated(temp3d)) temp3d=tempxy
 
          ! Compute Sea-Level Pressure
-         call MAPL_GetPointer(export, temp2d, "SLP", _RC)
-         call MAPL_GetPointer(export, Ztemp1, "H1000", _RC)
-         call MAPL_GetPointer(export, Ztemp2, "H850", _RC)
-         call MAPL_GetPointer(export, Ztemp3, "H500", _RC)
+         call MAPL_StateGetPointer(export, temp2d, "SLP", _RC)
+         call MAPL_StateGetPointer(export, Ztemp1, "H1000", _RC)
+         call MAPL_StateGetPointer(export, Ztemp2, "H850", _RC)
+         call MAPL_StateGetPointer(export, Ztemp3, "H500", _RC)
 
          if(associated(temp2d) .or. associated(ztemp1) &
               .or. associated(ztemp2) &
@@ -4500,10 +4501,10 @@ contains
          allocate( tend_un(is:ie  ,js:je+1,km) )
          allocate( tend_vn(is:ie+1,js:je  ,km) )
 
-         call MAPL_GetPointer(import, TEND, "DUDT", _RC)
+         call MAPL_StateGetPointer(import, TEND, "DUDT", _RC)
          tend_ua(is:ie,js:je,1:km) = tend
 
-         call MAPL_GetPointer(import, TEND, "DVDT", _RC)
+         call MAPL_StateGetPointer(import, TEND, "DVDT", _RC)
          tend_va(is:ie,js:je,1:km) = tend
 
          !if (.not. HYDROSTATIC ) then
@@ -4541,7 +4542,7 @@ contains
          ! ****                     Update Edge Pressures                    ****
          ! **********************************************************************
 
-         call MAPL_GetPointer(import, TEND, "DPEDT", _RC)
+         call MAPL_StateGetPointer(import, TEND, "DPEDT", _RC)
          self%vars%PE = self%vars%PE + DT*TEND
 
          ! **********************************************************************
@@ -4566,7 +4567,7 @@ contains
          ! ****                           b) D/Dt (T*DELP), IS_WEIGHTED=.T. ****
          ! *********************************************************************
 
-         call MAPL_GetPointer(import, TEND, "DTDT", _RC)
+         call MAPL_StateGetPointer(import, TEND, "DTDT", _RC)
 
          !if (DYN_DEBUG) then
          !   call prt_maxmin('AI PT1', self%vars%PT ,  is, ie, js, je, 0, km, 1.d00, MAPL_AM_I_ROOT())
@@ -4677,7 +4678,7 @@ contains
       real(r8), pointer :: cpl(:,:,:)
       integer :: status
 
-      call MAPL_GetPointer(export, cpl, name, _RC)
+      call MAPL_StateGetPointer(export, cpl, name, _RC)
       if(associated(cpl)) cpl = v
 
       _RETURN(_SUCCESS)
@@ -4692,7 +4693,7 @@ contains
       real(r4), pointer :: cpl(:,:,:)
       integer :: status
 
-      call MAPL_GetPointer(export, cpl, name, _RC)
+      call MAPL_StateGetPointer(export, cpl, name, _RC)
       if(associated(cpl)) cpl = v
 
       _RETURN(_SUCCESS)
@@ -4707,7 +4708,7 @@ contains
      real(r4), pointer :: cpl(:,:)
      integer :: status
 
-     call MAPL_GetPointer(export, cpl, name, _RC)
+     call MAPL_StateGetPointer(export, cpl, name, _RC)
      if(associated(cpl)) cpl = v
 
       _RETURN(_SUCCESS)
@@ -5019,21 +5020,21 @@ contains
          lats(:,:) = 15.0*PI/180.0
       endif
 
-      call MAPL_GetPointer(internal, U, "U", _RC) ! A-Grid U Wind
+      call MAPL_StateGetPointer(internal, U, "U", _RC) ! A-Grid U Wind
       is = lbound(U,1); ie = ubound(U,1)
       js = lbound(U,2); je = ubound(U,2)
       ks = lbound(U,3); ke = ubound(U,3)
       km = ke-ks+1
-      call MAPL_GetPointer(internal, V, "V", _RC) ! A-Grid V Wind
-      call MAPL_GetPointer(internal, PT, "PT", _RC) ! potential temperature
-      call MAPL_GetPointer(internal, PE1, "PE", _RC) ! edge pressures - 1 based
+      call MAPL_StateGetPointer(internal, V, "V", _RC) ! A-Grid V Wind
+      call MAPL_StateGetPointer(internal, PT, "PT", _RC) ! potential temperature
+      call MAPL_StateGetPointer(internal, PE1, "PE", _RC) ! edge pressures - 1 based
       PE(is:ie, js:je, 0:km) => PE1(is:ie, js:je, 1:km+1)
-      call MAPL_GetPointer(internal, PKZ , "PKZ", _RC) ! presssure ^ kappa at mid-layers
-      call MAPL_GetPointer(internal, ak1, "AK" , _RC) ! AK for vertical coordinate - 1 based
+      call MAPL_StateGetPointer(internal, PKZ , "PKZ", _RC) ! presssure ^ kappa at mid-layers
+      call MAPL_StateGetPointer(internal, ak1, "AK" , _RC) ! AK for vertical coordinate - 1 based
       ak(0:km) => ak1(1:km+1)
-      call MAPL_GetPointer(internal, bk1, "BK" , _RC) ! BK for vertical coordinate - 1 based
+      call MAPL_StateGetPointer(internal, bk1, "BK" , _RC) ! BK for vertical coordinate - 1 based
       bk(0:km) => bk1(1:km+1)
-      call MAPL_GetPointer(import, phis, "PHIS", _RC) ! surface geopotential
+      call MAPL_StateGetPointer(import, phis, "PHIS", _RC) ! surface geopotential
 
       U = 0.0
 
