@@ -998,9 +998,7 @@ contains
                     (trim(fieldname) /= "QRAIN"   ) .and. &
                     (trim(fieldname) /= "QSNOW"   ) .and. &
                     (trim(fieldname) /= "QGRAUPEL") ) then
-                  ! write(STRING,"(A,A)") "FV3+ADV is excluding ", trim(fieldname)
-                  ! call WRITE_PARALLEL(trim(STRING))
-                  call logger%info("Run:: FV3+ADV is excluding %s", trim(fieldname))
+                  call logger%info("Run:: FV3+ADV is excluding "//trim(fieldname))
 
                   n = n + 1
                   if (n > size(xlist)) then
@@ -3254,11 +3252,11 @@ contains
             allocate(cubeTEMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
             allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
 #ifdef SCALAR_WINDS
-            call WRITE_PARALLEL('Replaying increment of winds as scalars')
+            call logger%info("Replaying increment of winds as scalars")
             call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
             call l2c%regrid(VTMP3D, cubeVTMP3D, _RC)
 #else
-            call WRITE_PARALLEL('Replaying increment of winds')
+            call logger%info("Replaying increment of winds")
             call l2c%regrid(TEMP3d, VTMP3d, cubeTEMP3d, cubeVTMP3d, _RC)
 #endif /* SCALAR_WINDS */
             allocate( UAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
@@ -3274,7 +3272,7 @@ contains
          ! DELP
          if( trim(psname)=='NULL' .and. trim(dpname).ne.'NULL' ) then
             call ESMFL_BundleGetPointerToData(ana_bundle, trim(dpname), TEMP3D, _RC)
-            call WRITE_PARALLEL('Replaying increment of '//trim(dpname))
+            call logger%info("Replaying increment of "//trim(dpname))
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
             dpe(:,:,1) = 0.0
@@ -3299,7 +3297,7 @@ contains
          ! PS
          if( trim(psname)/='NULL' .and. trim(dpname)=='NULL' ) then
             call ESMFL_BundleGetPointerToData(ana_bundle, trim(psname), TEMP2D, _RC)
-            call WRITE_PARALLEL('Replaying increment of '//trim(psname))
+            call logger%info("Replaying increment of %s", trim(psname))
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
             allocate(     aux3D(size( TEMP2D,1),size( TEMP2D,2),1))
             aux3d(:,:,1) = TEMP2D ! same trick of putting in rank-3 array for transforms
@@ -3356,27 +3354,29 @@ contains
             call ESMFL_BundleGetPointerToData(ana_bundle, trim(qname), TEMP3D, _RC)
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
-            call WRITE_PARALLEL('Replaying increment of '//trim(qname))
+            call logger%info("Replaying increment of "//trim(qname))
             dqqv = cubeTEMP3D
             deallocate(cubeTEMP3D)
          endif
 
          ! PT
          if( trim(tname).ne.'NULL' ) then
-            if(trim(tvar).ne.'TV') then
-               call WRITE_PARALLEL('Error: Cannot Replay TVAR '//trim(tvar))
-               STATUS=99
-               _VERIFY(STATUS)
-            endif
-            if(trim(tname).ne.'tv') then
-               call WRITE_PARALLEL('Error: Cannot Replay TNAME '//trim(tname))
-               STATUS=99
-               _VERIFY(STATUS)
-            endif
+            _ASSERT(trim(tvar) .ne. "TV", "Cannot Replay TVAR " // trim(tvar))
+            ! if(trim(tvar).ne.'TV') then
+            !    call logger%info("Error: Cannot Replay TVAR "//trim(tvar))
+            !    STATUS=99
+            !    _VERIFY(STATUS)
+            ! endif
+            _ASSERT(trim(tname) .ne. "tv", "Cannot Replay TNAME " // trim(tname))
+            ! if(trim(tname).ne.'tv') then
+            !    call logger%info("Error: Cannot Replay TNAME "//trim(tname))
+            !    STATUS=99
+            !    _VERIFY(STATUS)
+            ! endif
             call ESMFL_BundleGetPointerToData(ana_bundle, trim(tname), TEMP3D, _RC)
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
-            call WRITE_PARALLEL('Replaying increment of '//trim(tname))
+            call logger%info("Replaying increment of "//trim(tname))
             ! have an incremental change to virtual temperature;
             ! want an incremental change to dry potential temperature
             ! calculate first incremental change to t-dry (save in dth for now)
@@ -3418,7 +3418,7 @@ contains
          deallocate( dpkz    )
          deallocate( dpkxy   )
 
-         call WRITE_PARALLEL('Incremental replay complete')
+         call logger%info("Incremental replay complete")
       end subroutine incremental_
 
       subroutine state_remap_
@@ -3454,13 +3454,14 @@ contains
                if (rank==3) nq3d=nq3d+1
             enddo
             write(STRING,'(A,I5,A)') "Found  ", nq3d, " 3d-tracers to remap"
-            call WRITE_PARALLEL( trim(STRING)   )
+            call logger%info(trim(STRING))
          endif
-         if (nq3d<2) then
-            call WRITE_PARALLEL('state_remap: invalid number of tracers')
-            status=999
-            _VERIFY(STATUS)
-         endif
+         _ASSERT(nq3d>=2, "state_remap: invalid number of tracers")
+         ! if (nq3d<2) then
+         !    call WRITE_PARALLEL('state_remap: invalid number of tracers')
+         !    status=999
+         !    _VERIFY(STATUS)
+         ! endif
 
          iib = lbound(vars%pe,1)
          iie = ubound(vars%pe,1)
@@ -3477,7 +3478,7 @@ contains
             ana_thv = vars%pt*(1.0+eps*qqq%content   (:,:,:))
          endif
 
-         call WRITE_PARALLEL('Replay start remapping')
+         call logger%info("Replay start remapping")
          !
          call ESMFL_BundleGetPointerToData(ana_bundle, 'phis', XTMP2D, _RC)
          allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
@@ -3496,20 +3497,22 @@ contains
                if (rank==2) cycle
                if (rank==3) then
                   icnt=icnt+1
-                  if (icnt>nq3d) then
-                     call WRITE_PARALLEL('state_remap: number of tracers exceeds known value')
-                     status=999
-                     _VERIFY(STATUS)
-                  endif
+                  _ASSERT(icnt<=nq3d, "state_remap: number of tracers exceeds known value")
+                  ! if (icnt>nq3d) then
+                  !    call WRITE_PARALLEL('state_remap: number of tracers exceeds known value')
+                  !    status=999
+                  !    _VERIFY(STATUS)
+                  ! endif
                   call ESMFL_BundleGetPointerToData(BUNDLE, NAME, ptr3dr4, _RC)
                   ana_qq(:,:,:,icnt) = ptr3dr4
                endif
             enddo
-            if (icnt/=nq3d) then
-               call WRITE_PARALLEL('state_remap: inconsitent number of tracers')
-               status=999
-               _VERIFY(STATUS)
-            endif
+            _ASSERT(icnt==nq3d, "state_remap: inconsitent number of tracers")
+            ! if (icnt/=nq3d) then
+            !    call WRITE_PARALLEL('state_remap: inconsitent number of tracers')
+            !    status=999
+            !    _VERIFY(STATUS)
+            ! endif
          else
             if( qqq%is_r4 ) then
                ana_qq(:,:,:,1) = qqq%content_r4(:,:,:)
@@ -3577,7 +3580,7 @@ contains
                  / ( kappa*( log(vars%pe(:,:,k+1))-log(vars%pe(:,:,k)) ) )
          enddo
 
-         call WRITE_PARALLEL('Replay done remapping')
+         call logger%info("Replay done remapping")
 
          deallocate(ana_qq)
          deallocate(ana_thv)
@@ -5006,9 +5009,12 @@ contains
       real(REAL8), parameter :: r0_6=0.6
       real(REAL8), parameter :: r1_0=1.0
 
+      class(logger_t), pointer :: logger
+
       _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
       grid  => self%grid ! direct handle to grid
 
+      call MAPL_GridCompGet(gc, logger=logger, _RC)
       call MAPL_GridCompGetResource(gc, "T0", T0, default=273., _RC)
       call MAPL_GridCompGetInternalState(gc, internal, _RC)
 
@@ -5111,7 +5117,7 @@ contains
          DYN_CASE = case_id
 
          write(string,'(A,I5,A)') "Initializing CASE_ID ", case_id, " in FVcubed:"
-         call WRITE_PARALLEL( trim(string) )
+         call logger%info(trim(string))
 
          ! Parse case_rotation
          if (case_rotation == -1) rot_ang =  0
