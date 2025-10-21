@@ -20,7 +20,6 @@ module FVdycoreCubed_GridComp
    use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
    use MAPL_Constants, only: MAPL_VectorField, MAPL_BundleItem
-   use MAPL_Constants, only: MAPL_RestartSkip, MAPL_RestartRequired, MAPL_InitialRestart
    use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
    use ESMFL_Mod, only: ESMFL_StateGetPointerToData, ESMFL_BundleGetPointerToData, MAPL_AreaMean
@@ -28,12 +27,13 @@ module FVdycoreCubed_GridComp
    ! use MAPL_GenericMod, only: MAPL_TimerAdd
    use MAPL_AbstractRegridderMod, only: AbstractRegridder
    use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
-   use MAPL_BaseMod, only: MAPL_AttributeSet, MAPL_RemapBounds
+   ! use MAPL_BaseMod, only: MAPL_AttributeSet
+   use MAPL_BaseMod, only: MAPL_RemapBounds
    use MAPL_GridManagerMod, only: grid_manager
    use MAPL_RegridderManagerMod, only: regridder_manager
    use MAPL_RegridMethods, only: REGRID_METHOD_BILINEAR
    use MAPL_CFIOMod, only: MAPL_CFIORead
-   use MAPL_MemUtilsMod, only: MAPL_MemUtilsWrite
+   ! use MAPL_MemUtilsMod, only: MAPL_MemUtilsWrite
    use MAPL_FieldPointerUtilities, only: MAPL_FieldDestroy
    use MAPL_MaxMinMod, only: MAPL_MaxMin
    use MAPL_CommsMod, only: MAPL_AM_I_ROOT, MAPL_ArrayGather => ArrayGather
@@ -49,6 +49,8 @@ module FVdycoreCubed_GridComp
    use mapl3g_State_API, only: MAPL_StateGetPointer
    use mapl3g_Field_API, only: MAPL_FieldCreate
    use mapl3g_FieldBundle_API, only: MAPL_FieldBundleAdd
+   use mapl3g_RestartModes, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
+
    use pflogger, only: logger_t => logger
 
    use m_set_eta, only: set_eta
@@ -511,6 +513,7 @@ contains
       call MAPL_StateGetPointer(export, bk4, "BK", _RC)
       call MAPL_StateGetPointer(internal, ak, "AK", _RC)
       call MAPL_StateGetPointer(internal, bk, "BK", _RC)
+      ! pchakrab: TODO - how to handle `alloc=.true.` in MAPL3??
       call MAPL_GetPointer(export, pref, "PREF", alloc=.true., _RC)
       ak4 = ak
       bk4 = bk
@@ -522,6 +525,7 @@ contains
       call MAPL_StateGetPointer(internal, pt, "PT", _RC)
       call MAPL_StateGetPointer(internal, pk, "PKZ", _RC)
 
+      ! pchakrab: TODO - how to handle `alloc=.true.` in MAPL3??
       call MAPL_GetPointer(export, ple, "PLE", alloc=.true., _RC)
       call MAPL_GetPointer(export, u, "U", alloc=.true., _RC)
       call MAPL_GetPointer(export, v, "V", alloc=.true., _RC)
@@ -544,6 +548,7 @@ contains
       deallocate(ur, vr)
 
       ! Fill Grid-Cell Area Delta-X/Y
+      ! pchakrab: TODO - how to handle `alloc=.true.` in MAPL3??
       call MAPL_GetPointer(export, temp2d, "DXC", alloc=.true., _RC)
       temp2d = self%grid%dxc
 
@@ -561,21 +566,21 @@ contains
       !     would be to move the computation to phase 2 of Initialize and
       !     eliminate this section alltogether
       ! ======================================================================
-      ! pchakrab: TODO - do we need to port the following to MAPL3
-      call ESMF_StateGet(export, "PREF", field, _RC)
-      call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
+      ! ! pchakrab: TODO - do we need to port the following to MAPL3
+      ! call ESMF_StateGet(export, "PREF", field, _RC)
+      ! call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
 
-      call ESMF_StateGet(export, "PLE", field, _RC)
-      call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
+      ! call ESMF_StateGet(export, "PLE", field, _RC)
+      ! call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
 
-      call ESMF_StateGet(export, "U", field, _RC)
-      call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
+      ! call ESMF_StateGet(export, "U", field, _RC)
+      ! call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
 
-      call ESMF_StateGet(export, "V", field, _RC)
-      call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
+      ! call ESMF_StateGet(export, "V", field, _RC)
+      ! call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
 
-      call ESMF_StateGet(export, "T", field, _RC)
-      call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
+      ! call ESMF_StateGet(export, "T", field, _RC)
+      ! call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
 
       call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", fv3_standalone, default=0, _RC)
       if (fv3_standalone /= 0) then
@@ -2612,6 +2617,7 @@ contains
          end if
 
          ! Updraft Helicty Exports
+         ! pchakrab: TODO - how to handle `alloc=.true.` in MAPL3??
          call MAPL_GetPointer(export,  uh25, 'UH25', alloc=.true., _RC)
          call MAPL_GetPointer(export,  uh03, 'UH03', alloc=.true., _RC)
          call MAPL_GetPointer(export, srh01,'SRH01', alloc=.true., _RC)
