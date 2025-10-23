@@ -4978,7 +4978,8 @@ contains
 
       real(REAL8), pointer :: AK1(:), BK1(:), AK(:), BK(:)
       real(REAL8), pointer :: U(:,:,:), V(:,:,:), PT(:,:,:)
-      real(REAL8), pointer :: PE1(:,:,:), PE(:,:,:), PKZ(:,:,:)
+      real(REAL8), pointer :: PE1(:,:,:), PKZ(:,:,:)
+      real(REAL8), allocatable :: PE(:,:,:)
       real(REAL4), pointer :: phis(:,:)
       real(REAL4), pointer :: lons(:,:), lats(:,:)
 
@@ -5039,8 +5040,11 @@ contains
       km = ke-ks+1
       call MAPL_StateGetPointer(internal, V, "V", _RC) ! A-Grid V Wind
       call MAPL_StateGetPointer(internal, PT, "PT", _RC) ! potential temperature
-      call MAPL_StateGetPointer(internal, PE1, "PE", _RC) ! edge pressures - 1 based
-      PE(is:ie, js:je, 0:km) => PE1(is:ie, js:je, 1:km+1)
+      ! call MAPL_StateGetPointer(internal, PE1, "PE", _RC) ! edge pressures - 1 based
+      ! pchakrab - gfortran has issues with the following rank
+      ! remapping (ifort doesn't) , so we allocate a new array
+      ! PE(is:ie, js:je, 0:km) => PE1(is:ie, js:je, 1:km+1)
+      allocate(PE(is:ie, js:je, 0:km), _STAT)
       call MAPL_StateGetPointer(internal, PKZ , "PKZ", _RC) ! presssure ^ kappa at mid-layers
       call MAPL_StateGetPointer(internal, ak1, "AK" , _RC) ! AK for vertical coordinate - 1 based
       ak(0:km) => ak1(1:km+1)
@@ -5466,8 +5470,9 @@ contains
 
       endif
 
-      deallocate(PS)
-
+      call MAPL_StateGetPointer(internal, PE1, "PE", _RC) ! edge pressures - 1 based
+      PE1(is:ie, js:je, 1:km+1) = PE(is:ie, js:je, 0:km)
+      deallocate(PE, PS)
       DYN_COLDSTART=.true.
 
       _RETURN(_SUCCESS)
