@@ -68,15 +68,18 @@ workflows:
           mepodevelop: false
           checkout_mapl3_release_branch: true
           persist_workspace: true # Needs to be true to run fv3/gcm experiment, costs extra
-      - ci/run_fv3:
-          name: run-FV3-as-<< matrix.fv_precision >>-on-<< matrix.compiler >>-with-GEOSfvdycore
-          context:
-            - docker-hub-creds
-          matrix:
-            parameters:
-              compiler: [gfortran, ifort]
-              fv_precision: ["R4", "R8"]
-          #baselibs_version: *baselibs_version
-          requires:
-            - build-GEOSfvdycore-as-<< matrix.fv_precision >>-on-<< matrix.compiler >>
-          repo: GEOSfvdycore
+      # We also turn off the FV3 dycore runs for now
+      #############################################################################################
+      # - ci/run_fv3:                                                                             #
+      #     name: run-FV3-as-<< matrix.fv_precision >>-on-<< matrix.compiler >>-with-GEOSfvdycore #
+      #     context:                                                                              #
+      #       - docker-hub-creds                                                                  #
+      #     matrix:                                                                               #
+      #       parameters:                                                                         #
+      #         compiler: [gfortran, ifort]                                                       #
+      #         fv_precision: ["R4", "R8"]                                                        #
+      #     #baselibs_version: *baselibs_version                                                  #
+      #     requires:                                                                             #
+      #       - build-GEOSfvdycore-as-<< matrix.fv_precision >>-on-<< matrix.compiler >>          #
+      #     repo: GEOSfvdycore                                                                    #
+      #############################################################################################
