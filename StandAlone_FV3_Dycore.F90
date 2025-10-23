@@ -5,12 +5,9 @@
 
 program StandAlone_FV3_Dycore
    use MAPL
-   use FVdycoreCubed_GridComp,      only: SetServices
+   use FVdycoreCubed_GridComp, only: SetServices
+
    implicit none
-
-!EOP
-
-!EOC
 
    character(*), parameter :: IAM = __FILE__
 
@@ -23,6 +20,3 @@ program StandAlone_FV3_Dycore
    call cap%run(_RC)
 
  end Program StandAlone_FV3_Dycore
-
-!EOC
-

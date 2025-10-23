@@ -104,7 +104,7 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
 
 endif ()
 
-set(dependencies MAPL GFTL_SHARED::gftl-shared-v2 GMAO_hermes GEOS_Shared esmf OpenMP::OpenMP_Fortran)
+set(dependencies MAPL MAPL.generic3g GFTL_SHARED::gftl-shared-v2 GMAO_hermes GEOS_Shared esmf OpenMP::OpenMP_Fortran)
 
 if (BUILD_GEOS_GTFV3_INTERFACE)
   esma_add_library (${this}
@@ -118,10 +118,12 @@ else ()
     SRCS ${srcs}
     SUBCOMPONENTS fvdycore
     DEPENDENCIES ${dependencies}
-    DEPENDENCIES ${GFDL})
+    DEPENDENCIES ${GFDL}
+    TYPE SHARED
+  )
 endif ()
 
-mapl_acg (${this} DynCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS INTERNAL_SPECS)
+mapl_acg (${this} DynCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS INTERNAL_SPECS 3g)
 mapl_acg (${this} AdvCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS)
 
 if (FV_PRECISION STREQUAL R4)
