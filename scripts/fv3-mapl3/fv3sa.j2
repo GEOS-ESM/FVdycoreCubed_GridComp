@@ -1,0 +1,43 @@
+---
+NX: {{ nx }}
+NY: {{ ny }}
+IM: {{ im }}
+JM: {{ jm }}
+AGCM_IM: {{ im }}
+AGCM_JM: {{ jm }}
+AGCM_LM: {{ num_levels }}
+FV3_STANDALONE: 1
+RUN_DT: {{ run_dt }}
+DYCORE: FV3
+COLDSTART: 1
+CASE_ID: 1
+CASE_TRACERS: 1
+ADIABATIC: 1
+fix_mass: 0
+EXCLUDE_ADVECTION_TRACERS_LIST: []
+
+mapl:
+
+  geometry:
+    esmf_geom:
+      class: CubedSphere
+      im_world: {{ im }}
+      jm_world: {{ jm }}
+      pole: PC
+      dateline: DC
+    vertical_grid:
+      class: model
+      standard_name: air_pressure
+      units: hPa
+      num_levels: {{ num_levels }}
+      field_edge: PLE
+      field_center: PE
+
+  misc:
+    activate_all_imports: true
+    activate_all_exports: true
+    checkpoint:
+      export: true
+      import: true
+      internal: true
+

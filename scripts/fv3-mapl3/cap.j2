@@ -1,0 +1,33 @@
+---
+cap:
+  name: CAP
+  restart: cap_restart.yaml
+
+  clock:
+    dt: PT1200S
+    start: 1891-03-01T00:00:00
+    stop: 2999-03-11T00:00:00
+    segment_duration: PT1H  # P1DT
+
+  run_extdata: false
+  run_history: false
+  root_name: fvcore
+
+  mapl:
+    children:
+      fvcore:
+        dso: {{ lib_dir }}/libFVdycoreCubed_GridComp.so
+        config_file: fv3sa.yaml
+
+  checkpointing:
+    enabled: true
+    final: true
+    path: checkpoints
+
+esmf:
+  logKindFlag: ESMF_LOGKIND_MULTI_ON_ERROR
+  logAppendFlag: false
+
+mapl:
+  model_petcount: {{ petcount }}
+
