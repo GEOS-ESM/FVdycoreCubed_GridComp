@@ -19,14 +19,16 @@ module FVdycoreCubed_GridComp
 
    use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
-   use MAPL_Constants, only: MAPL_VectorField, MAPL_BundleItem
+   ! pchakrab - TODO: need MAPL3 equivalent
+   use MAPL_Constants, only: MAPL_VectorField
    use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
    use ESMFL_Mod, only: ESMFL_StateGetPointerToData, ESMFL_BundleGetPointerToData, MAPL_AreaMean
 
    ! use MAPL_GenericMod, only: MAPL_TimerAdd
    use MAPL_AbstractRegridderMod, only: AbstractRegridder
-   use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
+   ! pchakrab - TODO: need MAPL3 equivalents
+   ! use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
    ! use MAPL_BaseMod, only: MAPL_AttributeSet
    use MAPL_BaseMod, only: MAPL_RemapBounds
    use MAPL_GridManagerMod, only: grid_manager
@@ -802,7 +804,7 @@ contains
       character(len=:), allocatable :: cremap,tremap
       character(len=:), allocatable :: uname, vname, tname, qname, psname, dpname, o3name, rgrid, tvar
 
-      type(MAPL_SunOrbit) :: ORBIT
+      ! type(MAPL_SunOrbit) :: ORBIT
       real(r4), pointer :: lats(:,:), lons(:,:)
       real(r4), allocatable :: ZTH(:,:), SLR(:,:)
 
