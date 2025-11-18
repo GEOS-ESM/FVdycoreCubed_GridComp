@@ -19,21 +19,19 @@ module FVdycoreCubed_GridComp
 
    use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
-   use MAPL_Constants, only: MAPL_VectorField, MAPL_BundleItem
+   use MAPL_Constants, only: MAPL_VectorField ! pchakrab: TODO - need MAPL3 equivalent
    use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
    use ESMFL_Mod, only: ESMFL_StateGetPointerToData, ESMFL_BundleGetPointerToData, MAPL_AreaMean
 
-   ! use MAPL_GenericMod, only: MAPL_TimerAdd
    use MAPL_AbstractRegridderMod, only: AbstractRegridder
-   use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
-   ! use MAPL_BaseMod, only: MAPL_AttributeSet
+   ! pchakrab - TODO: need MAPL3 equivalent
+   ! use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
    use MAPL_BaseMod, only: MAPL_RemapBounds
    use MAPL_GridManagerMod, only: grid_manager
    use MAPL_RegridderManagerMod, only: regridder_manager
    use MAPL_RegridMethods, only: REGRID_METHOD_BILINEAR
    use MAPL_CFIOMod, only: MAPL_CFIORead
-   ! use MAPL_MemUtilsMod, only: MAPL_MemUtilsWrite
    use MAPL_FieldPointerUtilities, only: MAPL_FieldDestroy
    use MAPL_MaxMinMod, only: MAPL_MaxMin
    use MAPL_CommsMod, only: MAPL_AM_I_ROOT, MAPL_ArrayGather => ArrayGather
@@ -470,10 +468,9 @@ contains
       real(r4), pointer :: temp2d(:,:)
 
       real(r8), pointer ::  ak(:), bk(:)
-      real(r4), pointer ::  ak4(:), bk4(:) ! exports are 32-bit
       real(r8), pointer ::  ud(:,:,:), vd(:,:,:)
       real(r8), pointer ::  pe(:,:,:), pt(:,:,:), pk(:,:,:)
-      real(r8), allocatable ::  ur(:,:,:), vr(:,:,:)
+      real(r8), allocatable ::  ur(:,:,:), vr(:,:,:) ! rotated winds
 
       real :: DNS_INTERVAL
       integer :: ColdRestart=0
@@ -509,15 +506,10 @@ contains
       ! call MAPL_TimerOff(MAPL, "-DYN_INIT")
 
       ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
-      call MAPL_StateGetPointer(export, ak4, "AK", _RC)
-      call MAPL_StateGetPointer(export, bk4, "BK", _RC)
       call MAPL_StateGetPointer(internal, ak, "AK", _RC)
       call MAPL_StateGetPointer(internal, bk, "BK", _RC)
-      ! pchakrab: TODO - how to handle `alloc=.true.` in MAPL3??
-      call MAPL_GetPointer(export, pref, "PREF", alloc=.true., _RC)
-      ak4 = ak
-      bk4 = bk
-      pref = ak + bk * P00
+      call MAPL_StateGetPointer(export, pref, "PREF", _RC)
+      if (associated(pref)) pref = ak + bk * P00
 
       call MAPL_StateGetPointer(internal, ud, "U", _RC)
       call MAPL_StateGetPointer(internal, vd, "V", _RC)
@@ -538,8 +530,8 @@ contains
       jlast  = self%grid%je
       km     = self%grid%npz
 
-      allocate(ur(ifirst:ilast,jfirst:jlast,km))
-      allocate(vr(ifirst:ilast,jfirst:jlast,km))
+      allocate(ur(ifirst:ilast, jfirst:jlast, km))
+      allocate(vr(ifirst:ilast, jfirst:jlast, km))
       call getAllWinds(ud, vd, ur=ur, vr=vr)
       u = ur
       v = vr
@@ -548,15 +540,14 @@ contains
       deallocate(ur, vr)
 
       ! Fill Grid-Cell Area Delta-X/Y
-      ! pchakrab: TODO - how to handle `alloc=.true.` in MAPL3??
-      call MAPL_GetPointer(export, temp2d, "DXC", alloc=.true., _RC)
-      temp2d = self%grid%dxc
+      call MAPL_StateGetPointer(export, temp2d, "DXC", _RC)
+      if (associated(temp2d)) temp2d = self%grid%dxc
 
-      call MAPL_GetPointer(export, temp2d, "DYC", alloc=.true., _RC)
-      temp2d = self%grid%dyc
+      call MAPL_StateGetPointer(export, temp2d, "DYC", _RC)
+      if (associated(temp2d)) temp2d = self%grid%dyc
 
-      call MAPL_GetPointer(export, temp2d, "AREA", alloc=.true., _RC)
-      temp2d = self%grid%area
+      call MAPL_StateGetPointer(export, temp2d, "AREA", _RC)
+      if (associated(temp2d)) temp2d = self%grid%area
 
       ! ======================================================================
       !ALT: the next section addresses the problem when export variables have been
@@ -802,7 +793,7 @@ contains
       character(len=:), allocatable :: cremap,tremap
       character(len=:), allocatable :: uname, vname, tname, qname, psname, dpname, o3name, rgrid, tvar
 
-      type(MAPL_SunOrbit) :: ORBIT
+      ! type(MAPL_SunOrbit) :: ORBIT
       real(r4), pointer :: lats(:,:), lons(:,:)
       real(r4), allocatable :: ZTH(:,:), SLR(:,:)
 
@@ -3909,9 +3900,9 @@ contains
 
          tempxy = vars%pt * vars%pkz   ! Dry Temperature
 
-         !#if defined(DEBUG_T)
-         !  call Write_Profile(grid, tempxy, 'T')
-         !#endif
+#if defined(DEBUG_T)
+         call Write_Profile(grid, tempxy, 'T')
+#endif
 
          if (DEBUG_DYN) then
             call MAPL_MaxMin('DYN: Q_AF_INC ', qv)

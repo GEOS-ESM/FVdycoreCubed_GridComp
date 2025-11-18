@@ -100,8 +100,8 @@ category: EXPORT
   DQLDTDYN       |  tendency_of_liquid_water_due_to_dynamics                                 |  kg/kg/s           |  xyz  |  C   |                    |
   DOXDTDYN       |  tendency_of_ozone_due_to_dynamics                                        |  mol mol-1 s-1     |  xyz  |  C   |                    |
   PREF           |  reference_air_pressure                                                   |  Pa                |    z  |  E   |                    |
-  AK             |  hybrid_sigma_pressure_a                                                  |  1                 |    z  |  E   |                    |
-  BK             |  hybrid_sigma_pressure_b                                                  |  1                 |    z  |  E   |                    |
+# AK             |  hybrid_sigma_pressure_a                                                  |  1                 |    z  |  E   |                    |
+# BK             |  hybrid_sigma_pressure_b                                                  |  1                 |    z  |  E   |                    |
   PHIS           |  surface_height                                                           |  m                 |  xy   |  N   |                    |
   PS             |  surface_pressure                                                         |  Pa                |  xy   |  N   |                    |
   TA             |  surface_air_temperature                                                  |  K                 |  xy   |  N   |                    |
@@ -259,15 +259,15 @@ category: IMPORT
 
 
 category: INTERNAL
-#---------------------------------------------------------------------------------------------------------
- SHORT_NAME |  LONG_NAME                     |  UNITS             |  TYPEKIND  |  DIMS |   RESTART  | VLOC
-#---------------------------------------------------------------------------------------------------------
-  AK        |  hybrid_sigma_pressure_a       |  Pa                |  R8        |    z  |  REQUIRED  |  E
-  BK        |  hybrid_sigma_pressure_b       |  1                 |  R8        |    z  |  REQUIRED  |  E
-  U         |  eastward_wind                 |  m s-1             |  R8        |  xyz  |  REQUIRED  |  C
-  V         |  northward_wind                |  m s-1             |  R8        |  xyz  |  REQUIRED  |  C
-  PT        |  scaled_potential_temperature  |  K Pa$^{-\kappa}$  |  R8        |  xyz  |  REQUIRED  |  C
-  PE        |  air_pressure                  |  Pa                |  R8        |  xyz  |  REQUIRED  |  E
-  PKZ       |  pressure_to_kappa             |  Pa$^\kappa$       |  R8        |  xyz  |  REQUIRED  |  C
-  DZ        |  height_thickness              |  m                 |  R8        |  xyz  |            |  C
-  W         |  vertical_velocity             |  m s-1             |  R8        |  xyz  |            |  C
+#------------------------------------------------------------------------------------------------------------------------
+ SHORT_NAME |  LONG_NAME                     |  UNITS             |  TYPEKIND  |  DIMS |   RESTART  | VLOC | ADD2EXPORT
+#------------------------------------------------------------------------------------------------------------------------
+  AK        |  hybrid_sigma_pressure_a       |  Pa                |  R8        |    z  |  REQUIRED  |  E   |    T
+  BK        |  hybrid_sigma_pressure_b       |  1                 |  R8        |    z  |  REQUIRED  |  E   |    T
+  U         |  eastward_wind                 |  m s-1             |  R8        |  xyz  |  REQUIRED  |  C   |    F
+  V         |  northward_wind                |  m s-1             |  R8        |  xyz  |  REQUIRED  |  C   |    F
+  W         |  vertical_velocity             |  m s-1             |  R8        |  xyz  |            |  C   |    F
+  PT        |  scaled_potential_temperature  |  K Pa$^{-\kappa}$  |  R8        |  xyz  |  REQUIRED  |  C   |    F
+  PE        |  air_pressure                  |  Pa                |  R8        |  xyz  |  REQUIRED  |  E   |    F
+  PKZ       |  pressure_to_kappa             |  Pa$^\kappa$       |  R8        |  xyz  |  REQUIRED  |  C   |    F
+  DZ        |  height_thickness              |  m                 |  R8        |  xyz  |            |  C   |    F
