@@ -313,10 +313,9 @@ contains
       endif
    end subroutine FV_RESET_CONSTANTS
 
-   subroutine FV_Setup(gc, layout_file, rc)
+   subroutine FV_Setup(gc, rc)
       use test_cases_mod, only : test_case
       type(ESMF_GridComp), intent(inout) :: gc
-      character(len=*), intent(in) :: layout_file
       integer, optional, intent(OUT) :: rc
 
       ! Local

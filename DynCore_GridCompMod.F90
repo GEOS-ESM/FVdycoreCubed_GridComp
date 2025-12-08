@@ -341,7 +341,6 @@ contains
       !EOP
 
       type(DynState), pointer :: self
-      character(len=:), allocatable :: layout_file
       character(len=ESMF_MAXSTR) :: myTracer
       class(logger_t), pointer :: logger
       integer :: FV3_STANDALONE, ilev, itracer, status
@@ -415,8 +414,7 @@ contains
       !  call MAPL_GridCompSetEntryPoint(gc, ESMF_SETREADRESTART, Coldstart, _RC)
 
       ! Setup FMS/FV3
-      call MAPL_GridCompGetResource(gc, "LAYOUT", layout_file, default="fvcore_layout.rc", _RC)
-      call DynSetup(gc, layout_file, _RC)
+      call DynSetup(gc, _RC)
 
       ! Register prototype of cubed sphere grid and associated regridders
       call register_grid_and_regridders()
@@ -460,7 +458,7 @@ contains
       type(ESMF_Alarm) :: alarm
       type(ESMF_FieldBundle) :: tradv, tradvex
 
-      character(len=:), allocatable :: layout_file, ReplayMode
+      character(len=:), allocatable :: ReplayMode
 
       real(r4), pointer :: pref(:)
       real(r4), pointer :: ple(:,:,:)
@@ -489,7 +487,6 @@ contains
       ! Get the private state
       _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
 
-      call MAPL_GridCompGetResource(gc, "LAYOUT", layout_file, default="fvcore_layout.rc", _RC)
       call MAPL_GridCompGetResource(gc, "DO_ADD_INCS", DO_ADD_INCS, default=DO_ADD_INCS, _RC)
 
       ! Check for ColdStart from the configuration
