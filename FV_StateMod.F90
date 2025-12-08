@@ -16,7 +16,7 @@ module FV_StateMod
    use FileIOSharedMod, only: WRITE_PARALLEL
 
    use mapl3g_generic, only: MAPL_GridCompGetResource, MAPL_GridCompGet, MAPL_GridCompGetInternalState
-   use mapl3g_Geom_API, only: MAPL_GridGet
+   use mapl3g_Geom_API, only: MAPL_GridGet, MAPL_GeomGet
    use mapl3g_State_API, only: MAPL_StateGetPointer
 #endif
    use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
@@ -320,12 +320,13 @@ contains
 
       ! Local
       type(ESMF_VM) :: vm
+      type(ESMF_Geom) :: geom
       character(len=ESMF_MAXSTR) :: Iam='FV_StateMod::FV_Setup'
       character(len=:), allocatable :: DYCORE
-
       real(FVPRC) :: DT
       real :: temp_real
       integer :: comm, ndt, nx, ny, status, p_split=1
+      integer, allocatable :: topology(:)
 
       call ESMF_VMGetCurrent(vm, _RC)
       call MAPL_MemUtilsWrite(vm, trim(Iam), _RC)
@@ -368,30 +369,29 @@ contains
       endif
       ! Check for Doubly Periodic Domain Info
       call MAPL_GridCompGetResource(gc, "FIXED_LATS", FV_Atm(1)%flagstruct%deglat, default=FV_Atm(1)%flagstruct%deglat, _RC)
+
       ! MPI decomp setup
-      call MAPL_GridCompGetResource(gc, "NX", nx, default=0, _RC)
-      FV_Atm(1)%layout(1) = nx
-      call MAPL_GridCompGetResource(gc, "NY", ny, default=0, _RC)
-      if (FV_Atm(1)%flagstruct%grid_type == 4) then
-         FV_Atm(1)%layout(2) = ny
-      else
-         FV_Atm(1)%layout(2) = ny / 6
-      end if
+      call MAPL_GridCompGet(gc, geom=geom, _RC)
+      call MAPL_GeomGet(geom, topology, _RC)
+      associate(layout => FV_Atm(1)%layout)
+        layout = topology
+        if (FV_Atm(1)%flagstruct%grid_type == 4) then
+           layout(2) = layout(2) * 6
+        end if
+      end associate
 
-      ! Get other scalars
-      call MAPL_GridCompGetResource(gc, "RUN_DT", ndt, default=0, _RC)
-      DT = ndt
+      ! DT
+      call MAPL_GridCompGetResource(gc, "RUN_DT", ndt, default=0, _RC); DT = ndt
+
+      ! Advect tracers within DynCore(AdvCore_Advection=.false.)
+      ! or within AdvCore(AdvCore_Advection=.true.)
       call MAPL_GridCompGetResource(gc, "DYCORE", DYCORE, default="", _RC)
-
       if(adjustl(DYCORE)=="FV3") then
          AdvCore_Advection = 0
       endif
       if(adjustl(DYCORE)=="FV3+ADV") then
          AdvCore_Advection = 1
       endif
-
-      ! Advect tracers within DynCore(AdvCore_Advection=.false.)
-      !             or within AdvCore(AdvCore_Advection=.true.)
       call MAPL_GridCompGetResource(gc, "AdvCore_Advection", AdvCore_Advection, default=AdvCore_Advection, _RC)
 
       call MAPL_GridCompGetResource(gc, "FV3_QSPLIT", FV3_QSPLIT, default=FV3_QSPLIT, _RC)

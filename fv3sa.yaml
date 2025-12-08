@@ -1,6 +1,4 @@
 ---
-# NX: 1
-# NY: 6
 # IM: 48
 # JM: 288
 # AGCM_IM: 48
@@ -13,6 +11,8 @@ COLDSTART: 1
 CASE_ID: 1
 CASE_TRACERS: 1
 ADIABATIC: 1
+FV_OFF: 0
+fix_mass: 0
 EXCLUDE_ADVECTION_TRACERS_LIST: []
 
 geometry:
