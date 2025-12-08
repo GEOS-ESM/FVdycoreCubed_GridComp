@@ -38,6 +38,7 @@ module FVdycoreCubed_GridComp
 
    use FileIOSharedMod, only: WRITE_PARALLEL
 
+   use mapl3g_generic, only: MAPL_GridCompSetGeometry
    use mapl3g_generic, only: MAPL_GridCompGet, MAPL_GridCompGetResource
    use mapl3g_generic, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
    use mapl3g_generic, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_FIELDBUNDLE
@@ -413,8 +414,8 @@ contains
       call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Finalize, Finalize, _RC)
       !  call MAPL_GridCompSetEntryPoint(gc, ESMF_SETREADRESTART, Coldstart, _RC)
 
-      ! Setup FMS/FV3
-      call DynSetup(gc, _RC)
+      ! Setup geometry
+      call MAPL_GridCompSetGeometry(gc, _RC)
 
       ! Register prototype of cubed sphere grid and associated regridders
       call register_grid_and_regridders()
@@ -483,6 +484,9 @@ contains
       ! ! Start the timers
       ! call MAPL_TimerOn(MAPL, "TOTAL")
       ! call MAPL_TimerOn(MAPL, "INITIALIZE")
+
+      ! Setup FMS/FV3
+      call DynSetup(gc, _RC)
 
       ! Get the private state
       _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
