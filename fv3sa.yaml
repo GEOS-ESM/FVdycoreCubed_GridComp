@@ -10,9 +10,9 @@ DYCORE: FV3
 COLDSTART: 1
 CASE_ID: 1
 CASE_TRACERS: 1
-ADIABATIC: 1
-FV_OFF: 0
-fix_mass: 0
+ADIABATIC: true
+FV_OFF: false
+fix_mass: false
 EXCLUDE_ADVECTION_TRACERS_LIST: []
 
 geometry:

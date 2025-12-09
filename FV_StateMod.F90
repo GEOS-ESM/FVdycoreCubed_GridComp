@@ -11,7 +11,6 @@ module FV_StateMod
    use mapl_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY, MAPL_RTRN
    use MAPL_MemUtilsMod, only: MAPL_MemUtilsWrite
    use MAPL_BaseMod, only: MAPL_UNDEF
-   use MAPL_GenericMod, only: MAPL_MetaComp, MAPL_Get, MAPL_GetObjectFromGC, MAPL_GetResource
    use ESMFL_Mod, only: ESMFL_StateGetPointerToData
    use FileIOSharedMod, only: WRITE_PARALLEL
 
@@ -63,19 +62,15 @@ module FV_StateMod
 
    !PUBLIC DATA MEMBERS:
    logical :: FV_OFF = .false.
-   integer :: INT_FV_OFF = 0
    logical :: ADJUST_DT = .false.
    logical :: DEBUG = .false.
    logical :: DEBUG_DYN = .false.
    logical :: DEBUG_ADV = .false.
    logical :: COLDSTART = .false.
    logical :: SW_DYNAMICS = .false.
-   integer :: INT_ADIABATIC = 0
    logical :: ADIABATIC = .false.
    logical :: FV_HYDROSTATIC = .true.
-   integer :: INT_check_mass = 0
    logical :: check_mass = .false.
-   integer :: INT_fix_mass = 1
    logical :: fix_mass = .true.
    integer :: CASE_ID = 11
    integer :: AdvCore_Advection = 0
@@ -154,7 +149,6 @@ module FV_StateMod
 
    type T_FVDYCORE_GRID
 #if defined( MAPL_MODE )
-      ! type (MAPL_MetaComp),   pointer :: FVgenstate
       type(ESMF_Grid) :: grid ! The 'horizontal' grid (2D decomp only)
 #endif
 
@@ -321,18 +315,16 @@ contains
       ! Local
       type(ESMF_VM) :: vm
       type(ESMF_Geom) :: geom
+      type(ESMF_HConfig) :: hconfig
       character(len=ESMF_MAXSTR) :: Iam='FV_StateMod::FV_Setup'
       character(len=:), allocatable :: DYCORE
       real(FVPRC) :: DT
       real :: temp_real
-      integer :: comm, ndt, nx, ny, status, p_split=1
+      integer :: comm, ndt, nx, ny, status, p_split=1, im_world
       integer, allocatable :: topology(:)
 
       call ESMF_VMGetCurrent(vm, _RC)
       call MAPL_MemUtilsWrite(vm, trim(Iam), _RC)
-
-      ! ! Retrieve the pointer to the state
-      ! call MAPL_GetObjectFromGC(gc, MAPL, _RC)
 
       ! call MAPL_TimerOn(MAPL,"--FMS_INIT")
       call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
@@ -347,26 +339,35 @@ contains
       call MAPL_MemUtilsWrite(vm, 'FV_StateMod::fv_init1', _RC)
 
       ! FV grid dimensions setup from MAPL
-      call MAPL_GridCompGetResource(gc, "AGCM_IM", FV_Atm(1)%flagstruct%npx, default= 32, _RC)
-      call MAPL_GridCompGetResource(gc, "AGCM_JM", FV_Atm(1)%flagstruct%npy, default=192, _RC)
-      call MAPL_GridCompGetResource(gc, "AGCM_LM", FV_Atm(1)%flagstruct%npz, default= 72, _RC)
-      if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
+      ! call MAPL_GridCompGetResource(gc, "AGCM_IM", FV_Atm(1)%flagstruct%npx, default= 32, _RC)
+      ! call MAPL_GridCompGetResource(gc, "AGCM_JM", FV_Atm(1)%flagstruct%npy, default=192, _RC)
+      ! call MAPL_GridCompGetResource(gc, "AGCM_LM", FV_Atm(1)%flagstruct%npz, default= 72, _RC)
+      call MAPL_GridCompGet(gc, hconfig=hconfig, _RC)
+      im_world = get_im_world(hconfig, _RC)
+      associate(flags => FV_Atm(1)%flagstruct)
+        flags%npx = im_world
+        flags%npy = im_world * 6
+        call MAPL_GridCompGet(gc, num_levels=flags%npz, _RC)
+        if (flags%npz == 1) SW_DYNAMICS = .true.
+        ! FV likes npx;npy in terms of cell vertices
+        if (flags%npy == 6*flags%npx) then
+           flags%npy = flags%npx+1
+           flags%npx = flags%npx+1
+           flags%ntiles = 6
+        else
+           flags%npy = flags%npy+1
+           flags%npx = flags%npx+1
+           flags%ntiles = 1
+        endif
+      end associate
+
       ! stretch_fac is kind(R_GRID) in FV, so to prevent a MAPL failure on RC check, we pull
       ! AGCM.STRETCH_FACTOR: as a REAL32 and then cast it to REAL64. This is because
-      ! FV_Atm(1)%flagstruct%stretch_fac is R_GRID => REAL64, and the MAPL_GetResource call
-      ! is getting a REAL32
+      ! FV_Atm(1)%flagstruct%stretch_fac is R_GRID => REAL64, and the MAPL_GridCompGetResource
+      ! call is getting a REAL32
       call MAPL_GridCompGetResource(gc, "AGCM.STRETCH_FACTOR", temp_real, default=1.0, _RC)
       FV_Atm(1)%flagstruct%stretch_fac = temp_real
-      ! FV likes npx;npy in terms of cell vertices
-      if (FV_Atm(1)%flagstruct%npy == 6*FV_Atm(1)%flagstruct%npx) then
-         FV_Atm(1)%flagstruct%ntiles = 6
-         FV_Atm(1)%flagstruct%npy    = FV_Atm(1)%flagstruct%npx+1
-         FV_Atm(1)%flagstruct%npx    = FV_Atm(1)%flagstruct%npx+1
-      else
-         FV_Atm(1)%flagstruct%ntiles = 1
-         FV_Atm(1)%flagstruct%npy    = FV_Atm(1)%flagstruct%npy+1
-         FV_Atm(1)%flagstruct%npx    = FV_Atm(1)%flagstruct%npx+1
-      endif
+
       ! Check for Doubly Periodic Domain Info
       call MAPL_GridCompGetResource(gc, "FIXED_LATS", FV_Atm(1)%flagstruct%deglat, default=FV_Atm(1)%flagstruct%deglat, _RC)
 
@@ -394,35 +395,13 @@ contains
       endif
       call MAPL_GridCompGetResource(gc, "AdvCore_Advection", AdvCore_Advection, default=AdvCore_Advection, _RC)
 
+      ! Other scalars
       call MAPL_GridCompGetResource(gc, "FV3_QSPLIT", FV3_QSPLIT, default=FV3_QSPLIT, _RC)
       call MAPL_GridCompGetResource(gc, "ADJUST_DT", ADJUST_DT, default=ADJUST_DT, _RC)
-      call MAPL_GridCompGetResource(gc, "fix_mass", INT_fix_mass, default=INT_fix_mass, _RC)
-      call MAPL_GridCompGetResource(gc, "check_mass", INT_check_mass, default=INT_check_mass, _RC)
-      call MAPL_GridCompGetResource(gc, "ADIABATIC", INT_ADIABATIC, default=INT_adiabatic, _RC)
-      call MAPL_GridCompGetResource(gc, "FV_OFF", INT_FV_OFF, default=INT_FV_OFF, _RC)
-
-      ! MAT The Fortran Standard, and thus gfortran, *does not allow* the use
-      !     of if (integer). So, we must convert integer resources to logicals
-      if (INT_fix_mass == 0) then
-         fix_mass = .FALSE.
-      else
-         fix_mass = .TRUE.
-      end if
-      if (INT_check_mass == 0) then
-         check_mass = .FALSE.
-      else
-         check_mass = .TRUE.
-      end if
-      if (INT_ADIABATIC == 0) then
-         ADIABATIC = .FALSE.
-      else
-         ADIABATIC = .TRUE.
-      end if
-      if (INT_FV_OFF == 0) then
-         FV_OFF = .FALSE.
-      else
-         FV_OFF = .TRUE.
-      end if
+      call MAPL_GridCompGetResource(gc, "fix_mass", fix_mass, default=.true., _RC)
+      call MAPL_GridCompGetResource(gc, "check_mass", check_mass, default=.false., _RC)
+      call MAPL_GridCompGetResource(gc, "ADIABATIC", ADIABATIC, default=.false., _RC)
+      call MAPL_GridCompGetResource(gc, "FV_OFF", FV_OFF, default=.false., _RC)
 
       ! Constants
       pi     = MAPL_PI_R8
@@ -718,6 +697,25 @@ contains
       _RETURN(_SUCCESS)
    end subroutine FV_Setup
 
+   function get_im_world(hconfig, rc) result(im_world)
+      type(ESMF_HConfig), intent(in) :: hconfig
+      integer, optional, intent(out) :: rc
+      integer :: im_world ! result
+
+      type(ESMF_HConfig) :: geometry_cfg, geom_cfg
+      integer :: status
+
+      geometry_cfg = ESMF_HConfigCreateAt(hconfig, keyString="geometry", _RC)
+      geom_cfg = ESMF_HConfigCreateAt(geometry_cfg, keyString="esmf_geom", _RC)
+
+      im_world = ESMF_HConfigAsI4(geom_cfg, keyString="im_world", _RC)
+
+      call ESMF_HConfigDestroy(geometry_cfg, _RC)
+      call ESMF_HConfigDestroy(geom_cfg, _RC)
+
+      _RETURN(_SUCCESS)
+   end function get_im_world
+
    subroutine FV_InitState(state, clock, import, gc, rc)
 
       use test_cases_mod, only : test_case, init_double_periodic
@@ -774,7 +772,6 @@ contains
       call MAPL_GridCompGetResource(gc, "RUN_DT", ndt, default=0, _RC)
       DT = ndt
 
-      ! state%grid%FVgenstate => MAPL
       grid => state%grid     ! For convenience
       state%DOTIME= .true.
       state%DT = DT
@@ -914,7 +911,7 @@ contains
       ! Create alarm for dry mass fix reporting
 
       ! Set an interval for printing. Currently hard-coded to
-      ! six hours, but could be a MAPL_GetResource value
+      ! six hours, but could be a MAPL_GridCompGetResource value
       call ESMF_TimeIntervalSet(MassAlarmInt, h=6, _RC)
 
       ! Create the alarm with the above interval
