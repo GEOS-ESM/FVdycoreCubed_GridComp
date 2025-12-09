@@ -344,7 +344,8 @@ contains
       type(DynState), pointer :: self
       character(len=ESMF_MAXSTR) :: myTracer
       class(logger_t), pointer :: logger
-      integer :: FV3_STANDALONE, ilev, itracer, status
+      integer :: ilev, itracer, status
+      logical :: FV3_STANDALONE
 
       call MAPL_GridCompGet(gc, logger=logger, _RC)
       call logger%info("SetServices:: starting...")
@@ -421,8 +422,8 @@ contains
       call register_grid_and_regridders()
 
       ! At this point check if FV is standalone and init the grid
-      call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=0, _RC)
-      if (FV3_STANDALONE /= 0) then
+      call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
+      if (FV3_STANDALONE) then
          ! call MAPL_GridCreate(gc, _RC)
          call MAPL_GridCompAddSpec(gc, &
               state_intent=ESMF_STATEINTENT_EXPORT, &
@@ -472,9 +473,9 @@ contains
       real(r8), allocatable ::  ur(:,:,:), vr(:,:,:) ! rotated winds
 
       real :: DNS_INTERVAL
-      integer :: ColdRestart=0
+      logical :: ColdRestart, FV3_STANDALONE
       integer :: ifirst, ilast, jfirst, jlast, km
-      integer :: i, numTracers, fv3_standalone, status
+      integer :: i, numTracers, status
 
       class(logger_t), pointer :: logger
 
@@ -494,8 +495,8 @@ contains
       call MAPL_GridCompGetResource(gc, "DO_ADD_INCS", DO_ADD_INCS, default=DO_ADD_INCS, _RC)
 
       ! Check for ColdStart from the configuration
-      call MAPL_GridCompGetResource(gc, "COLDSTART", ColdRestart, default=0, _RC)
-      if (ColdRestart /= 0 ) then
+      call MAPL_GridCompGetResource(gc, "COLDSTART", ColdRestart, default=.false., _RC)
+      if (ColdRestart) then
          call Coldstart(gc, import, export, clock, _RC)
       endif
 
@@ -574,8 +575,8 @@ contains
       ! call ESMF_StateGet(export, "T", field, _RC)
       ! call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
 
-      call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", fv3_standalone, default=0, _RC)
-      if (fv3_standalone /= 0) then
+      call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
+      if (FV3_STANDALONE) then
          call ESMF_StateGet(import, "TRADV", tradv, _RC)
          call ESMF_StateGet(export, "TRADVEX", tradvex, _RC)
          call ESMF_FieldBundleGet(tradv, fieldCount=numTracers, _RC)
@@ -812,7 +813,8 @@ contains
 
       logical, save :: firstime = .true.
       logical :: adjustTracers, tend, exclude, isPresent, doEnergetics, doTropvars
-      integer :: pos, nqt, FV3_STANDALONE, itracer
+      logical :: FV3_STANDALONE
+      integer :: pos, nqt, itracer
       type(ESMF_Alarm) :: predictorAlarm
       type(ESMF_Grid) :: bgrid
       character(len=ESMF_MAXSTR) :: tmpstring, fieldname, myTracer
@@ -1067,8 +1069,8 @@ contains
       end do
 
       ! WMP Begin REPLAY/ANA section
-      call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=0, _RC)
-      if (FV3_STANDALONE == 0) then
+      call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
+      if (.not. FV3_STANDALONE) then
          ! call MAPL_TimerOn(MAPL, "-DYN_ANA")
          call ESMF_ClockGetAlarm(clock, "ReplayShutOff", alarm, _RC)
          is_shutoff = ESMF_AlarmIsRinging(alarm, _RC)
@@ -1720,7 +1722,7 @@ contains
          end if
 
       endif
-      ! if (FV3_STANDALONE == 0) then
+      ! if (.not. FV3_STANDALONE) then
       !    call MAPL_TimerOff(MAPL,"-DYN_ANA")
       ! endif
 
@@ -4994,7 +4996,7 @@ contains
       logical :: perturb
       logical :: ak_is_missing = .false.
       logical :: bk_is_missing = .false.
-      integer :: FV3_STANDALONE
+      logical :: FV3_STANDALONE
       logical :: isPresent
 
       ! Tracer Stuff
@@ -5110,7 +5112,7 @@ contains
          PT = T0/PKZ
 
          ! Check if running standalone model
-         call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=0, _RC)
+         call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
 
          ! 3D Baroclinic Test Cases
          call MAPL_GridCompGetResource(gc, "CASE_ID", case_id, default=0, _RC)
@@ -5356,7 +5358,7 @@ contains
          endif ! case_id
 
          ! Parse Tracers
-         if (FV3_STANDALONE /= 0) then
+         if (FV3_STANDALONE) then
             call ESMF_StateGet(import, "TRADV", tradv_bundle, _RC)
             call MAPL_GridCompGet(gc, geom=geom, num_levels=num_levels, _RC)
 
