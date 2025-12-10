@@ -47,6 +47,7 @@ module FV_StateMod
    use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
    use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f_init, geos_gtfv3_interface_f_finalize
 #endif
+   use pflogger, only: logger_t => logger
 
    implicit none
    private
@@ -320,8 +321,12 @@ contains
       character(len=:), allocatable :: DYCORE
       real(FVPRC) :: DT
       real :: temp_real
-      integer :: comm, ndt, nx, ny, status, p_split=1, im_world
+      integer :: comm, ndt, nx, ny, status, p_split=1, im_world, num_levels
       integer, allocatable :: topology(:)
+      class(logger_t), pointer :: logger
+
+      call MAPL_GridCompGet(gc, logger=logger, _RC)
+      call logger%info("FV_Setup::starting...")
 
       call ESMF_VMGetCurrent(vm, _RC)
       call MAPL_MemUtilsWrite(vm, trim(Iam), _RC)
@@ -339,15 +344,12 @@ contains
       call MAPL_MemUtilsWrite(vm, 'FV_StateMod::fv_init1', _RC)
 
       ! FV grid dimensions setup from MAPL
-      ! call MAPL_GridCompGetResource(gc, "AGCM_IM", FV_Atm(1)%flagstruct%npx, default= 32, _RC)
-      ! call MAPL_GridCompGetResource(gc, "AGCM_JM", FV_Atm(1)%flagstruct%npy, default=192, _RC)
-      ! call MAPL_GridCompGetResource(gc, "AGCM_LM", FV_Atm(1)%flagstruct%npz, default= 72, _RC)
-      call MAPL_GridCompGet(gc, hconfig=hconfig, _RC)
+      call MAPL_GridCompGet(gc, hconfig=hconfig, num_levels=num_levels, _RC)
       im_world = get_im_world(hconfig, _RC)
       associate(flags => FV_Atm(1)%flagstruct)
         flags%npx = im_world
         flags%npy = im_world * 6
-        call MAPL_GridCompGet(gc, num_levels=flags%npz, _RC)
+        flags%npz = num_levels
         if (flags%npz == 1) SW_DYNAMICS = .true.
         ! FV likes npx;npy in terms of cell vertices
         if (flags%npy == 6*flags%npx) then
@@ -703,9 +705,14 @@ contains
       integer :: im_world ! result
 
       type(ESMF_HConfig) :: geometry_cfg, geom_cfg
+      logical :: has_section
       integer :: status
 
+      has_section = ESMF_HConfigIsDefined(hconfig, keyString="geometry", _RC)
+      _ASSERT(has_section, "hconfig is missing geometry section")
       geometry_cfg = ESMF_HConfigCreateAt(hconfig, keyString="geometry", _RC)
+      has_section = ESMF_HConfigIsDefined(geometry_cfg, keyString="esmf_geom", _RC)
+      _ASSERT(has_section, "geometry is missing esmf_geom section")
       geom_cfg = ESMF_HConfigCreateAt(geometry_cfg, keyString="esmf_geom", _RC)
 
       im_world = ESMF_HConfigAsI4(geom_cfg, keyString="im_world", _RC)
