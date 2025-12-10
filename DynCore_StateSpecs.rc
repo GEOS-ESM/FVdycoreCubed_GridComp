@@ -59,7 +59,7 @@ category: EXPORT
   ZLE            |  edge_heights                                                             |  m                 |  xyz  |  E   |                    |
   ZL             |  mid_layer_heights                                                        |  m                 |  xyz  |  C   |                    |
   S              |  mid_layer_dry_static_energy                                              |  m                 |  xyz  |  C   |                    |
-  PLE            |  edge_pressure                                                            |  Pa                |  xyz  |  E   |                    |
+# PLE            |  edge_pressure                                                            |  Pa                |  xyz  |  E   |                    |
   TH             |  potential_temperature                                                    |  K                 |  xyz  |  C   |                    |
   PLK            |  mid-layer_p$^\kappa$                                                     |  Pa$^\kappa$       |  xyz  |  C   |                    |
   PKE            |  edge_p$^\kappa$                                                          |  Pa$^\kappa$       |  xyz  |  E   |                    |
@@ -259,15 +259,15 @@ category: IMPORT
 
 
 category: INTERNAL
-#------------------------------------------------------------------------------------------------------------------------
- SHORT_NAME |  LONG_NAME                     |  UNITS             |  TYPEKIND  |  DIMS |   RESTART  | VLOC | ADD2EXPORT
-#------------------------------------------------------------------------------------------------------------------------
-  AK        |  hybrid_sigma_pressure_a       |  Pa                |  R8        |    z  |  REQUIRED  |  E   |    T
-  BK        |  hybrid_sigma_pressure_b       |  1                 |  R8        |    z  |  REQUIRED  |  E   |    T
-  U         |  eastward_wind                 |  m s-1             |  R8        |  xyz  |  REQUIRED  |  C   |    F
-  V         |  northward_wind                |  m s-1             |  R8        |  xyz  |  REQUIRED  |  C   |    F
-  W         |  vertical_velocity             |  m s-1             |  R8        |  xyz  |            |  C   |    F
-  PT        |  scaled_potential_temperature  |  K Pa$^{-\kappa}$  |  R8        |  xyz  |  REQUIRED  |  C   |    F
-  PE        |  air_pressure                  |  Pa                |  R8        |  xyz  |  REQUIRED  |  E   |    F
-  PKZ       |  pressure_to_kappa             |  Pa$^\kappa$       |  R8        |  xyz  |  REQUIRED  |  C   |    F
-  DZ        |  height_thickness              |  m                 |  R8        |  xyz  |            |  C   |    F
+#--------------------------------------------------------------------------------------------------------------------------------------
+ SHORT_NAME |  LONG_NAME                     |  UNITS             |  TYPEKIND  |  DIMS |   RESTART  | VLOC | ADD2EXPORT | EXPORT_NAME
+#--------------------------------------------------------------------------------------------------------------------------------------
+  AK        |  hybrid_sigma_pressure_a       |  Pa                |  R8        |    z  |  REQUIRED  |  E   |    T       |
+  BK        |  hybrid_sigma_pressure_b       |  1                 |  R8        |    z  |  REQUIRED  |  E   |    T       |
+  U         |  eastward_wind                 |  m s-1             |  R8        |  xyz  |  REQUIRED  |  C   |    F       |
+  V         |  northward_wind                |  m s-1             |  R8        |  xyz  |  REQUIRED  |  C   |    F       |
+  W         |  vertical_velocity             |  m s-1             |  R8        |  xyz  |            |  C   |    F       |
+  PT        |  scaled_potential_temperature  |  K Pa$^{-\kappa}$  |  R8        |  xyz  |  REQUIRED  |  C   |    F       |
+  PE        |  air_pressure                  |  Pa                |  R8        |  xyz  |  REQUIRED  |  E   |    T       |    PLE
+  PKZ       |  pressure_to_kappa             |  Pa$^\kappa$       |  R8        |  xyz  |  REQUIRED  |  C   |    F       |
+  DZ        |  height_thickness              |  m                 |  R8        |  xyz  |            |  C   |    F       |

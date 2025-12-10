@@ -343,12 +343,8 @@ contains
 
       type(DynState), pointer :: self
       character(len=ESMF_MAXSTR) :: myTracer
-      class(logger_t), pointer :: logger
       integer :: ilev, itracer, status
       logical :: FV3_STANDALONE
-
-      call MAPL_GridCompGet(gc, logger=logger, _RC)
-      call logger%info("SetServices:: starting...")
 
       ! Wrap gridcomp's private state and store it in gc
       _SET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE)
@@ -439,7 +435,6 @@ contains
       call MAPL_GridCompGetResource(gc, "DEBUG_ADV", DEBUG_ADV, default=.false., _RC)
       call MAPL_GridCompGetResource(gc, "DEBUG_TQ_ERRORS", DEBUG_TQ_ERRORS, default=.false., _RC)
 
-      call logger%info("SetServices:: ...complete")
       _RETURN(_SUCCESS)
 
    end subroutine SetServices
@@ -463,7 +458,7 @@ contains
       character(len=:), allocatable :: ReplayMode
 
       real(r4), pointer :: pref(:)
-      real(r4), pointer :: ple(:,:,:)
+      ! real(r4), pointer :: ple(:,:,:)
       real(r4), pointer :: u(:,:,:), v(:,:,:), t(:,:,:)
       real(r4), pointer :: temp2d(:,:)
 
@@ -476,11 +471,6 @@ contains
       logical :: ColdRestart, FV3_STANDALONE
       integer :: ifirst, ilast, jfirst, jlast, km
       integer :: i, numTracers, status
-
-      class(logger_t), pointer :: logger
-
-      call MAPL_GridCompGet(gc, logger=logger, _RC)
-      call logger%info("Initialize:: starting...")
 
       ! ! Start the timers
       ! call MAPL_TimerOn(MAPL, "TOTAL")
@@ -520,7 +510,6 @@ contains
       call MAPL_StateGetPointer(internal, pk, "PKZ", _RC)
 
       ! pchakrab: TODO - how to handle `alloc=.true.` in MAPL3??
-      call MAPL_GetPointer(export, ple, "PLE", alloc=.true., _RC)
       call MAPL_GetPointer(export, u, "U", alloc=.true., _RC)
       call MAPL_GetPointer(export, v, "V", alloc=.true., _RC)
       call MAPL_GetPointer(export, t, "T", alloc=.true., _RC)
@@ -538,7 +527,7 @@ contains
       u = ur
       v = vr
       t = pt*pk
-      ple = pe
+      ! ple = pe
       deallocate(ur, vr)
 
       ! Fill Grid-Cell Area Delta-X/Y
@@ -607,7 +596,6 @@ contains
       ! call MAPL_TimerOff(MAPL,"INITIALIZE")
       ! call MAPL_TimerOff(MAPL,"TOTAL")
 
-      call logger%info("Initialize:: ...complete")
       _RETURN(_SUCCESS)
    end subroutine Initialize
 
@@ -824,7 +812,6 @@ contains
       class(logger_t), pointer :: logger
 
       call MAPL_GridCompGet(gc, grid=esmfgrid, hconfig=hconfig, logger=logger, _RC)
-      call logger%info("Run:: starting...")
       call ESMF_GridValidate(esmfgrid, _RC)
 
       ! call MAPL_TimerOn(MAPL, "TOTAL")
@@ -2135,7 +2122,6 @@ contains
          call FILLOUT3(export, 'T'      , tempxy  , _RC)
          call FILLOUT3(export, 'Q'      , qv      , _RC)
          call FILLOUT3(export, 'PL'     , pl      , _RC)
-         call FILLOUT3(export, 'PLE'    , vars%pe , _RC)
          call FILLOUT3(export, 'PLK'    , plk     , _RC)
          call FILLOUT3(export, 'PKE'    , pkxy    , _RC)
          call FILLOUT3(export, 'PT'     , vars%pt , _RC)
@@ -2807,7 +2793,6 @@ contains
       !   call RunAddIncs(gc, import, export, clock, rc)
       !endif
 
-      call logger%info("Run:: ...complete")
       _RETURN(_SUCCESS)
 
    contains
@@ -3922,7 +3907,6 @@ contains
          call FILLOUT3(export, "T", tempxy, _RC)
          call FILLOUT3(export, "Q", qv, _RC)
          call FILLOUT3(export, "PL", pl, _RC)
-         call FILLOUT3(export, "PLE", vars%pe, _RC)
          call FILLOUT3(export, "PLK", plk, _RC)
          call FILLOUT3(export, "PKE", pke, _RC)
          call FILLOUT3(export, "THV", thv, _RC)
