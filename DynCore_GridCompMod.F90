@@ -458,7 +458,7 @@ contains
       character(len=:), allocatable :: ReplayMode
 
       real(r4), pointer :: pref(:)
-      real(r4), pointer :: ple(:,:,:)
+      ! real(r4), pointer :: ple(:,:,:)
       real(r4), pointer :: u(:,:,:), v(:,:,:), t(:,:,:)
       real(r4), pointer :: temp2d(:,:)
 
@@ -510,7 +510,6 @@ contains
       call MAPL_StateGetPointer(internal, pk, "PKZ", _RC)
 
       ! pchakrab: TODO - how to handle `alloc=.true.` in MAPL3??
-      call MAPL_GetPointer(export, ple, "PLE", alloc=.true., _RC)
       call MAPL_GetPointer(export, u, "U", alloc=.true., _RC)
       call MAPL_GetPointer(export, v, "V", alloc=.true., _RC)
       call MAPL_GetPointer(export, t, "T", alloc=.true., _RC)
@@ -528,7 +527,7 @@ contains
       u = ur
       v = vr
       t = pt*pk
-      ple = pe
+      ! ple = pe
       deallocate(ur, vr)
 
       ! Fill Grid-Cell Area Delta-X/Y
@@ -2123,7 +2122,6 @@ contains
          call FILLOUT3(export, 'T'      , tempxy  , _RC)
          call FILLOUT3(export, 'Q'      , qv      , _RC)
          call FILLOUT3(export, 'PL'     , pl      , _RC)
-         call FILLOUT3(export, 'PLE'    , vars%pe , _RC)
          call FILLOUT3(export, 'PLK'    , plk     , _RC)
          call FILLOUT3(export, 'PKE'    , pkxy    , _RC)
          call FILLOUT3(export, 'PT'     , vars%pt , _RC)
@@ -3909,7 +3907,6 @@ contains
          call FILLOUT3(export, "T", tempxy, _RC)
          call FILLOUT3(export, "Q", qv, _RC)
          call FILLOUT3(export, "PL", pl, _RC)
-         call FILLOUT3(export, "PLE", vars%pe, _RC)
          call FILLOUT3(export, "PLK", plk, _RC)
          call FILLOUT3(export, "PKE", pke, _RC)
          call FILLOUT3(export, "THV", thv, _RC)
