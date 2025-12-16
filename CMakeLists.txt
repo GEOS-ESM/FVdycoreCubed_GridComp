@@ -111,35 +111,42 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
     SRCS ${srcs}
     SUBCOMPONENTS fvdycore
     DEPENDENCIES ${dependencies}
+    DEPENDENCIES ${GFDL}
     DEPENDENCIES geos_gtfv3_interface_py) # Make the main library depend on the Python library
 else ()
   esma_add_library (${this}
     SRCS ${srcs}
     SUBCOMPONENTS fvdycore
-    DEPENDENCIES ${dependencies})
+    DEPENDENCIES ${dependencies}
+    DEPENDENCIES ${GFDL})
 endif ()
 
 if (FV_PRECISION STREQUAL R4)
-  target_link_libraries (${this} PUBLIC fms_r4)
-  target_compile_definitions (${this} PRIVATE SINGLE_FV OVERLOAD_R4)
+   set (GFDL fms_r4)
 elseif (FV_PRECISION STREQUAL R4R8) # FV is R4 but FMS is R8
-  # fvdycore needs r4 .mod interfaces
-  get_target_property(inc_r4 fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
-  target_include_directories(${this} PRIVATE $<BUILD_INTERFACE:${inc_r4}>)
-
-  # But fvdycore should not *compile* with fms_r8 includes
-  target_link_libraries(${this} PUBLIC $<LINK_ONLY:fms_r8>)
-
-  target_compile_definitions (${this} PRIVATE SINGLE_FV OVERLOAD_R4)
-
-  # This tells CMake that we need these targets built before we can build
-  add_dependencies(${this} fms_r4 fms_r8)
+   # We need to add_dependencies for fms_r4 because CMake doesn't know we
+   # need it for include purposes. In R4R8, we only ever link against
+   # fms_r4, so it doesn't know we need to build it.
+   # NOTE NOTE NOTE: This should *not* be included in GEOSgcm v12
+   #     because FMS is pre-built library in that case.
+   add_dependencies (${this} fms_r4)
+   get_target_property (extra_incs fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
+   target_include_directories(${this} PRIVATE
+   $<BUILD_INTERFACE:${extra_incs}>
+   )
+   set (GFDL fms_r8)
 elseif (FV_PRECISION STREQUAL R8)
-  target_link_libraries (${this} PUBLIC fms_r8)
-  string(REPLACE " " ";" tmp ${FREAL8})
-  foreach(flag ${tmp})
-    target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
-  endforeach()
+   set (GFDL fms_r8)
+   string(REPLACE " " ";" tmp ${FREAL8})
+   foreach(flag ${tmp})
+     target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
+   endforeach()
+endif ()
+
+if (FV_PRECISION MATCHES R4)
+  target_compile_definitions (${this} PRIVATE -DSINGLE_FV -DOVERLOAD_R4)
+elseif (FV_PRECISION MATCHES R4R8) # FV is R4 but FMS is R8
+  target_compile_definitions (${this} PRIVATE -DSINGLE_FV -DOVERLOAD_R4)
 endif ()
 
 message(STATUS "Building FV as ${FV_PRECISION}")
@@ -150,7 +157,11 @@ if (CRAY_POINTER)
   set_target_properties (${this} PROPERTIES COMPILE_FLAGS ${CRAY_POINTER})
 endif()
 
-target_compile_definitions (${this} PRIVATE MAPL_MODE FVREGRID_MAPL_MODE)
+add_definitions (-DSPMD -DMAPL_MODE -DFVREGRID_MAPL_MODE)
+
+foreach(flag ${tmp})
+   target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
+endforeach()
 
 ecbuild_add_executable (
   TARGET StandAlone_FV3_Dycore.x
@@ -187,32 +198,6 @@ ecbuild_add_executable (
    SOURCES interp_restarts_bin.F90
    LIBS ${this} OpenMP::OpenMP_Fortran)
 
-# If we are doing R4R8 we also need add_dependencies for both fms_r4 and fms_r8
-# for all our executables that link to ${this} because of the way we set up the
-# main library above.
-if (FV_PRECISION STREQUAL R4R8)
-  foreach(executable
-    StandAlone_FV3_Dycore.x
-    rs_scale.x
-    StandAlone_AdvCore.x
-    StandAlone_DynAdvCore.x
-    c2c.x
-    interp_restarts.x
-    interp_restarts_bin.x)
-
-    # fvdycore needs r4 .mod interfaces
-    get_target_property(inc_r4 fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
-    target_include_directories(${executable} PRIVATE $<BUILD_INTERFACE:${inc_r4}>)
-
-    # But fvdycore should not *compile* with fms_r8 includes
-    target_link_libraries(${executable} $<LINK_ONLY:fms_r8>)
-
-    # This tells CMake that we need these targets built before we can build
-    add_dependencies(${executable} fms_r4 fms_r8)
-  endforeach()
-endif ()
-
-
 if (BUILD_GEOS_GTFV3_INTERFACE)
   ecbuild_add_executable (
     TARGET fv3_driver.x
@@ -224,16 +209,6 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
     geos-gtfv3/driver/input/input_arrays.f90
     geos-gtfv3/driver/fv3_driver.F90
     LIBS ${this})
-  if (FV_PRECISION STREQUAL R4R8)
-    # fvdycore needs r4 .mod interfaces
-    get_target_property(inc_r4 fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
-    target_include_directories(fv3_driver.x PRIVATE $<BUILD_INTERFACE:${inc_r4}>)
-
-    # But fvdycore should not *compile* with fms_r8 includes
-    target_link_libraries(fv3_driver.x PUBLIC $<LINK_ONLY:fms_r8>)
-
-    add_dependencies(fv3_driver.x fms_r4 fms_r8)
-  endif ()
 endif ()
 
 add_subdirectory(scripts)
