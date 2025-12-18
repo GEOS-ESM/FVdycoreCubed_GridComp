@@ -1,0 +1,34 @@
+---
+FV3_STANDALONE: true
+COLDSTART: true
+RUN_DT: 1200
+DYCORE: FV3
+CASE_ID: 1
+CASE_TRACERS: 1
+ADIABATIC: true
+FV_OFF: false
+fix_mass: false
+EXCLUDE_ADVECTION_TRACERS_LIST: []
+
+geometry:
+  esmf_geom:
+    class: CubedSphere
+    im_world: 48
+    nx_face: 2
+    ny_face: 1
+  vertical_grid:
+    class: model
+    standard_name: air_pressure
+    units: hPa
+    num_levels: 181
+    field_edge: PLE
+    field_center: PE
+
+mapl:
+  misc:
+    activate_all_imports: true
+    activate_all_exports: true
+    checkpoint:
+      export: true
+      # import: true
+      internal: true
