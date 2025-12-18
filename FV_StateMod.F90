@@ -15,7 +15,8 @@ module FV_StateMod
    use FileIOSharedMod, only: WRITE_PARALLEL
 
    use mapl3g_generic, only: MAPL_GridCompGetResource, MAPL_GridCompGet, MAPL_GridCompGetInternalState
-   use mapl3g_Geom_API, only: MAPL_GridGet, MAPL_GeomGet
+   ! use mapl3g_generic, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
+   use mapl3g_Geom_API, only: MAPL_GridGet !, MAPL_GeomGet
    use mapl3g_State_API, only: MAPL_StateGetPointer
 #endif
    use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
@@ -331,16 +332,16 @@ contains
       call ESMF_VMGetCurrent(vm, _RC)
       call MAPL_MemUtilsWrite(vm, trim(Iam), _RC)
 
-      ! call MAPL_TimerOn(MAPL,"--FMS_INIT")
       call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
+      ! call MAPL_GridCompTimerStart(gc, "fms_init", _RC)
       call fms_init(comm)
-      ! call MAPL_TimerOff(MAPL, "--FMS_INIT")
+      ! call MAPL_GridCompTimerStop(gc, "fms_init", _RC)
       call MAPL_MemUtilsWrite(vm, 'FV_StateMod::fms_init', _RC)
 
       ! Start up FV
-      ! call MAPL_TimerOn(MAPL,"--FV_INIT")
+      ! call MAPL_GridCompTimerStart(gc, "fv_init1", _RC)
       call fv_init1(FV_Atm, DT, grids_on_this_pe, p_split)
-      ! call MAPL_TimerOff(MAPL,"--FV_INIT")
+      ! call MAPL_GridCompTimerStop(gc, "fv_init1", _RC)
       call MAPL_MemUtilsWrite(vm, 'FV_StateMod::fv_init1', _RC)
 
       ! FV grid dimensions setup from MAPL
@@ -374,10 +375,11 @@ contains
       call MAPL_GridCompGetResource(gc, "FIXED_LATS", FV_Atm(1)%flagstruct%deglat, default=FV_Atm(1)%flagstruct%deglat, _RC)
 
       ! MPI decomp setup
-      call MAPL_GridCompGet(gc, geom=geom, _RC)
-      call MAPL_GeomGet(geom, topology, _RC)
+      ! TODO: pchakrab - FIND A WAY TO RETRIEVE IM_WORLD
+      ! call MAPL_GridCompGet(gc, geom=geom, _RC)
+      ! call MAPL_GeomGet(geom, topology, _RC)
       associate(layout => FV_Atm(1)%layout)
-        layout = topology
+        layout = [2, 1]
         if (FV_Atm(1)%flagstruct%grid_type == 4) then
            layout(2) = layout(2) * 6
         end if
@@ -665,9 +667,9 @@ contains
       endif
 
       ! Start up FV
-      ! call MAPL_TimerOn(MAPL,"--FV_INIT")
+      ! call MAPL_GridCompTimerStart(gc, "fv_init2", _RC)
       call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
-      ! call MAPL_TimerOff(MAPL,"--FV_INIT")
+      ! call MAPL_GridCompTimerStop(gc, "fv_init2", _RC)
       call MAPL_MemUtilsWrite(VM, 'FV_StateMod::fv_init2', _RC)
 
       ! Force compatibility of gmao_remap and n_zfilter
@@ -1686,7 +1688,8 @@ contains
 
       ! Check Dry Mass (Apply fixer is option is enabled)
       if ( check_mass .OR. fix_mass ) then
-         ! call MAPL_TimerOn(MAPL,"--MASS_FIX")
+         ! call MAPL_GridCompTimerStart(gc, "mass_fix", _RC)
+
 
          if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. &
               ((.not. FV_Atm(1)%flagstruct%hydrostatic) .OR. FV_Atm(1)%flagstruct%nwat>=6)  ) then
@@ -1805,10 +1808,10 @@ contains
 
          endif
 
-         ! call MAPL_TimerOff(MAPL,"--MASS_FIX")
+         ! call MAPL_GridCompTimerStop(gc, "mass_fix", _RC)
       endif
 
-      ! call MAPL_TimerOn(MAPL,"--NH_ADIABATIC_INIT")
+      ! call MAPL_GridCompTimerStart(gc, "NH_ADIABATIC_INIT", _RC)
       if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
          allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
          call nullify_domain ( )
@@ -1820,9 +1823,9 @@ contains
          deallocate( DEBUG_ARRAY )
          FV_Atm(1)%flagstruct%na_init=0
       endif
-      ! call MAPL_TimerOff(MAPL,"--NH_ADIABATIC_INIT")
+      ! call MAPL_GridCompTimerStop(gc,"NH_ADIABATIC_INIT", _RC)
 
-      ! call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
+      ! call MAPL_GridCompTimerStart(gc, "FV_DYNAMICS", _RC)
       if (.not. FV_OFF) then
          call set_domain(FV_Atm(1)%domain)  ! needed for diagnostic output done in fv_dynamics
          allocate ( u_dt(isc:iec,jsc:jec,npz) )
@@ -1929,7 +1932,7 @@ contains
          call nullify_domain()
 
       endif
-      ! call MAPL_TimerOff(MAPL,"--FV_DYNAMICS")
+      ! call MAPL_GridCompTimerStop(gc, "FV_DYNAMICS", _RC)
 
       SPHU_FILLED = .FALSE.
       QLIQ_FILLED = .FALSE.

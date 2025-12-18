@@ -43,8 +43,9 @@ module FVdycoreCubed_GridComp
    use mapl3g_generic, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
    use mapl3g_generic, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_FIELDBUNDLE
    use mapl3g_generic, only: MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState
+   ! use mapl3g_generic, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
    use mapl3g_VerticalStaggerLoc, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
-   use mapl3g_Geom_API, only: MAPL_GridGet
+   use mapl3g_Geom_API, only: MAPL_GridGetCoordinates
    use mapl3g_State_API, only: MAPL_StateGetPointer
    use mapl3g_Field_API, only: MAPL_FieldCreate
    use mapl3g_FieldBundle_API, only: MAPL_FieldBundleAdd
@@ -389,21 +390,6 @@ contains
       !     6 ints: YYYY MM DD H M S
       !     5 ints: I,J,K, KS (num true pressure levels), NQ (num tracers) headers
 
-      ! ! Set the Profiling timers
-      ! call MAPL_TimerAdd(gc, name="INITIALIZE", _RC)
-      ! call MAPL_TimerAdd(gc, name="RUN", _RC)
-      ! call MAPL_TimerAdd(gc, name="RUN2", _RC)
-      ! call MAPL_TimerAdd(gc, name="-DYN_INIT", _RC)
-      ! call MAPL_TimerAdd(gc, name="--FMS_INIT", _RC)
-      ! call MAPL_TimerAdd(gc, name="--FV_INIT", _RC)
-      ! call MAPL_TimerAdd(gc, name="-DYN_ANA", _RC)
-      ! call MAPL_TimerAdd(gc, name="-DYN_PROLOGUE", _RC)
-      ! call MAPL_TimerAdd(gc, name="-DYN_CORE", _RC)
-      ! call MAPL_TimerAdd(gc, name="-DYN_EPILOGUE", _RC)
-      ! call MAPL_TimerAdd(gc, name="--FV_DYNAMICS", _RC)
-      ! call MAPL_TimerAdd(gc, name="--MASS_FIX", _RC)
-      ! call MAPL_TimerAdd(gc, name="FINALIZE", _RC)
-
       ! Register services for this component
       call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Initialize,  Initialize, _RC)
       call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Run, Run, phase_name="Run", _RC)
@@ -472,12 +458,10 @@ contains
       integer :: ifirst, ilast, jfirst, jlast, km
       integer :: i, numTracers, status
 
-      ! ! Start the timers
-      ! call MAPL_TimerOn(MAPL, "TOTAL")
-      ! call MAPL_TimerOn(MAPL, "INITIALIZE")
-
       ! Setup FMS/FV3
+      ! call MAPL_GridCompTimerStart(gc, "DynSetup", _RC)
       call DynSetup(gc, _RC)
+      ! call MAPL_GridCompTimerStop(gc, "DynSetup", _RC)
 
       ! Get the private state
       _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
@@ -493,9 +477,9 @@ contains
       ! Set Private Internal State from Restart File
       call MAPL_GridCompGetInternalState(gc, internal, _RC)
 
-      ! call MAPL_TimerOn(MAPL, "-DYN_INIT")
+      ! call MAPL_GridCompTimerStart(gc, "DynInit", _RC)
       call DynInit(self, clock, import, gc, _RC)
-      ! call MAPL_TimerOff(MAPL, "-DYN_INIT")
+      ! call MAPL_GridCompTimerStop(gc, "DynInit", _RC)
 
       ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
       call MAPL_StateGetPointer(internal, ak, "AK", _RC)
@@ -592,9 +576,6 @@ contains
       end if
 
       !========End intermittent replay========================
-
-      ! call MAPL_TimerOff(MAPL,"INITIALIZE")
-      ! call MAPL_TimerOff(MAPL,"TOTAL")
 
       _RETURN(_SUCCESS)
    end subroutine Initialize
@@ -784,7 +765,7 @@ contains
       character(len=:), allocatable :: uname, vname, tname, qname, psname, dpname, o3name, rgrid, tvar
 
       ! type(MAPL_SunOrbit) :: ORBIT
-      real(r4), pointer :: lats(:,:), lons(:,:)
+      real(r4), allocatable :: lats(:,:), lons(:,:)
       real(r4), allocatable :: ZTH(:,:), SLR(:,:)
 
       real :: rc_blend_p_above, rc_blend_p_below, sclinc
@@ -814,10 +795,7 @@ contains
       call MAPL_GridCompGet(gc, grid=esmfgrid, hconfig=hconfig, logger=logger, _RC)
       call ESMF_GridValidate(esmfgrid, _RC)
 
-      ! call MAPL_TimerOn(MAPL, "TOTAL")
-      ! call MAPL_TimerOn(MAPL, "RUN")
-
-      call MAPL_GridGet(esmfgrid, longitudes=lons, latitudes=lats, _RC)
+      call MAPL_GridGetCoordinates(esmfgrid, longitudes=lons, latitudes=lats, _RC)
       call MAPL_StateGetPointer(export, temp2d, "LONS", _RC)
       if( associated(temp2D) ) temp2d = lons
       call MAPL_StateGetPointer(export, temp2d, "LATS", _RC)
@@ -2785,9 +2763,6 @@ contains
 
       call freeTracers(self)
 
-      ! call MAPL_TimerOff(MAPL, "RUN")
-      ! call MAPL_TimerOff(MAPL, "TOTAL")
-
       !if (ADIABATIC) then
       !  ! Fill Exports
       !   call RunAddIncs(gc, import, export, clock, rc)
@@ -3724,10 +3699,6 @@ contains
       class(logger_t), pointer :: logger
 
       call MAPL_GridCompGet(gc, grid=esmfgrid, logger=logger, _RC)
-      call logger%info("RunAddIncs:: starting...")
-
-      ! call MAPL_TimerOn(GENSTATE,"TOTAL")
-      ! call MAPL_TimerOn(GENSTATE,"RUN2")
 
       ! Retrieve the pointer to the internal state
       _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
@@ -4276,10 +4247,6 @@ contains
 
       end if ! .not. SW_DYNAMICS
 
-      ! call MAPL_TimerOff(GENSTATE,"RUN2")
-      ! call MAPL_TimerOff(GENSTATE,"TOTAL")
-
-      call logger%info("RunAddIncs:: ...complete")
       _RETURN(_SUCCESS)
    end subroutine RunAddIncs
 
@@ -4310,7 +4277,7 @@ contains
       integer :: isd, ied, jsd, jed
       real(r4), allocatable :: fvQOLD(:,:,:), QTEND(:,:,:)
       real(r4), pointer :: tend(:,:,:)
-      real(r4), pointer, dimension(:,:) :: lons, lats
+      real(r4), allocatable, dimension(:,:) :: lons, lats
       real(r8), allocatable :: DPNEW(:,:,:), DPOLD(:,:,:)
       real(r8), allocatable :: tend_ua(:,:,:), tend_va(:,:,:)
       real(r8), allocatable :: tend_un(:,:,:), tend_vn(:,:,:)
@@ -4341,7 +4308,7 @@ contains
 
       ! call MAPL_Get( MAPL, LONS=LONS, LATS=LATS, RC=STATUS )
       ! VERIFY_(STATUS)
-      call MAPL_GridGet(esmfgrid, latitudes=lats, longitudes=lons, _RC)
+      call MAPL_GridGetCoordinates(esmfgrid, latitudes=lats, longitudes=lons, _RC)
 
       ! **********************************************************************
       ! ****  Use QV from FV3 init when coldstarting idealized cases      ****
@@ -4788,21 +4755,11 @@ contains
       integer :: status
       class(logger_t), pointer :: logger
 
-      call MAPL_GridCompGet(gc, logger=logger, _RC)
-      call logger%info("Finalize:: starting...")
-
-      ! call MAPL_TimerOn(MAPL,"TOTAL")
-      ! call MAPL_TimerOn(MAPL,"FINALIZE")
-
       ! Retrieve the pointer to the state
       _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
 
       call DynFinalize(self)
 
-      ! call MAPL_TimerOff(MAPL,"FINALIZE")
-      ! call MAPL_TimerOff(MAPL,"TOTAL")
-
-      call logger%info("Finalize:: ...complete")
       _RETURN(_SUCCESS)
    end subroutine FINALIZE
 
@@ -4959,7 +4916,7 @@ contains
       real(REAL8), pointer :: PE1(:,:,:), PKZ(:,:,:)
       real(REAL8), allocatable :: PE(:,:,:)
       real(REAL4), pointer :: phis(:,:)
-      real(REAL4), pointer :: lons(:,:), lats(:,:)
+      real(REAL4), allocatable :: lons(:,:), lats(:,:)
 
       integer :: i, j, k, n, L
       integer :: is, ie, js, je, ks, ke, im, jm, km, ls
@@ -5004,7 +4961,7 @@ contains
       call MAPL_GridCompGetInternalState(gc, internal, _RC)
 
       call MAPL_GridCompGet(gc, grid=esmfgrid, _RC)
-      call MAPL_GridGet(esmfgrid, latitudes=lats, longitudes=lons, _RC)
+      call MAPL_GridGetCoordinates(esmfgrid, latitudes=lats, longitudes=lons, _RC)
       if (FV_Atm(1)%flagstruct%grid_type == 4) then
          ! Doubly-Period setup based on first LAT/LON coordinate
          lons(:,:) =  0.0
