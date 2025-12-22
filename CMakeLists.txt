@@ -10,7 +10,6 @@ set (srcs
   Cube2LatLon.F90 LatLon2Cube.F90 AppGridCreate.F90 FV_StateMod.F90
   AdvCore_GridCompMod.F90
   DynCore_GridCompMod.F90 CreateInterpWeights_GridCompMod.F90
-  StandAlone_DynAdvCore_GridCompMod.F90
   CubeToLatLonRegridder.F90
   LatLonToCubeRegridder.F90
   CubeToCubeRegridder.F90
@@ -161,30 +160,9 @@ foreach(flag ${tmp})
 endforeach()
 
 ecbuild_add_executable (
-  TARGET StandAlone_FV3_Dycore.x
-  SOURCES StandAlone_FV3_Dycore.F90
-  LIBS ${this} OpenMP::OpenMP_Fortran)
-
-find_package (JeMalloc)
-if(JeMalloc_FOUND)
-  message(STATUS "JeMalloc found, using for StandAlone_FV3_Dycore.x")
-  target_link_libraries (StandAlone_FV3_Dycore.x JeMalloc::JeMalloc)
-endif()
-
-ecbuild_add_executable (
   TARGET rs_scale.x
   SOURCES rs_scale.F90
   LIBS ${this} OpenMP::OpenMP_Fortran)
-
-ecbuild_add_executable (
-   TARGET StandAlone_AdvCore.x
-   SOURCES StandAlone_AdvCore.F90
-   LIBS ${this} OpenMP::OpenMP_Fortran)
-
-ecbuild_add_executable (
-   TARGET StandAlone_DynAdvCore.x
-   SOURCES StandAlone_DynAdvCore.F90
-   LIBS ${this} OpenMP::OpenMP_Fortran)
 
 ecbuild_add_executable (
    TARGET c2c.x
