@@ -15,7 +15,7 @@ module FV_StateMod
    use FileIOSharedMod, only: WRITE_PARALLEL
 
    use mapl3g_generic, only: MAPL_GridCompGetResource, MAPL_GridCompGet, MAPL_GridCompGetInternalState
-   ! use mapl3g_generic, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
+   use mapl3g_generic, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
    use mapl3g_Geom_API, only: MAPL_GridGet !, MAPL_GeomGet
    use mapl3g_State_API, only: MAPL_StateGetPointer
 #endif
@@ -322,8 +322,7 @@ contains
       character(len=:), allocatable :: DYCORE
       real(FVPRC) :: DT
       real :: temp_real
-      integer :: comm, ndt, nx, ny, status, p_split=1, im_world, num_levels
-      integer, allocatable :: topology(:)
+      integer :: comm, ndt, nx, ny, status, p_split=1, im_world, num_levels, topology(2)
       class(logger_t), pointer :: logger
 
       call MAPL_GridCompGet(gc, logger=logger, _RC)
@@ -333,20 +332,20 @@ contains
       call MAPL_MemUtilsWrite(vm, trim(Iam), _RC)
 
       call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
-      ! call MAPL_GridCompTimerStart(gc, "fms_init", _RC)
+      call MAPL_GridCompTimerStart(gc, "fms_init", _RC)
       call fms_init(comm)
-      ! call MAPL_GridCompTimerStop(gc, "fms_init", _RC)
+      call MAPL_GridCompTimerStop(gc, "fms_init", _RC)
       call MAPL_MemUtilsWrite(vm, 'FV_StateMod::fms_init', _RC)
 
       ! Start up FV
-      ! call MAPL_GridCompTimerStart(gc, "fv_init1", _RC)
+      call MAPL_GridCompTimerStart(gc, "fv_init1", _RC)
       call fv_init1(FV_Atm, DT, grids_on_this_pe, p_split)
-      ! call MAPL_GridCompTimerStop(gc, "fv_init1", _RC)
+      call MAPL_GridCompTimerStop(gc, "fv_init1", _RC)
       call MAPL_MemUtilsWrite(vm, 'FV_StateMod::fv_init1', _RC)
 
       ! FV grid dimensions setup from MAPL
       call MAPL_GridCompGet(gc, hconfig=hconfig, num_levels=num_levels, _RC)
-      im_world = get_im_world(hconfig, _RC)
+      call get_im_world_and_topology(hconfig, im_world, topology, _RC)
       associate(flags => FV_Atm(1)%flagstruct)
         flags%npx = im_world
         flags%npy = im_world * 6
@@ -379,7 +378,7 @@ contains
       ! call MAPL_GridCompGet(gc, geom=geom, _RC)
       ! call MAPL_GeomGet(geom, topology, _RC)
       associate(layout => FV_Atm(1)%layout)
-        layout = [2, 1]
+        layout = topology
         if (FV_Atm(1)%flagstruct%grid_type == 4) then
            layout(2) = layout(2) * 6
         end if
@@ -667,9 +666,9 @@ contains
       endif
 
       ! Start up FV
-      ! call MAPL_GridCompTimerStart(gc, "fv_init2", _RC)
+      call MAPL_GridCompTimerStart(gc, "fv_init2", _RC)
       call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
-      ! call MAPL_GridCompTimerStop(gc, "fv_init2", _RC)
+      call MAPL_GridCompTimerStop(gc, "fv_init2", _RC)
       call MAPL_MemUtilsWrite(VM, 'FV_StateMod::fv_init2', _RC)
 
       ! Force compatibility of gmao_remap and n_zfilter
@@ -701,14 +700,15 @@ contains
       _RETURN(_SUCCESS)
    end subroutine FV_Setup
 
-   function get_im_world(hconfig, rc) result(im_world)
+   subroutine get_im_world_and_topology(hconfig, im_world, topology, rc)
       type(ESMF_HConfig), intent(in) :: hconfig
       integer, optional, intent(out) :: rc
-      integer :: im_world ! result
+      integer, intent(out) :: im_world
+      integer, intent(out) :: topology(2)
 
       type(ESMF_HConfig) :: geometry_cfg, geom_cfg
       logical :: has_section
-      integer :: status
+      integer :: nx_face, ny_face, status
 
       has_section = ESMF_HConfigIsDefined(hconfig, keyString="geometry", _RC)
       _ASSERT(has_section, "hconfig is missing geometry section")
@@ -718,12 +718,15 @@ contains
       geom_cfg = ESMF_HConfigCreateAt(geometry_cfg, keyString="esmf_geom", _RC)
 
       im_world = ESMF_HConfigAsI4(geom_cfg, keyString="im_world", _RC)
+      nx_face = ESMF_HConfigAsI4(geom_cfg, keyString="nx_face", _RC)
+      ny_face = ESMF_HConfigAsI4(geom_cfg, keyString="ny_face", _RC)
+      topology = [nx_face, ny_face]
 
       call ESMF_HConfigDestroy(geometry_cfg, _RC)
       call ESMF_HConfigDestroy(geom_cfg, _RC)
 
       _RETURN(_SUCCESS)
-   end function get_im_world
+   end subroutine get_im_world_and_topology
 
    subroutine FV_InitState(state, clock, import, gc, rc)
 
@@ -1688,7 +1691,7 @@ contains
 
       ! Check Dry Mass (Apply fixer is option is enabled)
       if ( check_mass .OR. fix_mass ) then
-         ! call MAPL_GridCompTimerStart(gc, "mass_fix", _RC)
+         call MAPL_GridCompTimerStart(gc, "mass_fix", _RC)
 
 
          if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. &
@@ -1808,10 +1811,10 @@ contains
 
          endif
 
-         ! call MAPL_GridCompTimerStop(gc, "mass_fix", _RC)
+         call MAPL_GridCompTimerStop(gc, "mass_fix", _RC)
       endif
 
-      ! call MAPL_GridCompTimerStart(gc, "NH_ADIABATIC_INIT", _RC)
+      call MAPL_GridCompTimerStart(gc, "NH_ADIABATIC_INIT", _RC)
       if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
          allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
          call nullify_domain ( )
@@ -1823,9 +1826,9 @@ contains
          deallocate( DEBUG_ARRAY )
          FV_Atm(1)%flagstruct%na_init=0
       endif
-      ! call MAPL_GridCompTimerStop(gc,"NH_ADIABATIC_INIT", _RC)
+      call MAPL_GridCompTimerStop(gc,"NH_ADIABATIC_INIT", _RC)
 
-      ! call MAPL_GridCompTimerStart(gc, "FV_DYNAMICS", _RC)
+      call MAPL_GridCompTimerStart(gc, "FV_DYNAMICS", _RC)
       if (.not. FV_OFF) then
          call set_domain(FV_Atm(1)%domain)  ! needed for diagnostic output done in fv_dynamics
          allocate ( u_dt(isc:iec,jsc:jec,npz) )
@@ -1932,7 +1935,7 @@ contains
          call nullify_domain()
 
       endif
-      ! call MAPL_GridCompTimerStop(gc, "FV_DYNAMICS", _RC)
+      call MAPL_GridCompTimerStop(gc, "FV_DYNAMICS", _RC)
 
       SPHU_FILLED = .FALSE.
       QLIQ_FILLED = .FALSE.

@@ -59,7 +59,6 @@ category: EXPORT
   ZLE            |  edge_heights                                                             |  m                 |  xyz  |  E   |                    |
   ZL             |  mid_layer_heights                                                        |  m                 |  xyz  |  C   |                    |
   S              |  mid_layer_dry_static_energy                                              |  m                 |  xyz  |  C   |                    |
-# PLE            |  edge_pressure                                                            |  Pa                |  xyz  |  E   |                    |
   TH             |  potential_temperature                                                    |  K                 |  xyz  |  C   |                    |
   PLK            |  mid-layer_p$^\kappa$                                                     |  Pa$^\kappa$       |  xyz  |  C   |                    |
   PKE            |  edge_p$^\kappa$                                                          |  Pa$^\kappa$       |  xyz  |  E   |                    |
@@ -100,8 +99,6 @@ category: EXPORT
   DQLDTDYN       |  tendency_of_liquid_water_due_to_dynamics                                 |  kg/kg/s           |  xyz  |  C   |                    |
   DOXDTDYN       |  tendency_of_ozone_due_to_dynamics                                        |  mol mol-1 s-1     |  xyz  |  C   |                    |
   PREF           |  reference_air_pressure                                                   |  Pa                |    z  |  E   |                    |
-# AK             |  hybrid_sigma_pressure_a                                                  |  1                 |    z  |  E   |                    |
-# BK             |  hybrid_sigma_pressure_b                                                  |  1                 |    z  |  E   |                    |
   PHIS           |  surface_height                                                           |  m                 |  xy   |  N   |                    |
   PS             |  surface_pressure                                                         |  Pa                |  xy   |  N   |                    |
   TA             |  surface_air_temperature                                                  |  K                 |  xy   |  N   |                    |
