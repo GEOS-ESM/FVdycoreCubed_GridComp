@@ -444,13 +444,12 @@ contains
       character(len=:), allocatable :: ReplayMode
 
       real(r4), pointer :: pref(:)
-      ! real(r4), pointer :: ple(:,:,:)
       real(r4), pointer :: u(:,:,:), v(:,:,:), t(:,:,:)
       real(r4), pointer :: temp2d(:,:)
 
       real(r8), pointer ::  ak(:), bk(:)
       real(r8), pointer ::  ud(:,:,:), vd(:,:,:)
-      real(r8), pointer ::  pe(:,:,:), pt(:,:,:), pk(:,:,:)
+      real(r8), pointer ::  pt(:,:,:), pk(:,:,:)
       real(r8), allocatable ::  ur(:,:,:), vr(:,:,:) ! rotated winds
 
       real :: DNS_INTERVAL
@@ -481,38 +480,36 @@ contains
       call DynInit(self, clock, import, gc, _RC)
       call MAPL_GridCompTimerStop(gc, "DynInit", _RC)
 
-      ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
+      ! Create PREF EXPORT Coupling (Needs to be done only once per run)
       call MAPL_StateGetPointer(internal, ak, "AK", _RC)
       call MAPL_StateGetPointer(internal, bk, "BK", _RC)
       call MAPL_StateGetPointer(export, pref, "PREF", _RC)
       if (associated(pref)) pref = ak + bk * P00
 
-      call MAPL_StateGetPointer(internal, ud, "U", _RC)
-      call MAPL_StateGetPointer(internal, vd, "V", _RC)
-      call MAPL_StateGetPointer(internal, pe, "PE", _RC)
-      call MAPL_StateGetPointer(internal, pt, "PT", _RC)
-      call MAPL_StateGetPointer(internal, pk, "PKZ", _RC)
-
-      ! pchakrab: TODO - how to handle `alloc=.true.` in MAPL3??
-      call MAPL_GetPointer(export, u, "U", alloc=.true., _RC)
-      call MAPL_GetPointer(export, v, "V", alloc=.true., _RC)
-      call MAPL_GetPointer(export, t, "T", alloc=.true., _RC)
-
       ! Create A-Grid Winds
-      ifirst = self%grid%is
-      ilast  = self%grid%ie
-      jfirst = self%grid%js
-      jlast  = self%grid%je
-      km     = self%grid%npz
+      call MAPL_StateGetPointer(export, u, "U", _RC)
+      call MAPL_StateGetPointer(export, v, "V", _RC)
+      if (associated(u) .and. associated(v)) then
+         ifirst = self%grid%is; ilast = self%grid%ie
+         jfirst = self%grid%js; jlast = self%grid%je
+         km = self%grid%npz
+         allocate(ur(ifirst:ilast, jfirst:jlast, km))
+         allocate(vr(ifirst:ilast, jfirst:jlast, km))
+         call MAPL_StateGetPointer(internal, ud, "U", _RC)
+         call MAPL_StateGetPointer(internal, vd, "V", _RC)
+         call getAllWinds(ud, vd, ur=ur, vr=vr)
+         u = ur
+         v = vr
+         deallocate(ur, vr)
+      end if
 
-      allocate(ur(ifirst:ilast, jfirst:jlast, km))
-      allocate(vr(ifirst:ilast, jfirst:jlast, km))
-      call getAllWinds(ud, vd, ur=ur, vr=vr)
-      u = ur
-      v = vr
-      t = pt*pk
-      ! ple = pe
-      deallocate(ur, vr)
+      ! Temperature
+      call MAPL_StateGetPointer(export, t, "T", _RC)
+      if (associated(t)) then
+         call MAPL_StateGetPointer(internal, pt, "PT", _RC)
+         call MAPL_StateGetPointer(internal, pk, "PKZ", _RC)
+         t = pt*pk
+      end if
 
       ! Fill Grid-Cell Area Delta-X/Y
       call MAPL_StateGetPointer(export, temp2d, "DXC", _RC)
@@ -560,13 +557,11 @@ contains
       end if
 
       !=====Begin intemittent replay=======================
-
       ! Set the intermittent replay alarm, if needed.
       ! Note that it is a non-sticky alarm
       ! and is set to ringing on first step. So it will
       ! work whether the clock is backed-up and ticked
       ! or not.
-
       call MAPL_GridCompGetResource(gc, "REPLAY_MODE", ReplayMode, default="NoReplay", _RC)
       if (adjustl(ReplayMode) == "Intermittent") then
          call MAPL_GridCompGetResource(gc, "REPLAY_INTERVAL", DNS_INTERVAL, default=21600., _RC)
@@ -574,7 +569,6 @@ contains
          alarm = ESMF_AlarmCreate(name="INTERMITTENT", clock=clock, ringInterval=intv, sticky=.false., _RC)
          call ESMF_AlarmRingerOn(alarm, _RC)
       end if
-
       !========End intermittent replay========================
 
       _RETURN(_SUCCESS)
