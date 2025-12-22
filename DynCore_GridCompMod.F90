@@ -43,7 +43,7 @@ module FVdycoreCubed_GridComp
    use mapl3g_generic, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
    use mapl3g_generic, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_FIELDBUNDLE
    use mapl3g_generic, only: MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState
-   ! use mapl3g_generic, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
+   use mapl3g_generic, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
    use mapl3g_VerticalStaggerLoc, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
    use mapl3g_Geom_API, only: MAPL_GridGetCoordinates
    use mapl3g_State_API, only: MAPL_StateGetPointer
@@ -459,9 +459,9 @@ contains
       integer :: i, numTracers, status
 
       ! Setup FMS/FV3
-      ! call MAPL_GridCompTimerStart(gc, "DynSetup", _RC)
+      call MAPL_GridCompTimerStart(gc, "DynSetup", _RC)
       call DynSetup(gc, _RC)
-      ! call MAPL_GridCompTimerStop(gc, "DynSetup", _RC)
+      call MAPL_GridCompTimerStop(gc, "DynSetup", _RC)
 
       ! Get the private state
       _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
@@ -477,9 +477,9 @@ contains
       ! Set Private Internal State from Restart File
       call MAPL_GridCompGetInternalState(gc, internal, _RC)
 
-      ! call MAPL_GridCompTimerStart(gc, "DynInit", _RC)
+      call MAPL_GridCompTimerStart(gc, "DynInit", _RC)
       call DynInit(self, clock, import, gc, _RC)
-      ! call MAPL_GridCompTimerStop(gc, "DynInit", _RC)
+      call MAPL_GridCompTimerStop(gc, "DynInit", _RC)
 
       ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
       call MAPL_StateGetPointer(internal, ak, "AK", _RC)
