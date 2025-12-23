@@ -27,7 +27,6 @@ module FVdycoreCubed_GridComp
    use MAPL_AbstractRegridderMod, only: AbstractRegridder
    ! pchakrab - TODO: need MAPL3 equivalent
    ! use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
-   use MAPL_BaseMod, only: MAPL_RemapBounds
    use MAPL_GridManagerMod, only: grid_manager
    use MAPL_RegridderManagerMod, only: regridder_manager
    use MAPL_RegridMethods, only: REGRID_METHOD_BILINEAR
@@ -3414,11 +3413,6 @@ contains
             call logger%info(trim(STRING))
          endif
          _ASSERT(nq3d>=2, "state_remap: invalid number of tracers")
-         ! if (nq3d<2) then
-         !    call WRITE_PARALLEL('state_remap: invalid number of tracers')
-         !    status=999
-         !    _VERIFY(STATUS)
-         ! endif
 
          iib = lbound(vars%pe,1)
          iie = ubound(vars%pe,1)
@@ -3455,21 +3449,11 @@ contains
                if (rank==3) then
                   icnt=icnt+1
                   _ASSERT(icnt<=nq3d, "state_remap: number of tracers exceeds known value")
-                  ! if (icnt>nq3d) then
-                  !    call WRITE_PARALLEL('state_remap: number of tracers exceeds known value')
-                  !    status=999
-                  !    _VERIFY(STATUS)
-                  ! endif
                   call ESMFL_BundleGetPointerToData(BUNDLE, NAME, ptr3dr4, _RC)
                   ana_qq(:,:,:,icnt) = ptr3dr4
                endif
             enddo
             _ASSERT(icnt==nq3d, "state_remap: inconsitent number of tracers")
-            ! if (icnt/=nq3d) then
-            !    call WRITE_PARALLEL('state_remap: inconsitent number of tracers')
-            !    status=999
-            !    _VERIFY(STATUS)
-            ! endif
          else
             if( qqq%is_r4 ) then
                ana_qq(:,:,:,1) = qqq%content_r4(:,:,:)
@@ -3599,7 +3583,7 @@ contains
          self%vars%TRACER(N)%TNAME = fieldname
          if ( self%vars%TRACER(N)%IS_R4 ) then
             call ESMF_ArrayGet(array, localDE=0, farrayptr=ptr_r4, _RC)
-            self%vars%tracer(n)%content_r4 => MAPL_RemapBounds(ptr_r4, i1, in, j1, jn, 1, km)
+            self%vars%tracer(n)%content_r4(i1:in, j1:jn, 1:km) => ptr_r4
             if (fieldname == QFieldName) then
                qqq%is_r4 = .true.
                qqq%content_r4 => self%vars%tracer(n)%content_r4

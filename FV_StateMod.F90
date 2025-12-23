@@ -9,7 +9,6 @@ module FV_StateMod
    use ESMF
    use mapl_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY, MAPL_RTRN
    use MAPL_MemUtilsMod, only: MAPL_MemUtilsWrite
-   use ESMFL_Mod, only: ESMFL_StateGetPointerToData
    use FileIOSharedMod, only: WRITE_PARALLEL
 
    use mapl3g_generic, only: MAPL_GridCompGetResource, MAPL_GridCompGet, MAPL_GridCompGetInternalState
