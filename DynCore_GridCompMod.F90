@@ -22,7 +22,7 @@ module FVdycoreCubed_GridComp
    use MAPL_Constants, only: MAPL_VectorField ! pchakrab: TODO - need MAPL3 equivalent
    use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
-   use ESMFL_Mod, only: ESMFL_StateGetPointerToData, ESMFL_BundleGetPointerToData, MAPL_AreaMean
+   use ESMFL_Mod, only: ESMFL_BundleGetPointerToData, MAPL_AreaMean
 
    use MAPL_AbstractRegridderMod, only: AbstractRegridder
    ! pchakrab - TODO: need MAPL3 equivalent
@@ -458,9 +458,9 @@ contains
       integer :: i, numTracers, status
 
       ! Setup FMS/FV3
-      call MAPL_GridCompTimerStart(gc, "DynSetup", _RC)
+      call MAPL_GridCompTimerStart(gc, "DYN_SETUP", _RC)
       call DynSetup(gc, _RC)
-      call MAPL_GridCompTimerStop(gc, "DynSetup", _RC)
+      call MAPL_GridCompTimerStop(gc, "DYN_SETUP", _RC)
 
       ! Get the private state
       _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
@@ -476,9 +476,9 @@ contains
       ! Set Private Internal State from Restart File
       call MAPL_GridCompGetInternalState(gc, internal, _RC)
 
-      call MAPL_GridCompTimerStart(gc, "DynInit", _RC)
+      call MAPL_GridCompTimerStart(gc, "DYN_INIT", _RC)
       call DynInit(self, clock, import, gc, _RC)
-      call MAPL_GridCompTimerStop(gc, "DynInit", _RC)
+      call MAPL_GridCompTimerStop(gc, "DYN_INIT", _RC)
 
       ! Create PREF EXPORT Coupling (Needs to be done only once per run)
       call MAPL_StateGetPointer(internal, ak, "AK", _RC)
@@ -741,11 +741,10 @@ contains
       real(r4), allocatable ::   cubetemp3d(:,:,:)
       real(r4), allocatable ::   cubevtmp3d(:,:,:)
 
-      real(r4), pointer :: uh25(:,:)
-      real(r4), pointer :: uh03(:,:)
-      real(r4), pointer :: srh01(:,:)
-      real(r4), pointer :: srh03(:,:)
-      real(r4), pointer :: srh25(:,:)
+      real(r4), pointer :: uh25(:,:), uh03(:,:)
+      real(r4), pointer :: srh01(:,:), srh03(:,:), srh25(:,:)
+      real(r4), allocatable :: uh25tmp(:,:), uh03tmp(:,:)
+      real(r4), allocatable :: srh01tmp(:,:), srh03tmp(:,:), srh25tmp(:,:)
 
       real(r8),     allocatable ::   uatmp(:,:,:)
       real(r8),     allocatable ::   vatmp(:,:,:)
@@ -1030,7 +1029,7 @@ contains
       ! WMP Begin REPLAY/ANA section
       call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
       if (.not. FV3_STANDALONE) then
-         ! call MAPL_TimerOn(MAPL, "-DYN_ANA")
+         call MAPL_GridCompTimerStart(gc, "DYN_ANA", _RC)
          call ESMF_ClockGetAlarm(clock, "ReplayShutOff", alarm, _RC)
          is_shutoff = ESMF_AlarmIsRinging(alarm, _RC)
       else
@@ -1681,11 +1680,11 @@ contains
          end if
 
       endif
-      ! if (.not. FV3_STANDALONE) then
-      !    call MAPL_TimerOff(MAPL,"-DYN_ANA")
-      ! endif
+      if (.not. FV3_STANDALONE) then
+         call MAPL_GridCompTimerStop(gc, "DYN_ANA", _RC)
+      endif
 
-      ! call MAPL_TimerOn(MAPL,"-DYN_PROLOGUE")
+      call MAPL_GridCompTimerStart(gc,"DYN_PROLOGUE", _RC)
       ! Create FV Thermodynamic Variables
       tempxy = vars%pt * vars%pkz      ! Compute Dry Temperature
 
@@ -1853,18 +1852,18 @@ contains
       ! Get pressures before dynamics
       pe0=vars%pe
 
-      ! call MAPL_TimerOff(MAPL, "-DYN_PROLOGUE")
+      call MAPL_GridCompTimerStop(gc, "DYN_PROLOGUE", _RC)
 
       !-------------------------------------------------------
 
-      ! call MAPL_TimerOn(MAPL, "-DYN_CORE")
+      call MAPL_GridCompTimerStart(gc, "DYN_CORE", _RC)
       t1 = MPI_Wtime(status)
       call DynRun(self, export, clock, gc, PLE0=pe0, _RC)
       t2 = MPI_Wtime(status)
       dyn_run_timer = t2-t1
-      ! call MAPL_TimerOff(MAPL, "-DYN_CORE")
+      call MAPL_GridCompTimerStop(gc, "DYN_CORE", _RC)
 
-      ! call MAPL_TimerOn(MAPL, "-DYN_EPILOGUE")
+      call MAPL_GridCompTimerStart(gc, "DYN_EPILOGUE", _RC)
       ! Computational diagnostics
       call MAPL_StateGetPointer(export, temp2d, "TIME_IN_DYN", _RC)
       if(associated(temp2d)) temp2d = dyn_run_timer
@@ -2569,19 +2568,23 @@ contains
          end if
 
          ! Updraft Helicty Exports
-         ! pchakrab: TODO - how to handle `alloc=.true.` in MAPL3??
-         call MAPL_GetPointer(export,  uh25, 'UH25', alloc=.true., _RC)
-         call MAPL_GetPointer(export,  uh03, 'UH03', alloc=.true., _RC)
-         call MAPL_GetPointer(export, srh01,'SRH01', alloc=.true., _RC)
-         call MAPL_GetPointer(export, srh03,'SRH03', alloc=.true., _RC)
-         call MAPL_GetPointer(export, srh25,'SRH25', alloc=.true., _RC)
+         call MAPL_StateGetPointer(export,  uh25, 'UH25', _RC)
+         call MAPL_StateGetPointer(export,  uh03, 'UH03', _RC)
+         call MAPL_StateGetPointer(export, srh01,'SRH01', _RC)
+         call MAPL_StateGetPointer(export, srh03,'SRH03', _RC)
+         call MAPL_StateGetPointer(export, srh25,'SRH25', _RC)
          ! Per WMP, this calculation is not useful if running hydrostatic
-         if (.not. HYDROSTATIC) then
-            if( associated( uh25) .or. associated( uh03) .or. &
-                 associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
-               call fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
+         if ( associated(uh25)  .or. associated(uh03) .or. &
+              associated(srh01) .or. associated(srh03) .or. associated(srh03)) then
+            if (.not. HYDROSTATIC) then
+               call fv_getUpdraftHelicity(uh25tmp, uh03tmp, srh01tmp, srh03tmp, srh25tmp)
+               if (associated(uh25)) uh25 = uh25tmp
+               if (associated(uh03)) uh03 = uh03tmp
+               if (associated(srh01)) srh01 = srh01tmp
+               if (associated(srh03)) srh03 = srh03tmp
+               if (associated(srh25)) srh25 = srh25tmp
             endif
-         endif
+         end if
 
          ! Divergence Exports
          logpe = log(vars%pe)
@@ -2689,7 +2692,7 @@ contains
 
       end if   ! SW_DYNAMICS
 
-      ! call MAPL_TimerOff(MAPL, "-DYN_EPILOGUE")
+      call MAPL_GridCompTimerStop(gc, "DYN_EPILOGUE", _RC)
 
       ! De-Allocate Arrays
 
@@ -3796,9 +3799,9 @@ contains
          endif
 
          ! Add Diabatic Forcing to State Variables
-         ! call MAPL_TimerOn (GENSTATE,"PHYS_ADD_INCS")
+         call MAPL_GridCompTimerStart(gc, "PHYS_ADD_INCS", _RC)
          call ADD_INCS(esmfgrid, self, import, DT)
-         ! call MAPL_TimerOff(GENSTATE,"PHYS_ADD_INCS")
+         call MAPL_GridCompTimerStop(gc, "PHYS_ADD_INCS", _RC)
 
          if (DYN_DEBUG) call DEBUG_FV_STATE('PHYSICS ADD_INCS', self)
 
@@ -4456,8 +4459,7 @@ contains
          tend_va(is:ie,js:je,1:km) = tend
 
          !if (.not. HYDROSTATIC ) then
-         !  call ESMFL_StateGetPointerToData ( import,TEND,'DWDT',RC=STATUS )
-         !  VERIFY_(STATUS)
+         !  call MAPL_StateGetPointer(import, TEND, 'DWDT', _RC)
          !  self%vars%W = self%vars%W + DT*TEND(is:ie,js:je,1:km)
          !endif
 

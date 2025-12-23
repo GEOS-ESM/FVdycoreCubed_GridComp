@@ -6,19 +6,18 @@ module FV_StateMod
 
    !USES:
 #if defined( MAPL_MODE )
-   use ESMF                ! ESMF base class
-   ! use MAPL              ! MAPL base class
+   use ESMF
    use mapl_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY, MAPL_RTRN
    use MAPL_MemUtilsMod, only: MAPL_MemUtilsWrite
-   use MAPL_BaseMod, only: MAPL_UNDEF
    use ESMFL_Mod, only: ESMFL_StateGetPointerToData
    use FileIOSharedMod, only: WRITE_PARALLEL
 
    use mapl3g_generic, only: MAPL_GridCompGetResource, MAPL_GridCompGet, MAPL_GridCompGetInternalState
    use mapl3g_generic, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
-   use mapl3g_Geom_API, only: MAPL_GridGet !, MAPL_GeomGet
+   use mapl3g_Geom_API, only: MAPL_GridGet
    use mapl3g_State_API, only: MAPL_StateGetPointer
 #endif
+   use MAPL_ConstantsMod, only: MAPL_UNDEFINED_REAL
    use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
    use MAPL_ConstantsMod, only: MAPL_KAPPA, MAPL_PI_R8, MAPL_ALHL, MAPL_PSDRY, MAPL_OMEGA
 
@@ -3097,8 +3096,8 @@ subroutine fv_computeMassFluxes_r4(ucI, vcI, ple, mfx, mfy, cx, cy, dt)
   integer     :: it, nsplt
 
 ! Fill Ghosted arrays and update halos
-  uc = MAPL_UNDEF
-  vc = MAPL_UNDEF
+  uc = MAPL_UNDEFINED_REAL
+  vc = MAPL_UNDEFINED_REAL
   uc(is:ie,js:je,:) = ucI
   vc(is:ie,js:je,:) = vcI
   call mpp_get_boundary(uc, vc, FV_Atm(1)%domain, &
@@ -3280,8 +3279,8 @@ subroutine fv_computeMassFluxes_r8(ucI, vcI, ple, mfx, mfy, cx, cy, dt)
   integer     :: it, nsplt
 
 ! Fill Ghosted arrays and update halos
-  uc = MAPL_UNDEF
-  vc = MAPL_UNDEF
+  uc = MAPL_UNDEFINED_REAL
+  vc = MAPL_UNDEFINED_REAL
   uc(is:ie,js:je,:) = ucI
   vc(is:ie,js:je,:) = vcI
   call mpp_get_boundary(uc, vc, FV_Atm(1)%domain, &
@@ -3927,11 +3926,11 @@ end subroutine fv_getDivergence
 subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
    use constants_mod, only: fms_grav=>grav
 ! made this REAL4
-   real(REAL4), intent(OUT) ::  uh25(:,:)
-   real(REAL4), intent(OUT) ::  uh03(:,:)
-   real(REAL4), intent(OUT) :: srh01(:,:)
-   real(REAL4), intent(OUT) :: srh03(:,:)
-   real(REAL4), intent(OUT) :: srh25(:,:)
+   real(REAL4), allocatable, intent(OUT) ::  uh25(:,:)
+   real(REAL4), allocatable, intent(OUT) ::  uh03(:,:)
+   real(REAL4), allocatable, intent(OUT) :: srh01(:,:)
+   real(REAL4), allocatable, intent(OUT) :: srh03(:,:)
+   real(REAL4), allocatable, intent(OUT) :: srh25(:,:)
 
 ! made an intermediate output of FVPRC
    real(FVPRC) :: uh_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
