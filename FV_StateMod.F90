@@ -8,13 +8,13 @@ module FV_StateMod
 #if defined( MAPL_MODE )
    use ESMF
    use mapl_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY, MAPL_RTRN
-   use MAPL_MemUtilsMod, only: MAPL_MemUtilsWrite
    use FileIOSharedMod, only: WRITE_PARALLEL
 
    use mapl3g_generic, only: MAPL_GridCompGetResource, MAPL_GridCompGet, MAPL_GridCompGetInternalState
    use mapl3g_generic, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
    use mapl3g_Geom_API, only: MAPL_GridGet
    use mapl3g_State_API, only: MAPL_StateGetPointer
+   use mapl3g_utilities, only: MAPL_MemInfoWrite
 #endif
    use MAPL_ConstantsMod, only: MAPL_UNDEFINED_REAL
    use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
@@ -316,7 +316,7 @@ contains
       type(ESMF_VM) :: vm
       type(ESMF_Geom) :: geom
       type(ESMF_HConfig) :: hconfig
-      character(len=ESMF_MAXSTR) :: Iam='FV_StateMod::FV_Setup'
+      character(len=*), parameter :: Iam="FV_StateMod::FV_Setup"
       character(len=:), allocatable :: DYCORE
       real(FVPRC) :: DT
       real :: temp_real
@@ -327,19 +327,19 @@ contains
       call logger%info("FV_Setup::starting...")
 
       call ESMF_VMGetCurrent(vm, _RC)
-      call MAPL_MemUtilsWrite(vm, trim(Iam), _RC)
-
       call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
+      call MAPL_MemInfoWrite(comm, logger, Iam, _RC)
+
       call MAPL_GridCompTimerStart(gc, "fms_init", _RC)
       call fms_init(comm)
       call MAPL_GridCompTimerStop(gc, "fms_init", _RC)
-      call MAPL_MemUtilsWrite(vm, 'FV_StateMod::fms_init', _RC)
+      call MAPL_MemInfoWrite(comm, logger, "fms_init", _RC)
 
       ! Start up FV
       call MAPL_GridCompTimerStart(gc, "fv_init1", _RC)
       call fv_init1(FV_Atm, DT, grids_on_this_pe, p_split)
       call MAPL_GridCompTimerStop(gc, "fv_init1", _RC)
-      call MAPL_MemUtilsWrite(vm, 'FV_StateMod::fv_init1', _RC)
+      call MAPL_MemInfoWrite(comm, logger, "fv_init1", _RC)
 
       ! FV grid dimensions setup from MAPL
       call MAPL_GridCompGet(gc, hconfig=hconfig, num_levels=num_levels, _RC)
@@ -667,7 +667,7 @@ contains
       call MAPL_GridCompTimerStart(gc, "fv_init2", _RC)
       call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
       call MAPL_GridCompTimerStop(gc, "fv_init2", _RC)
-      call MAPL_MemUtilsWrite(VM, 'FV_StateMod::fv_init2', _RC)
+      call MAPL_MemInfoWrite(comm, logger, "fv_init2", _RC)
 
       ! Force compatibility of gmao_remap and n_zfilter
       if (FV_Atm(1)%flagstruct%gmao_remap > 0) then
@@ -689,7 +689,7 @@ contains
       DEBUG = FV_Atm(1)%flagstruct%fv_debug
       call MAPL_GridCompGetResource(gc, "DEBUG_STATE", DEBUG, default=DEBUG, _RC)
 
-      call MAPL_MemUtilsWrite(vm, trim(Iam), _RC)
+      call MAPL_MemInfoWrite(comm, logger, Iam, _RC)
 
 #ifdef RUN_GTFV3
       call MAPL_GridCompGetResource(gc, "RUN_GTFV3", run_gtfv3, default=0, _RC)
@@ -746,7 +746,7 @@ contains
       type(ESMF_VM) :: vm
       type(ESMF_Time) :: fv_time
       type(T_FVDYCORE_GRID), pointer :: grid
-      character(len=ESMF_MAXSTR) :: IAm='FV:FV_InitState'
+      character(len=*), parameter :: IAm="FV:FV_InitState"
       character(len=1) :: sCODE, rCODE, zCODE
 
       real :: rPRS
@@ -776,8 +776,9 @@ contains
 
 #ifdef RUN_GTFV3
       logical :: halting_mode(5)
-      integer :: comm
 #endif
+      integer :: comm
+      class(logger_t), pointer :: logger
 
       call MAPL_GridCompGetResource(gc, "RUN_DT", ndt, default=0, _RC)
       DT = ndt
@@ -799,7 +800,8 @@ contains
       gid = mpp_pe()
 
       call ESMF_GridCompGet(gc, vm=vm, _RC)
-      call MAPL_GridCompGet(gc, grid=grid%grid, _RC)
+      call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
+      call MAPL_GridCompGet(gc, grid=grid%grid, logger=logger, _RC)
 
       call WRITE_PARALLEL(' ')
       call WRITE_PARALLEL(state%DT,format='("Dynamics time step : ",(F10.4))')
@@ -828,7 +830,7 @@ contains
            FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, &
            1, FV_Atm(1)%flagstruct%npz, FV_Atm(1)%flagstruct%npz+1, &
            U, V, PT, PE, PKZ, DZ, W, state%vars)
-      call MAPL_MemUtilsWrite(vm, 'FV_StateMod: CREATE_VARS', _RC)
+      call MAPL_MemInfoWrite(comm, logger, "create_vars", _RC)
 
       grid%IS = FV_Atm(1)%bd%isc
       grid%IE = FV_Atm(1)%bd%iec
@@ -1054,12 +1056,10 @@ contains
 300      format(A1,A1,A1,2x,i5,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
       endif
 
-      call MAPL_MemUtilsWrite(vm, 'FV_StateMod::FV Initialize', _RC)
+      call MAPL_MemInfoWrite(comm, logger, "FV Initialize", _RC)
 
 #ifdef RUN_GTFV3
       if (run_gtfv3 /= 0) then
-         ! call ESMF_VMGetCurrent(vm, _RC)
-         call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
          ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
          ! disable trapping of FPEs temporarily, call the Python interface and resume trapping
          call ieee_get_halting_mode(ieee_all, halting_mode)

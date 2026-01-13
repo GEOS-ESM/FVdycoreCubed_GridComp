@@ -29,6 +29,6 @@ mapl:
     activate_all_imports: true
     activate_all_exports: true
     checkpoint:
-      export: true
+      # export: true
       # import: true
       internal: true
