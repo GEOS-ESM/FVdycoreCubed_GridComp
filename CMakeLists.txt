@@ -140,11 +140,7 @@ if (CRAY_POINTER)
   set_target_properties (${this} PROPERTIES COMPILE_FLAGS ${CRAY_POINTER})
 endif()
 
-add_definitions (-DSPMD -DMAPL_MODE -DFVREGRID_MAPL_MODE)
-
-foreach(flag ${tmp})
-   target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
-endforeach()
+target_compile_definitions (${this} PRIVATE MAPL_MODE FVREGRID_MAPL_MODE)
 
 ecbuild_add_executable (
   TARGET StandAlone_FV3_Dycore.x
@@ -210,6 +206,16 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
     geos-gtfv3/driver/input/input_arrays.f90
     geos-gtfv3/driver/fv3_driver.F90
     LIBS ${this})
+  if (FV_PRECISION STREQUAL R4R8)
+    # fvdycore needs r4 .mod interfaces
+    get_target_property(inc_r4 FMS::fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
+    target_include_directories(fv3_driver.x PRIVATE $<BUILD_INTERFACE:${inc_r4}>)
+
+    # But fvdycore should not *compile* with FMS::fms_r8 includes
+    target_link_libraries(fv3_driver.x PUBLIC $<LINK_ONLY:FMS::fms_r8>)
+
+    add_dependencies(fv3_driver.x FMS::fms_r4 FMS::fms_r8)
+  endif ()
 endif ()
 
 add_subdirectory(scripts)
