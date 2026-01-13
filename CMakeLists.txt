@@ -184,10 +184,7 @@ ecbuild_add_executable (
 # main library above.
 if (FV_PRECISION STREQUAL R4R8)
   foreach(executable
-    StandAlone_FV3_Dycore.x
     rs_scale.x
-    StandAlone_AdvCore.x
-    StandAlone_DynAdvCore.x
     c2c.x
     interp_restarts.x
     interp_restarts_bin.x)
