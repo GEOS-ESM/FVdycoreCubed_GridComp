@@ -103,7 +103,10 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
 
 endif ()
 
-set(dependencies MAPL MAPL.generic3g GFTL_SHARED::gftl-shared-v2 GMAO_hermes GEOS_Shared esmf OpenMP::OpenMP_Fortran)
+set(dependencies
+  esmf MAPL MAPL.generic3g MAPL.utilities
+  GFTL_SHARED::gftl-shared-v2 GMAO_hermes GEOS_Shared
+  OpenMP::OpenMP_Fortran)
 
 if (BUILD_GEOS_GTFV3_INTERFACE)
   esma_add_library (${this}
@@ -181,10 +184,7 @@ ecbuild_add_executable (
 # main library above.
 if (FV_PRECISION STREQUAL R4R8)
   foreach(executable
-    StandAlone_FV3_Dycore.x
     rs_scale.x
-    StandAlone_AdvCore.x
-    StandAlone_DynAdvCore.x
     c2c.x
     interp_restarts.x
     interp_restarts_bin.x)
