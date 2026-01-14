@@ -3543,7 +3543,7 @@ contains
       type(ESMF_Field) :: field
       type(ESMF_Array) :: array
       type(ESMF_TypeKind_Flag) :: kind
-      real(r4), pointer :: ptr_r4(:,:,:)
+      real(r4), pointer, contiguous :: ptr_r4(:,:,:)
       real(r8), pointer :: ptr_r8(:,:,:)
       integer :: N,NQ
       integer :: i1, in, j1, jn, im, jm, km
