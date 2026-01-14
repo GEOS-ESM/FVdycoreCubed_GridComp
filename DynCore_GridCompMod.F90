@@ -27,7 +27,6 @@ module FVdycoreCubed_GridComp
    use MAPL_AbstractRegridderMod, only: AbstractRegridder
    ! pchakrab - TODO: need MAPL3 equivalent
    ! use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
-   use MAPL_BaseMod, only: MAPL_RemapBounds
    use MAPL_GridManagerMod, only: grid_manager
    use MAPL_RegridderManagerMod, only: regridder_manager
    use MAPL_RegridMethods, only: REGRID_METHOD_BILINEAR
@@ -3544,7 +3543,7 @@ contains
       type(ESMF_Field) :: field
       type(ESMF_Array) :: array
       type(ESMF_TypeKind_Flag) :: kind
-      real(r4), pointer :: ptr_r4(:,:,:)
+      real(r4), pointer, contiguous :: ptr_r4(:,:,:)
       real(r8), pointer :: ptr_r8(:,:,:)
       integer :: N,NQ
       integer :: i1, in, j1, jn, im, jm, km
@@ -3584,10 +3583,7 @@ contains
          self%vars%TRACER(N)%TNAME = fieldname
          if ( self%vars%TRACER(N)%IS_R4 ) then
             call ESMF_ArrayGet(array, localDE=0, farrayptr=ptr_r4, _RC)
-            ! gfortran has trouble with pointer bounds remapping
-            ! (Error: Rank remapping target must be rank 1 or simply contiguous)
-            ! self%vars%tracer(n)%content_r4(i1:in, j1:jn, 1:km) => ptr_r4
-            self%vars%tracer(n)%content_r4 => MAPL_RemapBounds(ptr_r4, i1, in, j1, jn, 1, km)
+            self%vars%tracer(n)%content_r4(i1:in, j1:jn, 1:km) => ptr_r4
             if (fieldname == QFieldName) then
                qqq%is_r4 = .true.
                qqq%content_r4 => self%vars%tracer(n)%content_r4
