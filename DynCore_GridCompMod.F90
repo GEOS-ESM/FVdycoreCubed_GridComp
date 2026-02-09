@@ -22,8 +22,6 @@ module FVdycoreCubed_GridComp
    use MAPL_Constants, only: MAPL_VectorField ! pchakrab: TODO - need MAPL3 equivalent
    use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
-   use ESMFL_Mod, only: ESMFL_BundleGetPointerToData, MAPL_AreaMean
-
    use MAPL_AbstractRegridderMod, only: AbstractRegridder
    ! pchakrab - TODO: need MAPL3 equivalent
    ! use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
@@ -32,7 +30,7 @@ module FVdycoreCubed_GridComp
    use MAPL_RegridMethods, only: REGRID_METHOD_BILINEAR
    use MAPL_CFIOMod, only: MAPL_CFIORead
    use MAPL_FieldPointerUtilities, only: MAPL_FieldDestroy
-   use MAPL_MaxMinMod, only: MAPL_MaxMin
+   use mapl3g_Utilities, only: MAPL_MaxMin, MAPL_AreaMean
    use MAPL_CommsMod, only: MAPL_AM_I_ROOT, MAPL_ArrayGather => ArrayGather
 
    use FileIOSharedMod, only: WRITE_PARALLEL
@@ -47,6 +45,7 @@ module FVdycoreCubed_GridComp
    use mapl3g_Geom_API, only: MAPL_GridGetCoordinates
    use mapl3g_State_API, only: MAPL_StateGetPointer
    use mapl3g_Field_API, only: MAPL_FieldCreate
+   use mapl3g_FieldBundle_API, only: MAPL_FieldBundleGetPointer
    use mapl3g_FieldBundle_API, only: MAPL_FieldBundleAdd
    use mapl3g_RestartModes, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
 
@@ -599,7 +598,8 @@ contains
       integer, intent(out) :: rc
       !EOP
 
-      integer :: status
+      integer :: status, comm
+      type(ESMF_VM) :: vm
       type(ESMF_FieldBundle) :: bundle, ana_bundle
       type(ESMF_Field) :: field, ana_field
       type(ESMF_Alarm) :: alarm
@@ -783,6 +783,9 @@ contains
       character(len=:), allocatable :: adjustTracerMode, xlist(:)
       real(kind=r8) :: t1, t2, dyn_run_timer
       class(logger_t), pointer :: logger
+
+      call ESMF_VMGetCurrent(vm, _RC)
+      call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
 
       call MAPL_GridCompGet(gc, grid=esmfgrid, hconfig=hconfig, logger=logger, _RC)
       call ESMF_GridValidate(esmfgrid, _RC)
@@ -1395,7 +1398,7 @@ contains
                elsewhere
                   qsum2 = MAPL_UNDEFINED_REAL
                end where
-               call MAPL_AreaMean(TRSUM1(n), qsum2, area, esmfgrid, _RC)
+               TRSUM1(n) = MAPL_AreaMean(qsum2, area, comm, _RC)
             enddo
          endif
 
@@ -1443,7 +1446,7 @@ contains
                elsewhere
                   qsum2 = MAPL_UNDEFINED_REAL
                end where
-               call MAPL_AreaMean(TRSUM2(n), qsum2, area, esmfgrid, _RC)
+               TRSUM2(n) = MAPL_AreaMean(qsum2, area, comm, _RC)
             enddo
          endif
 
@@ -2025,10 +2028,17 @@ contains
          call FILLOUT3(export, 'V_AGRID', va    , _RC)
 
          if (DEBUG_DYN) then
-            call MAPL_MaxMin('DYN: Q_AF_DYN ', qv)
-            call MAPL_MaxMin('DYN: T_AF_DYN ', tempxy)
-            call MAPL_MaxMin('DYN: U_AF_DYN ', ua)
-            call MAPL_MaxMin('DYN: V_AF_DYN ', va)
+            block
+               real :: maxmin(2)
+               maxmin = MAPL_MaxMin(qv, comm, _RC)
+               call logger%info("max/min(Q_AF_DYN): %f/%f", maxmin(1), maxmin(2))
+               maxmin = MAPL_MaxMin(tempxy, comm, _RC)
+               call logger%info("max/min(T_AF_DYN): %f/%f", maxmin(1), maxmin(2))
+               maxmin = MAPL_MaxMin(ua, comm, _RC)
+               call logger%info("max/min(U_AF_DYN): %f/%f", maxmin(1), maxmin(2))
+               maxmin = MAPL_MaxMin(va, comm, _RC)
+               call logger%info("max/min(V_AF_DYN): %f/%f", maxmin(1), maxmin(2))
+            end block
          endif
 
          ! Compute Diagnostic Dynamics Tendencies
@@ -2771,7 +2781,7 @@ contains
       subroutine check_replay_time_(lring)
 
          logical :: lring
-         
+
          integer :: REPLAY_REF_DATE, REPLAY_REF_TIME, REPLAY_REF_TGAP
          integer :: REF_TIME(6), REF_TGAP(6)
          type(ESMF_TimeInterval)  :: RefTGap
@@ -2878,12 +2888,12 @@ contains
          ! U
          iwind=0
          if( trim(uname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(uname), XTMP3d, _RC)
+            call MAPL_FieldBundleGetPointer(ana_bundle, trim(uname), XTMP3d, _RC)
             iwind=iwind+1
          endif
          ! V
          if( trim(vname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(vname), YTMP3D, _RC)
+            call MAPL_FieldBundleGetPointer(ana_bundle, trim(vname), YTMP3D, _RC)
             iwind=iwind+1
          endif
 
@@ -2967,7 +2977,7 @@ contains
 
          ! PE or PS
          if( trim(dpname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(dpname), XTMP3d, _RC)
+            call MAPL_FieldBundleGetPointer(ana_bundle, trim(dpname), XTMP3d, _RC)
             call logger%info("Run::dump_n_splash_:: Replaying "//trim(dpname))
             if ( iapproach == 1 ) then ! convert lat-lon delp to cubed and proceed
                allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
@@ -3005,7 +3015,7 @@ contains
             enddo
          else
             if( trim(psname).ne.'NULL' ) then
-               call ESMFL_BundleGetPointerToData(ana_bundle, trim(psname), XTMP2D, _RC)
+               call MAPL_FieldBundleGetPointer(ana_bundle, trim(psname), XTMP2D, _RC)
                call logger%info("Run::dump_n_splash_:: Replaying "//trim(psname))
                allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
                allocate(     aux3D(size(XTMP2d ,1),size(XTMP2d ,2),1))
@@ -3047,7 +3057,7 @@ contains
          ! pchakrab - TODO: orbit??
          ! ! O3
          ! if( trim(o3name).ne.'NULL' ) then
-         !    call ESMFL_BundleGetPointerToData(ana_bundle, trim(o3name), XTMP3d, _RC)
+         !    call MAPL_FieldBundleGetPointer(ana_bundle, trim(o3name), XTMP3d, _RC)
          !    allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
          !    call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
 
@@ -3084,7 +3094,7 @@ contains
 
          ! QV
          if( trim(qname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(qname), XTMP3d, _RC)
+            call MAPL_FieldBundleGetPointer(ana_bundle, trim(qname), XTMP3d, _RC)
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
             call logger%info("Run::dump_n_splash_:: Replaying "//trim(qname))
@@ -3103,7 +3113,7 @@ contains
 
          ! PT
          if( trim(tname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(tname), XTMP3d, _RC)
+            call MAPL_FieldBundleGetPointer(ana_bundle, trim(tname), XTMP3d, _RC)
             allocate(cubeTEMP3D(size(ana_thv,1),size(ana_thv,2),km))
             call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
             call logger%info("Run::dump_n_splash_:: Replaying "//trim(tname)// '; treated as '//trim(tvar))
@@ -3190,12 +3200,12 @@ contains
          ! U
          iwind=0
          if( trim(uname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(uname), TEMP3D, _RC)
+            call MAPL_FieldBundleGetPointer(ana_bundle, trim(uname), TEMP3D, _RC)
             iwind=iwind+1
          endif
          ! V
          if( trim(vname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(vname), VTMP3D, _RC)
+            call MAPL_FieldBundleGetPointer(ana_bundle, trim(vname), VTMP3D, _RC)
             iwind=iwind+1
          endif
 
@@ -3227,7 +3237,7 @@ contains
 
          ! DELP
          if( trim(psname)=='NULL' .and. trim(dpname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(dpname), TEMP3D, _RC)
+            call MAPL_FieldBundleGetPointer(ana_bundle, trim(dpname), TEMP3D, _RC)
             call logger%info("Replaying increment of "//trim(dpname))
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
@@ -3252,7 +3262,7 @@ contains
 
          ! PS
          if( trim(psname)/='NULL' .and. trim(dpname)=='NULL' ) then
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(psname), TEMP2D, _RC)
+            call MAPL_FieldBundleGetPointer(ana_bundle, trim(psname), TEMP2D, _RC)
             call logger%info("Replaying increment of %s", trim(psname))
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
             allocate(     aux3D(size( TEMP2D,1),size( TEMP2D,2),1))
@@ -3280,7 +3290,7 @@ contains
          ! pchakrab - TODO: orbit?
          ! ! O3
          ! if( trim(o3name).ne.'NULL' ) then
-         !    call ESMFL_BundleGetPointerToData(ana_bundle, trim(o3name), TEMP3D, _RC)
+         !    call MAPL_FieldBundleGetPointer(ana_bundle, trim(o3name), TEMP3D, _RC)
          !    allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
          !    call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
 
@@ -3307,7 +3317,7 @@ contains
 
          ! QV
          if( trim(qname).ne.'NULL' ) then
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(qname), TEMP3D, _RC)
+            call MAPL_FieldBundleGetPointer(ana_bundle, trim(qname), TEMP3D, _RC)
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
             call logger%info("Replaying increment of "//trim(qname))
@@ -3329,7 +3339,7 @@ contains
             !    STATUS=99
             !    _VERIFY(STATUS)
             ! endif
-            call ESMFL_BundleGetPointerToData(ana_bundle, trim(tname), TEMP3D, _RC)
+            call MAPL_FieldBundleGetPointer(ana_bundle, trim(tname), TEMP3D, _RC)
             allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
             call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
             call logger%info("Replaying increment of "//trim(tname))
@@ -3431,7 +3441,7 @@ contains
 
          call logger%info("Replay start remapping")
          !
-         call ESMFL_BundleGetPointerToData(ana_bundle, 'phis', XTMP2D, _RC)
+         call MAPL_FieldBundleGetPointer(ana_bundle, 'phis', XTMP2D, _RC)
          allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
          allocate(     aux3D(size(XTMP2D ,1),size(XTMP2D ,2),1))
          aux3d(:,:,1)=XTMP2D ! this is a trick since the 2d interface to the transform has not worked for me (RT)
@@ -3449,7 +3459,7 @@ contains
                if (rank==3) then
                   icnt=icnt+1
                   _ASSERT(icnt<=nq3d, "state_remap: number of tracers exceeds known value")
-                  call ESMFL_BundleGetPointerToData(BUNDLE, NAME, ptr3dr4, _RC)
+                  call MAPL_FieldBundleGetPointer(BUNDLE, NAME, ptr3dr4, _RC)
                   ana_qq(:,:,:,icnt) = ptr3dr4
                endif
             enddo
@@ -3478,7 +3488,7 @@ contains
                if (rank==2) cycle
                if (rank==3) then
                   icnt=icnt+1
-                  call ESMFL_BundleGetPointerToData(BUNDLE, NAME, ptr3dr4, _RC)
+                  call MAPL_FieldBundleGetPointer(BUNDLE, NAME, ptr3dr4, _RC)
                   ptr3dr4 = ana_qq(:,:,:,icnt)
                   if(trim(NAME)=="Q") then
                      if( qqq%is_r4 ) then
@@ -3683,7 +3693,7 @@ contains
 
       ! Retrieve the pointer to the internal state
       _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
-      
+
       vars => self%vars ! direct handle to control variables
       grid => self%grid ! direct handle to grid
       dt = self%dt      ! dynamics time step (large)
@@ -3845,12 +3855,22 @@ contains
 #endif
 
          if (DEBUG_DYN) then
-            call MAPL_MaxMin('DYN: Q_AF_INC ', qv)
-            call MAPL_MaxMin('DYN: T_AF_INC ', tempxy, pmax=TMAX, pmin=TMIN)
-            call MAPL_MaxMin('DYN: U_AF_INC ', ua)
-            call MAPL_MaxMin('DYN: V_AF_INC ', va)
-            if (TMIN <= 130.0_r8) call Write_Profile(grid, tempxy, 'TAFINC')
-            if (TMAX >= 333.0_r8) call Write_Profile(grid, tempxy, 'TAFINC')
+            block
+               type(ESMF_VM) :: vm
+               integer :: comm
+               real :: maxmin(2)
+
+               call ESMF_VMGetCurrent(vm, _RC)
+               call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
+               maxmin = MAPL_MaxMin(qv, comm, _RC)
+               call logger%info("max/min(Q_AF_INC): %f/%f", maxmin(1), maxmin(2))
+               maxmin = MAPL_MaxMin(tempxy, comm, _RC)
+               call logger%info("max/min(T_AF_INC): %f/%f", tmax, tmin)
+               maxmin = MAPL_MaxMin(ua, comm, _RC)
+               call logger%info("max/min(U_AF_INC): %f/%f", maxmin(1), maxmin(2))
+               maxmin = MAPL_MaxMin(va, comm, _RC)
+               call logger%info("max/min(V_AF_INC): %f/%f", maxmin(1), maxmin(2))
+            end block
          endif
 
          call FILLOUT3(export, "DELP", dp, _RC)
