@@ -31,7 +31,7 @@ module FVdycoreCubed_GridComp
    use MAPL_CFIOMod, only: MAPL_CFIORead
    use MAPL_FieldPointerUtilities, only: MAPL_FieldDestroy
    use mapl3g_Utilities, only: MAPL_MaxMin, MAPL_AreaMean
-   use MAPL_CommsMod, only: MAPL_AM_I_ROOT, MAPL_ArrayGather => ArrayGather
+   use mapl3g_Utilities_Comms_API, only: MAPL_Am_I_Root, MAPL_ArrayGather
 
    use FileIOSharedMod, only: WRITE_PARALLEL
 
@@ -340,10 +340,12 @@ contains
       !DESCRIPTION: Set services (register) for the FVCAM Dynamical Core GridComp
       !EOP
 
-      type(DynState), pointer :: self
+#ifdef SKIP_TRACERS
       character(len=ESMF_MAXSTR) :: myTracer
-      integer :: ilev, itracer, status
+      integer :: ilev, itracer
+#endif
       logical :: FV3_STANDALONE
+      integer :: status
 
       ! Wrap gridcomp's private state and store it in gc
       _SET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE)
@@ -615,10 +617,9 @@ contains
 
       integer :: NQ
       integer :: IM, JM, KM
-      integer :: NKE, NPHI
       integer :: NUMVARS
       integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
-      integer :: kend, i, j, K, L, n
+      integer :: kend, i, j, K, n
       integer :: im_replay,jm_replay
       logical, parameter :: convt = .false. ! Until this is run with full physics
       logical :: is_shutoff, is_ringing
@@ -758,7 +759,7 @@ contains
 
       ! type(MAPL_SunOrbit) :: ORBIT
       real(r4), allocatable :: lats(:,:), lons(:,:)
-      real(r4), allocatable :: ZTH(:,:), SLR(:,:)
+      ! real(r4), allocatable :: ZTH(:,:), SLR(:,:) - used in some commented code
 
       real :: rc_blend_p_above, rc_blend_p_below, sclinc
       integer :: rc_blend
@@ -773,12 +774,15 @@ contains
       integer :: CONSV,  FILL, nx_ana, ny_ana
 
       logical, save :: firstime = .true.
-      logical :: adjustTracers, tend, exclude, isPresent, doEnergetics, doTropvars
+      logical :: adjustTracers, exclude, doEnergetics, doTropvars
       logical :: FV3_STANDALONE
-      integer :: pos, nqt, itracer
+      integer :: pos, nqt
+#ifdef SKIP_TRACERS
+      integer :: itracer
+#endif
       type(ESMF_Alarm) :: predictorAlarm
       type(ESMF_Grid) :: bgrid
-      character(len=ESMF_MAXSTR) :: tmpstring, fieldname, myTracer
+      character(len=ESMF_MAXSTR) :: fieldname
       character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
       character(len=:), allocatable :: adjustTracerMode, xlist(:)
       real(kind=r8) :: t1, t2, dyn_run_timer
@@ -908,29 +912,6 @@ contains
       if (adjustTracers) then
          if (firstime) then
             firstime = .false.
-            ! get the list of excluded tracers from resource
-            n = 0
-            ! call ESMF_ConfigFindLabel(cf, "EXCLUDE_ADVECTION_TRACERS_LIST:", isPresent=isPresent, _RC)
-            ! if(isPresent .or. (AdvCore_Advection >= 1)) then
-            !    tend  = .false.
-            !    allocate(xlist(XLIST_MAX), stat=status)
-            !    VERIFY_(STATUS)
-            !    if (isPresent) then
-            !       do while (.not.tend)
-            !          call ESMF_ConfigGetAttribute(cf, value=tmpstring, default="", rc=status) !ALT: we don't check return status
-            !          if (tmpstring /= "")  then
-            !             n = n + 1
-            !             if (n > size(xlist)) then
-            !                allocate(biggerlist(2*n), _STAT)
-            !                biggerlist(1:n-1)=xlist
-            !                call move_alloc(from=biggerlist, to=xlist)
-            !             end if
-            !             xlist(n) = tmpstring
-            !          end if
-            !          call ESMF_ConfigNextLine(cf, tableEnd=tend, _RC)
-            !       enddo
-            !    endif
-            ! end if
             xlist = ESMF_HConfigAsStringSeq(hconfig, keyString="EXCLUDE_ADVECTION_TRACERS_LIST", stringLen=ESMF_MAXSTR, _RC)
             if (allocated(xlist)) n = size(xlist)
 
@@ -3612,6 +3593,7 @@ contains
       end do
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(import)
    end subroutine PULL_Q
 
    !BOP
@@ -4252,6 +4234,7 @@ contains
       end if ! .not. SW_DYNAMICS
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(clock)
    end subroutine RunAddIncs
 
    subroutine ADD_INCS(esmfgrid, self, import, DT, is_weighted, rc)
@@ -4279,13 +4262,11 @@ contains
       integer :: II, JJ, I, J, L
       integer :: is, ie, js, je, km
       integer :: isd, ied, jsd, jed
-      real(r4), allocatable :: fvQOLD(:,:,:), QTEND(:,:,:)
       real(r4), pointer :: tend(:,:,:)
       real(r4), allocatable, dimension(:,:) :: lons, lats
       real(r8), allocatable :: DPNEW(:,:,:), DPOLD(:,:,:)
       real(r8), allocatable :: tend_ua(:,:,:), tend_va(:,:,:)
       real(r8), allocatable :: tend_un(:,:,:), tend_vn(:,:,:)
-      real(FVPRC), allocatable :: u_dt(:,:,:), v_dt(:,:,:), t_dt(:,:,:)
       real(FVPRC), allocatable :: Q(:,:,:,:), CVM(:,:,:)
 
       type(DynTracers) :: qqq       ! Specific Humidity
@@ -4295,7 +4276,6 @@ contains
       real, parameter:: c_vap = MAPL_CPVAP       !< 1846.
       real, parameter:: c_air = MAPL_CP
       real(FVPRC) :: fac
-      type(time_type) :: Time_Nudge
       integer :: status
 
       is_weighted_ = .true.
@@ -4756,7 +4736,6 @@ contains
 
       type (DynState), pointer :: self
       integer :: status
-      class(logger_t), pointer :: logger
 
       ! Retrieve the pointer to the state
       _GET_NAMED_PRIVATE_STATE(gc, DynState, PRIVATE_STATE, self)
@@ -4764,6 +4743,9 @@ contains
       call DynFinalize(self)
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(import)
+      _UNUSED_DUMMY(export)
+      _UNUSED_DUMMY(clock)
    end subroutine FINALIZE
 
    subroutine get_slp ( km,ps,phis,slp,pe,pk,tv,H1000,H850,H500)
@@ -4822,19 +4804,17 @@ contains
       return
    end subroutine get_slp
 
-   subroutine VertInterp(v2,v3,ple,pp,positive_definite,rc)
-      real(r4), intent(OUT) :: v2(:,:)
-      real(r8), intent(IN ) :: v3(:,:,:)
-      real(r8), intent(IN ) :: ple(:,:,:)
-      real    , intent(IN ) :: pp
-      logical, optional, intent(IN ) :: positive_definite
-      integer, optional, intent(OUT) :: rc
+   subroutine VertInterp(v2, v3, ple, pp, positive_definite, rc)
+      real(r4), intent(out) :: v2(:,:)
+      real(r8), intent(in) :: v3(:,:,:)
+      real(r8), intent(in) :: ple(:,:,:)
+      real, intent(in) :: pp
+      logical, optional, intent(in) :: positive_definite
+      integer, optional, intent(out) :: rc
 
       real, dimension(size(v2,1),size(v2,2)) :: al,PT,PB
       integer km
       logical edge
-
-      character*(10) :: Iam='VertInterp'
 
       km   = size(ple,3)-1
       edge = size(v3,3)==km+1
@@ -4941,7 +4921,7 @@ contains
       logical :: ak_is_missing = .false.
       logical :: bk_is_missing = .false.
       logical :: FV3_STANDALONE
-      logical :: isPresent
+      ! logical :: isPresent - used in some code that has been commented out
 
       ! Tracer Stuff
       real(REAL4), pointer :: tracer(:,:,:)
@@ -5414,7 +5394,8 @@ contains
       DYN_COLDSTART=.true.
 
       _RETURN(_SUCCESS)
-
+      _UNUSED_DUMMY(export)
+      _UNUSED_DUMMY(clock)
    end subroutine Coldstart
 
 #ifdef MY_SET_ETA
