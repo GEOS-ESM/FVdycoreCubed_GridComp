@@ -1041,6 +1041,9 @@ contains
       if (.not. is_shutoff) then
          ! If requested, do Intermittent Replay
 
+         ! NOTE: pchakrab - need to double check with Bill, but the replay code is not going
+         ! to be here anymore
+
          call MAPL_GridCompGetResource(gc, "REPLAY_MODE", ReplayMode, default="NoReplay", _RC)
 
          REPLAYING: if(adjustl(ReplayMode)=="Intermittent") then
