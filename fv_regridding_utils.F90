@@ -259,7 +259,8 @@ contains
         call map_scalar( km, pe0, qp1,                    &
                         npz, pe1, qn1,                    &
                         dp0, dp1,                         &
-                        is, ie, j, is, ie, j, j, -1, kord(ikord_wz), -1.e25 )
+                        is, ie, j, is, ie, j, j, -1, kord(ikord_wz), &
+                        optional_top=.true., optional_bot=.true.)
         do k=1,npz
            do i=is,ie
               Atm%w(i,j,k) = qn1(i,k)
@@ -277,7 +278,8 @@ contains
         call map_scalar( km, pe0, qp1,                    &
                         npz, pe1, qn1,                    &
                         dp0, dp1,                         &
-                        is, ie, j, is, ie, j, j, 1, kord(ikord_wz), -1.e25 )
+                        is, ie, j, is, ie, j, j, 1, kord(ikord_wz), &
+                        optional_top=.true., optional_bot=.true.)
         do k=1,npz
            do i=is,ie
               Atm%delz(i,j,k) = -qn1(i,k) * Atm%delp(i,j,k) 
@@ -292,7 +294,8 @@ contains
         call map_scalar( km, pe0, qp(is,1,iq),         &
                         npz, pe1, qn1,                 &
                         dp0, dp1, is, ie,              &
-                        j,  is, ie, j, j, 0, kord(ikord_tr), -1.e25 )
+                        j,  is, ie, j, j, 0, kord(ikord_tr), &
+                        optional_top=.true., optional_bot=.true.)
         call fillz(ie-is+1, npz, 1, qn1, Atm%delp(is:ie,j,1:npz))
         do k=1,npz
            do i=is,ie
@@ -319,7 +322,8 @@ contains
                     call map_scalar( km, pe0, qp1,                 &       
                                     npz, pe1, qn1,                 &
                                     dp0, dp1, is, ie,              &
-                                    j,  is, ie, j, j, 0, kord(ikord_tr), -1.e25 )
+                                    j,  is, ie, j, j, 0, kord(ikord_tr), &
+                        optional_top=.true., optional_bot=.true.)
                     call fillz(ie-is+1, npz, 1, qn1, Atm%delp(is:ie,j,1:npz))
                     do k=1,npz
                        do i=is,ie
@@ -346,7 +350,8 @@ contains
                        call map_scalar( km, pe0, qp1,                 &         
                                        npz, pe1, qn1,                 &        
                                        dp0, dp1, is, ie,              &
-                                       j,  is, ie, j, j, 0, kord(ikord_tr), -1.e25 )        
+                                       j,  is, ie, j, j, 0, kord(ikord_tr), &
+                        optional_top=.true., optional_bot=.true.)
                        call fillz(ie-is+1, npz, 1, qn1, Atm%delp(is:ie,j,1:npz))     
                        do k=1,npz
                           do i=is,ie
@@ -380,7 +385,8 @@ contains
      call map_scalar( km,  pn0,  tp,                 &
                       npz, pn1, qn1,                 &
                       dpn0, dpn1, is, ie,            &
-                      j,  is, ie, j, j, 1, kord(ikord_tm), t_min )
+                      j,  is, ie, j, j, 1, kord(ikord_tm), q_min=t_min, &
+                        optional_top=.true., optional_bot=.true.)
      do k=1,npz
         do i=is,ie
            Atm%pt(i,j,k) = qn1(i,k)/(1.+zvir*Atm%q(i,j,k,sphum)) ! Convert back to dry T

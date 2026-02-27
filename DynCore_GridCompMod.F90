@@ -50,7 +50,7 @@
                            DYN_CASE        => CASE_ID,               &
                            DYN_DEBUG       => DEBUG,                 &
                            HYDROSTATIC     => FV_HYDROSTATIC,        &
-                           fv_getUpdraftHelicity, DEBUG_DYN,         &
+                           fv_getUpdraftHelicity, DEBUG_DYN,  DEBUG_ADV, &
                            ADIABATIC, SW_DYNAMICS, AdvCore_Advection
    use m_topo_remap, only: dyn_topo_remap
    use CubeGridPrototype, only: register_grid_and_regridders
@@ -66,6 +66,7 @@
   type(ESMF_FieldBundle), save :: bundleAdv
   integer :: NXQ = 0
   logical :: overwrite_Q = .true.
+  logical :: DEBUG_TQ_ERRORS
 
   public  SetServices      ! Register component methods
 
@@ -1066,6 +1067,15 @@ contains
          LONG_NAME  = 'vertical_mass_flux',                        &
          UNITS      = 'kg m-2 s-1',                                &
          PRECISION  = ESMF_KIND_R8,                                &
+         DIMS       = MAPL_DimsHorzVert,                           &
+         VLOCATION  = MAPL_VLocationEdge,               RC=STATUS  )
+     VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+         SHORT_NAME = 'MZ',                                       &
+         LONG_NAME  = 'vertical_mass_flux',                        &
+         UNITS      = 'kg m-2 s-1',                                &
+         PRECISION  = ESMF_KIND_R4,                                &
          DIMS       = MAPL_DimsHorzVert,                           &
          VLOCATION  = MAPL_VLocationEdge,               RC=STATUS  )
      VERIFY_(STATUS)
@@ -2601,6 +2611,12 @@ contains
     call MAPL_GetResource ( MAPL, DEBUG_DYN, 'DEBUG_DYN:', default=.FALSE., rc=status )
     VERIFY_(STATUS)
 
+    call MAPL_GetResource ( MAPL, DEBUG_ADV, 'DEBUG_ADV:', default=.FALSE., rc=status )
+    VERIFY_(STATUS)        
+
+    call MAPL_GetResource ( MAPL, DEBUG_TQ_ERRORS, 'DEBUG_TQ_ERRORS:', default=.FALSE., rc=status )
+    VERIFY_(STATUS)        
+
 ! Generic SetServices
 !--------------------
 
@@ -3320,12 +3336,12 @@ subroutine Run(gc, import, export, clock, rc)
             n = 0
             call ESMF_ConfigFindLabel ( CF,'EXCLUDE_ADVECTION_TRACERS_LIST:',isPresent=isPresent,rc=STATUS )
             VERIFY_(STATUS)
-            if(isPresent) then
-
+            if(isPresent .or. (AdvCore_Advection >= 1)) then
                tend  = .false.
                allocate(xlist(XLIST_MAX), stat=status)
                VERIFY_(STATUS)
-               do while (.not.tend)
+               if (isPresent) then
+                do while (.not.tend)
                   call ESMF_ConfigGetAttribute (CF,value=tmpstring,default='',rc=STATUS) !ALT: we don't check return status!!!
                   if (tmpstring /= '')  then
                      n = n + 1
@@ -3339,7 +3355,8 @@ subroutine Run(gc, import, export, clock, rc)
                   end if
                   call ESMF_ConfigNextLine(CF,tableEnd=tend,rc=STATUS )
                   VERIFY_(STATUS)
-               enddo
+                enddo
+               endif
             end if
 
             ! Count the number of tracers
@@ -3637,14 +3654,13 @@ subroutine Run(gc, import, export, clock, rc)
              if ( (qqq%is_r4) .and. associated(qqq%content_r4) ) then
                 if (size(qv)==size(qqq%content_r4)) then
                    qv = qqq%content_r4
-                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              elseif (associated(qqq%content)) then
                 if (size(qv)==size(qqq%content)) then
                    qv = qqq%content
-                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              endif
+             _ASSERT(all(qv >= 0.0),'Before AnaAddIncs: negative or nan water vapor detected')
          endif
 
        enddo
@@ -3883,7 +3899,7 @@ subroutine Run(gc, import, export, clock, rc)
       ! -----------------------
       delpold = delp                            ! Old Pressure Thickness
 
-      call ADD_INCS ( STATE,IMPORT,DT,IS_WEIGHTED=IS_WEIGHTED )
+      call ADD_INCS ( MAPL,STATE,IMPORT,DT,IS_WEIGHTED=IS_WEIGHTED )
 
       if (DYN_DEBUG) call DEBUG_FV_STATE('ANA ADD_INCS',STATE)
 
@@ -4031,6 +4047,7 @@ subroutine Run(gc, import, export, clock, rc)
              else
                   qv = qqq%content
              endif
+             _ASSERT(all(qv >= 0.0),'After AnaAddIncs: negative or nan water vapor detected')
          endif
       enddo
 
@@ -4203,14 +4220,13 @@ subroutine Run(gc, import, export, clock, rc)
              if ( (qqq%is_r4) .and. associated(qqq%content_r4) ) then
                 if (size(qv)==size(qqq%content_r4)) then
                    qv = qqq%content_r4
-                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              elseif (associated(qqq%content)) then
                 if (size(qv)==size(qqq%content)) then
                    qv = qqq%content
-                   _ASSERT(all(qv >= 0.0),'negative water vapor detected')
                 endif
              endif
+             _ASSERT(all(qv >= 0.0),'DYN_ANA: negative or nan water vapor detected')
          endif
        enddo
       endif
@@ -4481,6 +4497,7 @@ subroutine Run(gc, import, export, clock, rc)
       else
          if (size(qv)==size(qqq%content)   ) qv = qqq%content
       endif
+      _ASSERT(all(qv >= 0.0),'After DynRun: negative or nan water vapor detected')
     else
       qv = 0.0
     endif
@@ -4674,6 +4691,7 @@ subroutine Run(gc, import, export, clock, rc)
 ! Compute and return the vertical mass flux
       call getVerticalMassFlux(mfxxyz, mfyxyz, mfzxyz, dt)
       call FILLOUT3r8 (export, 'MFZ' , mfzxyz , rc=status); VERIFY_(STATUS)
+      call FILLOUT3 (export, 'MZ' , mfzxyz , rc=status); VERIFY_(STATUS)
 
       call FILLOUT3 (export, 'U'      , ur      , rc=status); VERIFY_(STATUS)
       call FILLOUT3 (export, 'V'      , vr      , rc=status); VERIFY_(STATUS)
@@ -5093,9 +5111,11 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Fill Surface and Near-Surface Variables
 ! ----------------------------------------------
-   call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT=50.0, RC=STATUS)
+                   HGT_SURFACE = 50.0
+   if (km .eq. 72) HGT_SURFACE =  0.0
+   call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT=HGT_SURFACE, RC=STATUS)
    VERIFY_(STATUS)
-   if ( (KM .ne. 72) .and. (HGT_SURFACE .gt. 0.0) ) then
+   if ( HGT_SURFACE .gt. 0.0 ) then
      ! Near surface height for surface
      ! -------------------------------
       call MAPL_GetPointer(export,temp2d,'DZ', rc=status)
@@ -6448,7 +6468,7 @@ end subroutine RUN
     real(r8), allocatable ::    thv(:,:,:)
     real(r8), allocatable ::    zle(:,:,:)
     real(r8), allocatable :: tempxy(:,:,:)
-    real(r8)              :: TMAX, QMAX
+    real(r8)              :: TMAX, TMIN
 
     real(r8), allocatable ::  logpl(:,:,:)
     real(r8), allocatable ::  logpe(:,:,:)
@@ -6580,6 +6600,7 @@ end subroutine RUN
       elseif (associated(qqq%content)) then
        if (size(qv)==size(qqq%content)) qv = qqq%content
       endif
+      _ASSERT(all(qv >= 0.0),'RunAddIncs: negative or nan water vapor detected')
     else
       qv = 0.0
     endif
@@ -6610,7 +6631,10 @@ end subroutine RUN
 
 ! Add Diabatic Forcing to State Variables
 ! ---------------------------------------
-    call ADD_INCS ( STATE,IMPORT,DT )
+    call MAPL_TimerOn (GENSTATE,"PHYS_ADD_INCS")
+    call ADD_INCS ( GENSTATE,STATE,IMPORT,DT )
+    call MAPL_TimerOff(GENSTATE,"PHYS_ADD_INCS")
+
 
     if (DYN_DEBUG) call DEBUG_FV_STATE('PHYSICS ADD_INCS',STATE)
 
@@ -6673,17 +6697,17 @@ end subroutine RUN
 
     tempxy = vars%pt * vars%pkz   ! Dry Temperature
 
-#if defined(DEBUG_T)
-  call Write_Profile(grid, tempxy, 'T')
-#endif
+!#if defined(DEBUG_T)
+!  call Write_Profile(grid, tempxy, 'T')
+!#endif
 
     if (DEBUG_DYN) then  
        call MAPL_MaxMin('DYN: Q_AF_INC ', qv)
-       call MAPL_MaxMin('DYN: T_AF_INC ', tempxy, pmax=TMAX)
+       call MAPL_MaxMin('DYN: T_AF_INC ', tempxy, pmax=TMAX, pmin=TMIN)
        call MAPL_MaxMin('DYN: U_AF_INC ', ua)
        call MAPL_MaxMin('DYN: V_AF_INC ', va)
-       if (TMAX >= 350.0_r8) call Write_Profile(grid, tempxy, 'TAFINC')
-       if (TMAX >= 350.0_r8) call Write_Profile(grid,     qv, 'QAFINC')
+       if (TMIN <= 130.0_r8) call Write_Profile(grid, tempxy, 'TAFINC')
+       if (TMAX >= 333.0_r8) call Write_Profile(grid, tempxy, 'TAFINC')
     endif
 
     call FILLOUT3 (export, 'DELP'   , dp      , rc=status); VERIFY_(STATUS)
@@ -7185,7 +7209,7 @@ end subroutine RUN
 end subroutine RunAddIncs
 
 !-----------------------------------------------------------------------
-  subroutine ADD_INCS ( STATE,IMPORT,DT,IS_WEIGHTED,RC )
+  subroutine ADD_INCS ( MAPL,STATE,IMPORT,DT,IS_WEIGHTED,RC )
 
    use fms_mod, only: set_domain, nullify_domain
    use fv_diagnostics_mod, only: prt_maxmin
@@ -7194,6 +7218,7 @@ end subroutine RunAddIncs
 !
 ! !INPUT PARAMETERS:
 
+   type (MAPL_MetaComp)                   :: MAPL
    type(DynState), pointer                :: STATE
    type(ESMF_State),       intent(INOUT)  :: IMPORT
    real(FVPRC),            intent(IN   )  :: DT
@@ -7210,6 +7235,7 @@ end subroutine RunAddIncs
     integer               :: status
     logical               :: is_weighted_
 
+    integer               :: II, JJ, I, J, L
     integer               :: is ,ie , js ,je , km
     integer               :: isd,ied, jsd,jed
     real(r4), allocatable :: fvQOLD(:,:,:), QTEND(:,:,:)
@@ -7220,7 +7246,10 @@ end subroutine RunAddIncs
 
     real(FVPRC), allocatable :: u_dt(:,:,:), v_dt(:,:,:), t_dt(:,:,:)
 
-    real(kind=4), pointer :: tend(:,:,:)
+    real(r4), pointer :: tend(:,:,:)
+
+    real(r4), pointer, dimension(:,:)   :: LONS
+    real(r4), pointer, dimension(:,:)   :: LATS
 
     type(DynTracers)      :: qqq       ! Specific Humidity
     real(FVPRC), allocatable :: Q(:,:,:,:), CVM(:,:,:)
@@ -7252,6 +7281,9 @@ end subroutine RunAddIncs
     jsd = state%grid%jsd
     jed = state%grid%jed
 
+    call MAPL_Get( MAPL, LONS=LONS, LATS=LATS, RC=STATUS )
+    VERIFY_(STATUS)
+
 ! **********************************************************************
 ! ****  Use QV from FV3 init when coldstarting idealized cases      ****
 ! **********************************************************************
@@ -7275,11 +7307,8 @@ end subroutine RunAddIncs
          if (TRIM(state%vars%tracer(n)%tname) == 'QSNOW'   ) nwat_tracers = nwat_tracers + 1
          if (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL') nwat_tracers = nwat_tracers + 1
        enddo
-       if (nwat_tracers >= 5) nwat = 1 ! STATE has QV only
-       if (.not. HYDROSTATIC) then
-          if (nwat_tracers >= 5) nwat = 3 ! STATE has QV, QLIQ, QICE
-          if (nwat_tracers == 8) nwat = 6 ! STATE has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
-       endif
+       if (nwat_tracers >= 5) nwat = 3 ! STATE has QV, QLIQ, QICE
+       if (nwat_tracers == 8) nwat = 6 ! STATE has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
     endif
     if (.not. ADIABATIC) then
        _ASSERT(nwat >= 1, 'expecting water species (nwat) to match')
@@ -7430,8 +7459,6 @@ end subroutine RunAddIncs
 
        DEALLOCATE( tend_ua )
        DEALLOCATE( tend_va )
-       DEALLOCATE( tend_un )
-       DEALLOCATE( tend_vn )
 
        ! **********************************************************************
        ! ****           Compute Old Pressure Thickness                     ****
@@ -7519,6 +7546,42 @@ end subroutine RunAddIncs
           STATE%VARS%PT =  STATE%VARS%PT                         *DPOLD
           STATE%VARS%PT = (STATE%VARS%PT + DT*TEND*(MAPL_CP/CVM))/DPNEW
        endif
+
+       if (DEBUG_TQ_ERRORS) then
+       do L=1,KM
+         do J=js,je
+           do I=is,ie
+             if ( (STATE%VARS%PT(I,J,L) > 333.0) .OR. (STATE%VARS%PT(I,J,L)/=STATE%VARS%PT(I,J,L)) .OR. &
+                  (Q(I,J,L,sphum  ) < 0.0) .OR. (Q(I,J,L,sphum  )/=Q(I,J,L,sphum  )) .OR. &
+                  (Q(I,J,L,liq_wat) < 0.0) .OR. (Q(I,J,L,liq_wat)/=Q(I,J,L,liq_wat)) .OR. & 
+                  (Q(I,J,L,ice_wat) < 0.0) .OR. (Q(I,J,L,ice_wat)/=Q(I,J,L,ice_wat)) .OR. & 
+                  (Q(I,J,L,rainwat) < 0.0) .OR. (Q(I,J,L,rainwat)/=Q(I,J,L,rainwat)) .OR. & 
+                  (Q(I,J,L,snowwat) < 0.0) .OR. (Q(I,J,L,snowwat)/=Q(I,J,L,snowwat)) .OR. & 
+                  (Q(I,J,L,graupel) < 0.0) .OR. (Q(I,J,L,graupel)/=Q(I,J,L,graupel)) ) then
+                 print *, "T or Q  spike detected : ", STATE%VARS%PT(I,J,L)
+                 print *, "  Temp  ANA|PHY  Increment : ", (DT*TEND(I,J,L)*(MAPL_CP/CVM(I,J,L)))/DPNEW(I,J,L)
+                 print *, "    IN ADD_INCS inside DYN   "
+                 II=I-is+1
+                 JJ=J-js+1
+                 print *, "  Latitude       =", LATS(II,JJ)*180.0/MAPL_PI
+                 print *, "  Longitude      =", LONS(II,JJ)*180.0/MAPL_PI
+                 print *, "  Pressure (mb)  =", 0.5*(STATE%VARS%PE(I,J,L+1)+STATE%VARS%PE(I,J,L))/100.0
+
+                 print *, "  UWND =", STATE%VARS%U(I,J,L), " UINC =", DT*TEND_UN(I,J,L)
+                 print *, "  VWND =", STATE%VARS%V(I,J,L), " VINC =", DT*TEND_VN(I,J,L)
+                 if (nwat >= 6) then
+                 print *, "  QV=", Q(I,J,L,sphum  ), "  QL=", Q(I,J,L,liq_wat), "  QI=", Q(I,J,L,ice_wat)
+                 print *, "  QR=", Q(I,J,L,rainwat), "  QS=", Q(I,J,L,snowwat), "  QG=", Q(I,J,L,graupel)
+                 end if
+             endif
+           end do ! IM loop
+         end do ! JM loop
+       end do ! LM loop
+       endif
+
+       DEALLOCATE( tend_un )
+       DEALLOCATE( tend_vn )
+
 
        ! Update PKZ from hydrostatic pressures
        !  This isn't entirely necessary, FV3 overwrites this in fv_dynamics
@@ -8983,13 +9046,12 @@ end subroutine freeTracers
 
     integer  :: istrt,iend, jstrt,jend, kstrt,kend
     integer  :: im, jm, km, k
-    real(r8) :: arr_global(grid%npx,grid%ntiles*grid%npy,grid%npz)
+    real(r8), allocatable :: arr_global(:,:,:)
     real(r8) :: rng(3,grid%npz)
     real(r8) :: GSUM
+    logical :: amIRoot
 
     real(kind=ESMF_KIND_R8)     :: locArr(grid%is:grid%ie,grid%js:grid%je)
-    real(kind=ESMF_KIND_R8)     :: glbArr(grid%npx,grid%ntiles*grid%npy)
-
     istrt = grid%is
     iend  = grid%ie
     jstrt = grid%js
@@ -9000,14 +9062,20 @@ end subroutine freeTracers
     jm    = grid%npy*grid%ntiles
     km    = grid%npz
 
+    amIRoot = MAPL_AM_I_ROOT()
+    if (amIRoot) then
+       allocate(arr_global(grid%npx,grid%ntiles*grid%npy,km))
+    else
+       allocate(arr_global(1,1,km))
+    end if
+
   ! call write_parallel('GlobalSUm')
     do k=kstrt,kend
        locArr(:,:) = arr(:,:,k)
-       call ArrayGather(locArr, glbArr, grid%grid)
-       arr_global(:,:,k) = glbArr
+       call ArrayGather(locArr, arr_global(:,:,k), grid%grid)
     enddo
 
-    IF (MAPL_AM_I_ROOT()) Then
+    IF (amIRoot) Then
        rng(1,:) = MINVAL(MINVAL(arr_global,DIM=1),DIM=1)
        rng(2,:) = MAXVAL(MAXVAL(arr_global,DIM=1),DIM=1)
        rng(3,:) = SUM(SUM(arr_global,DIM=1),DIM=1)/(IM*JM)
@@ -9024,6 +9092,8 @@ end subroutine freeTracers
        print*,' '
     End IF
 
+    deallocate(arr_global)
+
   End Subroutine Write_Profile_R8
 
   Subroutine Write_Profile_R4(grid, arr, name, delp)
@@ -9034,13 +9104,14 @@ end subroutine freeTracers
 
     integer  :: istrt,iend, jstrt,jend, kstrt,kend
     integer  :: im, jm, km, k
-    real(r4) :: arr_global(grid%npx,grid%ntiles*grid%npy,grid%npz)
+    real(r4), allocatable :: arr_global(:,:,:)
     real(r4) :: rng(3,grid%npz)
     real(r8) :: gsum_p
     real(r4) :: GSUM
+    logical :: amIRoot
 
     real(kind=ESMF_KIND_R8)     :: locArr(grid%is:grid%ie,grid%js:grid%je)
-    real(kind=ESMF_KIND_R8)     :: glbArr(grid%npx,grid%ntiles*grid%npy)
+    real(kind=ESMF_KIND_R8), allocatable :: glbArr(:,:)
 
     istrt = grid%is
     iend  = grid%ie
@@ -9052,12 +9123,23 @@ end subroutine freeTracers
     jm    = grid%npy*grid%ntiles
     km    = grid%npz
 
+    amIRoot = MAPL_AM_I_ROOT()
+    if (amIRoot) then
+       allocate(arr_global(grid%npx,grid%ntiles*grid%npy,km))
+       allocate(glbArr(grid%npx,grid%ntiles*grid%npy))
+    else
+       allocate(arr_global(1,1,km))
+       allocate(glbArr(1,1))
+    end if
+
     do k=kstrt,kend
        locArr(:,:) = arr(:,:,k)
        call ArrayGather(locArr, glbArr, grid%grid)
-       arr_global(:,:,k) = glbArr
+       if (amIRoot) then
+          arr_global(:,:,k) = glbArr
+       end if
     enddo
-    IF (MAPL_AM_I_ROOT()) Then
+    IF (amIRoot) Then
        rng(1,:) = MINVAL(MINVAL(arr_global,DIM=1),DIM=1)
        rng(2,:) = MAXVAL(MAXVAL(arr_global,DIM=1),DIM=1)
        rng(3,:) = SUM(SUM(arr_global,DIM=1),DIM=1)/(IM*JM)
@@ -9075,12 +9157,16 @@ end subroutine freeTracers
     do k=kstrt,kend
        locArr(:,:) = arr(:,:,k)*grid%area(:,:)*delp(:,:,k)
        call ArrayGather(locArr, glbArr, grid%grid)
-       arr_global(:,:,k) = glbArr
+       if (amIRoot) then
+          arr_global(:,:,k) = glbArr
+       end if
        locArr(:,:) = delp(:,:,k)
        call ArrayGather(locArr, glbArr, grid%grid)
-       gsum_p = gsum_p + SUM(SUM(glbArr,DIM=1),DIM=1)
+       if (amIRoot) then
+          gsum_p = gsum_p + SUM(SUM(glbArr,DIM=1),DIM=1)
+       end if
     enddo
-    IF (MAPL_AM_I_ROOT()) Then
+    IF (amIRoot) Then
        GSUM     = SUM(SUM(SUM(arr_global,DIM=1),DIM=1),DIM=1)
        print*,'***********'
        Write(*,"('GlobalSum: ',e21.9)") GSUM/(grid%globalarea*gsum_p)
@@ -9089,6 +9175,8 @@ end subroutine freeTracers
     End IF
     endif
 
+    deallocate(arr_global, glbArr)
+    
   End Subroutine Write_Profile_R4
 
   function R8_TO_R4(dbl_var)

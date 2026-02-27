@@ -58,12 +58,15 @@ module AdvCore_GridCompMod
       use ESMF
       use MAPL
       use m_set_eta,       only: set_eta
+      use mpp_mod,         only: mpp_pe, mpp_root_pe
       use fv_arrays_mod,   only: fv_atmos_type, FVPRC, REAL4, REAL8
       use fms_mod,         only: fms_init, set_domain, nullify_domain
       use fv_control_mod,  only: fv_init1, fv_init2, fv_end
       use fv_tracer2d_mod, only: offline_tracer_advection
       use fv_mp_mod,       only: is,ie, js,je, is_master, tile
       use fv_grid_utils_mod, only: g_sum_r8
+
+      use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
 
       USE FV_StateMod,     only: AdvCoreTracers => T_TRACERS
       USE FV_StateMod,     only: FV_Atm
@@ -72,12 +75,14 @@ module AdvCore_GridCompMod
       implicit none
       private
 
+      integer     :: QSPLIT
       integer     :: nx, ny
       integer     :: npes_x, npes_y
       real(FVPRC) :: dt
       logical     :: FV3_DynCoreIsRunning=.false.
       integer     :: AdvCore_Advection=1
       logical     :: rpt_mass=.false.
+      logical     :: DEBUG_ADV = .false.
 
       integer,  parameter :: ntiles_per_pe = 1
 
@@ -271,6 +276,9 @@ contains
                                   default=AdvCore_Advection, RC=STATUS )
       VERIFY_(STATUS)
 
+      call MAPL_GetResource(MAPL, DEBUG_ADV, 'DEBUG_ADV:', default=.FALSE., RC=STATUS )
+      VERIFY_(STATUS)
+
       ! Start up FMS/MPP
       !-------------------------------------------
       call ESMF_VMGet(VM,mpiCommunicator=comm,rc=STATUS)
@@ -322,6 +330,10 @@ contains
 
       call MAPL_GetResource( MAPL, rpt_mass, 'ADV_CORE_REPORT_TRACER_MASS:', default=rpt_mass, RC=STATUS )
       VERIFY_(STATUS)
+
+      call MAPL_GetResource( MAPL, QSPLIT, 'ADV_QSPLIT:', default=0, RC=STATUS )
+      VERIFY_(STATUS)
+
 
       ! Start up FV if AdvCore is running without FV3_DynCoreIsRunning
       !--------------------------------------------------
@@ -511,6 +523,9 @@ contains
       character(len=ESMF_MAXSTR), allocatable :: xlist(:)
       character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
       integer, parameter                  :: XLIST_MAX = 60
+
+      real(FVPRC), allocatable           :: DEBUG_ARRAY(:,:,:)
+      real(FVPRC) :: fac1    = 1.0
 
 ! Get my name and set-up traceback handle
 ! ---------------------------------------
@@ -748,7 +763,7 @@ contains
          call offline_tracer_advection(TRACERS, PLE0, PLE1, MFX, MFY, CX, CY, &
                                        FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, FV_Atm(1)%bd, &
                                        FV_Atm(1)%domain, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz,   &
-                                       NQ, dt)
+                                       NQ, dt, QSPLIT)
 
          ! Get Tracer Mass after advection
          !--------------------------------
@@ -794,6 +809,39 @@ contains
                if (associated(temp3D)) temp3D = TRACERS(:,:,:,N)
             endif
          enddo
+
+
+
+         ! Clean negative tracers and check
+         !-------------------------------------------------------------------------
+         if (DEBUG_ADV) then
+           prt_minmax     = DEBUG_ADV
+           if (mpp_pe()==0) print*,''
+           if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After ADV --------------'
+           allocate( DEBUG_ARRAY(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,FV_Atm(1)%npz) )
+         endif
+         do n=1,NQ
+            if (advTracers(n)%is_r4) then
+               where (advTracers(n)%content_r4 < tiny(0.0))
+                      advTracers(n)%content_r4 = 0.0
+               end where
+               if (DEBUG_ADV) DEBUG_ARRAY = advTracers(n)%content_r4
+            else
+               where (advTracers(n)%content < tiny(0.0))
+                      advTracers(n)%content = 0.0
+               end where
+               if (DEBUG_ADV) DEBUG_ARRAY = advTracers(n)%content
+            endif
+            if (DEBUG_ADV) then
+               call prt_maxmin(TRIM(advTracers(n)%tname), DEBUG_ARRAY, FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, 0, FV_Atm(1)%npz, fac1)
+            endif
+         enddo
+         if (DEBUG_ADV) then
+           deallocate ( DEBUG_ARRAY )
+           if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After ADV --------------'
+           if (mpp_pe()==0) print*,''
+           prt_minmax     = .false.
+         endif
 
          ! Deallocate the list of tracers
          !-------------------------------------------------------------------------
@@ -899,8 +947,7 @@ subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
       do k=1,KM
          qsum1(:,:) = qsum1(:,:) + dp(:,:,k)
       enddo
-      mass = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, &
-                      reproduce=FV_Atm(1)%flagstruct%exact_sum)
+      mass = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1)
 
 ! Loop over Tracers
 ! -----------------
@@ -909,8 +956,7 @@ subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
         do k=1,KM
            qsum1(:,:) = qsum1(:,:) + Q(:,:,k,n)*dp(:,:,k)
         enddo
-        qg(n) = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, &
-                      reproduce=FV_Atm(1)%flagstruct%exact_sum)
+        qg(n) = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1)
         if (mass > 0.0) qg(n) = qg(n)/mass
      enddo
 
