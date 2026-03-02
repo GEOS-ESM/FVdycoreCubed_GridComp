@@ -57,6 +57,16 @@ contains
        FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
        FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
     endif
+    if (FV_Atm(1)%flagstruct%npz >= 186) then 
+       FV_Atm(1)%flagstruct%n_sponge = 3   ! ~0.008mb
+       FV_Atm(1)%flagstruct%n_zfilter = 55 ! ~10mb
+       FV_Atm(1)%flagstruct%GEOS_MLT = .true.
+    endif
+    if (FV_Atm(1)%flagstruct%npz >= 191) then
+       FV_Atm(1)%flagstruct%nsponge = 3    ! ~0.001mb
+       FV_Atm(1)%flagstruct%n_zfilter = 60 ! `10mb
+       FV_Atm(1)%flagstruct%GEOS_MLT = .true.
+    endif
     FV_Atm(1)%flagstruct%tau = 0.
     FV_Atm(1)%flagstruct%rf_cutoff = 7.5e2
     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
