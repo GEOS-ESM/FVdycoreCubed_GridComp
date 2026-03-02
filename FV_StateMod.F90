@@ -67,6 +67,7 @@ private
   integer :: INT_ADIABATIC = 0
   logical :: ADIABATIC = .false.
   logical :: FV_HYDROSTATIC = .true.
+  logical :: FV_GEOS_MLT = .false.
   integer :: INT_check_mass = 0
   logical :: check_mass = .false.
   integer :: INT_fix_mass = 1
@@ -77,7 +78,7 @@ private
 
   public FV_Atm
   public FV_Setup, FV_InitState, FV_Run, FV_Finalize, FV_DA_Incs
-  public FV_HYDROSTATIC, ADIABATIC, DEBUG, COLDSTART, CASE_ID, SW_DYNAMICS, AdvCore_Advection
+  public FV_HYDROSTATIC, FV_GEOS_MLT, ADIABATIC, DEBUG, COLDSTART, CASE_ID, SW_DYNAMICS, AdvCore_Advection
   public FV_RESET_CONSTANTS
   public FV_To_State, State_To_FV
   public T_TRACERS, T_FVDYCORE_VARS, T_FVDYCORE_GRID, T_FVDYCORE_STATE
@@ -743,6 +744,7 @@ contains
     format='("                 stretch_fac       =",F10.4)'  )
 
   FV_HYDROSTATIC = FV_Atm(1)%flagstruct%hydrostatic
+  FV_GEOS_MLT    = FV_Atm(1)%flagstruct%GEOS_MLT
   DEBUG          = FV_Atm(1)%flagstruct%fv_debug
   prt_minmax     = FV_Atm(1)%flagstruct%fv_debug
 
@@ -1084,6 +1086,7 @@ contains
   if ( (gid==0) .and. (.not. FV_HYDROSTATIC) ) print*, 'FV3 being run Non-Hydrostatic'
   if ( (gid==0) .and. (.not. FV_HYDROSTATIC) .and. (FV_Atm(1)%flagstruct%Make_NH) ) print*, 'FV3 Coldstarting Non-Hydrostatic W and DZ'
   if ( (gid==0) .and. (FV_HYDROSTATIC)       ) print*, 'FV3 being run Hydrostatic'
+  if ( (gid==0) .and. (FV_GEOS_MLT)          ) print*, 'GEOS_MLT (lid extended to 210km) is being run'
   if ( (gid==0) .and. (SW_DYNAMICS)          ) print*, 'FV3 being run as Shallow-Water Model: test_case=', test_case
   if ( (gid==0) .and. (FV_Atm(1)%flagstruct%grid_type == 4) ) print*, 'FV3 being run as Doubly-Periodic: test_case=', test_case
   STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
@@ -2015,7 +2018,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             state%ksplit, state%nsplit, FV_Atm(1)%flagstruct%q_split, &
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-            FV_Atm(1)%flagstruct%hydrostatic, &
+            FV_Atm(1)%flagstruct%hydrostatic, FV_atm(1)%flagstruct%GEOS_MLT, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
@@ -5080,7 +5083,7 @@ end subroutine echo_fv3_setup
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-            FV_Atm(1)%flagstruct%hydrostatic, &
+            FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%flagstruct%GEOS_MLT, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
@@ -5099,7 +5102,7 @@ end subroutine echo_fv3_setup
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-            FV_Atm(1)%flagstruct%hydrostatic, &
+            FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%flagstruct%GEOS_MLT, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
@@ -5141,7 +5144,7 @@ end subroutine echo_fv3_setup
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-            FV_Atm(1)%flagstruct%hydrostatic, &
+            FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%flagstruct%GEOS_MLT, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
@@ -5160,7 +5163,7 @@ end subroutine echo_fv3_setup
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-            FV_Atm(1)%flagstruct%hydrostatic, &
+            FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%flagstruct%hydrostatic, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
