@@ -527,6 +527,8 @@ contains
    if (FV_Atm(1)%flagstruct%npz >= 180) then
      FV_Atm(1)%flagstruct%n_zfilter = 32 ! ~5mb
    endif
+  ! Cubed-Sphere Global Resolution Specific adjustments
+   FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
   ! Vertical remap options
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
    FV_Atm(1)%flagstruct%gmao_remap = 0   ! (0 for GFDL Schemes) (3 for GMAO Cubic)
@@ -547,100 +549,119 @@ contains
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%k_split = 1
    FV_Atm(1)%flagstruct%n_split = 0
-  ! Cubed-Sphere Global Resolution Specific adjustments
-   FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
-   FV_Atm(1)%flagstruct%hydrostatic = .true.
-   ! Rayleigh Damping
-   FV_Atm(1)%flagstruct%rf_cutoff = 0.50e2
+   ! Rayleigh Damping defaults
+   FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
    FV_Atm(1)%flagstruct%tau = 5.0
    FV_Atm(1)%flagstruct%RF_fast = .false.
+  ! Cubed-Sphere Global Resolution Specific adjustments
    if (FV_Atm(1)%flagstruct%ntiles == 6) then
-     ! Cubed-sphere grid resolution and DT dependence
+     ! Cubed-sphere uniform global grid resolution and DT dependence
      !              based on ideal remapping DT
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 12) then
-         FV_Atm(1)%flagstruct%hydrostatic = .true.
+      if (FV_Atm(1)%flagstruct%npx >= 12) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
+         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 5.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 24) then
-         FV_Atm(1)%flagstruct%hydrostatic = .true.
+      if (FV_Atm(1)%flagstruct%npx >= 24) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
-         FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%RF_fast = .false.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
-         FV_Atm(1)%flagstruct%hydrostatic = .true.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0  )
-         FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%RF_fast = .false.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
-         FV_Atm(1)%flagstruct%hydrostatic = .true.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
-         FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%RF_fast = .false.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
-         FV_Atm(1)%flagstruct%hydrostatic = .true.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
-         FV_Atm(1)%flagstruct%tau = 5.0
-         FV_Atm(1)%flagstruct%RF_fast = .false.
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
-         FV_Atm(1)%flagstruct%hydrostatic = .false.
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
+         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 4.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 120.0 )
-          FV_Atm(1)%flagstruct%tau = 3.0
-          FV_Atm(1)%flagstruct%RF_fast = .false.
+      if (FV_Atm(1)%flagstruct%npx >= 48) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0  )
+         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%tau = 3.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1120) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  90.0 )
-          FV_Atm(1)%flagstruct%tau = 2.5
-          FV_Atm(1)%flagstruct%RF_fast = .false.
+      if (FV_Atm(1)%flagstruct%npx >= 90) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
+         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%tau = 2.5
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  60.0 )
-          FV_Atm(1)%flagstruct%tau = 2.0
-          FV_Atm(1)%flagstruct%RF_fast = .true.
+      if (FV_Atm(1)%flagstruct%npx >= 180) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
+         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%tau = 2.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  30.0  )
-          FV_Atm(1)%flagstruct%tau = 1.5
-          FV_Atm(1)%flagstruct%RF_fast = .true.
+      if (FV_Atm(1)%flagstruct%npx >= 360) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
+         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%tau = 1.5
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0  )
-          FV_Atm(1)%flagstruct%tau = 1.0
-          FV_Atm(1)%flagstruct%RF_fast = .true.
+      if (FV_Atm(1)%flagstruct%npx >= 720) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%tau = 1.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.5   )
-          FV_Atm(1)%flagstruct%tau = 1.0
-          FV_Atm(1)%flagstruct%RF_fast = .true.
+      if (FV_Atm(1)%flagstruct%npx >= 1120) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%tau = 0.75
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 10800) then
-          FV_Atm(1)%flagstruct%hydrostatic = .false.                                            
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  4.6875 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  3.25   )
-          FV_Atm(1)%flagstruct%tau = 1.0
-          FV_Atm(1)%flagstruct%RF_fast = .true.
+      if (FV_Atm(1)%flagstruct%npx >= 1440) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
+         FV_Atm(1)%flagstruct%rf_cutoff = 30.0 ! Pa
+         FV_Atm(1)%flagstruct%tau = 0.5
+         FV_Atm(1)%flagstruct%RF_fast = .true.
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 2880) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
+         FV_Atm(1)%flagstruct%rf_cutoff = 35.0 ! Pa
+         FV_Atm(1)%flagstruct%tau = 0.25
+         FV_Atm(1)%flagstruct%RF_fast = .true.
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 5760) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
+         FV_Atm(1)%flagstruct%rf_cutoff = 40.0 ! Pa
+         FV_Atm(1)%flagstruct%tau = 0.125
+         FV_Atm(1)%flagstruct%RF_fast = .true.
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 10800) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  4.6875 )
+         FV_Atm(1)%flagstruct%rf_cutoff = 50.0 ! Pa
+         FV_Atm(1)%flagstruct%tau = 0.0625
+         FV_Atm(1)%flagstruct%RF_fast = .true.
+      endif
+      if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+     ! Cubed-sphere stretched global grid resolution and DT dependence
+     !              based on ideal remapping DT
+          if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 540) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
+              FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+              FV_Atm(1)%flagstruct%tau = 2.0 
+              FV_Atm(1)%flagstruct%RF_fast = .true.
+          endif
+          if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1080) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+              FV_Atm(1)%flagstruct%rf_cutoff = 30.0 ! Pa
+              FV_Atm(1)%flagstruct%tau = 1.0
+              FV_Atm(1)%flagstruct%RF_fast = .true.
+          endif
+          if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2160) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
+              FV_Atm(1)%flagstruct%rf_cutoff = 35.0 ! Pa
+              FV_Atm(1)%flagstruct%tau = 0.5
+              FV_Atm(1)%flagstruct%RF_fast = .true.
+          endif
+          if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )
+              FV_Atm(1)%flagstruct%rf_cutoff = 40.0 ! Pa
+              FV_Atm(1)%flagstruct%tau = 0.25
+              FV_Atm(1)%flagstruct%RF_fast = .true.
+          endif
+          if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 8640) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.5 )
+              FV_Atm(1)%flagstruct%rf_cutoff = 45.0 ! Pa
+              FV_Atm(1)%flagstruct%tau = 0.125
+              FV_Atm(1)%flagstruct%RF_fast = .true.
+          endif
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
      ! Divergence Damping
@@ -648,7 +669,11 @@ contains
       FV_Atm(1)%flagstruct%nord = 2
       FV_Atm(1)%flagstruct%dddmp = 0.2  ! Smagorinsky damping coef
       FV_Atm(1)%flagstruct%d4_bg_top = 0.12 ! High-order Divg Damping coef
-      FV_Atm(1)%flagstruct%d4_bg_bot = 0.12 ! High-order Divg Damping coef
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1200) then
+         FV_Atm(1)%flagstruct%d4_bg_bot = 0.06 ! High-order Divg Damping coef
+      else
+         FV_Atm(1)%flagstruct%d4_bg_bot = 0.12 ! High-order Divg Damping coef
+      endif
       FV_Atm(1)%flagstruct%d2_bg = 0.0  ! 2nd order Divg Damping coef
       FV_Atm(1)%flagstruct%d_ext = 0.0  ! External damping
      ! Local Richardson-number turbulent mixing 
@@ -657,7 +682,11 @@ contains
       FV_Atm(1)%flagstruct%n_sponge = 9
       FV_Atm(1)%flagstruct%d2_bg_k1 = 0.2
       FV_Atm(1)%flagstruct%d2_bg_k2 = 0.1
-      FV_Atm(1)%flagstruct%consv_te = 1.0
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1200) then
+         FV_Atm(1)%flagstruct%consv_te = 0.0
+      else
+         FV_Atm(1)%flagstruct%consv_te = 1.0
+      endif
      ! default NonHydrostatic settings (irrelavent to Hydrostatic)
      ! a_imp > 0.5 for semi-implicit scheme [1 fully backward]
      ! if (a_imp > 0.5) beta + a_imp must = 1.0
@@ -672,6 +701,7 @@ contains
      ! This is the best/fastest option for tracers
       FV_Atm(1)%flagstruct%hord_tr =  8
       if (index(FV3_CONFIG,"MONOTONIC") > 0) then
+         FV_Atm(1)%flagstruct%hydrostatic = .true.
         ! Monotonic advection schemes
          FV_Atm(1)%flagstruct%hord_mt =  10
          FV_Atm(1)%flagstruct%hord_vt =  10
@@ -683,10 +713,19 @@ contains
          FV_Atm(1)%flagstruct%d_con = 0.
       else
        ! Non-Monotonic advection schemes
-         FV_Atm(1)%flagstruct%hord_mt =  5
-         FV_Atm(1)%flagstruct%hord_vt =  6
-         FV_Atm(1)%flagstruct%hord_tm =  6
-         FV_Atm(1)%flagstruct%hord_dp = -6
+         if (FV_Atm(1)%flagstruct%npz == 72) then
+            FV_Atm(1)%flagstruct%hydrostatic = .true.
+            FV_Atm(1)%flagstruct%hord_mt =  5
+            FV_Atm(1)%flagstruct%hord_vt =  6
+            FV_Atm(1)%flagstruct%hord_tm =  6
+            FV_Atm(1)%flagstruct%hord_dp = -6
+         else
+            FV_Atm(1)%flagstruct%hydrostatic = .false.
+            FV_Atm(1)%flagstruct%hord_mt =  6
+            FV_Atm(1)%flagstruct%hord_vt =  6
+            FV_Atm(1)%flagstruct%hord_tm =  6
+            FV_Atm(1)%flagstruct%hord_dp = -6
+         endif
        ! Must now include hyperdiffusion (vorticity damping)
          FV_Atm(1)%flagstruct%d_con = 1.
          FV_Atm(1)%flagstruct%do_vort_damp = .true.
@@ -1797,126 +1836,116 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     endif
 
 ! Check Dry Mass (Apply fixer is option is enabled)
-   if ( check_mass .OR. fix_mass ) then
-      call MAPL_TimerOn(MAPL,"--MASS_FIX")
+    if ( check_mass .OR. fix_mass ) then
+       call MAPL_TimerOn(MAPL,"--MASS_FIX")
 
-      if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. &
-            ((.not. FV_Atm(1)%flagstruct%hydrostatic) .OR. FV_Atm(1)%flagstruct%nwat>=6)  ) then
+       if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. FV_Atm(1)%flagstruct%nwat>=6 ) then
 
-         call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
-                    FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
-                    FV_Atm(1)%pk,   FV_Atm(1)%pkz, kappa, FV_Atm(1)%q, FV_Atm(1)%ng, &
-                    FV_Atm(1)%ncnst, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%flagstruct%dry_mass,  &
-                    FV_Atm(1)%flagstruct%adjust_dry_mass,  FV_Atm(1)%flagstruct%mountain, &
-                    FV_Atm(1)%flagstruct%moist_phys,  FV_Atm(1)%flagstruct%hydrostatic, &
-                    FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%domain, FV_Atm(1)%flagstruct%make_nh)
+          call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
+                     FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
+                     FV_Atm(1)%pk,   FV_Atm(1)%pkz, kappa, FV_Atm(1)%q, FV_Atm(1)%ng, &
+                     FV_Atm(1)%ncnst, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%flagstruct%dry_mass,  &
+                     FV_Atm(1)%flagstruct%adjust_dry_mass,  FV_Atm(1)%flagstruct%mountain, &
+                     FV_Atm(1)%flagstruct%moist_phys,  FV_Atm(1)%flagstruct%hydrostatic, &
+                     FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%domain, FV_Atm(1)%flagstruct%make_nh)
 
-      else
-
-      allocate ( mass(isc:iec,jsc:jec))
-      allocate (tqtot(isc:iec,jsc:jec))
-      do j=jsc,jec
-         do i=isc,iec
-            mass(i,j) = FV_Atm(1)%pe(i,npz+1,j)
-         enddo
-      enddo
-      tqtot = 0.0
-      if ( (.not. ADIABATIC) .AND. (FV_Atm(1)%flagstruct%nwat /= 0) ) then
-       if (FV_Atm(1)%flagstruct%nwat >= 6) then
-         do k=1,npz
-            tqtot(:,:) = tqtot(:,:) + ( &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qice) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,rain) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,snow) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,grpl) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
-         enddo
-       elseif (FV_Atm(1)%flagstruct%nwat == 3) then
-         do k=1,npz
-            tqtot(:,:) = tqtot(:,:) + ( &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qice) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
-         enddo
        else
-         do k=1,npz
-            tqtot(:,:) = tqtot(:,:) + ( &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qlcn) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qlls) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qicn) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qils) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
-         enddo
+
+          allocate ( mass(isc:iec,jsc:jec))
+          allocate (tqtot(isc:iec,jsc:jec))
+          do j=jsc,jec
+             do i=isc,iec
+                mass(i,j) = FV_Atm(1)%pe(i,npz+1,j)
+             enddo
+          enddo
+          tqtot = 0.0
+          if ( (.not. ADIABATIC) .AND. (FV_Atm(1)%flagstruct%nwat /= 0) ) then
+           if (FV_Atm(1)%flagstruct%nwat >= 6) then
+             do k=1,npz
+                tqtot(:,:) = tqtot(:,:) + ( &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qice) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,rain) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,snow) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,grpl) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
+             enddo
+           elseif (FV_Atm(1)%flagstruct%nwat == 3) then
+             do k=1,npz
+                tqtot(:,:) = tqtot(:,:) + ( &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qice) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
+             enddo
+           else
+             do k=1,npz
+                tqtot(:,:) = tqtot(:,:) + ( &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qlcn) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qlls) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qicn) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qils) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
+             enddo
+           endif
+          endif
+          massD = g_sum(FV_Atm(1)%domain, mass-tqtot, isc, iec, jsc, jec, state%grid%ng, &
+                        fv_atm(1)%gridstruct%area_64, 1, reproduce=FV_Atm(1)%flagstruct%exact_sum)
+          ! If PSDRY is negative, set to use the incoming drymass.
+          ! NOTE: THIS WILL NOT TIME REGRESS
+          if (massD0 < 0.0d0) then
+             massD0 = massD
+          end if
+          if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
+             if (ABS((massD-massD0)/massD0) >= epsilon(1.0_REAL4)) then
+                if (mpp_pe()==mpp_root_pe()) then
+                   write(6,126)
+                   write(6,127) massD0
+                   write(6,128) massD
+                   write(6,129) massD0/massD, (massD-massD0)/massD0
+                   126 format('Dry Mass Difference of > epsilon relative found!')
+                   127 format('Dry Mass Expected:'2x,g21.14)
+                   128 format('Dry Mass Calculated in FV3:'2x,g21.14)
+                   129 format('Dry Mass Scaling Factor and Relative Difference'2x,g21.14,2x,g21.14)
+                end if
+             end if
+          end if
+
+          ! Apply the fixer if asked for
+          if (fix_mass) then
+             if (ABS((massD-massD0)/massD0) >= epsilon(1.0_REAL4)) then
+                if (mpp_pe()==mpp_root_pe()) then
+                   write(6,119) massD0, massD, massD0/massD, (massD-massD0)/massD0
+                   119 format('Dry Mass Violation (epsilon relative)!'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
+                end if
+             end if
+             ! Accumulate added dry mass from the fixer
+             massADDED = massADDED + (massD-massD0)/massD0
+             ! -----------------------------------------------
+             ! Fix Dry Mass after increments have been applied
+             ! -----------------------------------------------
+             FV_Atm(1)%pe = FV_Atm(1)%pe*massD0/massD
+             if (present(PLE0)) then
+                do k=1,npz
+                   PLE0(:,:,k) = FV_Atm(1)%pe(isc:iec,k,jsc:jec)
+                enddo
+             endif
+             if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
+                if (mpp_pe()==mpp_root_pe()) then
+                   write(6,109) massD0, massD, massD0/massD, (massD-massD0)/massD0, massADDED
+                   109    format('Dry Mass Fixer'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
+                end if
+             end if
+          else
+             ! Check Dry Mass Conservation and write to log
+             if(ESMF_AlarmIsRinging(MASSALARM) .AND. mpp_pe()==mpp_root_pe()) write(6,110) massD0, massD, massD0/massD, (massD-massD0)/massD0
+             110    format('Dry Mass Check'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
+          endif
+          deallocate (mass)
+          deallocate (tqtot)
        endif
-      endif
 
-      massD = g_sum(FV_Atm(1)%domain, mass-tqtot, isc, iec, jsc, jec, state%grid%ng, &
-                    fv_atm(1)%gridstruct%area_64, 1, reproduce=FV_Atm(1)%flagstruct%exact_sum)
-
-      ! If PSDRY is negative, set to use the incoming drymass.
-      ! NOTE: THIS WILL NOT TIME REGRESS
-      if (massD0 < 0.0d0) then
-         massD0 = massD
-      end if
-
-      if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
-         if (ABS((massD-massD0)/massD0) >= epsilon(1.0_REAL4)) then
-            if (mpp_pe()==mpp_root_pe()) then
-               write(6,126)
-               write(6,127) massD0
-               write(6,128) massD
-               write(6,129) massD0/massD, (massD-massD0)/massD0
-               126 format('Dry Mass Difference of > epsilon relative found!')
-               127 format('Dry Mass Expected:'2x,g21.14)
-               128 format('Dry Mass Calculated in FV3:'2x,g21.14)
-               129 format('Dry Mass Scaling Factor and Relative Difference'2x,g21.14,2x,g21.14)
-            end if
-         end if
-      end if
-
-      ! Apply the fixer if asked for
-      if (fix_mass) then
-
-         if (ABS((massD-massD0)/massD0) >= epsilon(1.0_REAL4)) then
-            if (mpp_pe()==mpp_root_pe()) then
-               write(6,119) massD0, massD, massD0/massD, (massD-massD0)/massD0
-               119 format('Dry Mass Violation (epsilon relative)!'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
-            end if
-         end if
-
-         ! Accumulate added dry mass from the fixer
-         massADDED = massADDED + (massD-massD0)/massD0
-
-         ! -----------------------------------------------
-         ! Fix Dry Mass after increments have been applied
-         ! -----------------------------------------------
-         FV_Atm(1)%pe = FV_Atm(1)%pe*massD0/massD
-         if (present(PLE0)) then
-            do k=1,npz
-               PLE0(:,:,k) = FV_Atm(1)%pe(isc:iec,k,jsc:jec)
-            enddo
-         endif
-
-         if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
-            if (mpp_pe()==mpp_root_pe()) then
-               write(6,109) massD0, massD, massD0/massD, (massD-massD0)/massD0, massADDED
-               109    format('Dry Mass Fixer'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
-            end if
-         end if
-      else
-         ! Check Dry Mass Conservation and write to log
-         if(ESMF_AlarmIsRinging(MASSALARM) .AND. mpp_pe()==mpp_root_pe()) write(6,110) massD0, massD, massD0/massD, (massD-massD0)/massD0
-         110    format('Dry Mass Check'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
-      endif
-
-      deallocate (mass)
-      deallocate (tqtot)
-
-      endif
-
-      call MAPL_TimerOff(MAPL,"--MASS_FIX")
-   endif
+       call MAPL_TimerOff(MAPL,"--MASS_FIX")
+    endif
 
     call MAPL_TimerOn(MAPL,"--NH_ADIABATIC_INIT")
        if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
