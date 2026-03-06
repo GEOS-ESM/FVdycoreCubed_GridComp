@@ -635,7 +635,7 @@ contains
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 540) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
               FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
-              FV_Atm(1)%flagstruct%tau = 2.0 
+              FV_Atm(1)%flagstruct%tau = 2.0
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1080) then
@@ -676,7 +676,7 @@ contains
       endif
       FV_Atm(1)%flagstruct%d2_bg = 0.0  ! 2nd order Divg Damping coef
       FV_Atm(1)%flagstruct%d_ext = 0.0  ! External damping
-     ! Local Richardson-number turbulent mixing 
+     ! Local Richardson-number turbulent mixing
       FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
      ! Sponge layer
       FV_Atm(1)%flagstruct%n_sponge = 9
@@ -694,7 +694,7 @@ contains
       FV_Atm(1)%flagstruct%a_imp = 1.0
      ! dz_min is a NH delta-z limiter increasing may improve stability
       FV_Atm(1)%flagstruct%dz_min = 2.0
-     ! p_fac is a NH pressure fraction limiter near model top (0:0.25) 
+     ! p_fac is a NH pressure fraction limiter near model top (0:0.25)
       FV_Atm(1)%flagstruct%p_fac = 0.05
      ! General defaults
       FV_Atm(1)%flagstruct%make_nh = .false.
@@ -1815,11 +1815,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (fv_first_run) then
      ! Make_NH
       if ( .not. FV_Atm(1)%flagstruct%hydrostatic ) then
-        if (all(FV_Atm(1)%w(isc:iec,jsc:jec,:) == 0.0)) FV_Atm(1)%flagstruct%Make_NH = .true.
         if ( FV_Atm(1)%flagstruct%Make_NH ) then
-          if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT))
+          if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT)) ! Default to 15 min if not set, but ensure at least 1 step
           if (mpp_pe()==0) print*, 'fv_first_run: FV3 is making Non-Hydrostatic W and DZ'
-          if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
           FV_Atm(1)%w = 0.0
           call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
                      FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
@@ -1839,7 +1837,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if ( check_mass .OR. fix_mass ) then
        call MAPL_TimerOn(MAPL,"--MASS_FIX")
 
-       if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. FV_Atm(1)%flagstruct%nwat>=6 ) then
+       if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. FV_Atm(1)%flagstruct%nwat > 1 ) then
 
           call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
                      FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
@@ -1949,6 +1947,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
     call MAPL_TimerOn(MAPL,"--NH_ADIABATIC_INIT")
        if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
+          if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
           allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
           call nullify_domain ( )
           DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
@@ -2743,9 +2742,9 @@ subroutine fv_getPKZ_NH(pkz,temp,qv,pe,delz)
 !-------------------------------------------------------------------------
 ! Re-compute the full (nonhydrostatic) pressure due to temperature changes
 !-------------------------------------------------------------------------
-!$omp parallel do default (none) & 
+!$omp parallel do default (none) &
 !$omp shared (npz, jsc, jec, isc, iec, pkz, kappa, rdg, delp, temp, zvir, qv, delz) &
-!$omp private (k, j, i) 
+!$omp private (k, j, i)
       do k=1,npz
          do j=jsc,jec
             do i=isc,iec
@@ -2778,9 +2777,9 @@ subroutine fv_getPKZ(pkz,pe)
   peln = log(pe)
   pk   = exp( kappa*peln )
 
-!$omp parallel do default (none) & 
+!$omp parallel do default (none) &
 !$omp shared (npz, jsc, jec, isc, iec, pkz, pk, kappa, peln) &
-!$omp private (k, j, i) 
+!$omp private (k, j, i)
       do k=1,npz
          do j=jsc,jec
             do i=isc,iec
@@ -5050,7 +5049,7 @@ end subroutine echo_fv3_setup
      allocate ( t0(isc:iec,jsc:jec, npz) )
      allocate (dp0(isc:iec,jsc:jec, npz) )
 
-!$omp parallel do default (none) & 
+!$omp parallel do default (none) &
 !$omp shared (npz, jsc, jec, isc, iec, n, sphum, u0, v0, t0, dp0, FV_Atm, zvir) &
 !$omp private (k, j, i)
        do k=1,npz
@@ -5114,7 +5113,7 @@ end subroutine echo_fv3_setup
             time_total)
 !Nudging back to IC
 !$omp parallel do default (none) &
-!$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) & 
+!$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) &
 !$omp private (i, j, k)
        do k=1,npz
           do j=jsc,jec+1
