@@ -36,7 +36,7 @@ module FV_StateMod
    use fv_sg_mod, only: fv_subgrid_z
 
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check, &
-                                 get_vorticity, updraft_helicity, bunkers_vector, helicity_relative_CAPS
+                                 get_vorticity, updraft_helicity, calculate_shear_06, bunkers_vector, helicity_relative_CAPS
 #ifdef RUN_GTFV3
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
    use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
@@ -1815,11 +1815,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (fv_first_run) then
      ! Make_NH
       if ( .not. FV_Atm(1)%flagstruct%hydrostatic ) then
-        if (all(FV_Atm(1)%w(isc:iec,jsc:jec,:) == 0.0)) FV_Atm(1)%flagstruct%Make_NH = .true.
         if ( FV_Atm(1)%flagstruct%Make_NH ) then
-          if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT))
+          if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT)) ! Default to 15 min if not set, but ensure at least 1 step
           if (mpp_pe()==0) print*, 'fv_first_run: FV3 is making Non-Hydrostatic W and DZ'
-          if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
           FV_Atm(1)%w = 0.0
           call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
                      FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
@@ -1839,7 +1837,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if ( check_mass .OR. fix_mass ) then
        call MAPL_TimerOn(MAPL,"--MASS_FIX")
 
-       if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. FV_Atm(1)%flagstruct%nwat>=6 ) then
+       if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. FV_Atm(1)%flagstruct%nwat > 1 ) then
 
           call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
                      FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
@@ -1949,6 +1947,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
     call MAPL_TimerOn(MAPL,"--NH_ADIABATIC_INIT")
        if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
+          if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
           allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
           call nullify_domain ( )
           DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
@@ -4056,7 +4055,7 @@ subroutine fv_getDivergence(uc, vc, divg)
     enddo
 end subroutine fv_getDivergence
 
-subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
+subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25, shr06)
    use constants_mod, only: fms_grav=>grav
 ! made this REAL4
    real(REAL4), intent(OUT) ::  uh25(:,:)
@@ -4064,6 +4063,7 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
    real(REAL4), intent(OUT) :: srh01(:,:)
    real(REAL4), intent(OUT) :: srh03(:,:)
    real(REAL4), intent(OUT) :: srh25(:,:)
+   real(REAL4), intent(OUT) :: shr06(:,:)
 
 ! made an intermediate output of FVPRC
    real(FVPRC) :: uh_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
@@ -4107,6 +4107,12 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
                          FV_Atm(1)%w, vort, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                          FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
    uh03 = uh_tmp
+
+   ! Shear 0-6km
+
+   call calculate_shear_06(isc, iec, jsc, jec, ng, npz, zvir, sphum, shr06, &
+                  FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
+                  FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, fms_grav)
 
    ! Storm relative helicities
 
