@@ -601,10 +601,6 @@ echo $EXPDIRroot > $HOME/.EXPDIRroot
 #######################################################################
 
 set     GEOSDIR  = $GEOSDEF
-
-#
-# GEOSBIN does point to the bin/ directory in each
-#
 setenv GEOSSRC  ${GEOSDIR}
 setenv GEOSBIN  ${GEOSDIR}/bin
 
