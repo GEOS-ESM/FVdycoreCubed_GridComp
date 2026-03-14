@@ -124,15 +124,19 @@ endif
 #######################################################################
 
 setenv GEOSDIR @GEOSDIR
-setenv GEOSBIN @GEOSBIN
-setenv GEOSETC @GEOSETC
+setenv GEOSBIN ${GEOSDIR}/bin
+setenv GEOSETC ${GEOSDIR}/etc
 
 set TAG = `cat $GEOSETC/.FV3_VERSION`
 set RUN_CMD = "$GEOSBIN/esma_mpirun -np "
 
 setenv ARCH `uname`
 source $GEOSBIN/g5_modules
-setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:${BASEDIR}/${ARCH}/lib:${GEOSDIR}/lib
+setenv @LD_LIBRARY_PATH_CMD ${LD_LIBRARY_PATH}:${GEOSDIR}/lib
+# We only add BASEDIR to the @LD_LIBRARY_PATH_CMD if BASEDIR is defined (i.e., not running with Spack)
+if ( $?BASEDIR ) then
+    setenv @LD_LIBRARY_PATH_CMD ${@LD_LIBRARY_PATH_CMD}:${BASEDIR}/${ARCH}/lib
+endif
 module list
 
 #########################################

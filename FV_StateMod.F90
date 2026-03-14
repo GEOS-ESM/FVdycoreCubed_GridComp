@@ -374,7 +374,6 @@ contains
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
-  if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
 
 
 ! FV grid dimensions setup from MAPL
@@ -384,6 +383,7 @@ contains
       VERIFY_(STATUS)
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'AGCM_LM:', default= 72, RC=STATUS )
       VERIFY_(STATUS)
+      if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
       ! stretch_fac is kind(R_GRID) in FV, so to prevent a MAPL failure on RC check, we pull
       ! AGCM.STRETCH_FACTOR: as a REAL32 and then cast it to REAL64. This is because
       ! FV_Atm(1)%flagstruct%stretch_fac is R_GRID => REAL64, and the MAPL_GetResource call
@@ -1991,14 +1991,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
        if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
           allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
           call nullify_domain ( )
-          DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:) 
+          DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
           call prt_maxmin('Before adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
           call adiabatic_init(myDT,DEBUG_ARRAY,fac1)
           DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
-          call prt_maxmin('After adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   ) 
+          call prt_maxmin('After adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
           deallocate( DEBUG_ARRAY )
           FV_Atm(1)%flagstruct%na_init=0
-       endif  
+       endif
     call MAPL_TimerOff(MAPL,"--NH_ADIABATIC_INIT")
 
     call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
@@ -2718,7 +2718,7 @@ subroutine fv_getDELZ(delz,temp,pe)
   real(REAL8) :: rdg
   peln = log(pe)
   rdg   = -rgas / grav
-  delz = rdg*temp*(peln(:,:,2:)-peln(:,:,1:))
+  delz = rdg*temp*(peln(:,:,2:)-peln(:,:,1:FV_Atm(1)%npz))
 return
 end subroutine fv_getDELZ
 
@@ -5055,9 +5055,9 @@ end subroutine echo_fv3_setup
      allocate ( t0(isc:iec,jsc:jec, npz) )
      allocate (dp0(isc:iec,jsc:jec, npz) )
 
-!$omp parallel do default (none) & 
+!$omp parallel do default (none) &
 !$omp              shared (npz, jsc, jec, isc, iec, n, sphum, u0, v0, t0, dp0, FV_Atm, zvir) &
-!$omp             private (k, j, i) 
+!$omp             private (k, j, i)
        do k=1,npz
           do j=jsc,jec+1
              do i=isc,iec
@@ -5099,7 +5099,7 @@ end subroutine echo_fv3_setup
             FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
             time_total)
 ! Backward
-       call fv_dynamics( & 
+       call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, -myDT, 0.0, &
             FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
             kappa, cp, zvir, &
@@ -5110,7 +5110,7 @@ end subroutine echo_fv3_setup
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
-            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, & 
+            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
             FV_Atm(1)%ak, FV_Atm(1)%bk, &
             FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
             FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
@@ -5119,7 +5119,7 @@ end subroutine echo_fv3_setup
             time_total)
 !Nudging back to IC
 !$omp parallel do default (none) &
-!$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) & 
+!$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) &
 !$omp private (i, j, k, p00, q00)
        do k=1,npz
           do j=jsc,jec+1
@@ -5141,7 +5141,7 @@ end subroutine echo_fv3_setup
        enddo
 
 ! Backward
-       call fv_dynamics( & 
+       call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, -myDT, 0.0, &
             FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
             kappa, cp, zvir, &
@@ -5152,7 +5152,7 @@ end subroutine echo_fv3_setup
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
-            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, & 
+            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
             FV_Atm(1)%ak, FV_Atm(1)%bk, &
             FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
             FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
@@ -5160,7 +5160,7 @@ end subroutine echo_fv3_setup
             FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
             time_total)
 ! Forward call
-       call fv_dynamics( & 
+       call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, 0.0, &
             FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
             kappa, cp, zvir, &
@@ -5171,7 +5171,7 @@ end subroutine echo_fv3_setup
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
-            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, & 
+            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
             FV_Atm(1)%ak, FV_Atm(1)%bk, &
             FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
             FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
