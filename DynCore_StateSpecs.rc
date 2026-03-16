@@ -157,6 +157,7 @@ category: EXPORT
   SRH01          |  storm_relative_helicity_0_to_1_km                                        |  m+2 s-2           |  xy   |  N   |                    |
   SRH03          |  storm_relative_helicity_0_to_3_km                                        |  m+2 s-2           |  xy   |  N   |                    |
   SRH25          |  storm_relative_helicity_2_to_5_km                                        |  m+2 s-2           |  xy   |  N   |                    |
+  SHR06          |  wind_shear_0_to_6_km                                                     |  m s-1             |  xy   |  N   |                    |
   VORT           |  vorticity_at_mid_layer_heights                                           |  s-1               |  xyz  |  C   |                    |
   VORT850        |  vorticity_at_850_hPa                                                     |  s-1               |  xy   |  N   |                    |
   VORT700        |  vorticity_at_700_hPa                                                     |  s-1               |  xy   |  N   |                    |

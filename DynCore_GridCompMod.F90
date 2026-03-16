@@ -744,7 +744,7 @@ contains
       real(r4), pointer :: uh25(:,:), uh03(:,:)
       real(r4), pointer :: srh01(:,:), srh03(:,:), srh25(:,:)
       real(r4), allocatable :: uh25tmp(:,:), uh03tmp(:,:)
-      real(r4), allocatable :: srh01tmp(:,:), srh03tmp(:,:), srh25tmp(:,:)
+      real(r4), allocatable :: srh01tmp(:,:), srh03tmp(:,:), srh25tmp(:,:), shr06tmp(:,:)
 
       real(r8),     allocatable ::   uatmp(:,:,:)
       real(r8),     allocatable ::   vatmp(:,:,:)
@@ -2568,14 +2568,16 @@ contains
          call MAPL_StateGetPointer(export, srh25,'SRH25', _RC)
          ! Per WMP, this calculation is not useful if running hydrostatic
          if ( associated(uh25)  .or. associated(uh03) .or. &
-              associated(srh01) .or. associated(srh03) .or. associated(srh03)) then
+              associated(srh01) .or. associated(srh03) .or. associated(srh25) .or. &
+              associated(shr06)) then
             if (.not. HYDROSTATIC) then
-               call fv_getUpdraftHelicity(uh25tmp, uh03tmp, srh01tmp, srh03tmp, srh25tmp)
+               call fv_getUpdraftHelicity(uh25tmp, uh03tmp, srh01tmp, srh03tmp, srh25tmp, shr06tmp)
                if (associated(uh25)) uh25 = uh25tmp
                if (associated(uh03)) uh03 = uh03tmp
                if (associated(srh01)) srh01 = srh01tmp
                if (associated(srh03)) srh03 = srh03tmp
                if (associated(srh25)) srh25 = srh25tmp
+               if (associated(shr06)) shr06 = shr06tmp
             endif
          end if
 

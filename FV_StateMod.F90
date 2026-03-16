@@ -40,7 +40,7 @@ module FV_StateMod
    use fv_sg_mod, only: fv_subgrid_z
 
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check
-   use fv_diagnostics_mod, only: get_vorticity, updraft_helicity, bunkers_vector, helicity_relative_CAPS
+   use fv_diagnostics_mod, only: get_vorticity, updraft_helicity, calculate_shear_06, bunkers_vector, helicity_relative_CAPS
 #ifdef RUN_GTFV3
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
    use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
@@ -3922,7 +3922,7 @@ subroutine fv_getDivergence(uc, vc, divg)
     enddo
 end subroutine fv_getDivergence
 
-subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
+subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25, shr06)
    use constants_mod, only: fms_grav=>grav
 ! made this REAL4
    real(REAL4), allocatable, intent(OUT) ::  uh25(:,:)
@@ -3930,6 +3930,7 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
    real(REAL4), allocatable, intent(OUT) :: srh01(:,:)
    real(REAL4), allocatable, intent(OUT) :: srh03(:,:)
    real(REAL4), allocatable, intent(OUT) :: srh25(:,:)
+   real(REAL4), allocatable, intent(OUT) :: srh06(:,:)
 
 ! made an intermediate output of FVPRC
    real(FVPRC) :: uh_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
@@ -3973,6 +3974,12 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
                          FV_Atm(1)%w, vort, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                          FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
    uh03 = uh_tmp
+
+   ! Shear 0-6km
+
+   call calculate_shear_06(isc, iec, jsc, jec, ng, npz, zvir, sphum, shr06, &
+                  FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
+                  FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, fms_grav)
 
    ! Storm relative helicities
 
