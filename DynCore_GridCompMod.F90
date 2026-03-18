@@ -1800,6 +1800,14 @@ contains
     VERIFY_(STATUS)
 
     call MAPL_AddExportSpec ( gc,                                  &
+         SHORT_NAME = 'SHR06',                                     &
+         LONG_NAME  = 'wind_shear_0_to_6_km',                      &
+         UNITS      = 'm s-1',                                     & 
+         DIMS       = MAPL_DimsHorzOnly,                           & 
+         VLOCATION  = MAPL_VLocationNone,               RC=STATUS  ) 
+    VERIFY_(STATUS)        
+
+    call MAPL_AddExportSpec ( gc,                                  &
          SHORT_NAME = 'VORT',                                      &
          LONG_NAME  = 'vorticity_at_mid_layer_heights',            &
          UNITS      = 's-1',                                       &
@@ -3110,6 +3118,7 @@ subroutine Run(gc, import, export, clock, rc)
     real(kind=4), pointer :: srh01(:,:)
     real(kind=4), pointer :: srh03(:,:)
     real(kind=4), pointer :: srh25(:,:)
+    real(kind=4), pointer :: shr06(:,:)                             
 
     real(r8),     allocatable ::   uatmp(:,:,:)
     real(r8),     allocatable ::   vatmp(:,:,:)
@@ -5249,11 +5258,13 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export, srh01,'SRH01', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
       call MAPL_GetPointer(export, srh03,'SRH03', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
       call MAPL_GetPointer(export, srh25,'SRH25', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
+      call MAPL_GetPointer(export, shr06,'SHR06', ALLOC=.TRUE., rc=status); VERIFY_(STATUS)
       ! Per WMP, this calculation is not useful if running hydrostatic
       if (.not. HYDROSTATIC) then
          if( associated( uh25) .or. associated( uh03) .or. &
-            associated(srh01) .or. associated(srh03) .or. associated(srh25) ) then
-            call fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
+            associated(srh01) .or. associated(srh03) .or. associated(srh25) .or. &
+            associated(shr06) ) then
+            call fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25, shr06)
          endif
       endif
 
