@@ -3934,6 +3934,7 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25, shr06)
 
 ! made an intermediate output of FVPRC
    real(FVPRC) :: uh_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+   real(FVPRC) :: shr_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
    integer :: sphum=1
    real(FVPRC) :: vort(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,FV_Atm(1)%npz)
    real(FVPRC) :: z_bot, z_top
@@ -3977,9 +3978,10 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25, shr06)
 
    ! Shear 0-6km
 
-   call calculate_shear_06(isc, iec, jsc, jec, ng, npz, zvir, sphum, shr06, &
+   call calculate_shear_06(isc, iec, jsc, jec, ng, npz, zvir, sphum, shr_tmp, &
                   FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                   FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, fms_grav)
+   shr06 = shr_tmp ! This is an FVPRC temporary to allow r4/r8
 
    ! Storm relative helicities
 
