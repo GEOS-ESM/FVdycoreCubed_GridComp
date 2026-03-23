@@ -742,7 +742,7 @@ contains
       real(r4), allocatable ::   cubevtmp3d(:,:,:)
 
       real(r4), pointer :: uh25(:,:), uh03(:,:)
-      real(r4), pointer :: srh01(:,:), srh03(:,:), srh25(:,:)
+      real(r4), pointer :: srh01(:,:), srh03(:,:), srh25(:,:), shr06(:,:)
       real(r4), allocatable :: uh25tmp(:,:), uh03tmp(:,:)
       real(r4), allocatable :: srh01tmp(:,:), srh03tmp(:,:), srh25tmp(:,:), shr06tmp(:,:)
 
