@@ -375,13 +375,27 @@ contains
 
 
 
+  call MAPL_GetResource( MAPL, AdvCore_Advection, label='AdvCore_Advection:', default=AdvCore_Advection, rc=status )
+  VERIFY_(STATUS)
+
 ! FV grid dimensions setup from MAPL
+  ! Advect core expects to find IM/JM/LM in the resource file not AGCM_IM/AGCM_JM/AGCM_LM
+  if (AdvCore_Advection == 1) then
+      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'IM:', default= 32, RC=STATUS )
+      VERIFY_(STATUS)
+      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npy, 'JM:', default=192, RC=STATUS )
+      VERIFY_(STATUS)
+      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'LM:', default= 72, RC=STATUS )
+      VERIFY_(STATUS)
+  else
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'AGCM_IM:', default= 32, RC=STATUS )
       VERIFY_(STATUS)
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npy, 'AGCM_JM:', default=192, RC=STATUS )
       VERIFY_(STATUS)
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'AGCM_LM:', default= 72, RC=STATUS )
       VERIFY_(STATUS)
+  endif
+
       if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
       ! stretch_fac is kind(R_GRID) in FV, so to prevent a MAPL failure on RC check, we pull
       ! AGCM.STRETCH_FACTOR: as a REAL32 and then cast it to REAL64. This is because
@@ -422,8 +436,8 @@ contains
   VERIFY_(STATUS)
   DT = ndt
 
-! Advect tracers within DynCore(AdvCore_Advection=.false.)
-!             or within AdvCore(AdvCore_Advection=.true.)
+! Advect tracers within DynCore(AdvCore_Advection=0)
+!             or within AdvCore(AdvCore_Advection=1)
   call MAPL_GetResource( MAPL, AdvCore_Advection, label='AdvCore_Advection:', default=AdvCore_Advection, rc=status )
   VERIFY_(STATUS)
 
