@@ -1626,11 +1626,11 @@ contains
          end select
          write (STRING, "(I3.3,' /= ',I3.3)") nn, FV_Atm(1)%ncnst
          _ASSERT(nn == FV_Atm(1)%ncnst, 'nn /= ncnst: '//trim(STRING))
-         
+
       else
 
          if (fv_first_run .and. (mpp_pe()==0)) print*, 'Running In Adiabatic Mode'
-         
+
          ! Report total number and names of advected tracers
          if (fv_first_run .and. state%grid%NQ > 0) then
             write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", state%grid%NQ, " tracers:"
@@ -2111,7 +2111,7 @@ contains
                   state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl)
                endif
             endif
-            
+
          enddo
 
          ! Verify
@@ -2146,7 +2146,7 @@ contains
             _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
             _ASSERT(nn == 5, 'Expecting 5 water species Out') ! Q, QLCN, QLLS, QICN, QILS
          end select
-         
+
          ! Include additional tracers
 
          select case(FV_Atm(1)%flagstruct%nwat)
@@ -3930,7 +3930,7 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25, shr06)
    real(REAL4), allocatable, intent(OUT) :: srh01(:,:)
    real(REAL4), allocatable, intent(OUT) :: srh03(:,:)
    real(REAL4), allocatable, intent(OUT) :: srh25(:,:)
-   real(REAL4), allocatable, intent(OUT) :: srh06(:,:)
+   real(REAL4), allocatable, intent(OUT) :: shr06(:,:)
 
 ! made an intermediate output of FVPRC
    real(FVPRC) :: uh_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
