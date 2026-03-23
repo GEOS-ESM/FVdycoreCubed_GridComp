@@ -63,7 +63,7 @@ module AdvCore_GridCompMod
       use fv_control_mod,  only: fv_init1, fv_init2, fv_end
       use fv_tracer2d_mod, only: offline_tracer_advection
       use fv_mp_mod,       only: is,ie, js,je, is_master, tile
-      use fv_grid_utils_mod, only: g_sum
+      use fv_grid_utils_mod, only: g_sum_r8
 
       USE FV_StateMod,     only: AdvCoreTracers => T_TRACERS
       USE FV_StateMod,     only: FV_Atm
@@ -83,12 +83,10 @@ module AdvCore_GridCompMod
 
 ! Tracer I/O History stuff
 ! -------------------------------------
-      integer, parameter         :: ntracers=11
+      integer, parameter         :: ntracers=38
       integer                    :: ntracer
       character(len=ESMF_MAXSTR) :: myTracer
       character(len=ESMF_MAXSTR) :: tMassStr
-      real(FVPRC), SAVE          :: TMASS0(ntracers)
-      real(REAL8), SAVE          ::  MASS0
       logical    , SAVE          :: firstRun=.true.
 
 ! !PUBLIC MEMBER FUNCTIONS:
@@ -314,6 +312,9 @@ contains
       VERIFY_(STATUS)
       DT = ndt
 
+      call MAPL_GetResource( MAPL, chk_mass, 'N_TRACER_MASS_CHECK:', default=chk_mass, RC=STATUS )
+      VERIFY_(STATUS)
+
       ! Start up FV if AdvCore is running without FV3_DynCoreIsRunning
       !--------------------------------------------------
       if (.NOT. FV3_DynCoreIsRunning) then
@@ -475,7 +476,8 @@ contains
       REAL(FVPRC), POINTER, DIMENSION(:)       :: BK
       REAL(REAL8), allocatable :: ak_r8(:),bk_r8(:)
       REAL(FVPRC), POINTER, DIMENSION(:,:,:,:) :: TRACERS
-      REAL(FVPRC) :: MASS1, TMASS1(ntracers)
+      REAL(FVPRC) :: TMASS0(ntracers)
+      REAL(FVPRC) :: TMASS1(ntracers)
       TYPE(AdvCoreTracers), POINTER :: advTracers(:)
       type(ESMF_FieldBundle) :: TRADV
       type(ESMF_Field)       :: field
@@ -752,15 +754,7 @@ contains
 
          if (chk_mass) then
         ! Check Mass conservation
-            if (firstRun .and. AdvCore_Advection>0) then
-               MASS0 = g_sum(FV_Atm(1)%domain, PLE0(:,:,LM), is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, .true.)
-               call global_integral(TMASS0, TRACERS, PLE0, IM,JM,LM,NQ)
-               if (MASS0 /= 0.0) TMASS0=TMASS0/MASS0
-            elseif (firstRun) then
-               MASS0 = g_sum(FV_Atm(1)%domain, PLE1(:,:,LM), is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, .true.)
-               call global_integral(TMASS0, TRACERS, PLE1, IM,JM,LM,NQ)
-               if (MASS0 /= 0.0) TMASS0=TMASS0/MASS0
-            endif
+             call global_integral(TMASS0, TRACERS, PLE0, IM,JM,LM, min(ntracers,NQ))
          endif
          firstRun=.false.
 
@@ -776,33 +770,18 @@ contains
          ! Update tracer mass conservation
          !-------------------------------------------------------------------------
          if (chk_mass) then 
-            MASS1 = g_sum(FV_Atm(1)%domain, PLE1(:,:,LM), is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, .true.)
-            call global_integral(TMASS1, TRACERS, PLE1, IM,JM,LM,NQ)
-            if (MASS1 /= 0.0) TMASS1=TMASS1/MASS1
+            call global_integral(TMASS1, TRACERS, PLE1, IM,JM,LM, min(ntracers,NQ))
          endif
 
          if (chk_mass .and. is_master()) then
-#ifdef PRINT_MASS
-            write(6,100)  MASS0   , &
-                         TMASS0(2), &
-                         TMASS0(3), &
-                         TMASS0(4), &
-                         TMASS0(5)
-            write(6,102)  MASS1   , &
-                         TMASS1(2), &
-                         TMASS1(3), &
-                         TMASS1(4), &
-                         TMASS1(5)
-#endif
-            write(6,103) ( MASS1   - MASS0   )/ MASS0   , &
-                         (TMASS1(2)-TMASS0(2))/TMASS0(2), &
-                         (TMASS1(3)-TMASS0(3))/TMASS0(3), &
-                         (TMASS1(4)-TMASS0(4))/TMASS0(4), &
-                         (TMASS1(5)-TMASS0(5))/TMASS0(5)
- 100        format('Tracer M0  : ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14)
- 101        format('Tracer Ma  : ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14)
- 102        format('Tracer M1  : ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14)
- 103        format('Tracer Mdif: ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14,' ',e21.14)
+            do N=1,min(ntracers,NQ)
+              if (TMASS0(N) > 0.0) then
+              if (ABS((TMASS1(N)-TMASS0(N))/TMASS0(N)) >= epsilon(1.0_REAL4)) then
+                 write(6,126) trim(advTracers(N)%tName), (TMASS1(N)-TMASS0(N))/TMASS0(N)
+               end if
+              endif
+            enddo
+            126 format('Mass Conservation Error > epsilon relative found in AdvCore:'2x,A,2x,g21.14)
          endif
 
          ! Go through the bundle copying tracers back to the bundle.
@@ -819,7 +798,7 @@ contains
             !--> This section is used for diagnostics only.
             !--> It has no effect on CTM experiments.
             !-----------------------------------------------
-            if (N<=ntracers) then
+            if (N<=min(ntracers,NQ)) then
                write(myTracer, "('TEST_TRACER',i5.5)") N-1
                call MAPL_GetPointer(EXPORT, temp3D, TRIM(myTracer), rc=status)
                VERIFY_(STATUS)
@@ -918,7 +897,8 @@ subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
 ! Locals
       integer   :: k,n
       real(REAL8), allocatable ::    dp(:,:,:)
-      real(FVPRC), allocatable :: qsum1(:,:)
+      real(REAL8), allocatable :: qsum1(:,:)
+      real(REAL8) :: mass
 
       allocate(    dp(im,jm,km) )
       allocate( qsum1(im,jm)    )
@@ -929,6 +909,14 @@ subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
          dp(:,:,k) = PLE(:,:,k+1)-PLE(:,:,k)
       enddo
 
+! Compute Global Mass
+! -------------------
+      qsum1(:,:) = 0.d0
+      do k=1,KM
+         qsum1(:,:) = qsum1(:,:) + dp(:,:,k)
+      enddo
+      mass = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, .true.)
+
 ! Loop over Tracers
 ! -----------------
      do n=1,NQ
@@ -936,7 +924,8 @@ subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
         do k=1,KM
            qsum1(:,:) = qsum1(:,:) + Q(:,:,k,n)*dp(:,:,k)
         enddo
-        qg(n) = g_sum(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, .true.)
+        qg(n) = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1, .true.)
+        if (mass > 0.0) qg(n) = qg(n)/mass
      enddo
 
      deallocate( dp )
