@@ -52,7 +52,7 @@
                            HYDROSTATIC     => FV_HYDROSTATIC,        &
                            fv_getUpdraftHelicity,                    &
                            ADIABATIC, SW_DYNAMICS, AdvCore_Advection
-   use m_topo_remap, only: dyn_topo_remap
+   use shared_topo_remap, only: dyn_topo_remap
    use CubeGridPrototype, only: register_grid_and_regridders
 
 ! !PUBLIC MEMBER FUNCTIONS:
@@ -7724,6 +7724,7 @@ subroutine Coldstart(gc, import, export, clock, rc)
     type (ESMF_FieldBundle)          :: TRADV_BUNDLE
     character(len=ESMF_MAXSTR)       :: FIELDNAME
     character(len=ESMF_MAXSTR)       :: STRING
+    character(len=ESMF_MAXSTR)       :: eta_rc_file
     real(REAL8), parameter    :: r0_6=0.6
     real(REAL8), parameter    :: r1_0=1.0
 
@@ -7847,7 +7848,14 @@ subroutine Coldstart(gc, import, export, clock, rc)
        bk_is_missing = .true.
     endif
 
-    if (ak_is_missing .or. bk_is_missing) call set_eta(km, ls, ptop, pint, AK, BK)
+    if (ak_is_missing .or. bk_is_missing) then
+       call MAPL_GetResource(MAPL, eta_rc_file, label='ETA_RC_FILE:', default = 'None', rc = status)
+       if( trim(eta_rc_file) == 'None' ) then
+          call set_eta(km, ls, ptop, pint, AK, BK)
+       else 
+          call get_eta(trim(eta_rc_file), ptop, pint, AK, BK)
+       endif
+    endif
 
     _ASSERT(ANY(AK /= 0.0) .or. ANY(BK /= 0.0),'needs informative message')
     do L=lbound(PE,3),ubound(PE,3)
