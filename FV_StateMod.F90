@@ -4108,7 +4108,7 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25, shr06)
                          FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
    uh03 = uh_tmp
 
-   ! Shear 0-6 km
+   ! Shear 0-6 kms
 
    call calculate_shear_06(isc, iec, jsc, jec, ng, npz, zvir, sphum, shr06, &
                   FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
