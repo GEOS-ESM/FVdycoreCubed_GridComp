@@ -22,7 +22,6 @@ module FVdycoreCubed_GridComp
    use MAPL_Constants, only: MAPL_VectorField ! pchakrab: TODO - need MAPL3 equivalent
    use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
-   use MAPL_AbstractRegridderMod, only: AbstractRegridder
    ! pchakrab - TODO: need MAPL3 equivalent
    ! use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
    use MAPL_GridManagerMod, only: grid_manager
@@ -437,11 +436,9 @@ contains
 
       type(ESMF_Field) :: field
       type(ESMF_State) :: internal
-      type(ESMF_TimeInterval) :: intv
-      type(ESMF_Alarm) :: alarm
       type(ESMF_FieldBundle) :: tradv, tradvex
 
-      character(len=:), allocatable :: ReplayMode
+      ! character(len=:), allocatable :: ReplayMode
 
       real(r4), pointer :: pref(:)
       real(r4), pointer :: u(:,:,:), v(:,:,:), t(:,:,:)
@@ -452,7 +449,6 @@ contains
       real(r8), pointer ::  pt(:,:,:), pk(:,:,:)
       real(r8), allocatable ::  ur(:,:,:), vr(:,:,:) ! rotated winds
 
-      real :: DNS_INTERVAL
       logical :: ColdRestart, FV3_STANDALONE
       integer :: ifirst, ilast, jfirst, jlast, km
       integer :: i, numTracers, status
@@ -556,21 +552,6 @@ contains
          enddo
       end if
 
-      !=====Begin intemittent replay=======================
-      ! Set the intermittent replay alarm, if needed.
-      ! Note that it is a non-sticky alarm
-      ! and is set to ringing on first step. So it will
-      ! work whether the clock is backed-up and ticked
-      ! or not.
-      call MAPL_GridCompGetResource(gc, "REPLAY_MODE", ReplayMode, default="NoReplay", _RC)
-      if (adjustl(ReplayMode) == "Intermittent") then
-         call MAPL_GridCompGetResource(gc, "REPLAY_INTERVAL", DNS_INTERVAL, default=21600., _RC)
-         call ESMF_TimeIntervalSet(intv, s=nint(DNS_INTERVAL), _RC)
-         alarm = ESMF_AlarmCreate(name="INTERMITTENT", clock=clock, ringInterval=intv, sticky=.false., _RC)
-         call ESMF_AlarmRingerOn(alarm, _RC)
-      end if
-      !========End intermittent replay========================
-
       _RETURN(_SUCCESS)
    end subroutine Initialize
 
@@ -602,14 +583,11 @@ contains
 
       integer :: status, comm
       type(ESMF_VM) :: vm
-      type(ESMF_FieldBundle) :: bundle, ana_bundle
-      type(ESMF_Field) :: field, ana_field
+      type(ESMF_FieldBundle) :: bundle
+      type(ESMF_Field) :: field
       type(ESMF_Alarm) :: alarm
-      type(ESMF_Grid) :: esmfgrid, ana_grid
-      type(ESMF_Time) :: current_time, RefTime
+      type(ESMF_Grid) :: esmfgrid
       type(ESMF_HConfig) :: hconfig
-
-      class(AbstractRegridder), pointer :: L2C, C2L
 
       type(DynState), pointer :: self
       type(DynGrid), pointer :: grid
@@ -620,7 +598,7 @@ contains
       integer :: NUMVARS
       integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
       integer :: kend, i, j, K, n
-      integer :: im_replay,jm_replay
+      ! pchakrab - convt is not used anywhere
       logical, parameter :: convt = .false. ! Until this is run with full physics
       logical :: is_shutoff, is_ringing
 
@@ -738,8 +716,6 @@ contains
       real(r4), pointer ::       temp2d(:,:)
       real(r4), pointer ::       tempu (:,:)
       real(r4), pointer ::       tempv (:,:)
-      real(r4), allocatable ::   cubetemp3d(:,:,:)
-      real(r4), allocatable ::   cubevtmp3d(:,:,:)
 
       real(r4), pointer :: uh25(:,:), uh03(:,:)
       real(r4), pointer :: srh01(:,:), srh03(:,:), srh25(:,:), shr06(:,:)
@@ -752,17 +728,11 @@ contains
       real(r8),     allocatable ::   vdtmp(:,:,:)
 
       character(len=ESMF_MAXSTR), allocatable :: names(:), names0(:)
-      character(len=ESMF_MAXSTR) :: STRING
-      character(len=:), allocatable :: ReplayMode, ReplayFile, ReplayType
-      character(len=:), allocatable :: cremap,tremap
-      character(len=:), allocatable :: uname, vname, tname, qname, psname, dpname, o3name, rgrid, tvar
 
       ! type(MAPL_SunOrbit) :: ORBIT
       real(r4), allocatable :: lats(:,:), lons(:,:)
       ! real(r4), allocatable :: ZTH(:,:), SLR(:,:) - used in some commented code
 
-      real :: rc_blend_p_above, rc_blend_p_below, sclinc
-      integer :: rc_blend
       real :: HGT_SURFACE
 
       character(len=:), allocatable :: ANA_IS_WEIGHTED
@@ -771,7 +741,7 @@ contains
       type(DynTracers) :: qqq       ! Specific Humidity
       type(DynTracers) :: ooo       ! ox
       logical :: LCONSV, LFILL
-      integer :: CONSV,  FILL, nx_ana, ny_ana
+      integer :: CONSV,  FILL
 
       logical, save :: firstime = .true.
       logical :: adjustTracers, exclude, doEnergetics, doTropvars
@@ -1011,113 +981,16 @@ contains
 
       ! WMP Begin REPLAY/ANA section
       call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
+      is_shutoff = .true.
       if (.not. FV3_STANDALONE) then
          call MAPL_GridCompTimerStart(gc, "DYN_ANA", _RC)
          call ESMF_ClockGetAlarm(clock, "ReplayShutOff", alarm, _RC)
          is_shutoff = ESMF_AlarmIsRinging(alarm, _RC)
-      else
-         is_shutoff = .true.
       end if
 
       if (.not. is_shutoff) then
          ! If requested, do Intermittent Replay
-
-         ! NOTE: pchakrab - need to double check with Bill, but the replay code is not going
-         ! to be here anymore
-
-         call MAPL_GridCompGetResource(gc, "REPLAY_MODE", ReplayMode, default="NoReplay", _RC)
-
-         REPLAYING: if(adjustl(ReplayMode)=="Intermittent") then
-
-            ! If replay alarm is ringing, we need to reset state
-            call ESMF_ClockGetAlarm(clock, "INTERMITTENT", alarm, _RC)
-            call ESMF_ClockGet(clock, CurrTime=current_time, _RC)
-
-            is_ringing = ESMF_AlarmIsRinging(alarm, _RC)
-
-            RefTime = current_time
-
-            call check_replay_time_(is_ringing)
-            TIME_TO_REPLAY: if(is_ringing) then
-
-               call ESMF_AlarmRingerOff(alarm, _RC)
-
-               ! Read in file name of field to replay to and all other relavant resources
-               call MAPL_GridCompGetResource(gc, "REPLAY_FILE", ReplayFile, _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_TYPE", ReplayType, default="FULL", _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_IM", im_replay, _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_JM", jm_replay, _RC)
-
-               call MAPL_GridCompGetResource(gc, "REPLAY_PSNAME", psname, default="NULL",  _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_DPNAME", dpname, default="delp",  _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_UNAME", uname, default="uwnd",   _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_VNAME", vname, default="vwnd",   _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_TNAME", tname, default="theta",  _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_QNAME", qname, default="sphu",   _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_O3NAME", o3name, default="ozone", _RC)
-
-               call MAPL_GridCompGetResource(gc, "REPLAY_GRID", rgrid, default="D-GRID", _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_TVAR", tvar, default="THETAV", _RC)
-
-               call MAPL_GridCompGetResource(gc, "REPLAY_REMAP", cremap, default="no", _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_REMAP_ALL_TRACERS", tremap, default="yes", _RC)
-
-               call MAPL_GridCompGetResource(gc, "REPLAY_BLEND", rc_blend, default=0, _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_BLEND_P_ABOVE", rc_blend_p_above, default=10.0, _RC)
-               call MAPL_GridCompGetResource(gc, "REPLAY_BLEND_P_BELOW", rc_blend_p_below, default=100.0, _RC)
-
-               call MAPL_GridCompGetResource(gc, "SCLINC", sclinc, default=1.0, _RC)
-
-               ! Read the fields to be reset into a bundle
-               ! call ESMF_ConfigGetAttribute(cf, nx_ana, label ="NX:", _RC)
-               ! call ESMF_ConfigGetAttribute(cf, ny_ana, label ="NY:", _RC)
-               call MAPL_GridCompGetResource(gc, "NX", nx_ana, _RC)
-               call MAPL_GridCompGetResource(gc, "NY", ny_ana, _RC)
-
-               block
-                  use MAPL_LatLonGridFactoryMod
-                  ana_grid = grid_manager%make_grid( &
-                       & LatLonGridFactory(im_world=IM_REPLAY, jm_world=JM_REPLAY, lm=km, &
-                       & nx=nx_ana, ny=ny_ana, rc=status))
-                  _VERIFY(status)
-               end block
-
-               ana_bundle = ESMF_FieldBundleCreate(_RC)
-               call ESMF_FieldBundleSet(ana_bundle, grid=ana_grid, _RC)
-
-               call MAPL_CFIORead(ReplayFile, RefTime, ana_bundle, _RC)
-
-               ! Create transform from lat-lon to cubed
-               l2c => regridder_manager%make_regridder(ana_grid, esmfgrid, REGRID_METHOD_BILINEAR, _RC)
-
-               ! Fill the state variables from the bundle only if
-               ! the corresponding fields are there
-
-               ! soon dump_n_splash will go; we'll have instead:
-               !    call get_inc_on_anagrid_ - this will convert the internal state to
-               !      ana-grid, diff with what's in file and produce what incremental_
-               !      normally works from - a knob will tell incremental_ where fields
-               !      are in memory or need reading from file.
-               !    call incremental_
-               !    call state_remap_
-               if (trim(ReplayType)=="FULL") then
-                  call dump_n_splash_
-               else
-                  call incremental_
-               endif
-               call state_remap_
-
-               ! Done with replay; clean-up
-               call ESMF_FieldBundleGet(ana_bundle, FieldCount=NUMVARS, _RC)
-
-               do k=1,NUMVARS
-                  call ESMF_FieldBundleGet(ana_bundle, k, ana_field, _RC)
-                  call MAPL_FieldDestroy(ana_field, _RC)
-               end do
-
-               call ESMF_FieldBundleDestroy(ana_bundle, _RC)
-            end if TIME_TO_REPLAY
-         end if REPLAYING
+         ! pchakrab - we are not doing this anymore, right?
 
          ! Create Local Copy of QV and OX (Contains Updates from Analysis)
          ox = 0.0
@@ -2761,768 +2634,6 @@ contains
       !endif
 
       _RETURN(_SUCCESS)
-
-   contains
-
-      subroutine check_replay_time_(lring)
-
-         logical :: lring
-
-         integer :: REPLAY_REF_DATE, REPLAY_REF_TIME, REPLAY_REF_TGAP
-         integer :: REF_TIME(6), REF_TGAP(6)
-         type(ESMF_TimeInterval)  :: RefTGap
-
-         call MAPL_GridCompGetResource(gc, "REPLAY_TYPE", ReplayType, default="FULL", _RC)
-         !  if (trim(ReplayType) == "FULL") return
-
-         call MAPL_GridCompGetResource(gc, "REPLAY_REF_DATE", REPLAY_REF_DATE, default=-1, _RC)
-         call MAPL_GridCompGetResource(gc, "REPLAY_REF_TIME", REPLAY_REF_TIME, default=-1, _RC)
-         call MAPL_GridCompGetResource(gc, "REPLAY_REF_TGAP", REPLAY_REF_TGAP, default=-1, _RC)
-
-         if(REPLAY_REF_DATE==-1.or.REPLAY_REF_TIME==-1) return
-
-         REF_TIME(1) =     REPLAY_REF_DATE/10000
-         REF_TIME(2) = mod(REPLAY_REF_DATE,10000)/100
-         REF_TIME(3) = mod(REPLAY_REF_DATE,100)
-         REF_TIME(4) =     REPLAY_REF_TIME/10000
-         REF_TIME(5) = mod(REPLAY_REF_TIME,10000)/100
-         REF_TIME(6) = mod(REPLAY_REF_TIME,100)
-
-         ! set replay time
-         call ESMF_TimeSet(RefTime, &
-              YY =  REF_TIME(1), &
-              MM =  REF_TIME(2), &
-              DD =  REF_TIME(3), &
-              H  =  REF_TIME(4), &
-              M  =  REF_TIME(5), &
-              S  =  REF_TIME(6), _RC)
-         if (REPLAY_REF_TGAP>0) then
-            REF_TGAP    = 0
-            REF_TGAP(4) =     REPLAY_REF_TGAP/10000
-            REF_TGAP(5) = mod(REPLAY_REF_TGAP,10000)/100
-            REF_TGAP(6) = mod(REPLAY_REF_TGAP,100)
-            call ESMF_TimeIntervalSet(RefTGap, &
-                 YY = REF_TGAP(1), &
-                 MM = REF_TGAP(2), &
-                 D = REF_TGAP(3), &
-                 H = REF_TGAP(4), &
-                 M = REF_TGAP(5), &
-                 S = REF_TGAP(6), &
-                 startTime = current_time, _RC)
-            RefTime = RefTime - RefTGap
-         endif
-
-         ! check if it's time to replay
-         if(RefTime==current_time) then
-            lring=.true.
-         else
-            lring=.false.
-         endif
-
-         ! In this case, increment RefTime to proper time
-         if (REPLAY_REF_TGAP>0) then
-            RefTime = current_time + RefTGap
-         endif
-
-      end subroutine check_replay_time_
-
-      subroutine dump_n_splash_
-
-         real(r4), pointer :: XTMP2d (:,:) =>NULL()
-         real(r4), pointer :: XTMP3d(:,:,:)=>NULL()
-         real(r4), pointer :: YTMP3d(:,:,:)=>NULL()
-         real(r8), allocatable :: ana_thv (:,:,:)
-         real(r8), allocatable :: ana_phis  (:,:)
-         real(r8), allocatable :: ana_pkxy  (:,:,:)
-         real(r8), allocatable :: ana_pkz   (:,:,:)
-         real(r8), allocatable :: ana_dp    (:,:,:)
-         real(r8), allocatable :: ana_pe    (:,:,:)
-         real(r8), allocatable :: ana_qq    (:,:,:,:)
-         real(r8), allocatable :: ana_pt    (:,:,:)
-         real(r8), allocatable :: ana_u     (:,:,:)
-         real(r8), allocatable :: ana_v     (:,:,:)
-         real(r4), allocatable :: aux3d     (:,:,:)
-         real(r4), allocatable :: UAtmpR4   (:,:,:)
-         real(r4), allocatable :: VAtmpR4   (:,:,:)
-
-         character(len=ESMF_MAXSTR) :: NAME
-         real(r4), pointer :: ptr3dr4   (:,:,:)
-         real(r8), pointer :: ptr3dr8   (:,:,:)
-         integer :: iwind,rank,icnt
-         integer :: iib,iie,jjb,jje,nq3d
-         integer, parameter :: iapproach=2 ! handle pressure more carefully
-         logical :: do_remap, remap_all_tracers
-
-         call logger%info("Run::dump_n_splash_:: Starting...")
-
-         do_remap = (cremap=="yes" .or. cremap=="YES")
-         remap_all_tracers = (tremap=="yes" .or. tremap=="YES")
-         nq3d=2 ! this routine only updates QV and OX
-         iib = lbound(vars%pe,1)
-         iie = ubound(vars%pe,1)
-         jjb = lbound(vars%pe,2)
-         jje = ubound(vars%pe,2)
-         allocate(   ana_thv (iib:iie,jjb:jje,km  ) )
-         allocate(   ana_pkxy(iib:iie,jjb:jje,km+1) )
-         allocate(   ana_pkz (iib:iie,jjb:jje,km  ) )
-         allocate(    ana_dp (iib:iie,jjb:jje,km  ) )
-         allocate(    ana_pe (iib:iie,jjb:jje,km+1) )
-         allocate(    ana_qq (iib:iie,jjb:jje,km  ,nq3d) )
-         allocate(    ana_pt (iib:iie,jjb:jje,km  ) )
-         allocate(     ana_u (grid%is:grid%ie  ,grid%js:grid%je+1,km) )
-         allocate(     ana_v (grid%is:grid%ie+1,grid%js:grid%je  ,km) )
-         ! U
-         iwind=0
-         if( trim(uname).ne.'NULL' ) then
-            call MAPL_FieldBundleGetPointer(ana_bundle, trim(uname), XTMP3d, _RC)
-            iwind=iwind+1
-         endif
-         ! V
-         if( trim(vname).ne.'NULL' ) then
-            call MAPL_FieldBundleGetPointer(ana_bundle, trim(vname), YTMP3D, _RC)
-            iwind=iwind+1
-         endif
-
-         ! calculate d-grid winds
-         if(iwind==0) then
-            ana_u = vars%u(grid%is:grid%ie,grid%js:grid%je,1:km)
-            ana_v = vars%v(grid%is:grid%ie,grid%js:grid%je,1:km)
-         else if(iwind==1) then
-            _FAIL("cannot handle single wind component")
-         else if (iwind==2) then
-#ifdef INC_WINDS
-            if (iapproach==1) then
-#endif /* INC_WINDS */
-               allocate(cubeTEMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
-               allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
-#ifdef SCALAR_WINDS
-               call logger%info("Run::dump_n_splash_:: Replaying winds as scalars")
-               call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
-               call l2c%regrid(YTMP3d, cubeVTMP3D, _RC)
-#else
-               call logger%info("Run::dump_n_splash_:: Replaying winds")
-               call l2c%regrid(XTMP3d, YTMP3d, cubeTEMP3d, cubeVTMP3d, rc=status)
-#endif /* SCALAR_WINDS */
-               allocate( UAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-               allocate( VAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-               UAtmp = cubetemp3d ! A-grid winds on cube
-               VAtmp = cubevtmp3d ! A-grid winds on cube
-               deallocate(cubeTEMP3D)
-               deallocate(cubeVTMP3D)
-               allocate( UDtmp(grid%is:grid%ie  ,grid%js:grid%je+1,km) )
-               allocate( VDtmp(grid%is:grid%ie+1,grid%js:grid%je  ,km) )
-               call Agrid_To_Native( UAtmp, VAtmp, UDtmp, VDtmp ) ! Calculate D-grid winds from rotated A-grid winds
-               ana_u = UDtmp(grid%is:grid%ie,grid%js:grid%je,1:km)
-               ana_v = VDtmp(grid%is:grid%ie,grid%js:grid%je,1:km)
-               deallocate(udtmp,vdtmp)
-               deallocate(uatmp,vatmp)
-#ifdef INC_WINDS
-            else ! approach 2: operate on increments
-               allocate(cubeTEMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
-               allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
-               allocate( UAtmpR4(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-               allocate( VAtmpR4(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-               ! get background A-grid winds
-               call getAllWinds(vars%u, vars%v, UR=ana_u, VR=ana_v)
-               ! transform background A-grid winds to lat-lon
-               call regridder_manager%make_regridder(esmfgrid, ana_grid, REGRID_METHOD_BILINEAR, _RC)
-               cubeTEMP3d = ana_u(grid%is:grid%ie,grid%js:grid%je,1:km) ! copy to satisfy interface below
-               cubeVTMP3d = ana_v(grid%is:grid%ie,grid%js:grid%je,1:km) ! copy to satisfy interface below
-               call c2l%regrid(cubeTEMP3d, cubeVTMP3d, UAtmpR4, VAtmpR4, _RC)
-               ! calculate unrotated analysis increments of lat-lon U/V-A-grid winds
-               UAtmpR4 = XTMP3d-UAtmpR4
-               UAtmpR4 = VTMP3d-VAtmpR4
-               ! convert the lat-lon A-grid wind increment back to the cubed
-               call logger%info("Run::dump_n_splash_:: Replaying winds")
-               call l2c%regrid(UAtmpR4, VAtmpR4, cubeTEMP3d, cubeVTMP3d, _RC)
-               ! convert cubed wind increment to D-grid
-               allocate( UDtmp(grid%is:grid%ie  ,grid%js:grid%je+1,km) )
-               allocate( VDtmp(grid%is:grid%ie+1,grid%js:grid%je  ,km) )
-               deallocate(ana_u,ana_v)
-               allocate( ana_u(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-               allocate( ana_v(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-               ana_u = cubeTEMP3d ! need this to satisfy interface below
-               ana_v = cubeVTMP3d ! need this to satisfy interface below
-               call Agrid_To_Native(ana_u, ana_v, UDtmp, VDtmp) ! Calculate D-grid winds from rotated A-grid winds
-               ! update winds: rotate, cubed, D-grid analyzed winds
-               deallocate(ana_u,ana_v)
-               allocate( ana_u(grid%is:grid%ie  ,grid%js:grid%je+1,km) )
-               allocate( ana_v(grid%is:grid%ie+1,grid%js:grid%je  ,km) )
-               ana_u = vars%u + UDtmp
-               ana_v = vars%v + VDtmp
-               ! clean up
-               deallocate(VDtmp)
-               deallocate(UDtmp)
-               deallocate(UAtmpR4)
-               deallocate(VAtmpR4)
-               deallocate(cubeVTMP3D)
-               deallocate(cubeTEMP3D)
-            endif
-#endif /* INC_WINDS */
-         endif
-
-         ! PE or PS
-         if( trim(dpname).ne.'NULL' ) then
-            call MAPL_FieldBundleGetPointer(ana_bundle, trim(dpname), XTMP3d, _RC)
-            call logger%info("Run::dump_n_splash_:: Replaying "//trim(dpname))
-            if ( iapproach == 1 ) then ! convert lat-lon delp to cubed and proceed
-               allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-               call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
-               ana_dp=cubeTEMP3D
-               deallocate(cubeTEMP3D)
-            else
-               ! just because pressure is such delicate beast: convert cubed delp
-               ! to lat-lon, calculate an increment in lat-lon, convert increment
-               ! on delp to cubed, and create cubed version of analyzed delp
-               allocate(aux3d (size(XTMP3d,1),size(XTMP3d,2),km))
-               allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-               ! delp on the cube
-               cubeTEMP3D(:,:,:) = vars%pe(:,:,2:)-vars%pe(:,:,:km)
-               ! transform cubed delp
-               c2l => regridder_manager%make_regridder(esmfgrid, ana_grid, REGRID_METHOD_BILINEAR, _RC)
-               call c2l%regrid(cubeTEMP3D, aux3d, _RC)
-               ! calculate delp increment on lat-lon and transform it to cubed
-               aux3d = XTMP3d - aux3d
-               call l2c%regrid(aux3d, cubeTEMP3D, _RC)
-               ! delp analysis on the cube (careful since want to preserve
-               ! precision in delp to the best extent possible)
-               ana_dp = vars%pe(:,:,2:)-vars%pe(:,:,:km) + cubeTEMP3D
-               deallocate(aux3d)
-               deallocate(cubeTEMP3D)
-            endif
-            ana_pe(:,:,1) = grid%ak(1)
-            do k=2,km+1
-               ana_pe(:,:,k) = ana_pe(:,:,k-1) + ana_dp(:,:,k-1)
-            enddo
-            pkxy = ana_pe**kappa
-            do k=1,km
-               ana_pkz(:,:,k) = ( pkxy(:,:,k+1)-pkxy(:,:,k) ) &
-                    / ( kappa*( log(ana_pe(:,:,k+1))-log(ana_pe(:,:,k))) )
-            enddo
-         else
-            if( trim(psname).ne.'NULL' ) then
-               call MAPL_FieldBundleGetPointer(ana_bundle, trim(psname), XTMP2D, _RC)
-               call logger%info("Run::dump_n_splash_:: Replaying "//trim(psname))
-               allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
-               allocate(     aux3D(size(XTMP2d ,1),size(XTMP2d ,2),1))
-               if ( iapproach == 1 ) then ! convert lat-lon delp to cubed and proceed
-                  aux3d(:,:,1)=XTMP2D ! rank-2 interface to HorzT does not work
-                  call l2c%regrid(aux3d, cubeTEMP3D, _RC)
-               else
-                  ! operate on increment to ps
-                  ! transform cubed delp
-                  cubeTEMP3D(:,:,1) = vars%pe(:,:,km+1) ! cubed ps
-                  c2l => regridder_manager%make_regridder(esmfgrid, ana_grid, REGRID_METHOD_BILINEAR, _RC)
-                  call c2l%regrid(cubeTEMP3D, aux3d, _RC)
-                  ! increment to ps on the lat-lon
-                  aux3d(:,:,1) = XTMP2D - aux3d(:,:,1)
-                  ! lat-lon increment to ps converted to the cube
-                  call l2c%regrid(aux3d, cubeTEMP3D, _RC)
-                  ! ps update on the cube
-                  cubeTEMP3d(:,:,1) = vars%pe(:,:,km+1) + cubeTEMP3D(:,:,1)
-               endif
-               do k=1,km+1
-                  ana_pe(:,:,k) = grid%ak(k) + cubeTEMP3d(:,:,1)*grid%bk(k)
-               enddo
-               deallocate(aux3D)
-               deallocate(cubeTEMP3D)
-               do k=2,km+1
-                  ana_dp(:,:,k-1) = ana_pe(:,:,k) - ana_pe(:,:,k-1)
-               enddo
-               pkxy = ana_pe**kappa
-               do k=1,km
-                  ana_pkz(:,:,k) = ( pkxy(:,:,k+1)-pkxy(:,:,k) ) &
-                       / ( kappa*( log(ana_pe(:,:,k+1))-log(ana_pe(:,:,k))) )
-               enddo
-            else
-               ana_pe  = vars%pe
-               ana_pkz = vars%pkz
-            endif
-         endif
-
-         ! pchakrab - TODO: orbit??
-         ! ! O3
-         ! if( trim(o3name).ne.'NULL' ) then
-         !    call MAPL_FieldBundleGetPointer(ana_bundle, trim(o3name), XTMP3d, _RC)
-         !    allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-         !    call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
-
-         !    ! Ozone needs to be adjusted to OX
-         !    call WRITE_PARALLEL('Replaying '//trim(o3name))
-
-         !    call MAPL_Get(MAPL, lons=lons, lats=lats, ORBIT=ORBIT, _RC)
-
-         !    allocate( ZTH( size(lons,1),size(lons,2) ) )
-         !    allocate( SLR( size(lons,1),size(lons,2) ) )
-
-         !    call MAPL_SunGetInsolation(lons, lats, ORBIT, ZTH, SLR, clock=clock, _RC)
-
-         !    pl = ( vars%pe(:,:,2:) + vars%pe(:,:,:km) ) * 0.5
-
-         !    do L=1,km
-         !       if( ooo%is_r4 ) then
-         !          where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
-         !               ooo%content_r4(:,:,L) = max(0.,cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6)
-         !       else
-         !          where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
-         !               ooo%content   (:,:,L) = max(0.,cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6)
-         !       endif
-         !    enddo
-
-         !    deallocate( ZTH, SLR )
-         !    deallocate(cubeTEMP3D)
-         ! endif
-         if( ooo%is_r4 ) then ! ana_qq(2) used as aux var to hold ox
-            ana_qq(:,:,:,2) = ooo%content_r4
-         else
-            ana_qq(:,:,:,2) = ooo%content
-         endif
-
-         ! QV
-         if( trim(qname).ne.'NULL' ) then
-            call MAPL_FieldBundleGetPointer(ana_bundle, trim(qname), XTMP3d, _RC)
-            allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-            call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
-            call logger%info("Run::dump_n_splash_:: Replaying "//trim(qname))
-            if( qqq%is_r4 ) then
-               qqq%content_r4 = max(0.,cubeTEMP3D)
-            else
-               qqq%content    = max(0.,cubeTEMP3D)
-            endif
-            deallocate(cubeTEMP3D)
-         endif
-         if( qqq%is_r4 ) then ! ana_qq(1) used as aux var to calculate pt/pthv
-            ana_qq(:,:,:,1) = qqq%content_r4
-         else
-            ana_qq(:,:,:,1) = qqq%content
-         endif
-
-         ! PT
-         if( trim(tname).ne.'NULL' ) then
-            call MAPL_FieldBundleGetPointer(ana_bundle, trim(tname), XTMP3d, _RC)
-            allocate(cubeTEMP3D(size(ana_thv,1),size(ana_thv,2),km))
-            call l2c%regrid(XTMP3d, cubeTEMP3D, _RC)
-            call logger%info("Run::dump_n_splash_:: Replaying "//trim(tname)// '; treated as '//trim(tvar))
-            if( trim(tvar).eq.'THETAV' ) ana_thv = cubeTEMP3D
-            if( trim(tvar).eq.'TV'     ) ana_thv = cubeTEMP3D/ana_pkz
-            if( trim(tvar).eq.'THETA' .or. &
-                 trim(tvar).eq.'T'      ) then
-               if( trim(tvar).eq.'THETA' ) ana_thv = cubeTEMP3D*(1.0+eps*ana_qq(:,:,:,1))
-               if( trim(tvar).eq.'T'     ) ana_thv = cubeTEMP3D*(1.0+eps*ana_qq(:,:,:,1))/ana_pkz
-            endif
-            deallocate(cubeTEMP3D)
-            ana_pt  = ana_thv/(1.0+eps*ana_qq(:,:,:,1))
-         else
-            ana_thv = vars%pt*(1.0+eps*ana_qq(:,:,:,1))
-            ana_pt  = vars%pt
-         endif
-
-         ! Refresh vars ("update" them)
-         vars%u   = ana_u(grid%is:grid%ie,grid%js:grid%je,:)
-         vars%v   = ana_v(grid%is:grid%ie,grid%js:grid%je,:)
-         vars%pe  = ana_pe
-         vars%pkz = ana_pkz
-         vars%pt  = ana_pt
-
-         ! clean up
-         deallocate( ana_v       )
-         deallocate( ana_u       )
-         deallocate( ana_pt      )
-         deallocate( ana_qq      )
-         deallocate( ana_dp      )
-         deallocate( ana_pe      )
-         deallocate( ana_pkz     )
-         deallocate( ana_pkxy    )
-         deallocate( ana_thv     )
-
-         call logger%info("Run::dump_n_splash_:: ...complete")
-
-      end subroutine dump_n_splash_
-
-      subroutine incremental_
-
-         real(r8), allocatable :: dpkxy  (:,:,:)
-         real(r8), allocatable :: dpkz   (:,:,:)
-         real(r8), allocatable :: dpe    (:,:,:)
-         real(r8), allocatable :: dqqv   (:,:,:)
-         real(r8), allocatable :: dqox   (:,:,:)
-         real(r8), allocatable :: dth    (:,:,:)
-         real(r8), allocatable :: du     (:,:,:)
-         real(r8), allocatable :: dv     (:,:,:)
-         real(r4), allocatable :: aux3d  (:,:,:)
-         integer :: iib,iie,jjb,jje
-         integer :: iwind
-         logical :: allhere,iamr4
-
-         iib = lbound(vars%pe,1)
-         iie = ubound(vars%pe,1)
-         jjb = lbound(vars%pe,2)
-         jje = ubound(vars%pe,2)
-         allocate( dpkxy(iib:iie,jjb:jje,km+1) )
-         allocate( dpkz (iib:iie,jjb:jje,km  ) )
-         allocate(  dpe (iib:iie,jjb:jje,km+1) )
-         allocate( dqqv (iib:iie,jjb:jje,km  ) )
-         allocate( dqox (iib:iie,jjb:jje,km  ) )
-         allocate(  dth (iib:iie,jjb:jje,km  ) )
-         allocate(   du (grid%is:grid%ie  ,grid%js:grid%je+1,km) )
-         allocate(   dv (grid%is:grid%ie+1,grid%js:grid%je  ,km) )
-         dpkxy=0.0d0
-         dpkz =0.0d0
-         dpe  =0.0d0
-         dqqv =0.0d0
-         dqox =0.0d0
-         dth  =0.0d0
-         du   =0.0d0
-         dv   =0.0d0
-
-         allhere = trim(uname ).ne.'NULL'.and.trim(vname ).ne.'NULL'.and. &
-              trim(o3name).ne.'NULL'.and. &
-              trim(tname ).ne.'NULL'.and.trim(qname ).ne.'NULL'
-         if(.not.allhere) then
-            _FAIL("Not all varibles needed for replay are available")
-         endif
-         call logger%info("Run::incremental_:: Starting...")
-
-         ! U
-         iwind=0
-         if( trim(uname).ne.'NULL' ) then
-            call MAPL_FieldBundleGetPointer(ana_bundle, trim(uname), TEMP3D, _RC)
-            iwind=iwind+1
-         endif
-         ! V
-         if( trim(vname).ne.'NULL' ) then
-            call MAPL_FieldBundleGetPointer(ana_bundle, trim(vname), VTMP3D, _RC)
-            iwind=iwind+1
-         endif
-
-         ! calculate d-grid winds
-         if(iwind==1) then
-            status=1
-            print *, 'cannot handle single wind component'
-            _VERIFY(STATUS)
-         else if (iwind==2) then
-            allocate(cubeTEMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
-            allocate(cubeVTMP3D(grid%is:grid%ie,grid%js:grid%je,km) )
-#ifdef SCALAR_WINDS
-            call logger%info("Replaying increment of winds as scalars")
-            call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
-            call l2c%regrid(VTMP3D, cubeVTMP3D, _RC)
-#else
-            call logger%info("Replaying increment of winds")
-            call l2c%regrid(TEMP3d, VTMP3d, cubeTEMP3d, cubeVTMP3d, _RC)
-#endif /* SCALAR_WINDS */
-            allocate( UAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-            allocate( VAtmp(grid%is:grid%ie  ,grid%js:grid%je  ,km) )
-            UAtmp = cubetemp3d ! A-grid winds on cube
-            VAtmp = cubevtmp3d ! A-grid winds on cube
-            call Agrid_To_Native(UAtmp, VAtmp, du, dv) ! Calculate D-grid winds from rotated A-grid winds
-            deallocate(uatmp,vatmp)
-            deallocate(cubeTEMP3D)
-            deallocate(cubeVTMP3D)
-         endif
-
-         ! DELP
-         if( trim(psname)=='NULL' .and. trim(dpname).ne.'NULL' ) then
-            call MAPL_FieldBundleGetPointer(ana_bundle, trim(dpname), TEMP3D, _RC)
-            call logger%info("Replaying increment of "//trim(dpname))
-            allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-            call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
-            dpe(:,:,1) = 0.0
-            do k=2,km+1
-               dpe(:,:,k) = dpe(:,:,k-1) + cubeTEMP3D(:,:,k-1)
-            enddo
-            deallocate(cubeTEMP3D)
-
-            pkxy =            (vars%pe)** kappa
-            dpkxy = kappa*(pkxy/vars%pe)*dpe
-            do k=1,km
-               dpkz(:,:,k) = (  (    dpkxy (:,:,k+1) -   dpkxy(:,:,k) )* &
-                    log((vars%pe (:,:,k+1))/(vars%pe(:,:,k) )) &
-                    -  (     pkxy (:,:,k+1) -    pkxy(:,:,k) )* &
-                    (     dpe  (:,:,k+1) * vars%pe(:,:,k) &
-                    -     dpe  (:,:,k)   * vars%pe(:,:,k+1) ) &
-                    / (vars%pe(:,:,k+1)*vars%pe(:,:,k)) &
-                    )  / (kappa*( log(vars%pe(:,:,k+1)/vars%pe(:,:,k)) )**2)
-            enddo
-         endif
-
-         ! PS
-         if( trim(psname)/='NULL' .and. trim(dpname)=='NULL' ) then
-            call MAPL_FieldBundleGetPointer(ana_bundle, trim(psname), TEMP2D, _RC)
-            call logger%info("Replaying increment of %s", trim(psname))
-            allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
-            allocate(     aux3D(size( TEMP2D,1),size( TEMP2D,2),1))
-            aux3d(:,:,1) = TEMP2D ! same trick of putting in rank-3 array for transforms
-            call l2c%regrid(aux3d, cubeTEMP3D, _RC)
-            do k=2,km+1
-               dpe(:,:,k-1) =  grid%ak(k) - grid%ak(k-1) + cubeTEMP3d(:,:,1)*(grid%bk(k)-grid%bk(k-1))
-            enddo
-            deallocate(     aux3d)
-            deallocate(cubeTEMP3D)
-
-            pkxy =            (vars%pe)** kappa
-            dpkxy = kappa*(pkxy/vars%pe)*dpe
-            do k=1,km
-               dpkz(:,:,k) = (  (    dpkxy (:,:,k+1) -   dpkxy(:,:,k) )* &
-                    log((vars%pe (:,:,k+1))/(vars%pe(:,:,k) )) &
-                    -  (     pkxy (:,:,k+1) -    pkxy(:,:,k) )* &
-                    (     dpe  (:,:,k+1) * vars%pe(:,:,k) &
-                    -     dpe  (:,:,k)   * vars%pe(:,:,k+1) ) &
-                    / (vars%pe(:,:,k+1)*vars%pe(:,:,k)) &
-                    )  / (kappa*( log(vars%pe(:,:,k+1)/vars%pe(:,:,k)) )**2)
-            enddo
-         endif
-
-         ! pchakrab - TODO: orbit?
-         ! ! O3
-         ! if( trim(o3name).ne.'NULL' ) then
-         !    call MAPL_FieldBundleGetPointer(ana_bundle, trim(o3name), TEMP3D, _RC)
-         !    allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-         !    call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
-
-         !    ! Ozone needs to be adjusted to OX
-         !    call WRITE_PARALLEL('Replaying increment of '//trim(o3name))
-
-         !    call MAPL_Get(MAPL, lons=lons, lats=lats, ORBIT=ORBIT, _RC)
-
-         !    allocate( ZTH( size(lons,1),size(lons,2) ) )
-         !    allocate( SLR( size(lons,1),size(lons,2) ) )
-
-         !    call MAPL_SunGetInsolation(lons, lats, ORBIT, ZTH, SLR, clock=clock, _RC)
-
-         !    pl = ( vars%pe(:,:,2:) + vars%pe(:,:,:km) ) * 0.5
-
-         !    do L=1,km
-         !       where(PL(:,:,L) >= 100.0 .or. ZTH <= 0.0) &
-         !            dqox(:,:,L) = cubeTEMP3D(:,:,L)*(MAPL_AIRMW/MAPL_O3MW)*1.0E-6
-         !    enddo
-
-         !    deallocate( ZTH, SLR )
-         !    deallocate(cubeTEMP3D)
-         ! endif
-
-         ! QV
-         if( trim(qname).ne.'NULL' ) then
-            call MAPL_FieldBundleGetPointer(ana_bundle, trim(qname), TEMP3D, _RC)
-            allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-            call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
-            call logger%info("Replaying increment of "//trim(qname))
-            dqqv = cubeTEMP3D
-            deallocate(cubeTEMP3D)
-         endif
-
-         ! PT
-         if( trim(tname).ne.'NULL' ) then
-            _ASSERT(trim(tvar) .ne. "TV", "Cannot Replay TVAR " // trim(tvar))
-            ! if(trim(tvar).ne.'TV') then
-            !    call logger%info("Error: Cannot Replay TVAR "//trim(tvar))
-            !    STATUS=99
-            !    _VERIFY(STATUS)
-            ! endif
-            _ASSERT(trim(tname) .ne. "tv", "Cannot Replay TNAME " // trim(tname))
-            ! if(trim(tname).ne.'tv') then
-            !    call logger%info("Error: Cannot Replay TNAME "//trim(tname))
-            !    STATUS=99
-            !    _VERIFY(STATUS)
-            ! endif
-            call MAPL_FieldBundleGetPointer(ana_bundle, trim(tname), TEMP3D, _RC)
-            allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),km))
-            call l2c%regrid(TEMP3D, cubeTEMP3D, _RC)
-            call logger%info("Replaying increment of "//trim(tname))
-            ! have an incremental change to virtual temperature;
-            ! want an incremental change to dry potential temperature
-            ! calculate first incremental change to t-dry (save in dth for now)
-            if( qqq%is_r4 ) then
-               dth = (cubeTEMP3D - eps*vars%pt*vars%pkz*dqqv)/(1.0+eps*qqq%content_r4)
-            else
-               dth = (cubeTEMP3D - eps*vars%pt*vars%pkz*dqqv)/(1.0+eps*qqq%content   )
-            endif
-            ! finally calculate increment to dry theta
-            dth = (dth - vars%pt*dpkz)/vars%pkz
-            deallocate(cubeTEMP3D)
-         endif
-
-         ! Only at the end, apply incremental correction to pressure,
-         ! potential temperature and water vapor
-         vars%u   = vars%u   + sclinc * du(grid%is:grid%ie,grid%js:grid%je,1:km)
-         vars%v   = vars%v   + sclinc * dv(grid%is:grid%ie,grid%js:grid%je,1:km)
-         pkxy =     pkxy + sclinc * dpkxy
-         vars%pkz = vars%pkz + sclinc * dpkz
-         vars%pe  = vars%pe  + sclinc * dpe
-         vars%pt  = vars%pt  + sclinc * dth
-         if( qqq%is_r4 ) then  ! protection for negative qv is slightly inconsistent w/ update of temperature
-            qqq%content_r4 = max(0.0_r4,qqq%content_r4 + sclinc*dqqv)
-         else
-            qqq%content    = max(0.0_r8,qqq%content    + sclinc*dqqv)
-         endif
-         if( ooo%is_r4 ) then  ! brute-force protection against non-zero values
-            ooo%content_r4 = max(0.0_r4,ooo%content_r4 + sclinc*dqox)
-         else
-            ooo%content    = max(0.0_r8,ooo%content    + sclinc*dqox)
-         end if
-
-         ! clean up
-         deallocate( du,dv   )
-         deallocate( dth     )
-         deallocate( dqox    )
-         deallocate( dqqv    )
-         deallocate( dpe     )
-         deallocate( dpkz    )
-         deallocate( dpkxy   )
-
-         call logger%info("Incremental replay complete")
-      end subroutine incremental_
-
-      subroutine state_remap_
-
-         real(r4), pointer :: XTMP2d (:,:) =>NULL()
-         real(r4), pointer :: XTMP3d(:,:,:)=>NULL()
-         real(r4), pointer :: YTMP3d(:,:,:)=>NULL()
-         real(r8), allocatable :: ana_thv (:,:,:)
-         real(r8), allocatable :: ana_phis  (:,:)
-         real(r8), allocatable :: ana_qq    (:,:,:,:)
-         real(r8), allocatable :: ana_u     (:,:,:)
-         real(r8), allocatable :: ana_v     (:,:,:)
-         real(r4), allocatable :: aux3d     (:,:,:)
-         !
-         character(len=ESMF_MAXSTR) :: NAME
-         real(r4), pointer :: ptr3dr4   (:,:,:)
-         real(r8), pointer :: ptr3dr8   (:,:,:)
-         integer :: iwind,icnt,nq3d,rank
-         integer :: iib,iie,jjb,jje
-         logical :: do_remap,remap_all_tracers
-
-         do_remap = (cremap=="yes" .or. cremap=="YES")
-         if (.not. do_remap) return
-
-         remap_all_tracers = (tremap=="yes" .or. tremap=="YES")
-         nq3d=2 ! at a minimum it will remap QV and OX
-         if(do_remap.and.remap_all_tracers) then
-            nq3d=0
-            do N=1,NQ
-               call ESMF_FieldBundleGet(BUNDLE, N, Field, _RC)
-               call ESMF_FieldGet(Field, dimCount = rank, _RC)
-               if (rank==2) cycle
-               if (rank==3) nq3d=nq3d+1
-            enddo
-            write(STRING,'(A,I5,A)') "Found  ", nq3d, " 3d-tracers to remap"
-            call logger%info(trim(STRING))
-         endif
-         _ASSERT(nq3d>=2, "state_remap: invalid number of tracers")
-
-         iib = lbound(vars%pe,1)
-         iie = ubound(vars%pe,1)
-         jjb = lbound(vars%pe,2)
-         jje = ubound(vars%pe,2)
-
-         allocate( ana_thv(iib:iie,jjb:jje,km  ) )
-         allocate( ana_qq (iib:iie,jjb:jje,km  ,nq3d) )
-         allocate(ana_phis(size(vars%pe,1),size(vars%pe,2)))
-
-         if( qqq%is_r4 ) then
-            ana_thv = vars%pt*(1.0+eps*qqq%content_r4(:,:,:))
-         else
-            ana_thv = vars%pt*(1.0+eps*qqq%content   (:,:,:))
-         endif
-
-         call logger%info("Replay start remapping")
-         !
-         call MAPL_FieldBundleGetPointer(ana_bundle, 'phis', XTMP2D, _RC)
-         allocate(cubeTEMP3D(size(vars%pe,1),size(vars%pe,2),1))
-         allocate(     aux3D(size(XTMP2D ,1),size(XTMP2D ,2),1))
-         aux3d(:,:,1)=XTMP2D ! this is a trick since the 2d interface to the transform has not worked for me (RT)
-         call l2c%regrid(aux3D, cubeTEMP3D, _RC)
-         ana_phis=cubeTEMP3D(:,:,1)
-         deallocate(     aux3D)
-         deallocate(cubeTEMP3D)
-         !
-         if (remap_all_tracers) then
-            icnt=0
-            do N=1,NQ
-               call ESMF_FieldBundleGet(BUNDLE, N, Field, _RC)
-               call ESMF_FieldGet(Field, NAME=NAME, dimCount=rank, _RC)
-               if (rank==2) cycle
-               if (rank==3) then
-                  icnt=icnt+1
-                  _ASSERT(icnt<=nq3d, "state_remap: number of tracers exceeds known value")
-                  call MAPL_FieldBundleGetPointer(BUNDLE, NAME, ptr3dr4, _RC)
-                  ana_qq(:,:,:,icnt) = ptr3dr4
-               endif
-            enddo
-            _ASSERT(icnt==nq3d, "state_remap: inconsitent number of tracers")
-         else
-            if( qqq%is_r4 ) then
-               ana_qq(:,:,:,1) = qqq%content_r4(:,:,:)
-            else
-               ana_qq(:,:,:,1) = qqq%content   (:,:,:)
-            endif
-            if( ooo%is_r4 ) then
-               ana_qq(:,:,:,2) = ooo%content_r4(:,:,:)
-            else
-               ana_qq(:,:,:,2) = ooo%content   (:,:,:)
-            endif
-         endif ! remap_all_tracers
-
-         call dyn_topo_remap ( vars%pe, vars%u, vars%v, ana_thv, ana_qq, ana_phis, phisxy, &
-              grid%ak, grid%bk, size(ana_thv,1), size(ana_thv,2), km, nq3d )
-
-         if (remap_all_tracers) then
-            icnt=0
-            do N=1,NQ
-               call ESMF_FieldBundleGet(BUNDLE, N, Field, _RC)
-               call ESMF_FieldGet(Field, NAME=NAME, dimCount=rank, _RC)
-               if (rank==2) cycle
-               if (rank==3) then
-                  icnt=icnt+1
-                  call MAPL_FieldBundleGetPointer(BUNDLE, NAME, ptr3dr4, _RC)
-                  ptr3dr4 = ana_qq(:,:,:,icnt)
-                  if(trim(NAME)=="Q") then
-                     if( qqq%is_r4 ) then
-                        qqq%content_r4(:,:,:) = ana_qq(:,:,:,icnt)
-                     else
-                        qqq%content   (:,:,:) = ana_qq(:,:,:,icnt)
-                     endif
-                  endif
-                  if(trim(NAME)=="OX") then
-                     if( ooo%is_r4 ) then
-                        ooo%content_r4(:,:,:) = ana_qq(:,:,:,icnt)
-                     else
-                        ooo%content   (:,:,:) = ana_qq(:,:,:,icnt)
-                     endif
-                  endif
-               endif
-            enddo
-         else
-            if( qqq%is_r4 ) then
-               qqq%content_r4(:,:,:) = ana_qq(:,:,:,1)
-            else
-               qqq%content   (:,:,:) = ana_qq(:,:,:,1)
-            endif
-            if( ooo%is_r4 ) then
-               ooo%content_r4(:,:,:) = ana_qq(:,:,:,2)
-            else
-               ooo%content   (:,:,:) = ana_qq(:,:,:,2)
-            endif
-         endif ! remap_all_tracers
-
-         if( qqq%is_r4 ) then
-            vars%pt=ana_thv(:,:,:)/(1.0+eps*qqq%content_r4(:,:,:))
-         else
-            vars%pt=ana_thv(:,:,:)/(1.0+eps*qqq%content   (:,:,:))
-         endif
-
-         pkxy = vars%pe**kappa
-         do k=1,km
-            vars%pkz(:,:,k) = ( pkxy(:,:,k+1)-pkxy(:,:,k) ) &
-                 / ( kappa*( log(vars%pe(:,:,k+1))-log(vars%pe(:,:,k)) ) )
-         enddo
-
-         call logger%info("Replay done remapping")
-
-         deallocate(ana_qq)
-         deallocate(ana_thv)
-         deallocate(ana_phis)
-      end subroutine state_remap_
 
    end subroutine Run
 
