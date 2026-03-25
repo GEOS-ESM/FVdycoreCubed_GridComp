@@ -22,18 +22,10 @@ module FVdycoreCubed_GridComp
    use MAPL_Constants, only: MAPL_VectorField ! pchakrab: TODO - need MAPL3 equivalent
    use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
-   ! pchakrab - TODO: need MAPL3 equivalent
-   ! use MAPL_SunMod, only: MAPL_SunOrbit, MAPL_SunGetInsolation
-   use MAPL_GridManagerMod, only: grid_manager
-   use MAPL_RegridderManagerMod, only: regridder_manager
-   use MAPL_RegridMethods, only: REGRID_METHOD_BILINEAR
-   use MAPL_CFIOMod, only: MAPL_CFIORead
-   use MAPL_FieldPointerUtilities, only: MAPL_FieldDestroy
-   use mapl3g_Utilities, only: MAPL_MaxMin, MAPL_AreaMean
-   use mapl3g_Utilities_Comms_API, only: MAPL_Am_I_Root, MAPL_ArrayGather
-
    use FileIOSharedMod, only: WRITE_PARALLEL
 
+   use mapl3g_Utilities, only: MAPL_MaxMin, MAPL_AreaMean
+   use mapl3g_Utilities_Comms_API, only: MAPL_Am_I_Root, MAPL_ArrayGather
    use mapl3g_generic, only: MAPL_GridCompSetGeometry
    use mapl3g_generic, only: MAPL_GridCompGet, MAPL_GridCompGetResource
    use mapl3g_generic, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
@@ -44,7 +36,6 @@ module FVdycoreCubed_GridComp
    use mapl3g_Geom_API, only: MAPL_GridGetCoordinates
    use mapl3g_State_API, only: MAPL_StateGetPointer
    use mapl3g_Field_API, only: MAPL_FieldCreate
-   use mapl3g_FieldBundle_API, only: MAPL_FieldBundleGetPointer
    use mapl3g_FieldBundle_API, only: MAPL_FieldBundleAdd
    use mapl3g_RestartModes, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
 
@@ -277,10 +268,8 @@ module FVdycoreCubed_GridComp
    integer,  parameter :: TIME_TO_RUN  = 1
    integer,  parameter :: CHECK_MAXMIN = 2
 
-   integer :: I, J, K  !  Default declaration for loops.
-
    ! Tracer I/O History stuff
-   integer, parameter :: ntracers=11
+   integer, parameter :: ntracers = 11
    integer, parameter :: plevs(5) = [850, 700, 600, 500, 300]
 
    interface addTracer
@@ -330,11 +319,11 @@ contains
 
    !INTERFACE:
 
-   Subroutine SetServices(gc, rc)
+   subroutine SetServices(gc, rc)
 
       !ARGUMENTS:
-      type(ESMF_GridComp), intent(inout) :: gc     ! gridded component
-      integer, intent(out), optional :: rc     ! return code
+      type(ESMF_GridComp), intent(inout) :: gc
+      integer, intent(out), optional :: rc
 
       !DESCRIPTION: Set services (register) for the FVCAM Dynamical Core GridComp
       !EOP
@@ -369,7 +358,7 @@ contains
             write(myTracer, "('Q',i5.5,'_',i3.3)") itracer-1, plevs(ilev)
             call MAPL_AddExportSpec(gc, &
                  short_name=TRIM(myTracer), &
-                 long_name =TRIM(myTracer), &
+                 long_name=TRIM(myTracer), &
                  units='1', &
                  dims=MAPL_DimsHorzOnly, &
                  vlocation=MAPL_VLocationNone, _RC)
@@ -405,11 +394,11 @@ contains
       ! At this point check if FV is standalone and init the grid
       call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
       if (FV3_STANDALONE) then
-         ! call MAPL_GridCreate(gc, _RC)
          call MAPL_GridCompAddSpec(gc, &
               state_intent=ESMF_STATEINTENT_EXPORT, &
               short_name='TRADVEX', &
               standard_name='advected_quantities', &
+              ! pchakrab - TODO: we shouldn't need dims and vstagger for a bundle
               dims="xyz", &
               vstagger=VERTICAL_STAGGER_NONE, &
               units='unknown', &
@@ -729,7 +718,6 @@ contains
 
       character(len=ESMF_MAXSTR), allocatable :: names(:), names0(:)
 
-      ! type(MAPL_SunOrbit) :: ORBIT
       real(r4), allocatable :: lats(:,:), lons(:,:)
       ! real(r4), allocatable :: ZTH(:,:), SLR(:,:) - used in some commented code
 
@@ -2963,7 +2951,7 @@ contains
                maxmin = MAPL_MaxMin(qv, comm, _RC)
                call logger%info("max/min(Q_AF_INC): %f/%f", maxmin(1), maxmin(2))
                maxmin = MAPL_MaxMin(tempxy, comm, _RC)
-               call logger%info("max/min(T_AF_INC): %f/%f", tmax, tmin)
+               call logger%info("max/min(T_AF_INC): %f/%f", maxmin(1), maxmin(2))
                maxmin = MAPL_MaxMin(ua, comm, _RC)
                call logger%info("max/min(U_AF_INC): %f/%f", maxmin(1), maxmin(2))
                maxmin = MAPL_MaxMin(va, comm, _RC)
@@ -3372,7 +3360,7 @@ contains
 
       logical               :: is_weighted_
 
-      integer :: II, JJ, I, J, L
+      integer :: II, JJ, I, J, k, L
       integer :: is, ie, js, je, km
       integer :: isd, ied, jsd, jed
       real(r4), pointer :: tend(:,:,:)
@@ -3926,8 +3914,8 @@ contains
       integer, optional, intent(out) :: rc
 
       real, dimension(size(v2,1),size(v2,2)) :: al,PT,PB
-      integer km
-      logical edge
+      integer :: k, km
+      logical :: edge
 
       km   = size(ple,3)-1
       edge = size(v3,3)==km+1
