@@ -1722,10 +1722,10 @@ contains
       if (associated(temp2d)) temp2d = 0 !WMP need to get from MAPL gid
 
       !#define DEBUG_WINDS
-      ! #if defined(DEBUG_WINDS)
+#if defined(DEBUG_WINDS)
       call Write_Profile(grid, vars%u, "U-after-DynRun")
       call Write_Profile(grid, vars%v, "V-after-DynRun")
-      ! #endif
+#endif
       plk = exp(KAPPA * log(0.5 * (vars%pe(:, :, 1:km) + vars%pe(:, :, 2:km + 1))))
       pkxy = exp(KAPPA * log(vars%pe))
 
@@ -2911,9 +2911,9 @@ contains
          ! Compute Energetics After Diabatic Forcing
          thv = vars%pt * (1.0 + EPS * qv)
 
-         ! #if defined(DEBUG_VPT)
+#if defined(DEBUG_VPT)
          call Write_Profile(grid, thv, 'VPT')
-         ! #endif
+#endif
 
          if (do_energetics) then
             call Energetics(ur, vr, thv, vars%pe, dp, vars%pkz, phisxy, kenrg, penrg, tenrg)
@@ -2942,9 +2942,9 @@ contains
 
          tempxy = vars%pt * vars%pkz ! Dry Temperature
 
-         ! #if defined(DEBUG_T)
+#if defined(DEBUG_T)
          call Write_Profile(grid, tempxy, 'T')
-         ! #endif
+#endif
 
          if (DEBUG_DYN) then
             block
@@ -3292,9 +3292,9 @@ contains
             end do
 
             !#define DEBUG_SLP
-            ! #if defined(DEBUG_SLP)
+#if defined(DEBUG_SLP)
             call Write_Profile(grid, slp / 100.0, 'SLP')
-            ! #endif
+#endif
 
             if (associated(temp2d)) temp2d = slp
             if (associated(ztemp1)) where (ztemp1 == MAPL_UNDEFINED_REAL) ztemp1 = H1000
