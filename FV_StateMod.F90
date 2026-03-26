@@ -1261,7 +1261,7 @@ contains
                if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
                   if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3 ! Tell FV3 about QV, QLIQ, QICE
                endif
-               if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL, QCLD
+               if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL plus QCLD
             endif
             state%VARS%nwat = FV_Atm(1)%flagstruct%nwat
          endif ! not adiabatic
@@ -1705,14 +1705,12 @@ contains
       if (fv_first_run) then
          ! Make_NH
          if ( .not. FV_Atm(1)%flagstruct%hydrostatic ) then
-            if (all(FV_Atm(1)%w(isc:iec,jsc:jec,:) == 0.0)) FV_Atm(1)%flagstruct%Make_NH = .true.
             if ( FV_Atm(1)%flagstruct%Make_NH ) then
-               if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,ceiling(900/myDT))
+               if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,ceiling(900/myDT)) ! Default to 15 min if not set, but ensure at least 1 step
                if (mpp_pe()==0) print*, 'fv_first_run: FV3 is making Non-Hydrostatic W and DZ'
-               if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
                FV_Atm(1)%w = 0.0
                call p_var( &
-                    FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min, &
+                    FV_Atm(1)%npz, isc, iec, jsc, jec, FV_Atm(1)%ptop, ptop_min, &
                     FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln, &
                     FV_Atm(1)%pk,   FV_Atm(1)%pkz, kappa, FV_Atm(1)%q, FV_Atm(1)%ng, &
                     FV_Atm(1)%ncnst, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%flagstruct%dry_mass,  &
@@ -1731,8 +1729,7 @@ contains
          call MAPL_GridCompTimerStart(gc, "mass_fix", _RC)
 
 
-         if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. &
-              ((.not. FV_Atm(1)%flagstruct%hydrostatic) .OR. FV_Atm(1)%flagstruct%nwat>=6)  ) then
+         if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. FV_Atm(1)%flagstruct%nwat > 1 ) then
             call p_var( &
                  FV_Atm(1)%npz, isc, iec, jsc, jec, FV_Atm(1)%ptop, ptop_min, &
                  FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%peln, &
@@ -1853,6 +1850,7 @@ contains
 
       call MAPL_GridCompTimerStart(gc, "NH_ADIABATIC_INIT", _RC)
       if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
+         if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
          allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
          call nullify_domain ( )
          DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
