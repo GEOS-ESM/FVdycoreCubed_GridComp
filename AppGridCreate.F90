@@ -5,7 +5,7 @@ subroutine AppCSEdgeCreateF(IM_WORLD, LonEdge,LatEdge, LonCenter, LatCenter, rc)
 
    use ESMF
    use MAPL
-   use MAPL_ConstantsMod, only : pi=> MAPL_PI_R8
+   use MAPL_Constants,    only : pi=> MAPL_PI_R8
    use fv_arrays_mod,     only: REAL4, REAL8, R_GRID
    use fv_grid_utils_mod, only: gnomonic_grids, cell_center2, direct_transform
    use fv_grid_tools_mod, only: mirror_grid
@@ -190,7 +190,7 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
 
    AppGridStandAlone = .false.
    call ESMF_VMGetCurrent(vm, rc=STATUS)
-   VERIFY_(STATUS)            
+   VERIFY_(STATUS)
 
    ! Check FV3 grid_type
    ! -------------------
@@ -278,7 +278,7 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
    endif
    VERIFY_(STATUS)
 
-   if (.not.allocated(FV_Atm)) then 
+   if (.not.allocated(FV_Atm)) then
 
       AppGridStandAlone = .true.
       if(MAPL_ShmInitialized) then
@@ -382,7 +382,7 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
             gridCornerLons(idx) = grid_global(i, j, 1, myTile+1)
             gridCornerLats(idx) = grid_global(i, j, 2, myTile+1)
          else
-            gridCornerLons(idx) = FV_Atm(1)%gridstruct%grid(i,j,1) 
+            gridCornerLons(idx) = FV_Atm(1)%gridstruct%grid(i,j,1)
             gridCornerLats(idx) = FV_Atm(1)%gridstruct%grid(i,j,2)
          end if
       end do

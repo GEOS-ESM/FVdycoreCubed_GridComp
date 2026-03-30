@@ -3,7 +3,7 @@ subroutine latlon2cube(npx, npy, nlon, nlat, data_ll, data_cs)
  use ESMF
  use MAPL, only : MAPL_UNDEF
  use MAPL_IOMod, only : GETFILEUNIT, FREE_FILE
- use MAPL_ConstantsMod, only : pi=> MAPL_PI_R8
+ use MAPL_Constants, only : pi=> MAPL_PI_R8
  use fv_grid_utils_mod, only : gnomonic_grids, cell_center2
  use fv_grid_tools_mod, only : mirror_grid
  use fv_arrays_mod,     only : REAL4, REAL8, R_GRID
@@ -135,7 +135,7 @@ subroutine latlon2cube(npx, npy, nlon, nlat, data_ll, data_cs)
 
   !--------------------------------------------------------------------!
   ! calculate weights for cubed sphere to latlon grid  interpolation   !
-  !--------------------------------------------------------------------! 
+  !--------------------------------------------------------------------!
   call remap_coef( npx, npy, nlon, nlat, agrid, xlon, ylat, id1, id2, jdc, l2c )
 
   deallocate ( agrid )
