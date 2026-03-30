@@ -4,7 +4,7 @@ program main
 
   use iso_c_binding, only: c_ptr, c_null_ptr
 
-  use MAPL_ConstantsMod, only: MAPL_KAPPA, MAPL_CP, MAPL_RVAP, MAPL_RGAS
+  use MAPL_Constants, only: MAPL_KAPPA, MAPL_CP, MAPL_RVAP, MAPL_RGAS
 
   use fms_mod, only: fms_init, fms_end
   use fv_control_mod, only: fv_init1, fv_init2, fv_end
@@ -63,7 +63,7 @@ program main
   call set_resolution_dependent_geos_defaults(fix_mass, scalars%dt, FV_Atm)
   call fv_init2(FV_Atm, scalars%dt, grids_on_this_pe, p_split)
   ASSERT_(FV_Atm(1)%flagstruct%hydrostatic .eqv. .false.)
-  
+
   ! Read input data - arrays
   write(input_file, '(a22, i0.2, a4)') 'input-data/array_data.', irank, '.bin'
   arr = InputArrays_T(input_file, bd, dim, scalars%nq_tot)
@@ -115,7 +115,7 @@ program main
     call cpu_time(finish)
     print *, irank, ', fv_dynamics: time taken = ', finish - start, 's'
  end do
- 
+
  if (irank == 0) print*, 'irank, sum(u), sum(v), sum(w), sum(delz)'
  call MPI_Barrier(MPI_COMM_WORLD, mpierr)
  print *, irank, sum(arr%u), sum (arr%v), sum(arr%w), sum(arr%delz)
