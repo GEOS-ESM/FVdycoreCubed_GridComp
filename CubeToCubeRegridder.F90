@@ -5,7 +5,7 @@
 #define _RETURN(A)   if(present(rc)) rc=A; return
 
 module CubeToCubeRegridderMod
-   use MAPL
+   use MAPL2
    use CubeLatLonTransformMod
    use, intrinsic :: iso_fortran_env, only: REAL32
    use, intrinsic :: iso_fortran_env, only: REAL64
@@ -45,7 +45,7 @@ contains
 
 
    subroutine initialize_subclass(this, unusable, rc)
-      use MAPL
+      use MAPL2
       use ESMF
       class (CubeToCubeRegridder), intent(inout) :: this
       class (KeywordEnforcer), optional, intent(in) :: unusable
@@ -111,7 +111,7 @@ contains
 
 
    subroutine regrid_scalar_3d_real32(this, q_in, q_out, rc)
-      use MAPL
+      use MAPL2
 
       class (CubeToCubeRegridder), intent(in) :: this
       real (kind=REAL32), intent(in) :: q_in(:,:,:)

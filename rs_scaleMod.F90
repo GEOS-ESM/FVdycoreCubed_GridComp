@@ -2,7 +2,7 @@
 module rs_scaleMod
 
    use fv_arrays_mod
-   use MAPL
+   use MAPL2
    use gFTL2_StringIntegerMap
    use ESMF
    use, intrinsic :: iso_fortran_env, only: REAL64, REAL32 

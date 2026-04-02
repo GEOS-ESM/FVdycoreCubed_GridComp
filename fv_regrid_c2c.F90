@@ -11,7 +11,7 @@ module fv_regrid_c2c
    use tracer_manager_mod, only: get_tracer_names, get_number_tracers, get_tracer_index
    use field_manager_mod,  only: MODEL_ATMOS
 
-   use MAPL
+   use MAPL2
    use gFTL2_StringVector
    use gFTL2_StringIntegerMap
    use, intrinsic :: iso_fortran_env, only: REAL64, REAL32
