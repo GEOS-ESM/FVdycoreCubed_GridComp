@@ -4,7 +4,7 @@ subroutine AppCSEdgeCreateF(IM_WORLD, LonEdge,LatEdge, LonCenter, LatCenter, rc)
 #include "MAPL_Generic.h"
 
    use ESMF
-   use MAPL
+   use MAPL2
    use MAPL_Constants,    only : pi=> MAPL_PI_R8
    use fv_arrays_mod,     only: REAL4, REAL8, R_GRID
    use fv_grid_utils_mod, only: gnomonic_grids, cell_center2, direct_transform
@@ -126,7 +126,7 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
 #define DEALLOCGLOB_(A) if(associated(A))then;A=0;if(MAPL_ShmInitialized)then; call MAPL_DeAllocNodeArray(A,rc=STATUS);else; deallocate(A,stat=STATUS);endif;VERIFY_(STATUS);NULLIFY(A);endif
 
    use ESMF
-   use MAPL, pi=> MAPL_PI_R8
+   use MAPL2, pi=> MAPL_PI_R8
 
    use fv_arrays_mod,     only: REAL4, REAL8, R_GRID
    use fv_grid_utils_mod, only: gnomonic_grids, cell_center2, direct_transform
@@ -436,7 +436,7 @@ subroutine AppGridCreate (META, esmfgrid, RC)
 #include "MAPL_Generic.h"
 
    use ESMF
-   use MAPL
+   use MAPL2
    use fv_arrays_mod,     only: REAL4, REAL8, R_GRID
    implicit none
 
