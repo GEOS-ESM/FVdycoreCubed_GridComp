@@ -1,7 +1,6 @@
 subroutine latlon2cube(npx, npy, nlon, nlat, data_ll, data_cs)
 
  use ESMF
- use MAPL, only : MAPL_UNDEF
  use MAPL_IOMod, only : GETFILEUNIT, FREE_FILE
  use MAPL_Constants, only : pi=> MAPL_PI_R8
  use fv_grid_utils_mod, only : gnomonic_grids, cell_center2

@@ -3,7 +3,7 @@ subroutine cube2latlon(npx, npy, nlon, nlat, data_cs, data_ll)
 #define REAL8 8
 
  use ESMF
- use MAPL, only : MAPL_UNDEF
+ use MAPL_Constants, only : MAPL_UNDEFINED_REAL64
  use MAPL_IOMod, only : GETFILEUNIT, FREE_FILE
  use CUB2LATLON_mod,    only : init_latlon_grid, &
                            read_c2l_weight,  write_c2l_weight,         &
@@ -81,7 +81,7 @@ subroutine cube2latlon(npx, npy, nlon, nlat, data_cs, data_ll)
  real(REAL8), pointer                          :: c2l_weight(:,:,:)               
  integer    , pointer                          :: c2l_index(:,:,:)
 
- real(REAL8) :: varmisval=MAPL_UNDEF
+ real(REAL8) :: varmisval=MAPL_UNDEFINED_REAL64
  real(ESMF_KIND_R4), allocatable :: var_cubsph(:,:)
 
  integer :: grid_type = 0
