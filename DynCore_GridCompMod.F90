@@ -460,7 +460,7 @@ contains
       call MAPL_GridCompGetInternalState(gc, internal, _RC)
 
       call MAPL_GridCompTimerStart(gc, "DYN_INIT", _RC)
-      call DynInit(self, clock, import, gc, _RC)
+      call DynInit(self, clock, internal, import, gc, _RC)
       call MAPL_GridCompTimerStop(gc, "DYN_INIT", _RC)
 
       ! Create PREF EXPORT Coupling (Needs to be done only once per run)
