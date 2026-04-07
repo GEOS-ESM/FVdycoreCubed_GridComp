@@ -13,7 +13,7 @@
 program gmao_regrid
 
   use ESMF
-  use MAPL
+  use MAPL2
   implicit none
 
   integer, parameter :: GridType_Unknown = 0
@@ -304,7 +304,7 @@ program gmao_regrid
 
     subroutine GuessFileType(filename, filetype, rc)
       use ESMF
-      use MAPL
+      use MAPL2
 
       implicit none
 
@@ -378,7 +378,7 @@ program gmao_regrid
     !subroutine GetGridInfo(gi, filetype, ncinfo, rc)
     subroutine GetGridInfo(gi, filetype, rc)
       use ESMF
-      use MAPL
+      use MAPL2
 
       implicit none
 

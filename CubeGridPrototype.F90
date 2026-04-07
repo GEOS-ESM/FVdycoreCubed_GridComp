@@ -6,8 +6,8 @@ module CubeGridPrototype
 contains
 
   subroutine register_grid_and_regridders()
-    use MAPL, only: regridder_manager
-    use MAPL, only: REGRID_METHOD_BILINEAR
+    use MAPL2, only: regridder_manager
+    use MAPL2, only: REGRID_METHOD_BILINEAR
     use LatLonToCubeRegridderMod
     use CubeToLatLonRegridderMod
     use CubeToCubeRegridderMod

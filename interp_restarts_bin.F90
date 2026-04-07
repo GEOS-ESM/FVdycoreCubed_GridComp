@@ -21,7 +21,7 @@ program interp_restarts
 ! use fv_eta_mod,     only: set_eta
    use m_set_eta,     only: set_eta
    use memutils_mod, only: print_memuse_stats
-   use MAPL
+   use MAPL2
    use pflogger, only: pfl_initialize => initialize
    use gFTL2_StringIntegerMap
    use rs_scaleMod

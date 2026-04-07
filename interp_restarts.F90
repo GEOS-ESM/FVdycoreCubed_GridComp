@@ -7,7 +7,7 @@ program interp_restarts
 !          to the cubed-sphere grid with optional vertical levels    !
 !--------------------------------------------------------------------!
    use ESMF
-   use MAPL
+   use MAPL2
    use mpp_mod,        only: mpp_error, FATAL, NOTE, mpp_root_pe, mpp_broadcast
    use fms_mod,        only: print_memory_usage, fms_init, fms_end, file_exist
    use fv_control_mod, only: fv_init1, fv_init2, fv_end

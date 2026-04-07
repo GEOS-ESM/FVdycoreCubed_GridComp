@@ -20,7 +20,7 @@
 Module CubeLatLonTransformMod
   
   use ESMF
-  use MAPL
+  use MAPL2
   use, intrinsic :: iso_fortran_env, only: REAL64, REAL32
 
   implicit none
