@@ -18,9 +18,9 @@ module FV_StateMod
    use mapl3g_utilities, only: MAPL_MemInfoWrite
 #endif
 
-   use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
-   use MAPL_ConstantsMod, only: MAPL_KAPPA, MAPL_PI_R8, MAPL_ALHL, MAPL_PSDRY, MAPL_OMEGA
-   use MAPL_ConstantsMod, only: MAPL_UNDEFINED_REAL
+   use MAPL_Constants, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
+   use MAPL_Constants, only: MAPL_KAPPA, MAPL_PI_R8, MAPL_ALHL, MAPL_PSDRY, MAPL_OMEGA
+   use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
    use fv_mp_mod,         only: start_group_halo_update, complete_group_halo_update
    use fv_mp_mod,         only: group_halo_update_type
