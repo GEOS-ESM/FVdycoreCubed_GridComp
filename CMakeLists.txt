@@ -201,6 +201,11 @@ if (FV_PRECISION STREQUAL R4R8)
   endforeach()
 endif ()
 
+# Install the resource files
+set (resource_files
+  fv3sa.yaml
+)
+install(FILES ${resource_files} DESTINATION etc)
 
 if (BUILD_GEOS_GTFV3_INTERFACE)
   ecbuild_add_executable (
