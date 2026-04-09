@@ -525,7 +525,7 @@ contains
       integer, parameter                  :: XLIST_MAX = 60
 
       ! Put this in your declaration section
-      REAL(FVPRC), PARAMETER :: TRACER_EPS = epsilon(1.0_FVPRC)  ! Adjust threshold as needed
+      REAL(FVPRC), PARAMETER :: TRACER_EPS = tiny(1.0_FVPRC)  ! Adjust threshold as needed
 
       real(FVPRC), allocatable           :: DEBUG_ARRAY(:,:,:)
       real(FVPRC) :: fac1    = 1.0
@@ -795,7 +795,7 @@ contains
          !-------------------------------------------------------------------------
          do N=1,NQ
 
-            ! Threshold the tracers to 0.0_FVPRC if they are strictly less than the epsilon
+            ! Threshold the tracers to 0.0_FVPRC if they are strictly less than the tiny
             where (TRACERS(:,:,:,N) < TRACER_EPS)
                TRACERS(:,:,:,N) = 0.0_FVPRC
             end where
