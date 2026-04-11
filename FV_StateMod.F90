@@ -651,13 +651,13 @@ contains
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
               FV_Atm(1)%flagstruct%rf_cutoff = 40.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 0.25
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 8640) then
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.5 )
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375 )
               FV_Atm(1)%flagstruct%rf_cutoff = 45.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 0.125
               FV_Atm(1)%flagstruct%RF_fast = .true.
