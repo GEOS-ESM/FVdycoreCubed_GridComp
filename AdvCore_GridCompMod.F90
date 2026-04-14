@@ -524,6 +524,9 @@ contains
       character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
       integer, parameter                  :: XLIST_MAX = 60
 
+      ! Put this in your declaration section
+      REAL(FVPRC), PARAMETER :: TRACER_EPS = tiny(1.0_FVPRC)  ! Adjust threshold as needed
+
       real(FVPRC), allocatable           :: DEBUG_ARRAY(:,:,:)
       real(FVPRC) :: fac1    = 1.0
 
@@ -781,7 +784,7 @@ contains
               if (is_master()) write(6,125) trim(advTracers(N)%tName), (TMASS1(N)-TMASS0(N))/TMASS0(N)
             !!TRACERS(:,:,:,N) = TRACERS(:,:,:,N) * TMASS0(N)/TMASS1(N)
             end if
-            125 format('Mass Conservation Adjustment in AdvCore:'2x,A,2x,g21.14)
+            125 format('Mass Conservation Adjustment Required in AdvCore:'2x,A,2x,g21.14)
             end if
          end do
          deallocate( TMASS0 )
@@ -791,6 +794,12 @@ contains
          ! Go through the bundle copying tracers back to the bundle.
          !-------------------------------------------------------------------------
          do N=1,NQ
+
+            ! Threshold the tracers to 0.0_FVPRC if they are strictly less than the tiny
+            where (TRACERS(:,:,:,N) < TRACER_EPS)
+               TRACERS(:,:,:,N) = 0.0_FVPRC
+            end where
+
             if (advTracers(N)%is_r4) then
                advTracers(N)%content_r4 = TRACERS(:,:,:,N)
             else
