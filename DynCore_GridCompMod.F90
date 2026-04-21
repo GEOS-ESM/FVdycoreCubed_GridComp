@@ -74,7 +74,7 @@ module FVdycoreCubed_GridComp
         DYN_DEBUG => DEBUG, &
         HYDROSTATIC => FV_HYDROSTATIC, &
         fv_getUpdraftHelicity, DEBUG_DYN, DEBUG_ADV, &
-         ADIABATIC, SW_DYNAMICS, AdvCore_Advection
+        ADIABATIC, SW_DYNAMICS, AdvCore_Advection
    use m_topo_remap, only: dyn_topo_remap
 
    !PUBLIC MEMBER FUNCTIONS:
