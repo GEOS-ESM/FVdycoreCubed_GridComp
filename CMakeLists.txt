@@ -10,14 +10,8 @@ set (srcs
   Cube2LatLon.F90 LatLon2Cube.F90 AppGridCreate.F90 FV_StateMod.F90
   AdvCore_GridCompMod.F90
   DynCore_GridCompMod.F90 CreateInterpWeights_GridCompMod.F90
-  CubeToLatLonRegridder.F90
-  LatLonToCubeRegridder.F90
-  CubeToCubeRegridder.F90
   CubeToLatLon.F90
-  CubeGridPrototype.F90
   GEOS_FV3_Utilities.F90
-  fv_regrid_c2c.F90
-  fv_regrid_c2c_bin.F90
   fv_regridding_utils.F90
   rs_scaleMod.F90
   )
@@ -164,30 +158,12 @@ ecbuild_add_executable (
   SOURCES rs_scale.F90
   LIBS ${this} OpenMP::OpenMP_Fortran)
 
-ecbuild_add_executable (
-   TARGET c2c.x
-   SOURCES c2c.F90
-   LIBS ${this} OpenMP::OpenMP_Fortran)
-
-ecbuild_add_executable (
-   TARGET interp_restarts.x
-   SOURCES interp_restarts.F90
-   LIBS ${this} OpenMP::OpenMP_Fortran)
-
-ecbuild_add_executable (
-   TARGET interp_restarts_bin.x
-   SOURCES interp_restarts_bin.F90
-   LIBS ${this} OpenMP::OpenMP_Fortran)
-
 # If we are doing R4R8 we also need add_dependencies for both fms_r4 and fms_r8
 # for all our executables that link to ${this} because of the way we set up the
 # main library above.
 if (FV_PRECISION STREQUAL R4R8)
   foreach(executable
-    rs_scale.x
-    c2c.x
-    interp_restarts.x
-    interp_restarts_bin.x)
+    rs_scale.x)
 
     # fvdycore needs r4 .mod interfaces
     get_target_property(inc_r4 FMS::fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
