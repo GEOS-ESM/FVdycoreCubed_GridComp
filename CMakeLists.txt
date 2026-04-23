@@ -13,6 +13,7 @@ set (srcs
   CubeToLatLon.F90
   GEOS_FV3_Utilities.F90
   fv_regridding_utils.F90
+  fv_regrid_c2c.F90
   rs_scaleMod.F90
   )
 if (BUILD_GEOS_GTFV3_INTERFACE)
@@ -158,12 +159,18 @@ ecbuild_add_executable (
   SOURCES rs_scale.F90
   LIBS ${this} OpenMP::OpenMP_Fortran)
 
+ecbuild_add_executable (
+  TARGET interp_restarts.x
+  SOURCES interp_restarts.F90
+  LIBS ${this} OpenMP::OpenMP_Fortran)
+
 # If we are doing R4R8 we also need add_dependencies for both fms_r4 and fms_r8
 # for all our executables that link to ${this} because of the way we set up the
 # main library above.
 if (FV_PRECISION STREQUAL R4R8)
   foreach(executable
-    rs_scale.x)
+    rs_scale.x
+    interp_restarts.x)
 
     # fvdycore needs r4 .mod interfaces
     get_target_property(inc_r4 FMS::fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
