@@ -693,7 +693,7 @@ contains
       FV_Atm(1)%flagstruct%beta = 0.0
       FV_Atm(1)%flagstruct%a_imp = 1.0
      ! dz_min is a NH delta-z limiter increasing may improve stability
-      FV_Atm(1)%flagstruct%dz_min = 2.0
+      FV_Atm(1)%flagstruct%dz_min = 3.0
      ! p_fac is a NH pressure fraction limiter near model top (0:0.25)
       FV_Atm(1)%flagstruct%p_fac = 0.05
      ! General defaults
@@ -1102,7 +1102,7 @@ contains
                                  FV_Atm(1)%flagstruct%moist_phys, FV_Atm(1)%flagstruct%hydrostatic, hybrid, FV_Atm(1)%delz, FV_Atm(1)%ze0, &
                                  FV_Atm(1)%ks, FV_Atm(1)%ptop, FV_Atm(1)%domain, tile_in, FV_Atm(1)%bd)
      ! Copy FV to internal State
-       call FV_To_State ( STATE )
+       call FV_To_State ( MAPL, STATE )
        if( gid==masterproc ) write(*,*) 'Doubly Periodic IC generated LAT:', FV_Atm(1)%flagstruct%deglat
    else
      ALLOCATE( UA(isc:iec  ,jsc:jec  ,1:FV_Atm(1)%npz) )
@@ -1125,7 +1125,7 @@ contains
         call fv_getDELZ(DZ,PT,PE)
         PT = PT/PKZ
      endif
-     call State_To_FV( STATE )
+     call State_To_FV( MAPL, STATE )
    endif ! doubly-periodic
 
   else ! COLDSTART
@@ -1137,7 +1137,7 @@ contains
     !   call fv_getDELZ(DZ,PT,PE)
     !   PT = PT/PKZ
     !endif
-     call State_To_FV( STATE )
+     call State_To_FV( MAPL, STATE )
 
   endif
 
@@ -1471,6 +1471,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
    cnvfrc = 0.0
 
  ! Pull Tracers
+  call MAPL_TimerOn(MAPL,"--PULL_TRACERS")
   nn = 0
   if (.not. ADIABATIC) then
     select case ( FV_Atm(1)%flagstruct%nwat )
@@ -1797,6 +1798,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
       _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
 
   endif
+  call MAPL_TimerOff(MAPL,"--PULL_TRACERS")
 
     myDT = state%dt
 
@@ -1805,7 +1807,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (DEBUG) call debug_fv_state('Before Dynamics Execution',STATE)
 
 ! Update FV with Internal State
-    call State_To_FV( STATE )
+    call State_To_FV( MAPL, STATE )
 
     ! Query for PSDRY from AGCM.rc and set to MAPL_PSDRY if not found
     call MAPL_GetResource( MAPL, massD0, 'PSDRY:', default=MAPL_PSDRY, RC=STATUS )
@@ -2083,6 +2085,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   CLCN_FILLED = .FALSE.
 
  ! Push Tracers
+  call MAPL_TimerOn(MAPL,"--PUSH_TRACERS")
   nn = 0
   if (.not. ADIABATIC) then
 
@@ -2382,9 +2385,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (mpp_pe()==0) print*,''
     prt_minmax     = .false.
   endif
+  call MAPL_TimerOff(MAPL,"--PUSH_TRACERS")
 
 ! Copy FV to internal State
-   call FV_To_State ( STATE )
+   call FV_To_State ( MAPL, STATE )
 
     if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
 
@@ -2433,10 +2437,11 @@ end subroutine FV_Run
 
  end subroutine FV_Finalize
 
-subroutine State_To_FV ( STATE )
+subroutine State_To_FV ( MAPL, STATE )
 
 ! !INPUT PARAMETERS:
 
+   type(MAPL_MetaComp),         pointer   :: MAPL
    type(T_FVDYCORE_STATE),      pointer   :: STATE
 
     integer               :: ISC,IEC, JSC,JEC
@@ -2475,6 +2480,8 @@ subroutine State_To_FV ( STATE )
 
     akap  = kappa
     if (SW_DYNAMICS) akap  = 1.
+
+    call MAPL_TimerOn(MAPL,"--State_To_FV")
 
 !------------
 ! Update Winds
@@ -2606,16 +2613,18 @@ subroutine State_To_FV ( STATE )
 
     endif
 
+    call MAPL_TimerOff(MAPL,"--State_To_FV")
 
    return
 
 end subroutine State_To_FV
 
-subroutine FV_To_State ( STATE )
+subroutine FV_To_State ( MAPL, STATE )
 
 !
 ! !INPUT PARAMETERS:
 
+   type(MAPL_MetaComp),         pointer   :: MAPL
    type(T_FVDYCORE_STATE),      pointer   :: STATE
 
     logical :: bad_range = .false.
@@ -2631,6 +2640,8 @@ subroutine FV_To_State ( STATE )
     JEC = state%grid%je
     KM  = state%grid%npz
     NG  = state%grid%ng
+
+    call MAPL_TimerOn(MAPL,"--FV_To_State")
 
 ! Copy updated FV data to internal state
     STATE%VARS%U(:,:,:) = FV_Atm(1)%u(isc:iec,jsc:jec,:)
@@ -2680,6 +2691,8 @@ subroutine FV_To_State ( STATE )
 !--------------------------------
        STATE%VARS%PT  = STATE%VARS%PT/STATE%VARS%PKZ
     endif
+
+    call MAPL_TimerOff(MAPL,"--FV_To_State")
 
    return
 
