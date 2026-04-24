@@ -77,7 +77,6 @@ module FVdycoreCubed_GridComp
         fv_getUpdraftHelicity, DEBUG_DYN, DEBUG_ADV, &
         ADIABATIC, SW_DYNAMICS, AdvCore_Advection
    use m_topo_remap, only: dyn_topo_remap
-   use CubeGridPrototype, only: register_grid_and_regridders
 
    !PUBLIC MEMBER FUNCTIONS:
    implicit none
@@ -391,9 +390,6 @@ contains
 
       ! Setup geometry
       call MAPL_GridCompSetGeometry(gc, _RC)
-
-      ! Register prototype of cubed sphere grid and associated regridders
-      call register_grid_and_regridders()
 
       ! At this point check if FV is standalone and init the grid
       call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
