@@ -11,7 +11,21 @@ module fv_regrid_c2c
    use tracer_manager_mod, only: get_tracer_names, get_number_tracers, get_tracer_index
    use field_manager_mod,  only: MODEL_ATMOS
 
-   use MAPL2
+   use mapl3g_regridder_mgr
+   use mapl3g_Regridder,         only: Regridder
+   use mapl3g_RegridderMethods,  only: REGRID_METHOD_BILINEAR, generate_esmf_regrid_param
+   use mapl3g_RegridderManager,  only: get_regridder_manager, RegridderManager
+   use mapl3g_RegridderSpec,     only: RegridderSpec
+   use mapl_ErrorHandlingMod
+   use mapl3g_CubedSphereGeomSpec
+   use MAPL_Constants,           only: MAPL_PI_R8, MAPL_OMEGA, MAPL_GRAV, MAPL_KAPPA, &
+                                       MAPL_RGAS, MAPL_RVAP, MAPL_CP, MAPL_PSDRY
+   use MAPL_BaseMod,             only: MAPL_GridGet
+   use MAPL_CommsMod,            only: ArrayScatter
+   use FileIOSharedMod,          only: ArrDescr, ArrDescrInit, ArrDescrSet
+   use NCIOMod,                  only: MAPL_VarRead, MAPL_NCIOGetFileType, &
+                                       MAPL_IOGetNonDimVars, MAPL_IOCountNonDimVars
+   use pfio
    use gFTL2_StringVector
    use gFTL2_StringIntegerMap
    use, intrinsic :: iso_fortran_env, only: REAL64, REAL32
@@ -58,17 +72,19 @@ module fv_regrid_c2c
 
 contains
 
-   subroutine read_topo_file_r4(fname,output,grid,rc)
+   subroutine read_topo_file_r4(fname,output,geom,rc)
       character(len=*), intent(in) :: fname
-      type(ESMF_Grid), intent(in) :: grid
+      type(ESMF_Geom), intent(in) :: geom
       real(REAL32), intent(inout) :: output(:,:)
       integer, intent(out), optional :: rc
 
       integer :: status,dims(3),funit
       integer :: rank
       type(ESMF_VM) :: vm
+      type(ESMF_Grid) :: grid
       real(REAL32), allocatable :: input(:,:)
 
+      call ESMF_GeomGet(geom, grid=grid, _RC)
       call ESMF_VMGetCurrent(vm,_RC)
       call ESMF_VMGet(vm,localPet=rank,_RC)
       call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
@@ -84,9 +100,9 @@ contains
       _RETURN(_SUCCESS)
    end subroutine read_topo_file_r4
 
-   subroutine read_topo_file_r8(fname,output,grid,rc)
+   subroutine read_topo_file_r8(fname,output,geom,rc)
       character(len=*), intent(in) :: fname
-      type(ESMF_Grid), intent(in) :: grid
+      type(ESMF_Geom), intent(in) :: geom
       real(REAL64), intent(inout) :: output(:,:)
       integer, intent(out), optional :: rc
 
@@ -94,8 +110,10 @@ contains
       real, allocatable :: input(:,:)
       integer :: rank
       type(ESMF_VM) :: vm
+      type(ESMF_Grid) :: grid
       real(REAL64), allocatable :: input_r8(:,:)
 
+      call ESMF_GeomGet(geom, grid=grid, _RC)
       call ESMF_VMGetCurrent(vm,_RC)
       call ESMF_VMGet(vm,localPet=rank,_RC)
       call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
@@ -112,10 +130,10 @@ contains
       _RETURN(_SUCCESS)
    end subroutine read_topo_file_r8
 
-   subroutine get_geos_ic( Atm_i, Atm, grid_i, grid, Arrdes_i, extra_rst )
+   subroutine get_geos_ic( Atm_i, Atm, geom_in, geom_out, Arrdes_i, extra_rst )
 
       type(fv_atmos_type), intent(inout) :: Atm_i(:), Atm(:)
-      type(ESMF_Grid), intent(inout) :: grid_i, grid
+      type(ESMF_Geom), intent(in) :: geom_in, geom_out
       type(ArrDescr), intent(inout) :: ArrDes_i
       type(fv_rst), pointer, intent(inout) :: extra_rst(:)
       integer i,j
@@ -126,7 +144,7 @@ contains
          enddo
       enddo
 
-      call get_geos_cubed_ic( Atm_i, Atm, grid_i, grid, Arrdes_i, extra_rst)
+      call get_geos_cubed_ic( Atm_i, Atm, geom_in, geom_out, Arrdes_i, extra_rst)
 
       Atm(1)%flagstruct%dry_mass = MAPL_PSDRY
       Atm(1)%flagstruct%adjust_dry_mass = .true.
@@ -143,9 +161,9 @@ contains
 
    end subroutine get_geos_ic
 
-   subroutine get_geos_cubed_ic( Atm_i, Atm, grid_i, grid, Arrdes_i, extra_rst )
+   subroutine get_geos_cubed_ic( Atm_i, Atm, geom_in, geom_out, Arrdes_i, extra_rst )
       type(fv_atmos_type), intent(inout) :: Atm_i(:), Atm(:)
-      type(ESMF_Grid), intent(inout) :: grid_i, grid
+      type(ESMF_Geom), intent(in) :: geom_in, geom_out
       type(ArrDescr), intent(inout) :: ArrDes_i
       type(fv_rst), pointer, intent(inout) :: extra_rst(:)
 
@@ -198,12 +216,16 @@ contains
       character(len=:), pointer :: cptr
       type(StringIntegerMapIterator) :: iter
       type(ESMF_Grid) :: gridIn
-      class(AbstractRegridder), pointer :: regridder=>null()
+      class(Regridder), pointer :: regridder=>null()
+      type(RegridderManager), pointer :: regr_mgr
 
 !--------------------------------------------------------------------!
 ! create ESMF regridder
 !--------------------------------------------------------------------!
-      regridder => new_regridder_manager%make_regridder(grid_i,grid,REGRID_METHOD_BILINEAR,rc=status)
+      regr_mgr => get_regridder_manager()
+      regridder => regr_mgr%get_regridder( &
+           RegridderSpec(generate_esmf_regrid_param(REGRID_METHOD_BILINEAR, ESMF_TYPEKIND_R4, rc=status), &
+                         geom_in, geom_out), rc=status)
 
 !--------------------------------------------------------------------!
 ! initialize cubed sphere grid: in                                   !
@@ -430,7 +452,7 @@ contains
          endif
          allocate ( gz0(is_i:ie_i,js_i:je_i) )
          call print_memuse_stats('get_geos_cubed_ic: '//TRIM(fname1)//' being read')
-         call read_topo_file(fname1,gz0(is_i:ie_i,js_i:je_i),grid_i)
+         call read_topo_file(fname1,gz0(is_i:ie_i,js_i:je_i),geom_in)
          gz0 = gz0*grav
 
 ! Horiz Interp for surface pressure
@@ -607,7 +629,7 @@ contains
          if (is_master()) print*, ''
          if (is_master()) print*, 'Vertical Remapping: '
 ! Vert remap for scalars
-         call read_topo_file('topo_dynave.data',Atm(1)%phis(is:ie,js:je),grid)
+         call read_topo_file('topo_dynave.data',Atm(1)%phis(is:ie,js:je),geom_out)
          call mpp_update_domains(Atm(1)%phis, Atm(1)%domain)
          Atm(1)%phis = Atm(1)%phis*grav
          call remap_scalar(im, jm, km, npz, Atm(1)%ncnst, Atm(1)%ncnst, ak0, bk0, psc, gzc, &
@@ -956,12 +978,12 @@ subroutine xyz_to_dgrid(v3, ud, vd, npx, npy, is, ie, js, je, isd, ied, jsd, jed
 
 end subroutine xyz_to_dgrid
 
-  subroutine d2a2d(ui, vi, uo, vo, Atm_i, Atm, regridder)
+  subroutine d2a2d(ui, vi, uo, vo, Atm_i, Atm, regrdr)
     !------------------------------------------------------------------!
 
     type(fv_atmos_type), intent(inout) :: Atm_i, Atm
 
-    class(AbstractRegridder), pointer :: regridder
+    class(Regridder), pointer :: regrdr
 
     real(FVPRC), dimension(Atm_i%bd%isd:Atm_i%bd%ied  ,Atm_i%bd%jsd:Atm_i%bd%jed+1), intent(in) :: ui
     real(FVPRC), dimension(Atm_i%bd%isd:Atm_i%bd%ied+1,Atm_i%bd%jsd:Atm_i%bd%jed  ), intent(in) :: vi
@@ -1034,7 +1056,7 @@ end subroutine xyz_to_dgrid
 !------------------------------------------------------------!
        do n=1,3
           tmp_i = va_xyz_i(n,:,:)
-          call regridder%regrid(tmp_i(       is:       ie,       js:       je), &
+           call regrdr%regrid(tmp_i(       is:       ie,       js:       je), &
                                 tmp_o(Atm%bd%is:Atm%bd%ie,Atm%bd%js:Atm%bd%je), rc=status)
           call mpp_update_domains(tmp_o, Atm%domain)
           va_xyz_o(n,:,:) = tmp_o

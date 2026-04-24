@@ -63,7 +63,6 @@ module AdvCore_GridCompMod
 
    USE FV_StateMod,     only: AdvCoreTracers => T_TRACERS
    USE FV_StateMod,     only: FV_Atm
-   use CubeGridPrototype, only: register_grid_and_regridders
 
    implicit none
    private
@@ -174,9 +173,8 @@ contains
       call fms_init(comm)
 
       if (.NOT. FV3_DynCoreIsRunning) then
-         ! Make sure FV3 is setup
-         call register_grid_and_regridders()
-         call fv_init1(FV_Atm, dt, grids_on_my_pe, p_split)
+          ! Make sure FV3 is setup
+          call fv_init1(FV_Atm, dt, grids_on_my_pe, p_split)
          ! Get Domain decomposition
          call MAPL_GetResource(MAPL, nx, 'NX:', default=0, _RC)
          FV_Atm(1)%layout(1) = nx

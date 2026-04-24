@@ -7,7 +7,15 @@ program interp_restarts
 !          to the cubed-sphere grid with optional vertical levels    !
 !--------------------------------------------------------------------!
    use ESMF
-   use MAPL2
+   use pfio
+   use NCIOMod,        only: MAPL_VarRead, MAPL_VarWrite, MAPL_NCIOGetFileType, &
+                              MAPL_IOGetNonDimVars, MAPL_IOCountNonDimVars, &
+                              MAPL_IOChangeRes, MAPL_IOCountLevels
+   use FileIOSharedMod,only: ArrDescr, ArrDescrInit, ArrDescrSet
+   use MAPL_ShmemMod,  only: MAPL_GetNodeInfo, MAPL_InitializeShmem, MAPL_FinalizeShmem
+   use mapl3g_Geom_API,            only: GeomManager, get_geom_manager, MaplGeom
+   use mapl3g_CubedSphereGeomSpec, only: CubedSphereGeomSpec
+   use mapl3g_CubedSphereDecomposition, only: CubedSphereDecomposition
    use mpp_mod,        only: mpp_error, FATAL, NOTE, mpp_root_pe, mpp_broadcast
    use fms_mod,        only: print_memory_usage, fms_init, fms_end, file_exist
    use fv_control_mod, only: fv_init1, fv_init2, fv_end
@@ -71,7 +79,7 @@ program interp_restarts
    integer        :: info
    logical        :: amWriter
    integer :: isl,iel,jsl,jel,n_writers,n_readers
-   type(ESMF_Grid) :: grid_i, grid_o
+   type(ESMF_Geom) :: geom_in, geom_out
    logical :: in_hydrostatic, scale_rst
    character(len=:), pointer :: var_name
    type(StringVariableMap), pointer :: variables
@@ -80,7 +88,9 @@ program interp_restarts
    type(StringVector), pointer :: var_dimensions
    character(len=:), pointer :: dname
    integer :: dim1,ndims
-   type(CubedSphereGridFactory) :: csfactory
+   type(CubedSphereGeomSpec) :: cs_spec
+   type(MaplGeom), pointer :: mapl_geom_ptr
+   type(GeomManager), pointer :: geom_mgr
    real, allocatable :: schmidt_parameters_out(:)
    real, allocatable :: schmidt_parameters_in(:)
 
@@ -407,17 +417,30 @@ program interp_restarts
    call print_memuse_stats('interp_restarts: begining get_external_ic')
 
 
-! Input Grid
+! Input Geom
+   geom_mgr => get_geom_manager()
    if (allocated(schmidt_parameters_in)) then
-      csfactory = CubedSphereGridFactory(nx=Atm_i(1)%layout(1),ny=Atm_i(1)%layout(2),im_world=im,lm=km, &
-                        stretch_factor=schmidt_parameters_in(3), &
-                            target_lon=schmidt_parameters_in(1),&
-                            target_lat=schmidt_parameters_in(2))
+      cs_spec = CubedSphereGeomSpec( &
+           im_world=im, &
+           schmidt_parameters=ESMF_CubedSphereTransform_Args( &
+                target_lon=dble(schmidt_parameters_in(1)), &
+                target_lat=dble(schmidt_parameters_in(2)), &
+                stretch_factor=dble(schmidt_parameters_in(3))), &
+           decomposition=CubedSphereDecomposition( &
+                dims=[Atm_i(1)%layout(1), Atm_i(1)%layout(2)*6], &
+                topology=[Atm_i(1)%layout(1), Atm_i(1)%layout(2)]))
    else
-      csfactory = CubedSphereGridFactory(nx=Atm_i(1)%layout(1),ny=Atm_i(1)%layout(2),im_world=im,lm=km)
+      cs_spec = CubedSphereGeomSpec( &
+           im_world=im, &
+           schmidt_parameters=ESMF_CubedSphereTransform_Args( &
+                target_lon=0d0, target_lat=0d0, stretch_factor=1d0), &
+           decomposition=CubedSphereDecomposition( &
+                dims=[Atm_i(1)%layout(1), Atm_i(1)%layout(2)*6], &
+                topology=[Atm_i(1)%layout(1), Atm_i(1)%layout(2)]))
    end if
-   grid_i = grid_manager%make_grid(csfactory,rc=status)
-   call ESMF_AttributeSet(grid_i,name="num_reader",value=n_readers)
+   mapl_geom_ptr => geom_mgr%get_mapl_geom(cs_spec, rc=status)
+   VERIFY_(status)
+   geom_in = mapl_geom_ptr%get_geom()
 ! Input Arrdes_i
    is = Atm_i(1)%bd%isc
    ie = Atm_i(1)%bd%iec
@@ -431,17 +454,29 @@ program interp_restarts
                      n_readers,n_writers,isl,iel,jsl,jel,rc=status)
    call ArrDescrSet(Arrdes_i,offset=0_MPI_OFFSET_KIND)
 
-! Output Grid
+! Output Geom
    if (allocated(schmidt_parameters_out)) then
-      csfactory = CubedSphereGridFactory(nx=Atm(1)%layout(1),ny=Atm(1)%layout(2),im_world=npx-1,lm=npz, &
-                        stretch_factor=schmidt_parameters_out(3), &
-                            target_lon=schmidt_parameters_out(1),&
-                            target_lat=schmidt_parameters_out(2))
+      cs_spec = CubedSphereGeomSpec( &
+           im_world=npx-1, &
+           schmidt_parameters=ESMF_CubedSphereTransform_Args( &
+                target_lon=dble(schmidt_parameters_out(1)), &
+                target_lat=dble(schmidt_parameters_out(2)), &
+                stretch_factor=dble(schmidt_parameters_out(3))), &
+           decomposition=CubedSphereDecomposition( &
+                dims=[Atm(1)%layout(1), Atm(1)%layout(2)*6], &
+                topology=[Atm(1)%layout(1), Atm(1)%layout(2)]))
    else
-      csfactory = CubedSphereGridFactory(nx=Atm(1)%layout(1),ny=Atm(1)%layout(2),im_world=npx-1,lm=npz)
+      cs_spec = CubedSphereGeomSpec( &
+           im_world=npx-1, &
+           schmidt_parameters=ESMF_CubedSphereTransform_Args( &
+                target_lon=0d0, target_lat=0d0, stretch_factor=1d0), &
+           decomposition=CubedSphereDecomposition( &
+                dims=[Atm(1)%layout(1), Atm(1)%layout(2)*6], &
+                topology=[Atm(1)%layout(1), Atm(1)%layout(2)]))
    end if
-   grid_o = grid_manager%make_grid(csfactory,rc=status)
-   call ESMF_AttributeSet(grid_o,name="num_writer",value=n_writers)
+   mapl_geom_ptr => geom_mgr%get_mapl_geom(cs_spec, rc=status)
+   VERIFY_(status)
+   geom_out = mapl_geom_ptr%get_geom()
 ! Output Arrdes
    is = Atm(1)%bd%isc
    ie = Atm(1)%bd%iec
@@ -456,7 +491,7 @@ program interp_restarts
    call ArrDescrSet(Arrdes,offset=0_MPI_OFFSET_KIND)
    amWriter = arrdes%writers_comm/=MPI_COMM_NULL
 
-   call get_geos_ic( Atm_i, Atm, grid_i, grid_o, Arrdes_i, rst_files )
+   call get_geos_ic( Atm_i, Atm, geom_in, geom_out, Arrdes_i, rst_files )
 
    call MPI_Info_create(info,status)
 
