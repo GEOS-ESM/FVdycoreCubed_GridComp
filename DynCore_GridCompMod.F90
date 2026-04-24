@@ -29,7 +29,7 @@ module FVdycoreCubed_GridComp
    use mapl3g_generic, only: MAPL_GridCompSetGeometry
    use mapl3g_generic, only: MAPL_GridCompGet, MAPL_GridCompGetResource
    use mapl3g_generic, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
-   use mapl3g_generic, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_FIELDBUNDLE
+   use mapl3g_generic, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE
    use mapl3g_generic, only: MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState
    use mapl3g_generic, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
    use mapl3g_VerticalStaggerLoc, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
@@ -40,6 +40,7 @@ module FVdycoreCubed_GridComp
    use mapl3g_RestartModes, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
 
    use pflogger, only: logger_t => logger
+   use gftl2_StringVector, only: StringVector
 
    use m_set_eta, only: set_eta
 
@@ -322,8 +323,8 @@ contains
    subroutine SetServices(gc, rc)
 
       !ARGUMENTS:
-      type(ESMF_GridComp), intent(inout) :: gc
-      integer, intent(out), optional :: rc
+      type(ESMF_GridComp) :: gc
+      integer, intent(out) :: rc
 
       !DESCRIPTION: Set services (register) for the FVCAM Dynamical Core GridComp
       !EOP
@@ -342,15 +343,18 @@ contains
 #include "DynCore_Export___.h"
 #include "DynCore_Internal___.h"
 
+      ! pchakrab - DynCore is the provider here, so the service items are not needed
+      ! NOTE: SERVICE, irrespective of whether you are a provider or subscriber, adds the bundle
+      ! to BOTH the export and import states
       call MAPL_GridCompAddSpec(gc, &
-           state_intent=ESMF_STATEINTENT_IMPORT, &
+           state_intent=ESMF_STATEINTENT_EXPORT, &
            short_name='TRADV', &
            standard_name='advected_quantities', &
       ! pchakrab: TODO - we shouldn't need dims and vstagger for a bundle
            dims="xyz", &
            vstagger=VERTICAL_STAGGER_NONE, &
            units='unknown', &
-           itemtype=MAPL_STATEITEM_FIELDBUNDLE, _RC)
+           itemtype=MAPL_STATEITEM_SERVICE, _RC)
 
 #ifdef SKIP_TRACERS
       do itracer = 1, ntracers
@@ -402,7 +406,7 @@ contains
               dims="xyz", &
               vstagger=VERTICAL_STAGGER_NONE, &
               units='unknown', &
-              itemtype=MAPL_STATEITEM_FIELDBUNDLE, _RC)
+              itemtype=MAPL_STATEITEM_SERVICE, _RC)
       end if
 
       call MAPL_GridCompGetResource(gc, "DEBUG_DYN", DEBUG_DYN, default=.false., _RC)
@@ -851,7 +855,10 @@ contains
       allocate(mfzxyz(ifirstxy:ilastxy, jfirstxy:jlastxy, km + 1))
 
       ! Report advected friendlies
-      call ESMF_StateGet(import, "TRADV", bundle, _RC)
+      ! call ESMF_StateGet(import, "TRADV", bundle, _RC)
+      ! TODO: pchakrab - we don't want to modify import data, so at this point
+      ! we should copy the tracer field data to the other bundle, from export
+      call ESMF_StateGet(export, "TRADV", bundle, _RC)
 
       ! ALT: this section attempts to limit the amount of advected tracers
       adjust_tracers = .false.
@@ -962,7 +969,7 @@ contains
       ! end of fewer_tracers-section
       !-----------------------------
 
-      do k = 1, size(names)
+      do k = 1, nq ! size(names)
          pos = index(names(k), "::")
          if (pos > 0) then
             if ((names(k)(pos + 2:)) == "OX") ooo = vars%tracer(k)
@@ -974,12 +981,26 @@ contains
       ! WMP Begin REPLAY/ANA section
       call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
       is_shutoff = .true.
-      if (.not. FV3_STANDALONE) then
-         call MAPL_GridCompTimerStart(gc, "DYN_ANA", _RC)
-         call ESMF_ClockGetAlarm(clock, "ReplayShutOff", alarm, _RC)
-         is_shutoff = ESMF_AlarmIsRinging(alarm, _RC)
-      end if
+      ! if (.not. FV3_STANDALONE) then
+      !    call MAPL_GridCompTimerStart(gc, "DYN_ANA", _RC)
+      !    block
+      !       integer :: iter, alarm_count
+      !       type(ESMF_Alarm), allocatable :: alarm_list(:)
+      !       character(len=ESMF_MAXSTR) :: alarm_name
+      !       call ESMF_ClockGetAlarmList(clock, ESMF_ALARMLIST_ALL, alarmCount=alarm_count, _RC)
+      !       _HERE, "alarm count: ", alarm_count
+      !       allocate(alarm_list(alarm_count), _STAT)
+      !       call ESMF_ClockGetAlarmList(clock, ESMF_ALARMLIST_ALL, alarmList=alarm_list, _RC)
+      !       do iter = 1, alarm_count
+      !          call ESMF_AlarmGet(alarm_list(iter), name=alarm_name, _RC)
+      !          _HERE, "alarm ", iter, ": ", trim(alarm_name)
+      !       end do
+      !    end block
+      !    call ESMF_ClockGetAlarm(clock, "REPLAYShutOff", alarm, _RC)
+      !    is_shutoff = ESMF_AlarmIsRinging(alarm, _RC)
+      ! end if
 
+      is_shutoff = .true. ! TODO: pchakrab - Until we figure out the issue with alarm creation
       if (.not. is_shutoff) then
          ! If requested, do Intermittent Replay
          ! pchakrab - we are not doing this anymore, right?
@@ -1532,7 +1553,7 @@ contains
 
       end if
       if (.not. FV3_STANDALONE) then
-         call MAPL_GridCompTimerStop(gc, "DYN_ANA", _RC)
+         ! call MAPL_GridCompTimerStop(gc, "DYN_ANA", _RC)
       end if
 
       call MAPL_GridCompTimerStart(gc, "DYN_PROLOGUE", _RC)
@@ -1553,6 +1574,7 @@ contains
       call FILLOUT3(export, "U_DYN_IN", ur, _RC)
       call FILLOUT3(export, "V_DYN_IN", vr, _RC)
       call FILLOUT3(export, "PLE_DYN_IN", vars%pe, _RC)
+      call FILLOUT3(export, "PLE4", vars%pe, _RC)
 
       ! Initialize 3-D Tracer Dynamics Tendencies
       call MAPL_StateGetPointer(export, dqldt, "DQLDTDYN", _RC)
@@ -1876,19 +1898,19 @@ contains
          call FILLOUT3(export, 'U_AGRID', ua, _RC)
          call FILLOUT3(export, 'V_AGRID', va, _RC)
 
-         if (DEBUG_DYN) then
-            block
-               real :: maxmin(2)
-               maxmin = MAPL_MaxMin(qv, comm, _RC)
-               call logger%info("max/min(Q_AF_DYN): %f/%f", maxmin(1), maxmin(2))
-               maxmin = MAPL_MaxMin(tempxy, comm, _RC)
-               call logger%info("max/min(T_AF_DYN): %f/%f", maxmin(1), maxmin(2))
-               maxmin = MAPL_MaxMin(ua, comm, _RC)
-               call logger%info("max/min(U_AF_DYN): %f/%f", maxmin(1), maxmin(2))
-               maxmin = MAPL_MaxMin(va, comm, _RC)
-               call logger%info("max/min(V_AF_DYN): %f/%f", maxmin(1), maxmin(2))
-            end block
-         end if
+         ! if (DEBUG_DYN) then
+         !    block
+         !       real :: maxmin(2)
+         !       maxmin = MAPL_MaxMin(qv, comm, _RC)
+         !       call logger%info("max/min(Q_AF_DYN): %f/%f", maxmin(1), maxmin(2))
+         !       maxmin = MAPL_MaxMin(tempxy, comm, _RC)
+         !       call logger%info("max/min(T_AF_DYN): %f/%f", maxmin(1), maxmin(2))
+         !       maxmin = MAPL_MaxMin(ua, comm, _RC)
+         !       call logger%info("max/min(U_AF_DYN): %f/%f", maxmin(1), maxmin(2))
+         !       maxmin = MAPL_MaxMin(va, comm, _RC)
+         !       call logger%info("max/min(V_AF_DYN): %f/%f", maxmin(1), maxmin(2))
+         !    end block
+         ! end if
 
          ! Compute Diagnostic Dynamics Tendencies
          !  (Note: initial values of d(m,u,v,T,q)/dt are progs m,u,v,T,q)
@@ -2946,24 +2968,24 @@ contains
          call Write_Profile(grid, tempxy, 'T')
 #endif
 
-         if (DEBUG_DYN) then
-            block
-               type(ESMF_VM) :: vm
-               integer :: comm
-               real :: maxmin(2)
+         ! if (DEBUG_DYN) then
+         !    block
+         !       type(ESMF_VM) :: vm
+         !       integer :: comm
+         !       real :: maxmin(2)
 
-               call ESMF_VMGetCurrent(vm, _RC)
-               call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
-               maxmin = MAPL_MaxMin(qv, comm, _RC)
-               call logger%info("max/min(Q_AF_INC): %f/%f", maxmin(1), maxmin(2))
-               maxmin = MAPL_MaxMin(tempxy, comm, _RC)
-               call logger%info("max/min(T_AF_INC): %f/%f", maxmin(1), maxmin(2))
-               maxmin = MAPL_MaxMin(ua, comm, _RC)
-               call logger%info("max/min(U_AF_INC): %f/%f", maxmin(1), maxmin(2))
-               maxmin = MAPL_MaxMin(va, comm, _RC)
-               call logger%info("max/min(V_AF_INC): %f/%f", maxmin(1), maxmin(2))
-            end block
-         end if
+         !       call ESMF_VMGetCurrent(vm, _RC)
+         !       call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
+         !       maxmin = MAPL_MaxMin(qv, comm, _RC)
+         !       call logger%info("max/min(Q_AF_INC): %f/%f", maxmin(1), maxmin(2))
+         !       maxmin = MAPL_MaxMin(tempxy, comm, _RC)
+         !       call logger%info("max/min(T_AF_INC): %f/%f", maxmin(1), maxmin(2))
+         !       maxmin = MAPL_MaxMin(ua, comm, _RC)
+         !       call logger%info("max/min(U_AF_INC): %f/%f", maxmin(1), maxmin(2))
+         !       maxmin = MAPL_MaxMin(va, comm, _RC)
+         !       call logger%info("max/min(V_AF_INC): %f/%f", maxmin(1), maxmin(2))
+         !    end block
+         ! end if
 
          call FILLOUT3(export, "DELP", dp, _RC)
          call FILLOUT3(export, "U", ur, _RC)
