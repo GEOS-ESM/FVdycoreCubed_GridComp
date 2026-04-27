@@ -211,5 +211,29 @@ ecbuild_add_executable (
    SOURCES interp_restarts_bin.F90
    LIBS ${this} OpenMP::OpenMP_Fortran)
 
+# If we are doing R4R8 we also need add_dependencies for both fms_r4 and fms_r8
+# for all our executables that link to ${this} because of the way we set up the
+# main library above.
+if (FV_PRECISION STREQUAL R4R8)
+  foreach(executable
+    StandAlone_FV3_Dycore.x
+    rs_scale.x
+    StandAlone_AdvCore.x
+    StandAlone_DynAdvCore.x
+    c2c.x
+    interp_restarts.x
+    interp_restarts_bin.x)
+
+    # fvdycore needs r4 .mod interfaces
+    get_target_property(inc_r4 fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
+    target_include_directories(${executable} PRIVATE $<BUILD_INTERFACE:${inc_r4}>)
+
+    # But fvdycore should not *compile* with fms_r8 includes
+    target_link_libraries(${executable} $<LINK_ONLY:fms_r8>)
+
+    # This tells CMake that we need these targets built before we can build
+    add_dependencies(${executable} fms_r4 fms_r8)
+  endforeach()
+endif ()
 
 add_subdirectory(scripts)
