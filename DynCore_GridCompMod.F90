@@ -36,7 +36,7 @@ module FVdycoreCubed_GridComp
    use mapl3g_Geom_API, only: MAPL_GridGetCoordinates
    use mapl3g_State_API, only: MAPL_StateGetPointer
    use mapl3g_Field_API, only: MAPL_FieldCreate
-   use mapl3g_FieldBundle_API, only: MAPL_FieldBundleAdd
+   use mapl3g_FieldBundle_API, only: MAPL_FieldBundleAdd, MAPL_FieldBundleCopy
    use mapl3g_RestartModes, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
 
    use pflogger, only: logger_t => logger
@@ -572,7 +572,7 @@ contains
 
       integer :: status, comm
       type(ESMF_VM) :: vm
-      type(ESMF_FieldBundle) :: bundle
+      type(ESMF_FieldBundle) :: bundle_imp, bundle
       type(ESMF_Field) :: field
       type(ESMF_Alarm) :: alarm
       type(ESMF_Grid) :: esmfgrid
@@ -850,11 +850,11 @@ contains
       allocate(mfyxyz(ifirstxy:ilastxy, jfirstxy:jlastxy, km))
       allocate(mfzxyz(ifirstxy:ilastxy, jfirstxy:jlastxy, km + 1))
 
-      ! Report advected friendlies
-      ! call ESMF_StateGet(import, "TRADV", bundle, _RC)
-      ! TODO: pchakrab - we don't want to modify import data, so at this point
-      ! we should copy the tracer field data to the other bundle, from export
+      ! SERVICE adds the bundle to both import and export states
+      ! Here we copy the tracer data from the import bundle to the export bundle
+      call ESMF_StateGet(import, "TRADV", bundle_imp, _RC)
       call ESMF_StateGet(export, "TRADV", bundle, _RC)
+      call MAPL_FieldBundleCopy(bundle_imp, bundle, _RC) ! copy tracer data to the export bundle
 
       ! ALT: this section attempts to limit the amount of advected tracers
       adjust_tracers = .false.
