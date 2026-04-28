@@ -187,6 +187,8 @@ endif ()
 # Install the resource files
 set (resource_files
   fv3sa.yaml
+  dyn.yaml
+  data-moist.yaml
 )
 install(FILES ${resource_files} DESTINATION etc)
 
