@@ -383,15 +383,15 @@ contains
 
       ! Register services for this component
       call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Initialize, Initialize, _RC)
-      call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Run, Run, phase_name="Run", _RC)
-      call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Run, RunAddIncs, phase_name="RunAddIncs", _RC)
+      call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Run, run, phase_name="run", _RC)
+      call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Run, run_add_incs, phase_name="run_add_incs", _RC)
       call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Finalize, Finalize, _RC)
       !  call MAPL_GridCompSetEntryPoint(gc, ESMF_SETREADRESTART, Coldstart, _RC)
 
       ! Setup geometry
       call MAPL_GridCompSetGeometry(gc, _RC)
 
-      ! At this point check if FV is standalone and init the grid
+      ! At this point check if FV is standalone
       call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
       if (FV3_STANDALONE) then
          call MAPL_GridCompAddSpec(gc, &
@@ -545,8 +545,8 @@ contains
    end subroutine Initialize
 
    !BOP
-   !IROUTINE: Run
-   !DESCRIPTION: This is the first Run stage of FV. It is the container
+   !IROUTINE: run
+   !DESCRIPTION: This is the first run stage of FV. It is the container
    !    for the dycore calculations. Subroutines from the core are
    !    invoked to do most of the work. A second run method, descibed below,
    !    adds the import tendencies from external sources to the FV
@@ -560,7 +560,7 @@ contains
 
    !INTERFACE:
 
-   subroutine Run(gc, import, export, clock, rc)
+   subroutine run(gc, import, export, clock, rc)
 
       !ARGUMENTS:
       type(ESMF_GridComp) :: gc
@@ -871,7 +871,7 @@ contains
             end if
          end if
       else
-         call logger%info("Run:: Invalid value specified for EXCLUDE_ADVECTION_TRACERS, ignored")
+         call logger%info("run:: Invalid value specified for EXCLUDE_ADVECTION_TRACERS, ignored")
          adjust_tracers = .false.
       end if
       if (adjust_tracers) then
@@ -903,7 +903,7 @@ contains
                     (TRIM(fieldname) /= "QRAIN") .and. &
                     (TRIM(fieldname) /= "QSNOW") .and. &
                     (TRIM(fieldname) /= "QGRAUPEL")) then
-                  call logger%info("Run:: FV3+ADV is excluding " // TRIM(fieldname))
+                  call logger%info("run:: FV3+ADV is excluding " // TRIM(fieldname))
 
                   n = n + 1
                   if (n > size(xlist)) then
@@ -2638,12 +2638,12 @@ contains
 
       !if (ADIABATIC) then
       !  ! Fill Exports
-      !   call RunAddIncs(gc, import, export, clock, rc)
+      !   call run_add_incs(gc, import, export, clock, rc)
       !endif
 
       _RETURN(_SUCCESS)
 
-   end subroutine Run
+   end subroutine run
 
    subroutine PULL_Q(self, import, qqq, iNXQ, InFieldName, rc)
       type(DynState) :: self
@@ -2718,7 +2718,7 @@ contains
    end subroutine PULL_Q
 
    !BOP
-   !IROUTINE: RunAddIncs
+   !IROUTINE: run_add_incs
 
    !DESCRIPTION: This is the second registered stage of FV.
    !    It calls an Fv supplied routine to add external contributions
@@ -2727,7 +2727,7 @@ contains
    !    FV internal state to reflect the added tendencies.
 
    !INTERFACE:
-   subroutine RunAddIncs(gc, import, export, clock, rc)
+   subroutine run_add_incs(gc, import, export, clock, rc)
 
       !ARGUMENTS:
       type(ESMF_GridComp) :: gc
@@ -3363,9 +3363,9 @@ contains
       _RETURN(_SUCCESS)
       _UNUSED_DUMMY(clock)
 
-   end subroutine RunAddIncs
+   end subroutine run_add_incs
 
-   subroutine ADD_INCS(esmfgrid, self, import, dt, is_weighted, rc)
+   subroutine add_incs(esmfgrid, self, import, dt, is_weighted, rc)
 
       use fms_mod, only: set_domain, nullify_domain
       use fv_diagnostics_mod, only: prt_maxmin
@@ -3741,7 +3741,7 @@ contains
 
       _RETURN(_SUCCESS)
 
-   end subroutine ADD_INCS
+   end subroutine add_incs
 
    subroutine FILLOUT3r8(export, name, v, rc)
       type(ESMF_State), intent(inout) :: export
@@ -4421,110 +4421,110 @@ contains
 
          end if ! case_id
 
-         ! Parse Tracers
-         if (FV3_STANDALONE) then
-            call ESMF_StateGet(import, "TRADV", tradv_bundle, _RC)
-            call MAPL_GridCompGet(gc, geom=geom, num_levels=num_levels, _RC)
+         ! ! Parse Tracers
+         ! if (FV3_STANDALONE) then
+         !    call ESMF_StateGet(import, "TRADV", tradv_bundle, _RC)
+         !    call MAPL_GridCompGet(gc, geom=geom, num_levels=num_levels, _RC)
 
-            allocate(tracer(is:ie, js:je, 1:km), _STAT)
-            tracer(:, :, :) = 0.0
-            fieldname = 'Q'
-            call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
+         !    allocate(tracer(is:ie, js:je, 1:km), _STAT)
+         !    tracer(:, :, :) = 0.0
+         !    fieldname = 'Q'
+         !    call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
 
-            if (case_tracers /= 1234) then
+         !    if (case_tracers /= 1234) then
 
-               do n = 1, case_tracers
-                  tracer(:, :, :) = 0.0
-                  write(fieldname, "('Q',i3.3)") n
-                  call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
-               end do
+         !       do n = 1, case_tracers
+         !          tracer(:, :, :) = 0.0
+         !          write(fieldname, "('Q',i3.3)") n
+         !          call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
+         !       end do
 
-            else
+         !    else
 
-               !-------------------
-               !     tracer q1
-               !-------------------
-               tracer(:, :, :) = 0.0
-               do k = ks, ke
-                  eta = 0.5 * ((ak(k - 1) + ak(k)) / 1.e5 + bk(k - 1) + bk(k))
-                  do j = js, je
-                     do i = is, ie
-                        LONc = lons(i, j)
-                        LATc = lats(i, j)
-                        dummy_1 = tracer_q1_q2(LONc, LATc, eta, rot_ang, r0_6)
-                        tracer(i, j, k) = dummy_1
-                     end do
-                  end do
-               end do
-               fieldname = 'Q1'
-               call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname)
+         !       !-------------------
+         !       !     tracer q1
+         !       !-------------------
+         !       tracer(:, :, :) = 0.0
+         !       do k = ks, ke
+         !          eta = 0.5 * ((ak(k - 1) + ak(k)) / 1.e5 + bk(k - 1) + bk(k))
+         !          do j = js, je
+         !             do i = is, ie
+         !                LONc = lons(i, j)
+         !                LATc = lats(i, j)
+         !                dummy_1 = tracer_q1_q2(LONc, LATc, eta, rot_ang, r0_6)
+         !                tracer(i, j, k) = dummy_1
+         !             end do
+         !          end do
+         !       end do
+         !       fieldname = 'Q1'
+         !       call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname)
 
-               !-------------------
-               !     tracer q2
-               !-------------------
-               do k = ks, ke
-                  eta = 0.5 * ((ak(k - 1) + ak(k)) / 1.e5 + bk(k - 1) + bk(k))
-                  do j = js, je
-                     do i = is, ie
-                        LONc = lons(i, j)
-                        LATc = lats(i, j)
-                        dummy_1 = tracer_q1_q2(LONc, LATc, eta, rot_ang, r1_0)
-                        tracer(i, j, k) = dummy_1
-                     end do
-                  end do
-               end do
-               fieldname = 'Q2'
-               call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
+         !       !-------------------
+         !       !     tracer q2
+         !       !-------------------
+         !       do k = ks, ke
+         !          eta = 0.5 * ((ak(k - 1) + ak(k)) / 1.e5 + bk(k - 1) + bk(k))
+         !          do j = js, je
+         !             do i = is, ie
+         !                LONc = lons(i, j)
+         !                LATc = lats(i, j)
+         !                dummy_1 = tracer_q1_q2(LONc, LATc, eta, rot_ang, r1_0)
+         !                tracer(i, j, k) = dummy_1
+         !             end do
+         !          end do
+         !       end do
+         !       fieldname = 'Q2'
+         !       call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
 
-               !-------------------
-               !     tracer q3
-               !-------------------
-               do k = ks, ke
-                  eta = 0.5 * ((ak(k - 1) + ak(k)) / 1.e5 + bk(k - 1) + bk(k))
-                  do j = js, je
-                     do i = is, ie
-                        LONc = lons(i, j)
-                        LATc = lats(i, j)
-                        dummy_1 = tracer_q3(LONc, LATc, eta, rot_ang)
-                        tracer(i, j, k) = dummy_1
-                     end do
-                  end do
-               end do
-               fieldname = 'Q3'
-               call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
+         !       !-------------------
+         !       !     tracer q3
+         !       !-------------------
+         !       do k = ks, ke
+         !          eta = 0.5 * ((ak(k - 1) + ak(k)) / 1.e5 + bk(k - 1) + bk(k))
+         !          do j = js, je
+         !             do i = is, ie
+         !                LONc = lons(i, j)
+         !                LATc = lats(i, j)
+         !                dummy_1 = tracer_q3(LONc, LATc, eta, rot_ang)
+         !                tracer(i, j, k) = dummy_1
+         !             end do
+         !          end do
+         !       end do
+         !       fieldname = 'Q3'
+         !       call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
 
-               !-------------------
-               !     tracer q4
-               !-------------------
-               tracer(:, :, :) = 1.0_r4
-               fieldname = 'Q4'
-               call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
+         !       !-------------------
+         !       !     tracer q4
+         !       !-------------------
+         !       tracer(:, :, :) = 1.0_r4
+         !       fieldname = 'Q4'
+         !       call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
 
-               !-------------------
-               !     tracer q5
-               !-------------------
-               if (allocated(Q5)) then
-                  tracer(:, :, :) = Q5(:, :, :)
-                  fieldname = 'Q5'
-                  call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
-                  deallocate(Q5, _STAT)
-               end if
+         !       !-------------------
+         !       !     tracer q5
+         !       !-------------------
+         !       if (allocated(Q5)) then
+         !          tracer(:, :, :) = Q5(:, :, :)
+         !          fieldname = 'Q5'
+         !          call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
+         !          deallocate(Q5, _STAT)
+         !       end if
 
-               !-------------------
-               !     tracer q6
-               !-------------------
-               if (allocated(Q6)) then
-                  tracer(:, :, :) = Q6(:, :, :)
-                  fieldname = 'Q6'
-                  call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
-                  deallocate(Q6, _STAT)
-               end if
+         !       !-------------------
+         !       !     tracer q6
+         !       !-------------------
+         !       if (allocated(Q6)) then
+         !          tracer(:, :, :) = Q6(:, :, :)
+         !          fieldname = 'Q6'
+         !          call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
+         !          deallocate(Q6, _STAT)
+         !       end if
 
-            end if
+         !    end if
 
-            deallocate(tracer, _STAT)
+         !    deallocate(tracer, _STAT)
 
-         end if ! parse tracers
+         ! end if ! parse tracers
 
       end if
 
