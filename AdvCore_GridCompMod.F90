@@ -50,6 +50,7 @@ module AdvCore_GridCompMod
    !USES:
    use ESMF
    use MAPL
+   use ESMFL_Mod
    use mapl3g_GridGet, only: GridGet
    use m_set_eta,       only: set_eta
    use mpp_mod,         only: mpp_pe, mpp_root_pe
@@ -342,7 +343,7 @@ contains
       logical                             :: tend
       logical                             :: exclude
       character(len=ESMF_MAXSTR)          :: tmpstring
-      character(len=ESMF_MAXSTR)          :: adjustTracerMode
+      character(len=:), allocatable       :: adjustTracerMode
       character(len=ESMF_MAXSTR), allocatable :: xlist(:)
       character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
       integer, parameter                  :: XLIST_MAX = 60
