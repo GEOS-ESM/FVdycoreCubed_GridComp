@@ -589,43 +589,43 @@ contains
       endif
       if (FV_Atm(1)%flagstruct%npx >= 360) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 50.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 1.5
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 720) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 125.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 1.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1120) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 250.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.75
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1440) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 30.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 500.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.5
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 2880) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 35.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.25
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 40.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.125
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 10800) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  4.6875 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 50.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.0625
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
@@ -634,31 +634,31 @@ contains
      !              based on ideal remapping DT
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 540) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+              FV_Atm(1)%flagstruct%rf_cutoff = 100.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 2.0
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1080) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 30.0 ! Pa
+              FV_Atm(1)%flagstruct%rf_cutoff = 500.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 1.0
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2160) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 35.0 ! Pa
+              FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 0.5
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 40.0 ! Pa
+              FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 0.25
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 8640) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 45.0 ! Pa
+              FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 0.125
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
