@@ -1,5 +1,5 @@
 
-#include "MAPL_Generic.h"
+#include "MAPL.h"
 
 !-----------------------------------------------------------------------
 !              ESMA - Earth System Modeling Applications
@@ -13,7 +13,7 @@
 ! !USES:
 
    use ESMF                ! ESMF base class
-   use MAPL2               ! GEOS base class
+   use MAPL               ! GEOS base class
 
 ! !PUBLIC MEMBER FUNCTIONS:
 
@@ -63,12 +63,6 @@ contains
     call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_INITIALIZE,  Initialize, rc=status)
     VERIFY_(STATUS)
  
-! Generic SetServices
-!--------------------
-
-    call MAPL_GenericSetServices( GC, RC=STATUS )
-    VERIFY_(STATUS)
-
     RETURN_(ESMF_SUCCESS)
 
   end subroutine SetServices
@@ -94,7 +88,6 @@ contains
   character(len=ESMF_MAXSTR)         :: IAm
   character(len=ESMF_MAXSTR)         :: COMP_NAME
 
-  type (MAPL_MetaComp), pointer      :: MAPL
   type (ESMF_Config)                 :: CF
   type (ESMF_VM)                     :: VM
   character (len=ESMF_MAXSTR)        :: strTxt
@@ -117,13 +110,7 @@ contains
 ! Call Generic Initialize
 !------------------------
 
-    call MAPL_GenericInitialize ( GC, IMPORT, EXPORT, CLOCK,  RC=STATUS)
-    VERIFY_(STATUS)
-
-    call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-    VERIFY_(STATUS)
-
-    call ESMF_VMGetCurrent(VM, rc=status)
+    call MAPL_GridCompGetResource(GC, layout_file, 'LAYOUT:', default='weights.rc', _RC)
 
     call ESMF_VMGet(VM,mpiCommunicator=comm,rc=status)
 
@@ -131,8 +118,6 @@ contains
   call MAPL_MemUtilsWrite(VM, strTxt, RC=STATUS )
   VERIFY_(STATUS)
 
-    call MAPL_GetResource ( MAPL, layout_file, 'LAYOUT:', default='weights.rc', rc=status )
-    VERIFY_(STATUS)
     call ESMF_ConfigLoadFile( cf, LAYOUT_FILE, rc = rc )
     call ESMF_ConfigGetAttribute   ( cf, npx, label = 'npx:', default=180, rc = rc )
     npy = npx*6
