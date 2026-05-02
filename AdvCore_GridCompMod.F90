@@ -54,7 +54,7 @@ module AdvCore_GridCompMod
         MAPL_GenericFinalize, MAPL_GenericInitialize, MAPL_GenericSetServices, &
         MAPL_Get, MAPL_GetObjectFromGC, MAPL_GetPointer, MAPL_GetResource, &
         MAPL_GridCreate, MAPL_MetaComp, &
-        MAPL_TimerAdd, MAPL_TimerOff, MAPL_TimerOn
+        MAPL_TimerAdd, MAPL_TimerOff, MAPL_TimerOn, write_parallel
    use m_set_eta,       only: set_eta
    use mpp_mod,         only: mpp_pe, mpp_root_pe
    use fv_arrays_mod,   only: fv_atmos_type, FVPRC, REAL4, REAL8
