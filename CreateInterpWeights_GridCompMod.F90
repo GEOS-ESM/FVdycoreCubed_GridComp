@@ -15,7 +15,8 @@
    use ESMF                ! ESMF base class
    use MAPL
    use MAPL2, only: MAPL_GenericInitialize, MAPL_GenericSetServices, &
-        MAPL_GetObjectFromGC, MAPL_GetResource, MAPL_MemUtilsWrite, MAPL_MetaComp
+        MAPL_GetObjectFromGC, MAPL_GetResource, MAPL_GridCompSetEntryPoint, &
+        MAPL_MemUtilsWrite, MAPL_MetaComp
 
 ! !PUBLIC MEMBER FUNCTIONS:
 

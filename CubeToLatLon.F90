@@ -22,9 +22,9 @@ Module CubeLatLonTransformMod
   use ESMF
   use MAPL
   use MAPL2, only: MAPL_AllocNodeArray, MAPL_am_I_root, MAPL_AmNodeRoot, &
-       MAPL_CommsBcast, MAPL_DeAllocNodeArray, MAPL_LocStream, MAPL_LocStreamCreate, &
-       MAPL_LocStreamCreateXform, MAPL_LocStreamGet, MAPL_LocStreamTransform, &
-       MAPL_LocStreamXform, MAPL_RegridLSCreate
+       MAPL_CommsBcast, MAPL_DeAllocNodeArray, GETFILE, MAPL_LocStream, &
+       MAPL_LocStreamCreate, MAPL_LocStreamCreateXform, MAPL_LocStreamGet, &
+       MAPL_LocStreamTransform, MAPL_LocStreamXform
   use, intrinsic :: iso_fortran_env, only: REAL64, REAL32
 
   implicit none
