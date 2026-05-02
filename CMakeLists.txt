@@ -10,7 +10,6 @@ set (srcs
   Cube2LatLon.F90 LatLon2Cube.F90 AppGridCreate.F90 FV_StateMod.F90
   AdvCore_GridCompMod.F90
   DynCore_GridCompMod.F90 CreateInterpWeights_GridCompMod.F90
-  CubeToLatLon.F90
   GEOS_FV3_Utilities.F90
   fv_regridding_utils.F90
   fv_regrid_c2c.F90
