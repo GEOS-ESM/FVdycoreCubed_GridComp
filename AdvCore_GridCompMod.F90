@@ -53,7 +53,7 @@ module AdvCore_GridCompMod
    use MAPL2, only: MAPL_AddExportSpec, MAPL_AddImportSpec, MAPL_FieldBundleAdd, &
         MAPL_GenericFinalize, MAPL_GenericInitialize, MAPL_GenericSetServices, &
         MAPL_Get, MAPL_GetObjectFromGC, MAPL_GetPointer, MAPL_GetResource, &
-        MAPL_GridCompSetEntryPoint, MAPL_GridCreate, MAPL_MetaComp, &
+        MAPL_GridCreate, MAPL_MetaComp, &
         MAPL_TimerAdd, MAPL_TimerOff, MAPL_TimerOn
    use m_set_eta,       only: set_eta
    use mpp_mod,         only: mpp_pe, mpp_root_pe
@@ -229,12 +229,12 @@ contains
    !INTERFACE:
    subroutine Initialize(gc, import, export, clock, rc)
       !INPUT/OUTPUT PARAMETERS:
-      type(ESMF_GridComp), intent(inout) :: gc  ! Gridded component
-      type(ESMF_State), intent(inout) :: import ! Import state
-      type(ESMF_State), intent(inout) :: export ! Export state
-      type(ESMF_Clock), intent(inout) :: clock  ! The clock
+      type(ESMF_GridComp)  :: gc  ! Gridded component
+      type(ESMF_State)     :: import ! Import state
+      type(ESMF_State)     :: export ! Export state
+      type(ESMF_Clock)     :: clock  ! The clock
       !OUTPUT PARAMETERS:
-      integer, optional, intent(out) :: rc      ! Error code
+      integer, intent(out) :: rc      ! Error code
 
       !DESCRIPTION:
       ! This initialization routine creates the import and export states,
@@ -302,13 +302,13 @@ contains
       subroutine Run(gc, import, export, clock, RC)
 !
 ! !INPUT/OUTPUT PARAMETERS:
-      type(ESMF_GridComp), intent(inout) :: gc     ! Gridded component
-      type(ESMF_State),    intent(inout) :: import ! Import state
-      type(ESMF_State),    intent(inout) :: export ! Export state
-      type(ESMF_Clock),    intent(inout) :: clock  ! The clock
+      type(ESMF_GridComp)  :: gc     ! Gridded component
+      type(ESMF_State)     :: import ! Import state
+      type(ESMF_State)     :: export ! Export state
+      type(ESMF_Clock)     :: clock  ! The clock
 !
 ! !OUTPUT PARAMETERS:
-      integer, optional,   intent(  out) :: RC     ! Error code
+      integer, intent(out) :: RC     ! Error code
 !
 ! !DESCRIPTION:
 !
@@ -728,13 +728,13 @@ contains
   subroutine Finalize(gc, import, export, clock, RC)
 !
 ! !INPUT/OUTPUT PARAMETERS:
-      type(ESMF_GridComp), intent(inout) :: gc     ! Gridded component
-      type(ESMF_State),    intent(inout) :: import ! Import state
-      type(ESMF_State),    intent(inout) :: export ! Export state
-      type(ESMF_Clock),    intent(inout) :: clock  ! The clock
+      type(ESMF_GridComp)  :: gc     ! Gridded component
+      type(ESMF_State)     :: import ! Import state
+      type(ESMF_State)     :: export ! Export state
+      type(ESMF_Clock)     :: clock  ! The clock
 !
 ! !OUTPUT PARAMETERS:
-      integer, optional,   intent(  out) :: RC     ! Error code
+      integer, intent(out) :: RC     ! Error code
 !
 ! !DESCRIPTION:
 !    Finalize merely destroys the FVadv object that was created in Initialize

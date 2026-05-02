@@ -15,8 +15,7 @@
    use ESMF                ! ESMF base class
    use MAPL
    use MAPL2, only: MAPL_GenericInitialize, MAPL_GenericSetServices, &
-        MAPL_GetObjectFromGC, MAPL_GetResource, MAPL_GridCompSetEntryPoint, &
-        MAPL_MemUtilsWrite, MAPL_MetaComp
+        MAPL_GetObjectFromGC, MAPL_GetResource, MAPL_MemUtilsWrite, MAPL_MetaComp
 
 ! !PUBLIC MEMBER FUNCTIONS:
 
@@ -84,14 +83,14 @@ contains
 
 ! !ARGUMENTS:
 
-  type(ESMF_GridComp), intent(inout) :: gc       ! composite gridded component 
-  type(ESMF_State),    intent(inout) :: import   ! import state
-  type(ESMF_State),    intent(inout) :: export   ! export state
-  type(ESMF_Clock),    intent(inout) :: clock    ! the clock
+  type(ESMF_GridComp)  :: gc       ! composite gridded component 
+  type(ESMF_State)     :: import   ! import state
+  type(ESMF_State)     :: export   ! export state
+  type(ESMF_Clock)     :: clock    ! the clock
   
-  integer, intent(out), OPTIONAL     :: rc       ! Error code:
-                                                 ! = 0 all is well
-                                                 ! otherwise, error
+  integer, intent(out) :: rc       ! Error code:
+                                   ! = 0 all is well
+                                   ! otherwise, error
 
   integer                            :: status
   character(len=ESMF_MAXSTR)         :: IAm
