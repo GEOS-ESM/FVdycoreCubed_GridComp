@@ -49,7 +49,11 @@ module AdvCore_GridCompMod
 
    !USES:
    use ESMF
-   use MAPL2
+   use MAPL
+   use MAPL2, only: MAPL_AddExportSpec, MAPL_AddImportSpec, MAPL_GenericFinalize, &
+        MAPL_GenericInitialize, MAPL_GenericSetServices, MAPL_GetObjectFromGC, &
+        MAPL_GetPointer, MAPL_GetResource, MAPL_GridCreate, MAPL_MetaComp, &
+        MAPL_TimerAdd, MAPL_TimerOff, MAPL_TimerOn
    use m_set_eta,       only: set_eta
    use mpp_mod,         only: mpp_pe, mpp_root_pe
    use fv_arrays_mod,   only: fv_atmos_type, FVPRC, REAL4, REAL8

@@ -13,7 +13,9 @@
 ! !USES:
 
    use ESMF                ! ESMF base class
-   use MAPL2               ! GEOS base class
+   use MAPL
+   use MAPL2, only: MAPL_GenericInitialize, MAPL_GenericSetServices, &
+        MAPL_GetObjectFromGC, MAPL_GetResource, MAPL_MemUtilsWrite, MAPL_MetaComp
 
 ! !PUBLIC MEMBER FUNCTIONS:
 
