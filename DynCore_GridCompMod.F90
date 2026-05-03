@@ -35,12 +35,12 @@ module FVdycoreCubed_GridComp
    use mapl3g_VerticalStaggerLoc, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
    use mapl3g_Geom_API, only: MAPL_GridGetCoordinates
    use mapl3g_State_API, only: MAPL_StateGetPointer
-   use mapl3g_Field_API, only: MAPL_FieldCreate
-   use mapl3g_FieldBundle_API, only: MAPL_FieldBundleAdd, MAPL_FieldBundleCopy
+   use mapl3g_Field_API, only: MAPL_FieldCreate, MAPL_FieldGet
+   use mapl3g_FieldBundle_API, only: MAPL_FieldBundleAdd, MAPL_FieldBundleSameData
    use mapl3g_RestartModes, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
 
    use pflogger, only: logger_t => logger
-   use gftl2_StringVector, only: StringVector
+   ! use gftl2_StringVector, only: StringVector
 
    use m_set_eta, only: set_eta
 
@@ -272,11 +272,6 @@ module FVdycoreCubed_GridComp
    integer, parameter :: ntracers = 11
    integer, parameter :: plevs(5) = [850, 700, 600, 500, 300]
 
-   interface addTracer
-      module procedure addTracer_r4
-      module procedure addTracer_r8
-   end interface addTracer
-
    interface Write_Profile
       module procedure Write_Profile_R4
       module procedure Write_Profile_R8
@@ -356,20 +351,21 @@ contains
            itemtype=MAPL_STATEITEM_SERVICE, _RC)
 
 #ifdef SKIP_TRACERS
+      ! NOTE: pchakrab - Need to check with Bill, but this block can probably go away
       do itracer = 1, ntracers
          do ilev = 1, size(plevs)
             write(myTracer, "('Q',i5.5,'_',i3.3)") itracer - 1, plevs(ilev)
             call MAPL_AddExportSpec(gc, &
-                 short_name=TRIM(myTracer), &
-                 long_name=TRIM(myTracer), &
+                 short_name=trim(myTracer), &
+                 long_name=trim(myTracer), &
                  units='1', &
                  dims=MAPL_DimsHorzOnly, &
                  vlocation=MAPL_VLocationNone, _RC)
          end do
          write(myTracer, "('Q',i5.5)") itracer - 1
          call MAPL_AddExportSpec(gc, &
-              short_name=TRIM(myTracer), &
-              long_name=TRIM(myTracer), &
+              short_name=trim(myTracer), &
+              long_name=trim(myTracer), &
               units='1', &
               dims=MAPL_DimsHorzVert, &
               vlocation=MAPL_VLocationCenter, _RC)
@@ -393,17 +389,19 @@ contains
 
       ! At this point check if FV is standalone
       call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
-      if (FV3_STANDALONE) then
-         call MAPL_GridCompAddSpec(gc, &
-              state_intent=ESMF_STATEINTENT_EXPORT, &
-              short_name='TRADVEX', &
-              standard_name='advected_quantities', &
-         ! pchakrab - TODO: we shouldn't need dims and vstagger for a bundle
-              dims="xyz", &
-              vstagger=VERTICAL_STAGGER_NONE, &
-              units='unknown', &
-              itemtype=MAPL_STATEITEM_SERVICE, _RC)
-      end if
+      ! NOTE: pchakrab - Since TRADV is a service, it gets added to both the import and export
+      ! states, so we don't need to explictly export it
+      ! if (FV3_STANDALONE) then
+      !    call MAPL_GridCompAddSpec(gc, &
+      !         state_intent=ESMF_STATEINTENT_EXPORT, &
+      !         short_name='TRADVEX', &
+      !         standard_name='advected_quantities', &
+      !    ! pchakrab - TODO: we shouldn't need dims and vstagger for a bundle
+      !         dims="xyz", &
+      !         vstagger=VERTICAL_STAGGER_NONE, &
+      !         units='unknown', &
+      !         itemtype=MAPL_STATEITEM_SERVICE, _RC)
+      ! end if
 
       call MAPL_GridCompGetResource(gc, "DEBUG_DYN", DEBUG_DYN, default=.false., _RC)
       call MAPL_GridCompGetResource(gc, "DEBUG_ADV", DEBUG_ADV, default=.false., _RC)
@@ -422,23 +420,22 @@ contains
       integer, intent(out) :: rc ! Error code, 0 all is well, error otherwise
 
       type(DynState), pointer :: self
-
       type(ESMF_Field) :: field
       type(ESMF_State) :: internal
-      type(ESMF_FieldBundle) :: tradv, tradvex
-
+      type(ESMF_FieldBundle) :: tradv
       real(kind=r4), pointer :: pref(:)
       real(kind=r4), pointer :: u(:, :, :), v(:, :, :), t(:, :, :)
       real(kind=r4), pointer :: temp2d(:, :)
-
       real(kind=r8), pointer :: ak(:), bk(:)
       real(kind=r8), pointer :: ud(:, :, :), vd(:, :, :)
       real(kind=r8), pointer :: pt(:, :, :), pk(:, :, :)
       real(kind=r8), allocatable :: ur(:, :, :), vr(:, :, :) ! rotated winds
-
       logical :: ColdRestart, FV3_STANDALONE
       integer :: ifirst, ilast, jfirst, jlast, km
       integer :: i, numTracers, status
+      integer :: replay_shutoff_seconds
+      type(ESMF_TimeInterval) :: replay_shutoff_interval
+      type(ESMF_Alarm) :: replay_shutoff_alarm
 
       ! Setup FMS/FV3
       call MAPL_GridCompTimerStart(gc, "DYN_SETUP", _RC)
@@ -506,40 +503,14 @@ contains
       call MAPL_StateGetPointer(export, temp2d, "AREA", _RC)
       if (associated(temp2d)) temp2d = self%grid%area
 
-      ! ======================================================================
-      !ALT: the next section addresses the problem when export variables have been
-      !     assigned values during Initialize. To prevent "connected" exports
-      !     being overwritten by DEFAULT in the Import spec in the other component
-      !     we label them as being "initailized by restart". A better solution
-      !     would be to move the computation to phase 2 of Initialize and
-      !     eliminate this section alltogether
-      ! ======================================================================
-      ! ! pchakrab: TODO - do we need to port the following to MAPL3
-      ! call ESMF_StateGet(export, "PREF", field, _RC)
-      ! call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
-
-      ! call ESMF_StateGet(export, "PLE", field, _RC)
-      ! call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
-
-      ! call ESMF_StateGet(export, "U", field, _RC)
-      ! call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
-
-      ! call ESMF_StateGet(export, "V", field, _RC)
-      ! call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
-
-      ! call ESMF_StateGet(export, "T", field, _RC)
-      ! call MAPL_AttributeSet(field, NAME="MAPL_InitStatus", VALUE=MAPL_InitialRestart, _RC)
-
-      call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
-      if (FV3_STANDALONE) then
-         call ESMF_StateGet(import, "TRADV", tradv, _RC)
-         call ESMF_StateGet(export, "TRADVEX", tradvex, _RC)
-         call ESMF_FieldBundleGet(tradv, fieldCount=numTracers, _RC)
-         do i = 1, numTracers
-            call ESMF_FieldBundleGet(tradv, fieldIndex=i, field=field, _RC)
-            call MAPL_FieldBundleAdd(tradvex, [field], _RC)
-         end do
-      end if
+      ! Replay shutoff alarm
+      call MAPL_GridCompGetResource(gc, "REPLAY_SHUTOFF", replay_shutoff_seconds, default=-3600, _RC)
+      call ESMF_TimeIntervalSet(replay_shutoff_interval, s=abs(replay_shutoff_seconds), _RC)
+      replay_shutoff_alarm = ESMF_AlarmCreate( &
+           name="ReplayShutOff", &
+           clock=clock, &
+           ringInterval=replay_shutoff_interval, &
+           sticky=.true., _RC)
 
       _RETURN(_SUCCESS)
    end subroutine Initialize
@@ -587,7 +558,7 @@ contains
       integer :: numvars
       integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
       integer :: kend, i, j, k, n
-      ! pchakrab - convt is not used anywhere
+      ! TODO: pchakrab - convt is not used anywhere
       logical, parameter :: convt = .false. ! Until this is run with full physics
       logical :: is_shutoff, is_ringing
 
@@ -716,7 +687,7 @@ contains
       real(kind=r8), allocatable :: udtmp(:, :, :)
       real(kind=r8), allocatable :: vdtmp(:, :, :)
 
-      character(len=ESMF_MAXSTR), allocatable :: names(:), names0(:)
+      character(len=ESMF_MAXSTR), allocatable :: names(:) !, names0(:)
 
       real(kind=r4), allocatable :: lats(:, :), lons(:, :)
       ! real(r4), allocatable :: ZTH(:,:), SLR(:,:) - used in some commented code
@@ -740,11 +711,12 @@ contains
 #endif
       type(ESMF_Alarm) :: predictor_alarm
       type(ESMF_Grid) :: bgrid
-      character(len=ESMF_MAXSTR) :: fieldname
+      character(len=:), allocatable :: field_name
       character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
       character(len=:), allocatable :: adjust_tracer_mode, xlist(:)
       real(kind=r8) :: t1, t2, dyn_run_timer
       class(logger_t), pointer :: logger
+      logical :: same_tradv_data
 
       call ESMF_VMGetCurrent(vm, _RC)
       call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
@@ -854,7 +826,11 @@ contains
       ! Here we copy the tracer data from the import bundle to the export bundle
       call ESMF_StateGet(import, "TRADV", bundle_imp, _RC)
       call ESMF_StateGet(export, "TRADV", bundle, _RC)
-      call MAPL_FieldBundleCopy(bundle_imp, bundle, _RC) ! copy tracer data to the export bundle
+      ! Instead of copying, ensure that bundle_imp and bundle point to the same data in the
+      ! contained fields. This is important to check because we don't have a coupling mechanism yet
+      ! call MAPL_FieldBundleCopy(bundle_imp, bundle, _RC) ! copy tracer data to the export bundle
+      same_tradv_data = MAPL_FieldBundleSameData(bundle_imp, bundle, _RC)
+      _ASSERT(same_tradv_data, "TRADV bundles in import and export do not point to the same data")
 
       ! ALT: this section attempts to limit the amount of advected tracers
       adjust_tracers = .false.
@@ -886,24 +862,24 @@ contains
             call ESMF_FieldBundleSet(BundleAdv, grid=bgrid, _RC)
             ! loop over NQ in TRADV
             do i = 1, nqt
-               !get field from TRADV and its name
+               ! Get field from TRADV and its name
                call ESMF_FieldBundleGet(bundle, fieldIndex=i, field=field, _RC)
-               call ESMF_FieldGet(field, name=fieldname, _RC)
+               field_name = get_short_name(field, _RC)
                !exclude everything that is not cloud/water species
                if ((AdvCore_Advection >= 1) .and. &
-                    (TRIM(fieldname) /= "Q") .and. &
-                    (TRIM(fieldname) /= "QLCN") .and. &
-                    (TRIM(fieldname) /= "QLLS") .and. &
-                    (TRIM(fieldname) /= "QICN") .and. &
-                    (TRIM(fieldname) /= "QILS") .and. &
-                    (TRIM(fieldname) /= "CLCN") .and. &
-                    (TRIM(fieldname) /= "CLLS") .and. &
-                    (TRIM(fieldname) /= "NCPL") .and. &
-                    (TRIM(fieldname) /= "NCPI") .and. &
-                    (TRIM(fieldname) /= "QRAIN") .and. &
-                    (TRIM(fieldname) /= "QSNOW") .and. &
-                    (TRIM(fieldname) /= "QGRAUPEL")) then
-                  call logger%info("run:: FV3+ADV is excluding " // TRIM(fieldname))
+                    (field_name /= "Q") .and. &
+                    (field_name /= "QLCN") .and. &
+                    (field_name /= "QLLS") .and. &
+                    (field_name /= "QICN") .and. &
+                    (field_name /= "QILS") .and. &
+                    (field_name /= "CLCN") .and. &
+                    (field_name /= "CLLS") .and. &
+                    (field_name /= "NCPL") .and. &
+                    (field_name /= "NCPI") .and. &
+                    (field_name /= "QRAIN") .and. &
+                    (field_name /= "QSNOW") .and. &
+                    (field_name /= "QGRAUPEL")) then
+                  call logger%info("run:: FV3+ADV is excluding " // field_name)
 
                   n = n + 1
                   if (n > size(xlist)) then
@@ -911,12 +887,12 @@ contains
                      biggerlist(1:n - 1) = xlist
                      call move_alloc(from=biggerlist, to=xlist)
                   end if
-                  xlist(n) = TRIM(fieldname)
+                  xlist(n) = trim(field_name)
                end if
                !loop over exclude_list
                exclude = .false.
                do j = 1, n
-                  if (fieldname == xlist(j)) then
+                  if (field_name == xlist(j)) then
                      exclude = .true.
                      exit
                   end if
@@ -942,15 +918,14 @@ contains
          BundleAdv = bundle ! replace with TRADV
       end if ! adjust_tracers
 
+      ! Collect tracer names from the bundle for later use
       call ESMF_FieldBundleGet(bundle, fieldCount=nq, _RC)
-
       if (nq > 0) then
          allocate(names(nq), _STAT)
-         call ESMF_FieldBundleGet(bundle, itemorderflag=ESMF_ITEMORDER_ADDORDER, fieldNameList=names, _RC)
-         if (.not.allocated(names0)) then
-            allocate(names0(nq), _STAT)
-            names0 = names
-         end if
+         do i = 1, nq
+            call ESMF_FieldBundleGet(bundle, fieldIndex=i, field=field, _RC)
+            names(i) = get_short_name(field, _RC)
+         end do
       end if
 
       ! Surface Geopotential from import state
@@ -965,7 +940,7 @@ contains
       ! end of fewer_tracers-section
       !-----------------------------
 
-      do k = 1, nq ! size(names)
+      do k = 1, nq ! size(names) - array names can be unallocated if there are no tracers
          pos = index(names(k), "::")
          if (pos > 0) then
             if ((names(k)(pos + 2:)) == "OX") ooo = vars%tracer(k)
@@ -977,26 +952,11 @@ contains
       ! WMP Begin REPLAY/ANA section
       call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
       is_shutoff = .true.
-      ! if (.not. FV3_STANDALONE) then
-      !    call MAPL_GridCompTimerStart(gc, "DYN_ANA", _RC)
-      !    block
-      !       integer :: iter, alarm_count
-      !       type(ESMF_Alarm), allocatable :: alarm_list(:)
-      !       character(len=ESMF_MAXSTR) :: alarm_name
-      !       call ESMF_ClockGetAlarmList(clock, ESMF_ALARMLIST_ALL, alarmCount=alarm_count, _RC)
-      !       _HERE, "alarm count: ", alarm_count
-      !       allocate(alarm_list(alarm_count), _STAT)
-      !       call ESMF_ClockGetAlarmList(clock, ESMF_ALARMLIST_ALL, alarmList=alarm_list, _RC)
-      !       do iter = 1, alarm_count
-      !          call ESMF_AlarmGet(alarm_list(iter), name=alarm_name, _RC)
-      !          _HERE, "alarm ", iter, ": ", trim(alarm_name)
-      !       end do
-      !    end block
-      !    call ESMF_ClockGetAlarm(clock, "REPLAYShutOff", alarm, _RC)
-      !    is_shutoff = ESMF_AlarmIsRinging(alarm, _RC)
-      ! end if
-
-      is_shutoff = .true. ! TODO: pchakrab - Until we figure out the issue with alarm creation
+      if (.not. FV3_STANDALONE) then
+         call MAPL_GridCompTimerStart(gc, "DYN_ANA", _RC)
+         call ESMF_ClockGetAlarm(clock, "ReplayShutOff", alarm, _RC)
+         is_shutoff = ESMF_AlarmIsRinging(alarm, _RC)
+      end if
       if (.not. is_shutoff) then
          ! If requested, do Intermittent Replay
          ! pchakrab - we are not doing this anymore, right?
@@ -1023,7 +983,7 @@ contains
                   end if
                end if
 
-               if (TRIM(names(k)) == "Q") then
+               if (trim(names(k)) == "Q") then
                   if ((qqq%is_r4) .and. associated(qqq%content_r4)) then
                      if (size(qv) == size(qqq%content_r4)) then
                         qv = qqq%content_r4
@@ -1064,35 +1024,35 @@ contains
          qs = 0.0
          qg = 0.0
          do n = 1, size(names)
-            if (TRIM(names(n)) == "QLCN" .or. TRIM(names(n)) == "QLLS") then
+            if (trim(names(n)) == "QLCN" .or. trim(names(n)) == "QLLS") then
                if (self%vars%tracer(n)%is_r4) then
                   ql = ql + self%vars%tracer(n)%content_r4
                else
                   ql = ql + self%vars%tracer(n)%content
                end if
             end if
-            if (TRIM(names(n)) == "QICN" .or. TRIM(names(n)) == "QILS") then
+            if (trim(names(n)) == "QICN" .or. trim(names(n)) == "QILS") then
                if (self%vars%tracer(n)%is_r4) then
                   qi = qi + self%vars%tracer(n)%content_r4
                else
                   qi = qi + self%vars%tracer(n)%content
                end if
             end if
-            if (TRIM(names(n)) == "QRAIN") then
+            if (trim(names(n)) == "QRAIN") then
                if (self%vars%tracer(n)%is_r4) then
                   qr = self%vars%tracer(n)%content_r4
                else
                   qr = self%vars%tracer(n)%content
                end if
             end if
-            if (TRIM(names(n)) == "QSNOW") then
+            if (trim(names(n)) == "QSNOW") then
                if (self%vars%tracer(n)%is_r4) then
                   qs = self%vars%tracer(n)%content_r4
                else
                   qs = self%vars%tracer(n)%content
                end if
             end if
-            if (TRIM(names(n)) == "QGRAUPEL") then
+            if (trim(names(n)) == "QGRAUPEL") then
                if (self%vars%tracer(n)%is_r4) then
                   qg = self%vars%tracer(n)%content_r4
                else
@@ -1165,7 +1125,7 @@ contains
             allocate(dqldtanaint2(ifirstxy:ilastxy, jfirstxy:jlastxy))
             dqldtanaint1 = 0.0
             do n = 1, size(names)
-               if (TRIM(names(n)) == "QLCN" .or. TRIM(names(n)) == "QLLS") then
+               if (trim(names(n)) == "QLCN" .or. trim(names(n)) == "QLLS") then
                   do k = 1, km
                      if (self%vars%tracer(n)%is_r4) then
                         dqldtanaint1 = dqldtanaint1 + self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
@@ -1187,7 +1147,7 @@ contains
             allocate(dqidtanaint2(ifirstxy:ilastxy, jfirstxy:jlastxy))
             dqidtanaint1 = 0.0
             do n = 1, size(names)
-               if (TRIM(names(n)) == "QICN" .or. TRIM(names(n)) == "QILS") then
+               if (trim(names(n)) == "QICN" .or. trim(names(n)) == "QILS") then
                   do k = 1, km
                      if (self%vars%tracer(n)%is_r4) then
                         dqidtanaint1 = dqidtanaint1 + self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
@@ -1271,16 +1231,16 @@ contains
          ! Update Specific Mass of Aerosol Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air After ANA Updates
          if ((.not. ADIABATIC)) then
             do n = 1, nq
-               if ((TRIM(names(n)) /= "Q") .and. &
-                    (TRIM(names(n)) /= "QLLS") .and. &
-                    (TRIM(names(n)) /= "QLCN") .and. &
-                    (TRIM(names(n)) /= "QILS") .and. &
-                    (TRIM(names(n)) /= "QICN") .and. &
-                    (TRIM(names(n)) /= "CLLS") .and. &
-                    (TRIM(names(n)) /= "CLCN") .and. &
-                    (TRIM(names(n)) /= "QRAIN") .and. &
-                    (TRIM(names(n)) /= "QSNOW") .and. &
-                    (TRIM(names(n)) /= "QGRAUPEL")) then
+               if ((trim(names(n)) /= "Q") .and. &
+                    (trim(names(n)) /= "QLLS") .and. &
+                    (trim(names(n)) /= "QLCN") .and. &
+                    (trim(names(n)) /= "QILS") .and. &
+                    (trim(names(n)) /= "QICN") .and. &
+                    (trim(names(n)) /= "CLLS") .and. &
+                    (trim(names(n)) /= "CLCN") .and. &
+                    (trim(names(n)) /= "QRAIN") .and. &
+                    (trim(names(n)) /= "QSNOW") .and. &
+                    (trim(names(n)) /= "QGRAUPEL")) then
                   if (self%vars%tracer(n)%is_r4) then
                      self%vars%tracer(n)%content_r4 = self%vars%tracer(n)%content_r4 * (qdnew / qdold)
                   else
@@ -1319,16 +1279,16 @@ contains
          ! Ensure Conservation of Global Mass of Aerosol Constituents After ANA Updates
          if ((.not. ADIABATIC)) then
             do n = 1, nq
-               if ((TRIM(names(n)) /= "Q") .and. &
-                    (TRIM(names(n)) /= "QLLS") .and. &
-                    (TRIM(names(n)) /= "QLCN") .and. &
-                    (TRIM(names(n)) /= "QILS") .and. &
-                    (TRIM(names(n)) /= "QICN") .and. &
-                    (TRIM(names(n)) /= "CLLS") .and. &
-                    (TRIM(names(n)) /= "CLCN") .and. &
-                    (TRIM(names(n)) /= "QRAIN") .and. &
-                    (TRIM(names(n)) /= "QSNOW") .and. &
-                    (TRIM(names(n)) /= "QGRAUPEL")) then
+               if ((trim(names(n)) /= "Q") .and. &
+                    (trim(names(n)) /= "QLLS") .and. &
+                    (trim(names(n)) /= "QLCN") .and. &
+                    (trim(names(n)) /= "QILS") .and. &
+                    (trim(names(n)) /= "QICN") .and. &
+                    (trim(names(n)) /= "CLLS") .and. &
+                    (trim(names(n)) /= "CLCN") .and. &
+                    (trim(names(n)) /= "QRAIN") .and. &
+                    (trim(names(n)) /= "QSNOW") .and. &
+                    (trim(names(n)) /= "QGRAUPEL")) then
 
                   if (real(trsum1(n), kind=4) /= MAPL_UNDEFINED_REAL .and. &
                        real(trsum2(n), kind=4) /= MAPL_UNDEFINED_REAL) then
@@ -1370,7 +1330,7 @@ contains
                   end if
                end if
             end if
-            if (TRIM(names(k)) == "Q") then
+            if (trim(names(k)) == "Q") then
                if (qqq%is_r4) then
                   qv = qqq%content_r4
                else
@@ -1444,8 +1404,8 @@ contains
          if (associated(temp2d)) then
             dqldtanaint2 = 0.0
             do n = 1, size(names)
-               if (TRIM(names(n)) == "QLCN" .or. &
-                    TRIM(names(n)) == "QLLS") then
+               if (trim(names(n)) == "QLCN" .or. &
+                    trim(names(n)) == "QLLS") then
                   do k = 1, km
                      if (self%vars%tracer(n)%is_r4) then
                         dqldtanaint2 = dqldtanaint2 + self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
@@ -1465,8 +1425,8 @@ contains
          if (associated(temp2d)) then
             dqidtanaint2 = 0.0
             do n = 1, size(names)
-               if (TRIM(names(n)) == "QICN" .or. &
-                    TRIM(names(n)) == "QILS") then
+               if (trim(names(n)) == "QICN" .or. &
+                    trim(names(n)) == "QILS") then
                   do k = 1, km
                      if (self%vars%tracer(n)%is_r4) then
                         dqidtanaint2 = dqidtanaint2 + self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
@@ -1525,7 +1485,7 @@ contains
                      end if
                   end if
                end if
-               if (TRIM(names(k)) == "Q") then
+               if (trim(names(k)) == "Q") then
                   if ((qqq%is_r4) .and. associated(qqq%content_r4)) then
                      if (size(qv) == size(qqq%content_r4)) then
                         qv = qqq%content_r4
@@ -1549,7 +1509,7 @@ contains
 
       end if
       if (.not. FV3_STANDALONE) then
-         ! call MAPL_GridCompTimerStop(gc, "DYN_ANA", _RC)
+         call MAPL_GridCompTimerStop(gc, "DYN_ANA", _RC)
       end if
 
       call MAPL_GridCompTimerStart(gc, "DYN_PROLOGUE", _RC)
@@ -1582,8 +1542,8 @@ contains
          if (associated(dqldt)) then
             dqldt = 0.0
             do k = 1, size(names)
-               if (TRIM(names(k)) == "QLCN" .or. &
-                    TRIM(names(k)) == "QLLS") then
+               if (trim(names(k)) == "QLCN" .or. &
+                    trim(names(k)) == "QLLS") then
                   if (self%vars%tracer(k)%is_r4) then
                      if (size(dqldt) == size(self%vars%tracer(k)%content_r4)) &
                           dqldt = dqldt - self%vars%tracer(k)%content_r4
@@ -1598,8 +1558,8 @@ contains
          if (associated(dqidt)) then
             dqidt = 0.0
             do k = 1, size(names)
-               if (TRIM(names(k)) == "QICN" .or. &
-                    TRIM(names(k)) == "QILS") then
+               if (trim(names(k)) == "QICN" .or. &
+                    trim(names(k)) == "QILS") then
                   if (self%vars%tracer(k)%is_r4) then
                      if (size(dqidt) == size(self%vars%tracer(k)%content_r4)) &
                           dqidt = dqidt - self%vars%tracer(k)%content_r4
@@ -1643,8 +1603,8 @@ contains
       if (associated(temp2d)) then
          temp2d = 0.0
          do n = 1, size(names)
-            if (TRIM(names(n)) == "QLCN" .or. &
-                 TRIM(names(n)) == "QLLS") then
+            if (trim(names(n)) == "QLCN" .or. &
+                 trim(names(n)) == "QLLS") then
                if (self%vars%tracer(n)%is_r4) then
                   do k = 1, km
                      temp2d = temp2d - self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
@@ -1662,8 +1622,8 @@ contains
       if (associated(temp2d)) then
          temp2d = 0.0
          do n = 1, size(names)
-            if (TRIM(names(n)) == "QICN" .or. &
-                 TRIM(names(n)) == "QILS") then
+            if (trim(names(n)) == "QICN" .or. &
+                 trim(names(n)) == "QILS") then
                if (self%vars%tracer(n)%is_r4) then
                   do k = 1, km
                      temp2d = temp2d - self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
@@ -1976,7 +1936,7 @@ contains
 #ifdef SKIP_TRACERS
          do itracer = 1, ntracers
             write(myTracer, "('Q',i5.5)") itracer - 1
-            call MAPL_StateGetPointer(export, temp3d, TRIM(myTracer), _RC)
+            call MAPL_StateGetPointer(export, temp3d, trim(myTracer), _RC)
             if ((associated(temp3d)) .and. (nq >= itracer)) then
                if (self%vars%tracer(itracer)%is_r4) then
                   temp3d = self%vars%tracer(itracer)%content_r4
@@ -2008,10 +1968,10 @@ contains
          if (associated(qctmp)) then
             qctmp = 0.0
             do k = 1, size(names)
-               if (TRIM(names(k)) == 'QLCN' .or. &
-                    TRIM(names(k)) == 'QILS' .or. &
-                    TRIM(names(k)) == 'QICN' .or. &
-                    TRIM(names(k)) == 'QLLS') then
+               if (trim(names(k)) == 'QLCN' .or. &
+                    trim(names(k)) == 'QILS' .or. &
+                    trim(names(k)) == 'QICN' .or. &
+                    trim(names(k)) == 'QLLS') then
                   if (self%vars%tracer(k)%is_r4) then
                      if (size(dqldt) == size(self%vars%tracer(k)%content_r4)) &
                           qctmp = qctmp + self%vars%tracer(k)%content_r4
@@ -2025,8 +1985,8 @@ contains
 
          if (associated(dqldt)) then
             do n = 1, size(names)
-               if (TRIM(names(n)) == 'QLCN' .or. &
-                    TRIM(names(n)) == 'QLLS') then
+               if (trim(names(n)) == 'QLCN' .or. &
+                    trim(names(n)) == 'QLLS') then
                   if (self%vars%tracer(n)%is_r4) then
                      dqldt = dqldt + self%vars%tracer(n)%content_r4
                   else
@@ -2039,8 +1999,8 @@ contains
 
          if (associated(dqidt)) then
             do n = 1, size(names)
-               if (TRIM(names(n)) == 'QICN' .or. &
-                    TRIM(names(n)) == 'QILS') then
+               if (trim(names(n)) == 'QICN' .or. &
+                    trim(names(n)) == 'QILS') then
                   if (self%vars%tracer(n)%is_r4) then
                      dqidt = dqidt + self%vars%tracer(n)%content_r4
                   else
@@ -2079,8 +2039,8 @@ contains
          call MAPL_StateGetPointer(export, temp2d, 'DQLDTDYNINT', _RC)
          if (associated(temp2d)) then
             do n = 1, size(names)
-               if (TRIM(names(n)) == 'QLCN' .or. &
-                    TRIM(names(n)) == 'QLLS') then
+               if (trim(names(n)) == 'QLCN' .or. &
+                    trim(names(n)) == 'QLLS') then
                   if (self%vars%tracer(n)%is_r4) then
                      do k = 1, km
                         temp2d = temp2d + self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
@@ -2098,8 +2058,8 @@ contains
          call MAPL_StateGetPointer(export, temp2d, 'DQIDTDYNINT', _RC)
          if (associated(temp2d)) then
             do n = 1, size(names)
-               if (TRIM(names(n)) == 'QICN' .or. &
-                    TRIM(names(n)) == 'QILS') then
+               if (trim(names(n)) == 'QICN' .or. &
+                    trim(names(n)) == 'QILS') then
                   if (self%vars%tracer(n)%is_r4) then
                      do k = 1, km
                         temp2d = temp2d + self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
@@ -2231,8 +2191,8 @@ contains
          if (associated(temp2d)) then
             temp2d = 0.0
             do n = 1, size(names)
-               if (TRIM(names(n)) == 'QLCN' .or. &
-                    TRIM(names(n)) == 'QLLS') then
+               if (trim(names(n)) == 'QLCN' .or. &
+                    trim(names(n)) == 'QLLS') then
                   do k = 1, km
                      if (self%vars%tracer(n)%is_r4) then
                         temp2d = temp2d + ur(:, :, k) * self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
@@ -2249,8 +2209,8 @@ contains
          if (associated(temp2d)) then
             temp2d = 0.0
             do n = 1, size(names)
-               if (TRIM(names(n)) == 'QLCN' .or. &
-                    TRIM(names(n)) == 'QLLS') then
+               if (trim(names(n)) == 'QLCN' .or. &
+                    trim(names(n)) == 'QLLS') then
                   do k = 1, km
                      if (self%vars%tracer(n)%is_r4) then
                         temp2d = temp2d + vr(:, :, k) * self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
@@ -2268,8 +2228,8 @@ contains
          if (associated(temp2d)) then
             temp2d = 0.0
             do n = 1, size(names)
-               if (TRIM(names(n)) == 'QICN' .or. &
-                    TRIM(names(n)) == 'QILS') then
+               if (trim(names(n)) == 'QICN' .or. &
+                    trim(names(n)) == 'QILS') then
                   do k = 1, km
                      if (self%vars%tracer(n)%is_r4) then
                         temp2d = temp2d + ur(:, :, k) * self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
@@ -2286,8 +2246,8 @@ contains
          if (associated(temp2d)) then
             temp2d = 0.0
             do n = 1, size(names)
-               if (TRIM(names(n)) == 'QICN' .or. &
-                    TRIM(names(n)) == 'QILS') then
+               if (trim(names(n)) == 'QICN' .or. &
+                    trim(names(n)) == 'QILS') then
                   do k = 1, km
                      if (self%vars%tracer(n)%is_r4) then
                         temp2d = temp2d + vr(:, :, k) * self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
@@ -2632,9 +2592,9 @@ contains
       deallocate(ddpdt)
       deallocate(phisxy)
       if (allocated(names)) deallocate(names)
-      if (allocated(names0)) deallocate(names0)
+      ! if (allocated(names0)) deallocate(names0)
 
-      call freeTracers(self)
+      call free_tracers (self)
 
       !if (ADIABATIC) then
       !  ! Fill Exports
@@ -2645,27 +2605,28 @@ contains
 
    end subroutine run
 
-   subroutine PULL_Q(self, import, qqq, iNXQ, InFieldName, rc)
+   subroutine PULL_Q(self, import, qqq, inxq, in_field_name, rc)
       type(DynState) :: self
       type(ESMF_State) :: import
       type(DynTracers) :: qqq ! Specific Humidity
-      integer, intent(in) :: iNXQ
-      character(len=*), optional, intent(in) :: InFieldName
+      integer, intent(in) :: inxq
+      character(len=*), optional, intent(in) :: in_field_name
       integer, optional, intent(out) :: rc
 
-      character(len=ESMF_MAXSTR) :: fieldname, QFieldName
+      character(len=ESMF_MAXSTR) :: q_field_name
+      character(len=:), allocatable :: field_name
       type(ESMF_FieldBundle) :: bundle
       type(ESMF_Field) :: field
       type(ESMF_Array) :: array
-      type(ESMF_TypeKind_Flag) :: kind
+      type(ESMF_TypeKind_Flag) :: tk
       real(kind=r4), pointer, contiguous :: ptr_r4(:, :, :)
       real(kind=r8), pointer :: ptr_r8(:, :, :)
       integer :: n, nq
       integer :: i1, in, j1, jn, im, jm, km
       integer :: status
 
-      QFieldName = "Q"
-      if (present(InFieldName)) QFieldName = InFieldName
+      q_field_name = "Q"
+      if (present(in_field_name)) q_field_name = in_field_name
 
       i1 = self%grid%is
       in = self%grid%ie
@@ -2677,36 +2638,40 @@ contains
 
       bundle = BundleAdv
 
-      ! Count the friendlies
+      ! Count the bundles tracers
       call ESMF_FieldBundleGet(bundle, fieldCount=nq, _RC)
 
-      nq = nq + iNXQ
-      self%grid%nq = nq ! grid%NQ is now the "official" NQ
+      ! grid%nq - number of tracers
+      nq = nq + inxq
+      self%grid%nq = nq ! grid%nq is now the "official" nq
 
-      ! Tracer pointer array
+      ! vars%tracer - tracer pointer array
       if (associated(self%vars%tracer)) then
-         call freeTracers(self)
+         call free_tracers(self)
       end if
-
       allocate(self%vars%tracer(nq), _STAT)
 
-      do n = 1, nq - iNXQ
+      do n = 1, nq - inxq
          call ESMF_FieldBundleGet(bundle, fieldIndex=n, field=field, _RC)
-         call ESMF_FieldGet(field, array=array, name=fieldname, _RC)
-         call ESMF_ArrayGet(array, typekind=kind, _RC)
-         self%vars%tracer(n)%is_r4 = (kind == ESMF_TYPEKIND_R4) ! Is real*4?
-         self%vars%tracer(n)%TNAME = fieldname
+         ! tracer(n)%is_r4
+         call ESMF_FieldGet(field, array=array, _RC)
+         call ESMF_ArrayGet(array, typekind=tk, _RC)
+         self%vars%tracer(n)%is_r4 = (tk == ESMF_TYPEKIND_R4) ! Is real*4?
+         ! tracer(n)%tname
+         field_name = get_short_name(field, _RC)
+         self%vars%tracer(n)%tname = field_name
+         ! tracer(n)%content/content_r4
          if (self%vars%tracer(n)%is_r4) then
             call ESMF_ArrayGet(array, localDE=0, farrayptr=ptr_r4, _RC)
             self%vars%tracer(n)%content_r4(i1:in, j1:jn, 1:km) => ptr_r4
-            if (fieldname == QFieldName) then
+            if (field_name == q_field_name) then
                qqq%is_r4 = .true.
                qqq%content_r4 => self%vars%tracer(n)%content_r4
             end if
          else
             call ESMF_ArrayGet(array, localDE=0, farrayptr=ptr_r8, _RC)
             self%vars%tracer(n)%content => ptr_r8
-            if (fieldname == QFieldName) then
+            if (field_name == q_field_name) then
                qqq%is_r4 = .false.
                qqq%content => self%vars%tracer(n)%content
             end if
@@ -2716,6 +2681,43 @@ contains
       _RETURN(_SUCCESS)
       _UNUSED_DUMMY(import)
    end subroutine PULL_Q
+
+   function get_short_name(field, rc) result(short_name)
+      type(ESMF_Field) :: field
+      integer, intent(out) :: rc
+      character(len=:), allocatable :: short_name
+
+      character(len=:), allocatable :: standard_name
+      integer :: status
+
+      call MAPL_FieldGet(field, standard_name=standard_name, _RC)
+      select case (trim(standard_name))
+      case ("specific_humidity")
+         short_name = "Q"
+      case ("mass_fraction_of_large_scale_cloud_liquid_water")
+         short_name = "QLLS"
+      case ("mass_fraction_of_convective_cloud_liquid_water")
+         short_name = "QLCN"
+      case ("mass_fraction_of_large_scale_cloud_ice_water")
+         short_name = "QILS"
+      case ("mass_fraction_of_convective_cloud_ice_water")
+         short_name = "QICN"
+      case ("large_scale_cloud_area_fraction")
+         short_name = "CLLS"
+      case ("convective_cloud_area_fraction")
+         short_name = "CLCN"
+      case ("mass_fraction_of_rain")
+         short_name = "QRAIN"
+      case ("mass_fraction_of_snow")
+         short_name = "QSNOW"
+      case ("mass_fraction_of_graupel")
+         short_name = "QGRAUPEL"
+      case default
+         _FAIL("Unrecognized standard_name: " // trim(standard_name))
+      end select
+
+      _RETURN(_SUCCESS)
+   end function get_short_name
 
    !BOP
    !IROUTINE: run_add_incs
@@ -3002,7 +3004,7 @@ contains
 #ifdef SKIP_TRACERS
          do itracer = 1, ntracers
             write(myTracer, "('Q',i5.5)") itracer - 1
-            call MAPL_StateGetPointer(export, temp3d, TRIM(myTracer), _RC)
+            call MAPL_StateGetPointer(export, temp3d, trim(myTracer), _RC)
             if ((associated(temp3d)) .and. (self%grid%nq >= itracer)) then
                if (self%vars%tracer(itracer)%is_r4) then
                   temp3d = self%vars%tracer(itracer)%content_r4
@@ -3356,7 +3358,7 @@ contains
          deallocate(dthdtphyint1)
          deallocate(dthdtphyint2)
 
-         call freeTracers(self)
+         call free_tracers(self)
 
       end if ! .not. SW_DYNAMICS
 
@@ -3435,19 +3437,19 @@ contains
       nwat_tracers = 0
       if ((nwat == 0) .and. (.not. ADIABATIC)) then
          do n = 1, self%grid%nq
-            if (TRIM(self%vars%tracer(n)%TNAME) == 'Q') nwat_tracers = nwat_tracers + 1
-            if (TRIM(self%vars%tracer(n)%TNAME) == 'QLCN') nwat_tracers = nwat_tracers + 1
-            if (TRIM(self%vars%tracer(n)%TNAME) == 'QLLS') nwat_tracers = nwat_tracers + 1
-            if (TRIM(self%vars%tracer(n)%TNAME) == 'QICN') nwat_tracers = nwat_tracers + 1
-            if (TRIM(self%vars%tracer(n)%TNAME) == 'QILS') nwat_tracers = nwat_tracers + 1
+            if (trim(self%vars%tracer(n)%TNAME) == 'Q') nwat_tracers = nwat_tracers + 1
+            if (trim(self%vars%tracer(n)%TNAME) == 'QLCN') nwat_tracers = nwat_tracers + 1
+            if (trim(self%vars%tracer(n)%TNAME) == 'QLLS') nwat_tracers = nwat_tracers + 1
+            if (trim(self%vars%tracer(n)%TNAME) == 'QICN') nwat_tracers = nwat_tracers + 1
+            if (trim(self%vars%tracer(n)%TNAME) == 'QILS') nwat_tracers = nwat_tracers + 1
          end do
          ! We must have these first 5 at a minimum
          _ASSERT(nwat_tracers == 5, 'expecting 5 water species: Q QLCN QLLS QICN QILS')
          ! Check for QRAIN, QSNOW, QGRAUPEL
          do n = 1, self%grid%nq
-            if (TRIM(self%vars%tracer(n)%TNAME) == 'QRAIN') nwat_tracers = nwat_tracers + 1
-            if (TRIM(self%vars%tracer(n)%TNAME) == 'QSNOW') nwat_tracers = nwat_tracers + 1
-            if (TRIM(self%vars%tracer(n)%TNAME) == 'QGRAUPEL') nwat_tracers = nwat_tracers + 1
+            if (trim(self%vars%tracer(n)%TNAME) == 'QRAIN') nwat_tracers = nwat_tracers + 1
+            if (trim(self%vars%tracer(n)%TNAME) == 'QSNOW') nwat_tracers = nwat_tracers + 1
+            if (trim(self%vars%tracer(n)%TNAME) == 'QGRAUPEL') nwat_tracers = nwat_tracers + 1
          end do
          if (nwat_tracers >= 5) nwat = 3 ! state has QV, QLIQ, QICE
          if (nwat_tracers == 8) nwat = 6 ! state has QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL
@@ -3484,7 +3486,7 @@ contains
          allocate(Q(is:ie, js:je, 1:km, nwat))
          allocate(CVM(is:ie, js:je, 1:km))
          Q(:, :, :, :) = 0.0
-         call PULL_Q(self, import, qqq, NXQ, InFieldName='Q', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='Q', rc=rc)
          if (DYN_COLDSTART .and. overwrite_Q .and. (.not. ADIABATIC)) then
             ! USE Q computed by FV3
             call getQ(Q(:, :, :, sphum), 'Q')
@@ -3508,14 +3510,14 @@ contains
       end if
       if (nwat >= 3) then
          ! Grab QLIQ from imports
-         call PULL_Q(self, import, qqq, NXQ, InFieldName='QLLS', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QLLS', rc=rc)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, liq_wat)) == size(qqq%content_r4)) Q(:, :, :, liq_wat) = Q(:, :, :, liq_wat) &
                  + qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:, :, :, liq_wat)) == size(qqq%content)) Q(:, :, :, liq_wat) = Q(:, :, :, liq_wat) + qqq%content
          end if
-         call PULL_Q(self, import, qqq, NXQ, InFieldName='QLCN', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QLCN', rc=rc)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, liq_wat)) == size(qqq%content_r4)) Q(:, :, :, liq_wat) = Q(:, :, :, liq_wat) &
                  + qqq%content_r4
@@ -3523,14 +3525,14 @@ contains
             if (size(Q(:, :, :, liq_wat)) == size(qqq%content)) Q(:, :, :, liq_wat) = Q(:, :, :, liq_wat) + qqq%content
          end if
          ! Grab QICE from imports
-         call PULL_Q(self, import, qqq, NXQ, InFieldName='QILS', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QILS', rc=rc)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, ice_wat)) == size(qqq%content_r4)) Q(:, :, :, ice_wat) = Q(:, :, :, ice_wat) &
                  + qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:, :, :, ice_wat)) == size(qqq%content)) Q(:, :, :, ice_wat) = Q(:, :, :, ice_wat) + qqq%content
          end if
-         call PULL_Q(self, import, qqq, NXQ, InFieldName='QICN', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QICN', rc=rc)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, ice_wat)) == size(qqq%content_r4)) Q(:, :, :, ice_wat) = Q(:, :, :, ice_wat) &
                  + qqq%content_r4
@@ -3540,21 +3542,21 @@ contains
       end if
       if (nwat >= 6) then
          ! Grab RAIN from imports
-         call PULL_Q(self, import, qqq, NXQ, InFieldName='QRAIN', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QRAIN', rc=rc)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, rainwat)) == size(qqq%content_r4)) Q(:, :, :, rainwat) = qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:, :, :, rainwat)) == size(qqq%content)) Q(:, :, :, rainwat) = qqq%content
          end if
          ! Grab SNOW from imports
-         call PULL_Q(self, import, qqq, NXQ, InFieldName='QSNOW', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QSNOW', rc=rc)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, snowwat)) == size(qqq%content_r4)) Q(:, :, :, snowwat) = qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:, :, :, snowwat)) == size(qqq%content)) Q(:, :, :, snowwat) = qqq%content
          end if
          ! Grab GRAUPEL from imports
-         call PULL_Q(self, import, qqq, NXQ, InFieldName='QGRAUPEL', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QGRAUPEL', rc=rc)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, graupel)) == size(qqq%content_r4)) Q(:, :, :, graupel) = qqq%content_r4
          elseif (associated(qqq%content)) then
@@ -4183,7 +4185,7 @@ contains
          DYN_CASE = CASE_ID
 
          write(string, '(A,I5,A)') "Initializing CASE_ID ", CASE_ID, " in FVcubed:"
-         call logger%info(TRIM(string))
+         call logger%info(trim(string))
 
          ! Parse case_rotation
          if (case_rotation == -1) rot_ang = 0
@@ -4421,111 +4423,6 @@ contains
 
          end if ! case_id
 
-         ! ! Parse Tracers
-         ! if (FV3_STANDALONE) then
-         !    call ESMF_StateGet(import, "TRADV", tradv_bundle, _RC)
-         !    call MAPL_GridCompGet(gc, geom=geom, num_levels=num_levels, _RC)
-
-         !    allocate(tracer(is:ie, js:je, 1:km), _STAT)
-         !    tracer(:, :, :) = 0.0
-         !    fieldname = 'Q'
-         !    call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
-
-         !    if (case_tracers /= 1234) then
-
-         !       do n = 1, case_tracers
-         !          tracer(:, :, :) = 0.0
-         !          write(fieldname, "('Q',i3.3)") n
-         !          call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
-         !       end do
-
-         !    else
-
-         !       !-------------------
-         !       !     tracer q1
-         !       !-------------------
-         !       tracer(:, :, :) = 0.0
-         !       do k = ks, ke
-         !          eta = 0.5 * ((ak(k - 1) + ak(k)) / 1.e5 + bk(k - 1) + bk(k))
-         !          do j = js, je
-         !             do i = is, ie
-         !                LONc = lons(i, j)
-         !                LATc = lats(i, j)
-         !                dummy_1 = tracer_q1_q2(LONc, LATc, eta, rot_ang, r0_6)
-         !                tracer(i, j, k) = dummy_1
-         !             end do
-         !          end do
-         !       end do
-         !       fieldname = 'Q1'
-         !       call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname)
-
-         !       !-------------------
-         !       !     tracer q2
-         !       !-------------------
-         !       do k = ks, ke
-         !          eta = 0.5 * ((ak(k - 1) + ak(k)) / 1.e5 + bk(k - 1) + bk(k))
-         !          do j = js, je
-         !             do i = is, ie
-         !                LONc = lons(i, j)
-         !                LATc = lats(i, j)
-         !                dummy_1 = tracer_q1_q2(LONc, LATc, eta, rot_ang, r1_0)
-         !                tracer(i, j, k) = dummy_1
-         !             end do
-         !          end do
-         !       end do
-         !       fieldname = 'Q2'
-         !       call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
-
-         !       !-------------------
-         !       !     tracer q3
-         !       !-------------------
-         !       do k = ks, ke
-         !          eta = 0.5 * ((ak(k - 1) + ak(k)) / 1.e5 + bk(k - 1) + bk(k))
-         !          do j = js, je
-         !             do i = is, ie
-         !                LONc = lons(i, j)
-         !                LATc = lats(i, j)
-         !                dummy_1 = tracer_q3(LONc, LATc, eta, rot_ang)
-         !                tracer(i, j, k) = dummy_1
-         !             end do
-         !          end do
-         !       end do
-         !       fieldname = 'Q3'
-         !       call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
-
-         !       !-------------------
-         !       !     tracer q4
-         !       !-------------------
-         !       tracer(:, :, :) = 1.0_r4
-         !       fieldname = 'Q4'
-         !       call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
-
-         !       !-------------------
-         !       !     tracer q5
-         !       !-------------------
-         !       if (allocated(Q5)) then
-         !          tracer(:, :, :) = Q5(:, :, :)
-         !          fieldname = 'Q5'
-         !          call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
-         !          deallocate(Q5, _STAT)
-         !       end if
-
-         !       !-------------------
-         !       !     tracer q6
-         !       !-------------------
-         !       if (allocated(Q6)) then
-         !          tracer(:, :, :) = Q6(:, :, :)
-         !          fieldname = 'Q6'
-         !          call addTracer(self, tradv_bundle, tracer, geom, num_levels, fieldname, _RC)
-         !          deallocate(Q6, _STAT)
-         !       end if
-
-         !    end if
-
-         !    deallocate(tracer, _STAT)
-
-         ! end if ! parse tracers
-
       end if
 
       call MAPL_StateGetPointer(internal, pe1, "PE", _RC) ! edge pressures - 1 based
@@ -4536,6 +4433,7 @@ contains
       _RETURN(_SUCCESS)
       _UNUSED_DUMMY(export)
       _UNUSED_DUMMY(clock)
+
    end subroutine COLDSTART
 
 #ifdef MY_SET_ETA
@@ -4838,101 +4736,7 @@ contains
    end subroutine set_eta
 #endif
 
-   subroutine addTracer_r8(self, bundle, var, geom, num_levels, fieldname, rc)
-      type(DynState), pointer :: self
-      type(ESMF_FieldBundle) :: bundle
-      real(kind=r8), pointer :: var(:, :, :)
-      type(ESMF_Geom), intent(in) :: geom
-      integer, intent(in) :: num_levels
-      character(len=*), intent(in) :: fieldname
-      integer, optional, intent(out) :: rc
-
-      integer :: nq, status
-      type(DynTracers), pointer :: t(:)
-      type(ESMF_Field) :: field
-      real(kind=r8), pointer :: ptr(:, :, :)
-
-      call ESMF_FieldBundleGet(bundle, fieldCount=nq, _RC)
-      nq = nq + 1
-
-      field = MAPL_FieldCreate( &
-           geom, typekind=ESMF_TYPEKIND_R8, &
-           name=fieldname, &
-           num_levels=num_levels, &
-           vert_staggerloc=VERTICAL_STAGGER_CENTER, &
-           units="unknown_units", &
-           standard_name="unknown_standard_name", &
-           long_name="unknown_long_name", _RC)
-      call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
-      ptr = var
-      call MAPL_FieldBundleAdd(bundle, [field], _RC)
-
-      if (nq == 1) then
-         allocate(self%vars%tracer(nq), _STAT)
-         self%vars%tracer(nq)%content => ptr
-         self%vars%tracer(nq)%is_r4 = .false.
-      else
-         allocate(t(nq))
-         t(1:nq - 1) = self%vars%tracer
-         deallocate(self%vars%tracer)
-         self%vars%tracer => t
-         self%vars%tracer(nq)%content => ptr
-         self%vars%tracer(nq)%is_r4 = .false.
-      end if
-
-      self%grid%nq = nq
-
-      _RETURN(_SUCCESS)
-   end subroutine addTracer_r8
-
-   subroutine addTracer_r4(self, bundle, var, geom, num_levels, fieldname, rc)
-      type(DynState), pointer :: self
-      type(ESMF_FieldBundle) :: bundle
-      real(kind=r4), pointer :: var(:, :, :)
-      type(ESMF_Geom), intent(in) :: geom
-      integer, intent(in) :: num_levels
-      character(len=*), intent(in) :: fieldname
-      integer, optional, intent(out) :: rc
-
-      integer :: nq, status
-      type(DynTracers), pointer :: t(:)
-      type(ESMF_Field) :: field
-      real(kind=r4), pointer :: ptr(:, :, :)
-
-      call ESMF_FieldBundleGet(bundle, fieldCount=nq, _RC)
-      nq = nq + 1
-
-      field = MAPL_FieldCreate( &
-           geom, typekind=ESMF_TYPEKIND_R4, &
-           name=fieldname, &
-           num_levels=num_levels, &
-           vert_staggerloc=VERTICAL_STAGGER_CENTER, &
-           units="unknown_units", &
-           standard_name="unknown_standard_name", &
-           long_name="unknown_long_name", _RC)
-      call ESMF_FieldGet(field, localDE=0, farrayptr=ptr, _RC)
-      ptr = var
-      call MAPL_FieldBundleAdd(bundle, [field], _RC)
-
-      if (nq == 1) then
-         allocate(self%vars%tracer(nq), _STAT)
-         self%vars%tracer(nq)%content_r4 => ptr
-         self%vars%tracer(nq)%is_r4 = .true.
-      else
-         allocate(t(nq))
-         t(1:nq - 1) = self%vars%tracer
-         deallocate(self%vars%tracer)
-         self%vars%tracer => t
-         self%vars%tracer(nq)%content_r4 => ptr
-         self%vars%tracer(nq)%is_r4 = .true.
-      end if
-
-      self%grid%nq = nq
-
-      _RETURN(_SUCCESS)
-   end subroutine addTracer_r4
-
-   subroutine freeTracers(self)
+   subroutine free_tracers(self)
       type(DynState) :: self
 
       if (associated(self%vars%tracer)) then
@@ -4941,7 +4745,7 @@ contains
       end if
 
       return
-   end subroutine freeTracers
+   end subroutine free_tracers
 
    subroutine Write_Profile_2d_R8(grid, arr, name)
       type(DynGrid), intent(in) :: grid
@@ -4976,7 +4780,7 @@ contains
          GSUM = SUM(SUM(arr_global, DIM=1), DIM=1)
 
          print*, '***********'
-         print*, 'stats for ', TRIM(name)
+         print*, 'stats for ', trim(name)
 
          write(*, '(3(f21.9,1x))')rng(:)
          !   Write(*,"('GlobalSum: ',f21.9)") GSUM
@@ -5019,7 +4823,7 @@ contains
          GSUM = SUM(SUM(arr_global, DIM=1), DIM=1)
 
          print*, '***********'
-         print*, 'stats for ', TRIM(name)
+         print*, 'stats for ', trim(name)
 
          write(*, '(3(f21.9,1x))')rng(:)
          !    Write(*,"('GlobalSum: ',f21.9)") GSUM
@@ -5072,7 +4876,7 @@ contains
          GSUM = SUM(SUM(SUM(arr_global, DIM=1), DIM=1), DIM=1)
 
          print*, '***********'
-         print*, 'stats for ', TRIM(name)
+         print*, 'stats for ', trim(name)
 
          do k = 1, km
             write(*, '(a,i4.0,3(f21.9,1x))')'k:', k, rng(:, k)
@@ -5134,7 +4938,7 @@ contains
          rng(2, :) = MAXVAL(MAXVAL(arr_global, DIM=1), DIM=1)
          rng(3, :) = SUM(SUM(arr_global, DIM=1), DIM=1) / (im * jm)
          print*, '***********'
-         print*, 'stats for ', TRIM(name)
+         print*, 'stats for ', trim(name)
          do k = 1, km
             write(*, '(a,i4.0,3(f21.9,1x))')'k:', k, rng(:, k)
          end do
