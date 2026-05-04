@@ -5,7 +5,7 @@ subroutine AppCSEdgeCreateF(IM_WORLD, LonEdge,LatEdge, LonCenter, LatCenter, rc)
 
    use ESMF
    use MAPL
-   use MAPL2, only: MAPL_AllocNodeArray, MAPL_AM_I_ROOT, MAPL_DeAllocNodeArray, &
+   use MAPL2, only: MAPL_AllocNodeArray, MAPL_DeAllocNodeArray, &
         MAPL_GRID_INTERIOR, MAPL_MemUtilsWrite
    use MAPL_Constants,    only : pi=> MAPL_PI_R8
    use fv_arrays_mod,     only: REAL4, REAL8, R_GRID
