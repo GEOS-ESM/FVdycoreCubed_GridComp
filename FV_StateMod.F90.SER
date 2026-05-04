@@ -2942,7 +2942,7 @@ subroutine fv_getDELZ(delz,temp,pe)
   real(REAL8) :: rdg
   peln = log(pe)
   rdg   = -rgas / grav
-  delz = rdg*temp*(peln(:,:,2:)-peln(:,:,1:))
+  delz = rdg*temp*(peln(:,:,2:)-peln(:,:,1:FV_Atm(1)%npz))
 return
 end subroutine fv_getDELZ
 
