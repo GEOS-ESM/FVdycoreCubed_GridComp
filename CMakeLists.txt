@@ -188,6 +188,7 @@ set (resource_files
   dyn.yaml
   dyn-sa.yaml
   data-moist.yaml
+  data-ana.yaml
 )
 install(FILES ${resource_files} DESTINATION etc)
 
