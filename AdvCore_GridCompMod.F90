@@ -49,51 +49,45 @@ module AdvCore_GridCompMod
 
    !USES:
    use ESMF
-   use MAPL
-   use MAPL2, only: MAPL_AddExportSpec, MAPL_AddImportSpec, MAPL_FieldBundleAdd, &
-        MAPL_GenericFinalize, MAPL_GenericInitialize, MAPL_GenericSetServices, &
-        MAPL_Get, MAPL_GetObjectFromGC, MAPL_GetPointer, MAPL_GetResource, &
-        MAPL_GridCreate, MAPL_MetaComp, &
-        MAPL_TimerAdd, MAPL_TimerOff, MAPL_TimerOn, write_parallel
-   use m_set_eta,       only: set_eta
-   use mpp_mod,         only: mpp_pe, mpp_root_pe
-   use fv_arrays_mod,   only: fv_atmos_type, FVPRC, REAL4, REAL8
-   use fms_mod,         only: fms_init, set_domain, nullify_domain
-   use fv_control_mod,  only: fv_init1, fv_init2, fv_end
+   use MAPL, only: MAPL_GridCompAddSpec, MAPL_GridCompSetEntryPoint
+   use MAPL, only: VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_EDGE
+   use MAPL, only: MAPL_GridCompGetResource, MAPL_GridCompGet, MAPL_GridGet
+   use MAPL, only: MAPL_GridCompSetGeometry
+   use MAPL, only: MAPL_StateGetPointer
+   use MAPL, only: MAPL_FieldBundleSameData, MAPL_FieldBundleAdd
+   use MAPL, only: MAPL_STATEITEM_SERVICE
+   use MAPL, only: MAPL_Verify, MAPL_Return, MAPL_Assert
+
+   use m_set_eta, only: set_eta
+   use mpp_mod, only: mpp_pe, mpp_root_pe
+   use fv_arrays_mod, only: fv_atmos_type, FVPRC, REAL4, REAL8
+   use fms_mod, only: fms_init, set_domain, nullify_domain
+   use fv_control_mod, only: fv_init1, fv_init2, fv_end
    use fv_tracer2d_mod, only: offline_tracer_advection
-   use fv_mp_mod,       only: is,ie, js,je, is_master, tile
+   use fv_mp_mod, only: is, ie, js, je, is_master, tile
    use fv_grid_utils_mod, only: g_sum_r8
-
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
+   use FV_StateMod, only: AdvCoreTracers => T_TRACERS
+   use FV_StateMod, only: FV_Atm
+   use FV_StateMod, only: get_im_world_and_topology
 
-   USE FV_StateMod,     only: AdvCoreTracers => T_TRACERS
-   USE FV_StateMod,     only: FV_Atm
+   use pflogger, only: logger_t => logger
 
    implicit none
    private
 
-   integer :: QSPLIT
-   integer :: nx, ny
-   integer :: npes_x, npes_y
-   logical :: FV3_DynCoreIsRunning=.false.
-   integer :: AdvCore_Advection=1
-   logical :: rpt_mass=.false.
-   logical :: DEBUG_ADV = .false.
-   real(FVPRC) :: dt
-
-   integer, parameter :: ntiles_per_pe = 1
+   logical :: FV3_DynCoreIsRunning = .false.
+   integer :: AdvCore_Advection = 1
+   logical, allocatable, save :: grids_on_my_pe(:)
+   real(kind=FVPRC) :: dt
 
    ! Tracer I/O History stuff
-   integer, parameter :: ntracers=38
-   integer :: ntracer
-   character(len=ESMF_MAXSTR) :: myTracer
-   character(len=ESMF_MAXSTR) :: tMassStr
-   logical, save :: firstRun=.true.
+   integer, parameter :: ntracers = 38
+   logical, save :: first_run = .true.
 
    !PUBLIC MEMBER FUNCTIONS:
-
    public SetServices
-   logical, allocatable, save :: grids_on_my_pe(:)
+
    !EOP
 
 contains
@@ -103,8 +97,8 @@ contains
    !INTERFACE:
    subroutine SetServices(gc, rc)
       !ARGUMENTS:
-      type(ESMF_GridComp), intent(inout) :: gc
-      integer, optional,   intent(  out) :: rc
+      type(ESMF_GridComp) :: gc
+      integer, intent(out) :: rc
 
       !DESCRIPTION:
       ! User-supplied setservices routine.
@@ -113,43 +107,38 @@ contains
       ! private to the module.
       !EOP
 
-      character(len=ESMF_MAXSTR) :: IAm
+      type(ESMF_VM) :: vm
+      type(ESMF_HConfig) :: hconfig
+      character(len=:), allocatable :: dycore, my_tracer
+      integer :: comm, ndt, itracer, im_world, topology(2), num_levels
+      integer :: p_split = 1
       integer :: status
-      character(len=ESMF_MAXSTR) :: comp_name
-      type(MAPL_MetaComp), pointer :: MAPL
-      character(len=ESMF_MAXSTR) :: dycore
-      type(ESMF_VM) :: VM
-      integer :: comm, ndt
-      integer :: p_split=1
-
-      ! Get my name and set-up traceback handle
-      call ESMF_GridCompGet(gc, name=comp_name, vm=vm, _RC)
-      Iam = trim(comp_name) // 'SetServices'
 
 #include "AdvCore_Import___.h"
-      call MAPL_AddImportSpec(gc, &
-           short_name='TRADV', &
-           long_name='advected_quantities', &
-           units='unknown', &
-           datatype=MAPL_BundleItem, _RC)
+      call MAPL_GridCompAddSpec(gc, &
+           state_intent=ESMF_STATEINTENT_EXPORT, &
+           short_name="TRADV", &
+           standard_name="advected_quantities", &
+      ! TODO: pchakrab - we shouldn't need dims and vstagger for a bundle
+           dims="xyz", &
+           vstagger=VERTICAL_STAGGER_NONE, &
+           units="unknown", &
+           itemtype=MAPL_STATEITEM_SERVICE, _RC)
 
 #include "AdvCore_Export___.h"
-      ! 3D Tracers
-      do ntracer=1,ntracers
-         write(myTracer, "('TEST_TRACER',i5.5)") ntracer-1
-         call MAPL_AddExportSpec(gc, &
-              short_name=trim(myTracer), &
-              long_name=trim(myTracer), &
-              units='1', &
-              dims=MAPL_DimsHorzVert, &
-              vlocation=MAPL_VLocationCenter, _RC)
-      enddo
 
-      ! Set the Profiling timers
-      call MAPL_TimerAdd(gc, name="INITIALIZE", _RC)
-      call MAPL_TimerAdd(gc, name="RUN", _RC)
-      call MAPL_TimerAdd(gc, name="FINALIZE", _RC)
-      call MAPL_TimerAdd(gc, name="TOTAL", _RC)
+      ! 3D Tracers
+      ! TODO: pchakrab - do we need these ntracers
+      do itracer = 1, ntracers
+         write(my_tracer, "('TEST_TRACER',i5.5)") itracer - 1
+         call MAPL_GridCompAddSpec(gc, &
+              state_intent=ESMF_STATEINTENT_EXPORT, &
+              short_name=trim(my_tracer), &
+              standard_name=trim(my_tracer), &
+              units='1', &
+              dims="xyz", &
+              vstagger=VERTICAL_STAGGER_CENTER, _RC)
+      end do
 
       ! Register methods with MAPL
       call MAPL_GridCompSetEntryPoint(gc, ESMF_METHOD_INITIALIZE, Initialize, _RC)
@@ -157,69 +146,58 @@ contains
       call MAPL_GridCompSetEntryPoint(gc, ESMF_METHOD_FINALIZE, Finalize, _RC)
 
       ! Check if AdvCore is running without FV3_DynCoreIsRunning, if yes then setup the MAPL Grid
-      call MAPL_GetObjectFromGC(gc, MAPL, _RC)
-      call MAPL_GetResource(MAPL, dycore, 'DYCORE:', default="", _RC)
-
-      if(adjustl(DYCORE)=="FV3") then
+      call MAPL_GridCompGetResource(gc, "DYCORE", dycore, default="", _RC)
+      ! TODO: pchakrab - use select case here
+      if (trim(dycore) == "FV3") then
          FV3_DynCoreIsRunning = .true.
          AdvCore_Advection = 0
-      endif
-      if(adjustl(DYCORE)=="FV3+ADV") then
+      end if
+      if (trim(dycore) == "FV3+ADV") then
          FV3_DynCoreIsRunning = .true.
          AdvCore_Advection = 1
-      endif
+      end if
+      call MAPL_GridCompGetResource(gc, "AdvCore_Advection", AdvCore_Advection, default=AdvCore_Advection, _RC)
 
-      call MAPL_GetResource(MAPL, AdvCore_Advection , label='AdvCore_Advection:', default=AdvCore_Advection, _RC)
-      call MAPL_GetResource(MAPL, DEBUG_ADV, 'DEBUG_ADV:', default=.FALSE., _RC)
 
       ! Start up FMS/MPP
-      !-------------------------------------------
       call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
       call fms_init(comm)
 
-      if (.NOT. FV3_DynCoreIsRunning) then
-          ! Make sure FV3 is setup
-          call fv_init1(FV_Atm, dt, grids_on_my_pe, p_split)
-         ! Get Domain decomposition
-         call MAPL_GetResource(MAPL, nx, 'NX:', default=0, _RC)
-         FV_Atm(1)%layout(1) = nx
-         call MAPL_GetResource(MAPL, ny, 'NY:', default=0, _RC)
-         if (FV_Atm(1)%flagstruct%grid_type == 4) then
-            FV_Atm(1)%layout(2) = ny
-         else
-            FV_Atm(1)%layout(2) = ny / 6
-         end if
-         ! Get Resolution Information
-         ! FV grid dimensions setup from MAPL
-         call MAPL_GetResource(MAPL, FV_Atm(1)%flagstruct%npx, 'IM:', default=32, _RC)
-         call MAPL_GetResource(MAPL, FV_Atm(1)%flagstruct%npy, 'JM:', default=192, _RC)
-         call MAPL_GetResource(MAPL, FV_Atm(1)%flagstruct%npz, 'LM:', default=72, _RC)
+      call MAPL_GridCompGetResource(gc, "RUN_DT", ndt, default=0, _RC)
+      dt = ndt
 
-         ! FV likes npx;npy in terms of cell vertices
-         if (FV_Atm(1)%flagstruct%npy == 6*FV_Atm(1)%flagstruct%npx) then
-            FV_Atm(1)%flagstruct%ntiles = 6
-            FV_Atm(1)%flagstruct%npy    = FV_Atm(1)%flagstruct%npx+1
-            FV_Atm(1)%flagstruct%npx    = FV_Atm(1)%flagstruct%npx+1
-         else
-            FV_Atm(1)%flagstruct%ntiles = 1
-            FV_Atm(1)%flagstruct%npy    = FV_Atm(1)%flagstruct%npy+1
-            FV_Atm(1)%flagstruct%npx    = FV_Atm(1)%flagstruct%npx+1
-         endif
-      endif
+      if (.not. FV3_DynCoreIsRunning) then
+         ! Make sure FV3 is setup
+         call fv_init1(FV_Atm, dt, grids_on_my_pe, p_split)
 
-      call MAPL_GetResource(MAPL, ndt, 'RUN_DT:', default=0, _RC)
-      DT = ndt
+         call MAPL_GridCompGet(gc, hconfig=hconfig, num_levels=num_levels, _RC)
+         call get_im_world_and_topology(hconfig, im_world, topology, _RC)
+         associate(layout => FV_Atm(1)%layout, flags => FV_Atm(1)%flagstruct)
+            ! Domain decomposition
+            layout = topology
+            if (flags%grid_type == 4) then
+               layout(2) = layout(2) * 6
+            end if
+            ! Grid dimensions
+            flags%npx = im_world
+            flags%npy = im_world * 6
+            flags%npz = num_levels
+            ! TODO: pchakrab - check this! npy is always set to 6*npx!
+            if (flags%npy == 6 * flags%npx) then
+               flags%npy = flags%npx + 1
+               flags%npx = flags%npx + 1
+               flags%ntiles = 6
+            else
+               flags%npy = flags%npy + 1
+               flags%npx = flags%npx + 1
+               flags%ntiles = 1
+            end if
+         end associate
 
-      call MAPL_GetResource(MAPL, rpt_mass, 'ADV_CORE_REPORT_TRACER_MASS:', default=rpt_mass, _RC)
-      call MAPL_GetResource(MAPL, QSPLIT, 'ADV_QSPLIT:', default=0, _RC)
+         ! TODO: pchakrab - shouldn't we setup the geomtry here?
 
-      ! Start up FV if AdvCore is running without FV3_DynCoreIsRunning
-      if (.NOT. FV3_DynCoreIsRunning) then
          call fv_init2(FV_Atm, dt, grids_on_my_pe, p_split)
       end if
-
-      ! Ending with a Generic SetServices call is a MAPL requirement
-      call MAPL_GenericSetServices(gc, _RC)
 
       _RETURN(_SUCCESS)
    end subroutine SetServices
@@ -228,13 +206,11 @@ contains
    !IROUTINE: Initialize - initialization routine
    !INTERFACE:
    subroutine Initialize(gc, import, export, clock, rc)
-      !INPUT/OUTPUT PARAMETERS:
-      type(ESMF_GridComp)  :: gc  ! Gridded component
-      type(ESMF_State)     :: import ! Import state
-      type(ESMF_State)     :: export ! Export state
-      type(ESMF_Clock)     :: clock  ! The clock
-      !OUTPUT PARAMETERS:
-      integer, intent(out) :: rc      ! Error code
+      type(ESMF_GridComp) :: gc
+      type(ESMF_State) :: import
+      type(ESMF_State) :: export
+      type(ESMF_Clock) :: clock
+      integer, intent(out) :: rc
 
       !DESCRIPTION:
       ! This initialization routine creates the import and export states,
@@ -244,407 +220,271 @@ contains
       !EOP
 
       !BOC
-      character(len=ESMF_MAXSTR) :: IAm, comp_name
-      type(ESMF_Config) :: cf
-      type(MAPL_MetaComp), pointer :: MAPL
-      type(ESMF_VM) :: vm
       type(ESMF_Grid) :: grid
-      real, pointer :: temp2d(:,:)
-      logical :: gridCreated
+      real, pointer :: area(:, :)
+      logical :: grid_created
       integer :: is, ie, js, je, status
 
-      ! Get the target components name and set-up traceback handle.
-      Iam = "Initialize"
-      call ESMF_GridCompGet(gc, name=comp_name, config=cf, vm=vm, _RC)
-      Iam = trim(comp_name) // trim(Iam)
-
-      ! Retrieve the pointer to the state
-      call MAPL_GetObjectFromGC(gc, MAPL, _RC)
-
-      call MAPL_TimerOn(MAPL, "TOTAL")
-      call MAPL_TimerOn(MAPL, "INITIALIZE")
-
-      gridCreated=.false.
-      call MAPL_GetObjectFromGC(gc, MAPL, _RC)
+      grid_created = .false.
       call ESMF_GridCompGet(gc, grid=grid, rc=status)
       if (status == ESMF_SUCCESS) then
          call ESMF_GridValidate(grid, rc=status)
-         if (status==ESMF_SUCCESS) gridCreated = .true.
+         if (status == ESMF_SUCCESS) grid_created = .true.
       end if
-
-      if (.not. gridCreated) call MAPL_GridCreate(gc, _RC)
-
-      call MAPL_GenericInitialize(gc, import, export, clock, _RC)
+      if (.not. grid_created) call MAPL_GridCompSetGeometry(gc, _RC)
 
       ! Compute Grid-Cell Area
-      if (.NOT. FV3_DynCoreIsRunning) then
+      if (.not. FV3_DynCoreIsRunning) then
          is = FV_Atm(1)%bd%isc
          ie = FV_Atm(1)%bd%iec
          js = FV_Atm(1)%bd%jsc
          je = FV_Atm(1)%bd%jec
-         call MAPL_GetPointer(export, temp2d, 'AREA', ALLOC=.TRUE., _RC)
-         temp2d = FV_Atm(1)%gridstruct%area(is:ie, js:je)
-      endif
-
-      call MAPL_TimerOff(MAPL, "INITIALIZE")
-      call MAPL_TimerOff(MAPL, "TOTAL")
+         call MAPL_StateGetPointer(export, area, "AREA", _RC)
+         if (associated(area)) then
+            area = FV_Atm(1)%gridstruct%area(is:ie, js:je)
+         end if
+      end if
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(import)
+      _UNUSED_DUMMY(clock)
    end subroutine Initialize
 
+   !BOP
+   !IROUTINE: Run - run routine
+   !INTERFACE:
+   subroutine Run(gc, import, export, clock, rc)
+      type(ESMF_GridComp) :: gc
+      type(ESMF_State) :: import
+      type(ESMF_State) :: export
+      type(ESMF_Clock) :: clock
+      integer, intent(out) :: rc
 
-!BOP
-!
-! !IROUTINE: Run - run routine
-!
-! !INTERFACE:
-!
-      subroutine Run(gc, import, export, clock, RC)
-!
-! !INPUT/OUTPUT PARAMETERS:
-      type(ESMF_GridComp)  :: gc     ! Gridded component
-      type(ESMF_State)     :: import ! Import state
-      type(ESMF_State)     :: export ! Export state
-      type(ESMF_Clock)     :: clock  ! The clock
-!
-! !OUTPUT PARAMETERS:
-      integer, intent(out) :: RC     ! Error code
-!
-! !DESCRIPTION:
-!
-! The Run method advanced the advection one long time step, as
-! specified in the configuration.  This may be broken down int a
-! number of internal, small steps, also configurable.
-!
-!EOP
-!=============================================================================
-!BOC
-! !LOCAL VARIABLES:
-      character(len=ESMF_MAXSTR)    :: IAm
-      integer                       :: STATUS
-      character(len=ESMF_MAXSTR)    :: COMP_NAME
-      type (ESMF_Grid)              :: ESMFGRID
-      type (MAPL_MetaComp), pointer :: MAPL
-      type (ESMF_Alarm)             :: ALARM
+      !DESCRIPTION:
+      ! The Run method advanced the advection one long time step, as
+      ! specified in the configuration.  This may be broken down int a
+      ! number of internal, small steps, also configurable.
+      !EOP
 
-! Imports
-      REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iCX
-      REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iCY
-      REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iMFX
-      REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iMFY
-      REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iPLE0
-      REAL(REAL8), POINTER, DIMENSION(:,:,:)   :: iPLE1
+      integer :: status
+      type(ESMF_Grid) :: esmfgrid, bgrid
+      type(ESMF_HConfig) :: hconfig
+      type(ESMF_FieldBundle) :: tradv, tradv_import
+      type(ESMF_Field) :: field
+      type(ESMF_Array) :: array
+      type(ESMF_TypeKind_Flag) :: kind
+      type(ESMF_FieldBundle), save :: bundle_adv
+      type(ESMF_Alarm) :: predictor_alarm
 
-! Locals
-      REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: CX
-      REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: CY
-      REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: MFX
-      REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: MFY
-      REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: PLE0
-      REAL(FVPRC), POINTER, DIMENSION(:,:,:)   :: PLE1
-      REAL(FVPRC), POINTER, DIMENSION(:,:,:,:) :: TRACERS
-      REAL(REAL8), allocatable :: TMASS0(:)
-      REAL(REAL8), allocatable :: TMASS1(:)
-      TYPE(AdvCoreTracers), POINTER :: advTracers(:)
-      type(ESMF_FieldBundle) :: TRADV
-      type(ESMF_Field)       :: field
-      type(ESMF_Array)       :: array
-      INTEGER :: IM, JM, LM, N, NQ, LS
-! Temporaries for exports/tracers
-      REAL, POINTER :: temp3D(:,:,:)
-      real(REAL4),        pointer     :: tracer_r4 (:,:,:)
-      real(REAL8),        pointer     :: tracer_r8 (:,:,:)
-      character(len=ESMF_MAXSTR)    :: fieldName
-      type(ESMF_TypeKind_Flag)      :: kind
-      character(len=ESMF_MAXSTR)    :: STRING
-! Excluding tracers
-      type(ESMF_FieldBundle), save        :: bundleAdv
-      type (ESMF_Config)                  :: CF
-      logical                             :: adjustTracers
-      type(ESMF_Alarm)                    :: predictorAlarm
-      type(ESMF_Grid)                     :: bgrid
-      integer, save                       :: nq_saved = 0
-      integer                             :: i,j,k
-      integer                             :: nqt
-      logical                             :: tend
-      logical                             :: exclude
-      character(len=ESMF_MAXSTR)          :: tmpstring
-      character(len=ESMF_MAXSTR)          :: adjustTracerMode
-      character(len=ESMF_MAXSTR), allocatable :: xlist(:)
-      character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
-      integer, parameter                  :: XLIST_MAX = 60
+      ! Imports
+      ! TODO: pchakrab - replace with AdvCore_DeclarePointer___.h once the typekind bug is fixed
+      real(kind=REAL8), pointer, dimension(:, :, :) :: area
+      real(kind=REAL8), pointer, dimension(:, :, :) :: CX
+      real(kind=REAL8), pointer, dimension(:, :, :) :: CY
+      real(kind=REAL8), pointer, dimension(:, :, :) :: MFX
+      real(kind=REAL8), pointer, dimension(:, :, :) :: MFY
+      real(kind=REAL8), pointer, dimension(:, :, :) :: PLE0
+      real(kind=REAL8), pointer, dimension(:, :, :) :: PLE1
+      ! TODO: pchakrab - this stays
+      real(kind=FVPRC), allocatable, dimension(:, :, :) :: xPLE1
+      real(kind=FVPRC), pointer, dimension(:, :, :, :) :: tracers
+      real(kind=REAL8), allocatable :: tmass0(:), tmass1(:)
+      type(AdvCoreTracers), pointer :: adv_tracers(:)
 
-      real(FVPRC), allocatable           :: DEBUG_ARRAY(:,:,:)
-      real(FVPRC) :: fac1    = 1.0
+      integer :: im, jm, lm, nq, nqt, QSPLIT
+      integer :: i, j, n
+      integer, save :: nq_saved = 0
+      logical :: exclude, same_tradv_data, rpt_mass, DEBUG_ADV, adjust_tracers
 
-! Get my name and set-up traceback handle
-! ---------------------------------------
+      real, pointer :: temp3D(:, :, :)
+      real(kind=REAL4), pointer :: tracer_r4(:, :, :)
+      real(kind=REAL8), pointer :: tracer_r8(:, :, :)
 
-      Iam = 'Run'
-      call ESMF_GridCompGet( gc, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
-      VERIFY_(STATUS)
-      Iam = trim(COMP_NAME) // Iam
+      character(len=ESMF_MAXSTR) :: field_name, mytracer
+      character(len=:), allocatable :: adjust_tracer_mode
+      character(len=ESMF_MAXSTR), allocatable :: xlist(:), biggerlist(:)
 
-      if (AdvCore_Advection>0) then
+      real(kind=FVPRC), allocatable :: DEBUG_ARRAY(:, :, :)
+      real(kind=FVPRC) :: fac1 = 1.0
+      class(logger_t), pointer :: logger
 
-! Get parameters from generic state.
-!-----------------------------------
-      call MAPL_GetObjectFromGC ( gc, MAPL, RC=STATUS)
-      VERIFY_(STATUS)
-      call MAPL_Get( MAPL, IM=IM, JM=JM, LM=LM,   &
-                                RUNALARM = ALARM, &
-                                      RC = STATUS )
-      VERIFY_(STATUS)
+      _RETURN_UNLESS(AdvCore_Advection > 0)
 
-      call MAPL_TimerOn(MAPL,"TOTAL")
-      call MAPL_TimerOn(MAPL,"RUN")
+      call MAPL_GridCompGet(gc, hconfig=hconfig, logger=logger, _RC)
 
-      CALL MAPL_GetPointer(import, iPLE0, 'PLE0', ALLOC = .TRUE., RC=STATUS)
-      VERIFY_(STATUS)
-      CALL MAPL_GetPointer(import, iPLE1, 'PLE1', ALLOC = .TRUE., RC=STATUS)
-      VERIFY_(STATUS)
-      CALL MAPL_GetPointer(import, iMFX,   'MFX', ALLOC = .TRUE., RC=STATUS)
-      VERIFY_(STATUS)
-      CALL MAPL_GetPointer(import, iMFY,   'MFY', ALLOC = .TRUE., RC=STATUS)
-      VERIFY_(STATUS)
-      CALL MAPL_GetPointer(import, iCX,     'CX', ALLOC = .TRUE., RC=STATUS)
-      VERIFY_(STATUS)
-      CALL MAPL_GetPointer(import, iCY,     'CY', ALLOC = .TRUE., RC=STATUS)
-      VERIFY_(STATUS)
+#include "AdvCore_GetPointer___.h"
+      xPLE1 = PLE1
 
-      ALLOCATE( PLE0(IM,JM,LM+1) )
-      ALLOCATE( PLE1(IM,JM,LM+1) )
-      ALLOCATE(  MFX(IM,JM,LM  ) )
-      ALLOCATE(  MFY(IM,JM,LM  ) )
-      ALLOCATE(   CX(IM,JM,LM  ) )
-      ALLOCATE(   CY(IM,JM,LM  ) )
+      ! SERVICE adds the bundle containing tracers to be advected to both import and export states
+      ! Here we copy the tracer data from the import bundle to the export
+      call ESMF_StateGet(import, "TRADV", tradv_import, _RC)
+      call ESMF_StateGet(export, "TRADV", tradv, _RC)
+      ! Instead of copying, we ensure that bundle_imp and bundle point to the same data in the
+      ! contained fields. This is important to check because we don't have a coupling mechanism yet
+      same_tradv_data = MAPL_FieldBundleSameData(tradv_import, tradv, _RC)
+      _ASSERT(same_tradv_data, "TRADV bundles in import and export do not point to the same data")
 
-      PLE0 = iPLE0
-      PLE1 = iPLE1
-       MFX = iMFX
-       MFY = iMFY
-        CX = iCX
-        CY = iCY
-
-      ! The quantities to be advected come as friendlies in a bundle
-      !  in the import state.
-      !--------------------------------------------------------------
-
-      call ESMF_StateGet(import, "TRADV", TRADV, rc=STATUS)
-      VERIFY_(STATUS)
-
-      !-------------------------------------------------------------------
       ! ALT: this section attempts to limit the amount of advected tracers
-      !-------------------------------------------------------------------
-      adjustTracers = .false.
-      call MAPL_GetResource ( MAPL, adjustTracerMode, &
-           'EXCLUDE_ADVECTION_TRACERS:', &
-           default='ALWAYS', rc=status )
-      VERIFY_(STATUS)
-      if (adjustTracerMode == 'ALWAYS') then
-         adjustTracers = .true.
-      else if (adjustTracerMode == 'PREDICTOR') then
-         !get PredictorAlarm from clock
-         call ESMF_ClockGetAlarm(clock, alarmName='PredictorAlarm', &
-              alarm=PredictorAlarm, rc=status)
+      adjust_tracers = .false.
+      call MAPL_GridCompGetResource(gc, "EXCLUDE_ADVECTION_TRACERS", adjust_tracer_mode, default="ALWAYS", _RC)
+      select case (trim(adjust_tracer_mode))
+      case ("ALWAYS")
+         adjust_tracers = .true.
+      case ("PREDICTOR")
+         call ESMF_ClockGetAlarm(clock, alarmName="PredictorAlarm", alarm=predictor_alarm, rc=status)
          if (status == ESMF_SUCCESS) then
-            !check if ringing
-            if (ESMF_AlarmIsRinging(predictorAlarm)) then
-               adjustTracers = .true.
+            if (ESMF_AlarmIsRinging(predictor_alarm)) then
+               adjust_tracers = .true.
             end if
          end if
-      else if (adjustTracerMode == 'NO') then
-         ! Proceed without warning
-         adjustTracers = .false.
-      else
-         call WRITE_PARALLEL('Invalid option, ignored')
-         adjustTracers = .false.
-      end if
-      if (adjustTracers) then
-         if (firstRun) then
-            ! get the list of excluded tracers from resource
-            allocate(xlist(XLIST_MAX), stat=status)
-            VERIFY_(STATUS)
+      case ("NO")
+         adjust_tracers = .false. ! proceed without warning
+      case default
+         call logger%info("Invalid value specified for EXCLUDE_ADVECTION_TRACERS, ignored")
+         adjust_tracers = .false.
+      end select
+      if (adjust_tracers) then
+         if (first_run) then
+            xlist = ESMF_HConfigAsStringSeq(hconfig, keyString="EXCLUDE_ADVECTION_TRACERS_LIST", stringLen=ESMF_MAXSTR,&
+                 & _RC)
             n = 0
-            call ESMF_ConfigFindLabel ( CF,'EXCLUDE_ADVECTION_TRACERS_LIST:',rc=STATUS )
-            if(STATUS==ESMF_SUCCESS) then
-
-               tend  = .false.
-               do while (.not.tend)
-                  call ESMF_ConfigGetAttribute (CF,value=tmpstring,default='',rc=STATUS) !ALT: we don't check return status!!!
-                  if (tmpstring /= '')  then
-                     n = n + 1
-                     if (n > size(xlist)) then
-                        allocate( biggerlist(2*n), stat=status )
-                        VERIFY_(STATUS)
-                        biggerlist(1:n-1)=xlist
-                        call move_alloc(from=biggerlist, to=xlist)
-                     end if
-                     xlist(n) = tmpstring
-                  end if
-                  call ESMF_ConfigNextLine(CF,tableEnd=tend,rc=STATUS )
-                  VERIFY_(STATUS)
-               enddo
-            end if
-
+            if (allocated(xlist)) n = size(xlist)
             ! Count the number of tracers
-            !---------------------
-            call ESMF_FieldBundleGet(TRADV, grid=bgrid,fieldCount=nqt,  RC=STATUS)
-            VERIFY_(STATUS)
-            BundleAdv = ESMF_FieldBundleCreate ( name='xTRADV', rc=STATUS )
-            VERIFY_(STATUS)
-            call ESMF_FieldBundleSet ( BundleAdv, grid=bgrid, rc=STATUS )
-            VERIFY_(STATUS)
-            !loop over NQ in TRADV
+            call ESMF_FieldBundleGet(tradv, grid=bgrid, fieldCount=nqt, _RC)
+            bundle_adv = ESMF_FieldBundleCreate(name="xTRADV", _RC)
+            call ESMF_FieldBundleSet(bundle_adv, grid=bgrid, _RC)
+            ! Loop over NQ in TRADV
             do i = 1, nqt
-               !get field from TRADV and its name
-               call ESMF_FieldBundleGet(TRADV, fieldIndex=i, field=field, rc=status)
-               VERIFY_(STATUS)
-               call ESMF_FieldGet(FIELD, name=fieldname, RC=STATUS)
-               VERIFY_(STATUS)
-               !exclude everything that is not cloud/water species
-               if ( (FV3_DynCoreIsRunning      ) .and. &
-                   ( (TRIM(fieldname) == 'Q'       ) .or. &
-                     (TRIM(fieldname) == 'QLCN'    ) .or. &
-                     (TRIM(fieldname) == 'QLLS'    ) .or. &
-                     (TRIM(fieldname) == 'QICN'    ) .or. &
-                     (TRIM(fieldname) == 'QILS'    ) .or. &
-                     (TRIM(fieldname) == 'CLCN'    ) .or. &
-                     (TRIM(fieldname) == 'CLLS'    ) .or. &
-                     (TRIM(fieldname) == 'NCPL'    ) .or. &
-                     (TRIM(fieldname) == 'NCPI'    ) .or. &
-                     (TRIM(fieldname) == 'QRAIN'   ) .or. &
-                     (TRIM(fieldname) == 'QSNOW'   ) .or. &
-                     (TRIM(fieldname) == 'QGRAUPEL') ) ) then
-                   ! write(STRING,'(A,A)') "ADV is excluding ", TRIM(fieldname)
-                   ! call WRITE_PARALLEL( trim(STRING)   )
-                     n = n + 1
-                     if (n > size(xlist)) then
-                        allocate( biggerlist(2*n), stat=status )
-                        VERIFY_(STATUS)
-                        biggerlist(1:n-1)=xlist
-                        call move_alloc(from=biggerlist, to=xlist)
-                     end if
-                     xlist(n) = TRIM(fieldname)
+               ! Get field from TRADV and its name
+               call ESMF_FieldBundleGet(tradv, fieldIndex=i, field=field, _RC)
+               ! TODO: pchakrab - replace the call below with a call to get_short_name
+               call ESMF_FieldGet(field, name=field_name, _RC)
+               ! field_name = get_short_name(field, _RC)
+               ! Exclude everything that is not cloud/water species
+               if ((FV3_DynCoreIsRunning) .and. &
+                    (field_name == 'Q') .or. &
+                    (field_name == 'QLCN') .or. &
+                    (field_name == 'QLLS') .or. &
+                    (field_name == 'QICN') .or. &
+                    (field_name == 'QILS') .or. &
+                    (field_name == 'CLCN') .or. &
+                    (field_name == 'CLLS') .or. &
+                    (field_name == 'NCPL') .or. &
+                    (field_name == 'NCPI') .or. &
+                    (field_name == 'QRAIN') .or. &
+                    (field_name == 'QSNOW') .or. &
+                    (field_name == 'QGRAUPEL')) then
+                  ! write(STRING,'(A,A)') "ADV is excluding ", TRIM(field_name)
+                  ! call WRITE_PARALLEL( trim(STRING)   )
+                  n = n + 1
+                  if (n > size(xlist)) then
+                     allocate(biggerlist(2 * n), _STAT)
+                     biggerlist(1:n - 1) = xlist
+                     call move_alloc(from=biggerlist, to=xlist)
+                  end if
+                  xlist(n) = trim(field_name)
                end if
-               !loop over exclude_list
+               ! Loop over exclude_list
                exclude = .false.
                do j = 1, n
-                  if (fieldname == xlist(j)) then
+                  if (field_name == xlist(j)) then
                      exclude = .true.
                      exit
                   end if
                end do
                if (.not. exclude) then
-                  call MAPL_FieldBundleAdd(BundleAdv, FIELD, RC=STATUS)
-                  VERIFY_(STATUS)
+                  call MAPL_FieldBundleAdd(bundle_adv, [field], _RC)
                end if
             end do
 
-            if (allocated(xlist)) then
-               deallocate(xlist)
-            end if
+            if (allocated(xlist)) deallocate(xlist)
+            if (allocated(biggerlist)) deallocate(biggerlist)
 
-            if (allocated(biggerlist)) then
-               deallocate(biggerlist)
-            end if
+            first_run = .false.
+         end if ! first_run
+         tradv = bundle_adv
+      end if ! adjust_tracers
 
-            firstRun=.false.
-         end if ! firstRun
-         TRADV = bundleAdv
-      end if ! adjustTracers
+      call MAPL_GridCompGet(gc, grid=esmfgrid, num_levels=lm, _RC)
+      call MAPL_GridGet(esmfgrid, im=im, jm=jm, _RC)
+      call ESMF_FieldBundleGet(tradv, fieldCount=nq, _RC)
 
-      call ESMF_FieldBundleGet(TRADV, fieldCount=NQ,    rc=STATUS)
-      VERIFY_(STATUS)
-
-      if (NQ > 0) then
+      if (nq > 0) then
          ! We allocate a list of tracers big enough to hold all items in the bundle
-         !-------------------------------------------------------------------------
-         ALLOCATE( TRACERS(IM,JM,LM,NQ),stat=STATUS )
-         VERIFY_(STATUS)
-         ALLOCATE( advTracers(NQ),stat=STATUS )
-         VERIFY_(STATUS)
+         allocate(tracers(im, jm, lm, nq), _STAT)
+         allocate(adv_tracers(nq), _STAT)
 
-         if (NQ /= NQ_SAVED) then
-            write(STRING,'(A,I5,A)') "AdvCore is Advecting the following ", nq, " tracers:"
-            call WRITE_PARALLEL( trim(STRING)   )
+         if (nq /= nq_saved) then
+            call logger%info("Advcore is Advecting the following %i tracers", nq)
          end if
 
          ! Go through the bundle copying the friendlies into the tracer list.
-         !-------------------------------------------------------------------------
-         do N=1,NQ
-            call ESMF_FieldBundleGet (TRADV, fieldIndex=N, field=FIELD, RC=STATUS)
-            VERIFY_(STATUS)
-            call ESMF_FieldGet  (field, array=array, name=fieldName, RC=STATUS)
-            VERIFY_(STATUS)
-            call ESMF_ArrayGet(array,typekind=kind, rc=status )
-            VERIFY_(STATUS)
-            advTracers(N)%is_r4 = (kind == ESMF_TYPEKIND_R4)   ! Is real*4?
-            advTracers(N)%tName = fieldName
-
-            if (NQ /= NQ_SAVED) call WRITE_PARALLEL( trim('--'//fieldName) )
-
-            if (advTracers(N)%is_r4) then
-               call ESMF_ArrayGet(array,farrayptr=tracer_r4, rc=status )
-               VERIFY_(STATUS)
-               advTracers(N)%content_r4 => tracer_r4
-               TRACERS(:,:,:,N) = advTracers(N)%content_r4
+         do n = 1, nq
+            call ESMF_FieldBundleGet(tradv, fieldIndex=n, field=field, _RC)
+            ! TODO: pchakrab - replace the call below with a call to get_short_name
+            call ESMF_FieldGet(field, array=array, name=field_name, _RC)
+            ! field_name = get_short_name(field, _RC)
+            call ESMF_ArrayGet(array, typekind=kind, _RC)
+            adv_tracers(n)%is_r4 = (kind == ESMF_TYPEKIND_R4) ! Is real*4?
+            adv_tracers(n)%tName = field_name
+            if (nq /= nq_saved) call logger%info(trim('--' // field_name))
+            if (adv_tracers(n)%is_r4) then
+               call ESMF_ArrayGet(array, farrayptr=tracer_r4, _RC)
+               adv_tracers(n)%content_r4 => tracer_r4
+               tracers(:, :, :, n) = adv_tracers(n)%content_r4
             else
-               call ESMF_ArrayGet(array,farrayptr=tracer_r8, rc=status )
-               VERIFY_(STATUS)
-               advTracers(N)%content => tracer_r8
-               TRACERS(:,:,:,N) = advTracers(N)%content
+               call ESMF_ArrayGet(array, farrayptr=tracer_r8, _RC)
+               adv_tracers(n)%content => tracer_r8
+               tracers(:, :, :, n) = adv_tracers(n)%content
             end if
          end do
 
-         if (NQ /= NQ_SAVED) then
-            NQ_SAVED = NQ
+         if (nq /= nq_saved) then
+            nq_saved = nq
          end if
 
          ! Get Tracer Mass before advection
-         !---------------------------------
+         call MAPL_GridCompGetResource(gc, "ADV_CORE_REPORT_TRACER_MASS", rpt_mass, default=.false., _RC)
          if (rpt_mass) then
-         allocate( TMASS0(NQ) )
-         call global_integral(TMASS0, TRACERS, PLE0, IM,JM,LM, NQ)
-         endif
+            allocate(tmass0(nq))
+            call global_integral(tmass0, tracers, real(PLE0, kind=FVPRC), im, jm, lm, nq)
+         end if
 
          ! Run FV3 advection
-         !------------------
-         call offline_tracer_advection(TRACERS, PLE0, PLE1, MFX, MFY, CX, CY, &
-                                       FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, FV_Atm(1)%bd, &
-                                       FV_Atm(1)%domain, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz,   &
-                                       NQ, dt, QSPLIT)
+         call MAPL_GridCompGetResource(gc, "ADV_QSPLIT", QSPLIT, default=0, _RC)
+         call offline_tracer_advection(tracers, &
+              real(PLE0, kind=FVPRC), xPLE1, &
+              real(MFX, kind=FVPRC), real(MFY, kind=FVPRC), &
+              real(CX, kind=FVPRC), real(CY, kind=FVPRC), &
+              FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
+              FV_Atm(1)%bd, FV_Atm(1)%domain, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, &
+              nq, dt, QSPLIT)
 
          ! Get Tracer Mass after advection
-         !--------------------------------
          if (rpt_mass) then
-         allocate( TMASS1(NQ) )
-         call global_integral(TMASS1, TRACERS, PLE1, IM,JM,LM, NQ)
-         endif
-
-         ! Conserve Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air
-         ! --------------------------------------------------------------------------------
-         if (rpt_mass) then
-         do N=1,NQ
-            if (TMASS1(N) > 0.0) then
-            if (ABS((TMASS0(N)-TMASS1(N))/TMASS1(N)) >= epsilon(1.0_REAL4)) then
-              if (is_master()) write(6,125) trim(advTracers(N)%tName), (TMASS1(N)-TMASS0(N))/TMASS0(N)
-            !!TRACERS(:,:,:,N) = TRACERS(:,:,:,N) * TMASS0(N)/TMASS1(N)
-            end if
-            125 format('Mass Conservation Adjustment in AdvCore:'2x,A,2x,g21.14)
-            end if
-         end do
-         deallocate( TMASS0 )
-         deallocate( TMASS1 )
-         endif
+            allocate(tmass1(nq))
+            call global_integral(tmass1, tracers, real(PLE1, kind=FVPRC), im, jm, lm, nq)
+            ! Conserve Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air
+            do n = 1, nq
+               if (tmass1(n) > 0.0) then
+                  if (ABS((tmass0(n) - tmass1(n)) / tmass1(n)) >= epsilon(1.0_REAL4)) then
+                     if (is_master()) call logger%info(trim(adv_tracers(n)%tName) // ': ' // &
+                          trim(adjustl(transfer((tmass1(n) - tmass0(n)) / tmass0(n), 'G21.14'))))
+                     !!TRACERS(:,:,:,N) = TRACERS(:,:,:,N) * TMASS0(N)/TMASS1(N)
+                  end if
+                  125 format('Mass Conservation Adjustment in AdvCore:'2x, A, 2x, g21.14)
+               end if
+            end do
+            deallocate(tmass0)
+            deallocate(tmass1)
+         end if
 
          ! Go through the bundle copying tracers back to the bundle.
-         !-------------------------------------------------------------------------
-         do N=1,NQ
-            if (advTracers(N)%is_r4) then
-               advTracers(N)%content_r4 = TRACERS(:,:,:,N)
+         do n = 1, nq
+            if (adv_tracers(n)%is_r4) then
+               adv_tracers(n)%content_r4 = tracers(:, :, :, n)
             else
-               advTracers(N)%content    = TRACERS(:,:,:,N)
+               adv_tracers(n)%content = tracers(:, :, :, n)
             end if
 
             !-----------------------------------------------
@@ -652,167 +492,126 @@ contains
             !--> This section is used for diagnostics only.
             !--> It has no effect on CTM experiments.
             !-----------------------------------------------
-            if (N<=min(ntracers,NQ)) then
-               write(myTracer, "('TEST_TRACER',i5.5)") N-1
-               call MAPL_GetPointer(export, temp3D, TRIM(myTracer), rc=status)
-               VERIFY_(STATUS)
-               if (associated(temp3D)) temp3D = TRACERS(:,:,:,N)
-            endif
-         enddo
-
-
+            if (n <= min(ntracers, nq)) then
+               write(mytracer, "('TEST_TRACER',i5.5)") n - 1
+               call MAPL_StateGetPointer(export, temp3D, trim(mytracer), _RC)
+               if (associated(temp3D)) temp3D = tracers(:, :, :, n)
+            end if
+         end do
 
          ! Clean negative tracers and check
-         !-------------------------------------------------------------------------
+         call MAPL_GridCompGetResource(gc, "DEBUG_ADV", DEBUG_ADV, default=.false., _RC)
          if (DEBUG_ADV) then
-           prt_minmax     = DEBUG_ADV
-           if (mpp_pe()==0) print*,''
-           if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After ADV --------------'
-           allocate( DEBUG_ARRAY(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,FV_Atm(1)%npz) )
-         endif
-         do n=1,NQ
-            if (advTracers(n)%is_r4) then
-               where (advTracers(n)%content_r4 < tiny(0.0))
-                      advTracers(n)%content_r4 = 0.0
+            prt_minmax = DEBUG_ADV
+            if (mpp_pe() == 0) print*, ''
+            if (mpp_pe() == 0) print*, '-------------- FV3 Tracer Debug After ADV --------------'
+            allocate(DEBUG_ARRAY(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec, FV_Atm(1)%npz))
+         end if
+         do n = 1, nq
+            if (adv_tracers(n)%is_r4) then
+               where (adv_tracers(n)%content_r4 < tiny(0.0))
+                  adv_tracers(n)%content_r4 = 0.0
                end where
-               if (DEBUG_ADV) DEBUG_ARRAY = advTracers(n)%content_r4
+               if (DEBUG_ADV) DEBUG_ARRAY = adv_tracers(n)%content_r4
             else
-               where (advTracers(n)%content < tiny(0.0))
-                      advTracers(n)%content = 0.0
+               where (adv_tracers(n)%content < tiny(0.0))
+                  adv_tracers(n)%content = 0.0
                end where
-               if (DEBUG_ADV) DEBUG_ARRAY = advTracers(n)%content
-            endif
+               if (DEBUG_ADV) DEBUG_ARRAY = adv_tracers(n)%content
+            end if
             if (DEBUG_ADV) then
-               call prt_maxmin(TRIM(advTracers(n)%tname), DEBUG_ARRAY, FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, 0, FV_Atm(1)%npz, fac1)
-            endif
-         enddo
+               call prt_maxmin(trim(adv_tracers(n)%tName), DEBUG_ARRAY, FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)&
+                    %bd%jsc, FV_Atm(1)%bd%jec, 0, FV_Atm(1)%npz, fac1)
+            end if
+         end do
          if (DEBUG_ADV) then
-           deallocate ( DEBUG_ARRAY )
-           if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After ADV --------------'
-           if (mpp_pe()==0) print*,''
-           prt_minmax     = .false.
-         endif
+            deallocate(DEBUG_ARRAY)
+            if (mpp_pe() == 0) print*, '-------------- FV3 Tracer Debug After ADV --------------'
+            if (mpp_pe() == 0) print*, ''
+            prt_minmax = .false.
+         end if
 
          ! Deallocate the list of tracers
-         !-------------------------------------------------------------------------
-         deallocate( TRACERS, stat=STATUS )
-         VERIFY_(STATUS)
-         deallocate( advTracers, stat=STATUS )
-         VERIFY_(STATUS)
+         deallocate(tracers, adv_tracers, _STAT)
 
       end if ! NQ > 0
 
-      DEALLOCATE( PLE0 )
-      DEALLOCATE( PLE1 )
-      DEALLOCATE(  MFX )
-      DEALLOCATE(  MFY )
-      DEALLOCATE(   CX )
-      DEALLOCATE(   CY )
+      _RETURN(_SUCCESS)
+   end subroutine Run
 
-      call MAPL_TimerOff(MAPL,"RUN")
-      call MAPL_TimerOff(MAPL,"TOTAL")
+   !BOP
+   !IROUTINE:  Finalize - user supplied finalize routine
+   !INTERFACE:
+   subroutine Finalize(gc, import, export, clock, rc)
+      type(ESMF_GridComp) :: gc
+      type(ESMF_State) :: import
+      type(ESMF_State) :: export
+      type(ESMF_Clock) :: clock
+      integer, intent(out) :: rc
 
-      end if ! AdvCore_Advection
-
-      RETURN_(ESMF_SUCCESS)
-
-      end subroutine Run
-!EOC
-!------------------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE:  Finalize - user supplied finalize routine
-!
-! !INTERFACE:
-!
-  subroutine Finalize(gc, import, export, clock, RC)
-!
-! !INPUT/OUTPUT PARAMETERS:
-      type(ESMF_GridComp)  :: gc     ! Gridded component
-      type(ESMF_State)     :: import ! Import state
-      type(ESMF_State)     :: export ! Export state
-      type(ESMF_Clock)     :: clock  ! The clock
-!
-! !OUTPUT PARAMETERS:
-      integer, intent(out) :: RC     ! Error code
-!
-! !DESCRIPTION:
-!    Finalize merely destroys the FVadv object that was created in Initialize
-!    and releases the space for the persistent data .
-!
-!EOP
-!=============================================================================
-!BOC
-! !LOCAL VARIABLES:
-
-      character(len=ESMF_MAXSTR)    :: IAm
-      integer                       :: STATUS
-      character(len=ESMF_MAXSTR)    :: COMP_NAME
-
-! Get my name and set-up traceback handle
-! ---------------------------------------
-
-      Iam = 'Finalize'
-      call ESMF_GridCompGet( gc, NAME=COMP_NAME, RC=STATUS )
-      VERIFY_(STATUS)
-      Iam = trim(COMP_NAME) // TRIM(Iam)
+      !DESCRIPTION:
+      !    Finalize merely destroys the FVadv object that was created in Initialize
+      !    and releases the space for the persistent data .
+      !EOP
 
       ! Clean up FV if AdvCore is running without FV3_DynCoreIsRunning
-      !--------------------------------------------------
-      if (.NOT. FV3_DynCoreIsRunning) then
+      if (.not. FV3_DynCoreIsRunning) then
          call fv_end(FV_Atm, grids_on_my_pe, .false.)
-      endif
+      end if
 
-      call MAPL_GenericFinalize(gc, import, export, clock, RC)
-      VERIFY_(STATUS)
+      _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(gc)
+      _UNUSED_DUMMY(import)
+      _UNUSED_DUMMY(export)
+      _UNUSED_DUMMY(clock)
+   end subroutine Finalize
 
-      RETURN_(ESMF_SUCCESS)
-      end subroutine Finalize
+   subroutine global_integral(QG, Q, PLE, im, jm, KM, nq)
+      real(kind=REAL8), intent(out) :: QG(nq)
+      real(kind=FVPRC), intent(in) :: Q(im, jm, KM, nq)
+      real(kind=FVPRC), intent(in) :: PLE(im, jm, KM + 1)
+      integer, intent(in) :: im, jm, KM, nq
+      ! Locals
+      integer :: k, n
+      real(kind=REAL8), allocatable :: dp(:, :, :)
+      real(kind=REAL8), allocatable :: qsum1(:, :)
+      real(kind=REAL8) :: mass
 
+      allocate(dp(im, jm, KM))
+      allocate(qsum1(im, jm))
 
-subroutine global_integral (QG,Q,PLE,IM,JM,KM,NQ)
+      ! Compute Pressure Thickness
+      do k = 1, KM
+         dp(:, :, k) = PLE(:, :, k + 1) - PLE(:, :, k)
+      end do
 
-      real(REAL8), intent(OUT)   :: QG(NQ)
-      real(FVPRC), intent(IN)    :: Q(IM,JM,KM,NQ)
-      real(FVPRC), intent(IN)    :: PLE(IM,JM,KM+1)
-      integer,     intent(IN)    :: IM,JM,KM,NQ
-! Locals
-      integer   :: k,n
-      real(REAL8), allocatable ::    dp(:,:,:)
-      real(REAL8), allocatable :: qsum1(:,:)
-      real(REAL8) :: mass
+      ! Compute Global Mass
+      qsum1(:, :) = 0.d0
+      do k = 1, KM
+         qsum1(:, :) = qsum1(:, :) + dp(:, :, k)
+      end do
+      mass = g_sum_r8(FV_Atm(1)%domain, qsum1, is, ie, js, je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1)
 
-      allocate(    dp(im,jm,km) )
-      allocate( qsum1(im,jm)    )
+      ! Loop over Tracers
+      do n = 1, nq
+         qsum1(:, :) = 0.d0
+         do k = 1, KM
+            qsum1(:, :) = qsum1(:, :) + Q(:, :, k, n) * dp(:, :, k)
+         end do
+         QG(n) = g_sum_r8(FV_Atm(1)%domain, qsum1, is, ie, js, je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1)
+         if (mass > 0.0) QG(n) = QG(n) / mass
+      end do
 
-! Compute Pressure Thickness
-! --------------------------
-      do k=1,KM
-         dp(:,:,k) = PLE(:,:,k+1)-PLE(:,:,k)
-      enddo
-
-! Compute Global Mass
-! -------------------
-      qsum1(:,:) = 0.d0
-      do k=1,KM
-         qsum1(:,:) = qsum1(:,:) + dp(:,:,k)
-      enddo
-      mass = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1)
-
-! Loop over Tracers
-! -----------------
-     do n=1,NQ
-        qsum1(:,:) = 0.d0
-        do k=1,KM
-           qsum1(:,:) = qsum1(:,:) + Q(:,:,k,n)*dp(:,:,k)
-        enddo
-        qg(n) = g_sum_r8(FV_Atm(1)%domain, qsum1, is,ie, js,je, FV_Atm(1)%ng, FV_Atm(1)%gridstruct%area_64, 1)
-        if (mass > 0.0) qg(n) = qg(n)/mass
-     enddo
-
-     deallocate( dp )
-     deallocate( qsum1 )
-
-end subroutine global_integral
+      deallocate(dp)
+      deallocate(qsum1)
+   end subroutine global_integral
 
 end module AdvCore_GridCompMod
+
+subroutine AdvCore_SetServices(gc, rc)
+   use ESMF, only: ESMF_GridComp
+   use AdvCore_GridCompMod, only: mySetServices => SetServices
+   type(ESMF_GridComp) :: gc
+   integer, intent(out) :: rc
+   call mySetServices(gc, rc=rc)
+end subroutine AdvCore_SetServices

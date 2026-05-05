@@ -422,7 +422,6 @@ contains
       type(DynState), pointer :: self
       type(ESMF_Field) :: field
       type(ESMF_State) :: internal
-      type(ESMF_FieldBundle) :: tradv
       real(kind=r4), pointer :: pref(:)
       real(kind=r4), pointer :: u(:, :, :), v(:, :, :), t(:, :, :)
       real(kind=r4), pointer :: temp2d(:, :)
@@ -822,8 +821,8 @@ contains
       allocate(mfyxyz(ifirstxy:ilastxy, jfirstxy:jlastxy, km))
       allocate(mfzxyz(ifirstxy:ilastxy, jfirstxy:jlastxy, km + 1))
 
-      ! SERVICE adds the bundle to both import and export states
-      ! Here we copy the tracer data from the import bundle to the export bundle
+      ! SERVICE adds the bundle containing tracers to be advected to both import and export states
+      ! Here we copy the tracer data from the import bundle to the export
       call ESMF_StateGet(import, "TRADV", bundle_imp, _RC)
       call ESMF_StateGet(export, "TRADV", bundle, _RC)
       ! Instead of copying, ensure that bundle_imp and bundle point to the same data in the
@@ -835,37 +834,36 @@ contains
       ! ALT: this section attempts to limit the amount of advected tracers
       adjust_tracers = .false.
       call MAPL_GridCompGetResource(gc, "EXCLUDE_ADVECTION_TRACERS", adjust_tracer_mode, default="ALWAYS", _RC)
-      if (adjust_tracer_mode == "ALWAYS") then
+      select case(trim(adjust_tracer_mode))
+      case ("ALWAYS")
          adjust_tracers = .true.
-      else if (adjust_tracer_mode == "PREDICTOR") then
-         !get predictor_alarm from clock
+      case ("PREDICTOR")
          call ESMF_ClockGetAlarm(clock, alarmName="PredictorAlarm", alarm=predictor_alarm, rc=status)
          if (status == ESMF_SUCCESS) then
-            !check if ringing
             if (ESMF_AlarmIsRinging(predictor_alarm)) then
                adjust_tracers = .true.
             end if
          end if
-      else
+      case default
          call logger%info("run:: Invalid value specified for EXCLUDE_ADVECTION_TRACERS, ignored")
          adjust_tracers = .false.
-      end if
+      end select
       if (adjust_tracers) then
          if (firstime) then
             firstime = .false.
             xlist = ESMF_HConfigAsStringSeq(hconfig, keyString="EXCLUDE_ADVECTION_TRACERS_LIST", stringLen=ESMF_MAXSTR, _RC)
+            n = 0
             if (allocated(xlist)) n = size(xlist)
 
             ! Count the number of tracers
             call ESMF_FieldBundleGet(bundle, grid=bgrid, fieldCount=nqt, _RC)
             BundleAdv = ESMF_FieldBundleCreate(name="xTRADV", _RC)
             call ESMF_FieldBundleSet(BundleAdv, grid=bgrid, _RC)
-            ! loop over NQ in TRADV
-            do i = 1, nqt
+            do i = 1, nqt ! loop over nq in TRADV
                ! Get field from TRADV and its name
                call ESMF_FieldBundleGet(bundle, fieldIndex=i, field=field, _RC)
                field_name = get_short_name(field, _RC)
-               !exclude everything that is not cloud/water species
+               ! Exclude everything that is not cloud/water species
                if ((AdvCore_Advection >= 1) .and. &
                     (field_name /= "Q") .and. &
                     (field_name /= "QLCN") .and. &
@@ -889,7 +887,7 @@ contains
                   end if
                   xlist(n) = trim(field_name)
                end if
-               !loop over exclude_list
+               ! Loop over exclude_list
                exclude = .false.
                do j = 1, n
                   if (field_name == xlist(j)) then
@@ -902,15 +900,7 @@ contains
                end if
             end do
 
-            if (allocated(xlist)) then
-               !   ! Just in case xlist was allocated, but nothing was in it, could have garbage
-               !   if (n > 0) then
-               !      call ESMF_FieldBundleRemove(BUNDLE, fieldNameList=xlist, &
-               !         relaxedFlag=.true., rc=status)
-               !      VERIFY_(STATUS)
-               !   end if
-               deallocate(xlist)
-            end if
+            if (allocated(xlist)) deallocate(xlist)
 
          end if ! firstime
          bundle = BundleAdv ! replace TRADV

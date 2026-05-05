@@ -105,6 +105,7 @@ private
 
   public fv_getAllWinds
   public INTERP_AGRID_TO_DGRID
+  public get_im_world_and_topology
 
   interface fv_computeMassFluxes
      module procedure fv_computeMassFluxes_r4
