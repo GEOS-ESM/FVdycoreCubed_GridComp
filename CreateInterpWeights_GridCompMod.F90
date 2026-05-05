@@ -16,7 +16,8 @@
    use MAPL
    use MAPL2, only: MAPL_GenericInitialize, MAPL_GenericSetServices, &
         MAPL_GetObjectFromGC, MAPL_GetResource, MAPL_MemUtilsWrite, &
-        MAPL_MetaComp, write_parallel
+        MAPL_MetaComp
+   use pflogger, only: logger_t => logger
 
 ! !PUBLIC MEMBER FUNCTIONS:
 
@@ -108,6 +109,7 @@ contains
 
   integer :: numtasks
   integer :: comm, gid, pe0, pe1, pe2, pe3, pe4, pe5, pe6, pe7
+  class(logger_t), pointer :: logger
 
 ! Begin
 !------
@@ -121,6 +123,9 @@ contains
 !------------------------
 
     call MAPL_GenericInitialize ( GC, IMPORT, EXPORT, CLOCK,  RC=STATUS)
+    VERIFY_(STATUS)
+
+    call MAPL_GridCompGet(GC, logger=logger, RC=STATUS)
     VERIFY_(STATUS)
 
     call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
@@ -142,10 +147,10 @@ contains
     call ESMF_ConfigGetAttribute   ( cf, nlon, label = 'nlon:', default=360, rc = rc )
     call ESMF_ConfigGetAttribute   ( cf, nlat, label = 'nlat:', default=181, rc = rc )
 
-    call write_parallel(npx)
-    call write_parallel(npy)
-    call write_parallel(nlon)
-    call write_parallel(nlat)
+    call logger%info('npx: %i0', npx)
+    call logger%info('npy: %i0', npy)
+    call logger%info('nlon: %i0', nlon)
+    call logger%info('nlat: %i0', nlat)
 
     call ESMF_VMGet(vm, petCount=numtasks, rc=status)
     call ESMF_VMGet(vm, localPet=gid, rc=status)
@@ -153,7 +158,7 @@ contains
    !call GetWeights_init (6,1,npx,npy,1,&
    !     1,6,.false.,.true.,comm)
 
-    call write_parallel('Generating Weights')
+    call logger%info('Generating Weights')
     allocate ( data_ll(nlon,nlat) )
     allocate ( data_cs(npx ,npy ) )
     data_cs(:,:) = 1.0
