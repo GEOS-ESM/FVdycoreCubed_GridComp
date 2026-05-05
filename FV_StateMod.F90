@@ -1299,7 +1299,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 #endif
 
   type(ESMF_VM) :: vm_
-  integer :: comm_, irank_, nranks_, mpierr_
 
 ! Begin
 
