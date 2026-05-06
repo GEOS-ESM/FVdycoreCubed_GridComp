@@ -50,6 +50,7 @@
                            DYN_CASE        => CASE_ID,               &
                            DYN_DEBUG       => DEBUG,                 &
                            HYDROSTATIC     => FV_HYDROSTATIC,        &
+                           GEOS_MLT        => FV_GEOS_MLT,           & 
                            fv_getUpdraftHelicity,                    &
                            ADIABATIC, SW_DYNAMICS, AdvCore_Advection
    use m_topo_remap, only: dyn_topo_remap
