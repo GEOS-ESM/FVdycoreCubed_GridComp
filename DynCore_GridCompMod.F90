@@ -701,7 +701,7 @@ contains
       logical :: LCONSV, LFILL
       integer :: CONSV, FILL
 
-      logical, save :: firstime = .true.
+      logical, save :: first_run = .true.
       logical :: adjust_tracers, exclude, do_energetics, do_tropvars
       logical :: FV3_STANDALONE
       integer :: pos, nqt
@@ -711,8 +711,8 @@ contains
       type(ESMF_Alarm) :: predictor_alarm
       type(ESMF_Grid) :: bgrid
       character(len=:), allocatable :: field_name
-      character(len=ESMF_MAXSTR), allocatable :: biggerlist(:)
-      character(len=:), allocatable :: adjust_tracer_mode, xlist(:)
+      character(len=ESMF_MAXSTR), allocatable :: xlist(:), biggerlist(:)
+      character(len=:), allocatable :: adjust_tracer_mode
       real(kind=r8) :: t1, t2, dyn_run_timer
       class(logger_t), pointer :: logger
       logical :: same_tradv_data
@@ -849,60 +849,38 @@ contains
          adjust_tracers = .false.
       end select
       if (adjust_tracers) then
-         if (firstime) then
-            firstime = .false.
+         if (first_run) then
+            first_run = .false.
+            call ESMF_FieldBundleGet(bundle, grid=bgrid, fieldCount=nqt, _RC) ! num tracers
+            BundleAdv = ESMF_FieldBundleCreate(name="xTRADV", _RC)
+            call ESMF_FieldBundleSet(BundleAdv, grid=bgrid, _RC)
             xlist = ESMF_HConfigAsStringSeq(hconfig, keyString="EXCLUDE_ADVECTION_TRACERS_LIST", stringLen=ESMF_MAXSTR, _RC)
             n = 0
             if (allocated(xlist)) n = size(xlist)
-
-            ! Count the number of tracers
-            call ESMF_FieldBundleGet(bundle, grid=bgrid, fieldCount=nqt, _RC)
-            BundleAdv = ESMF_FieldBundleCreate(name="xTRADV", _RC)
-            call ESMF_FieldBundleSet(BundleAdv, grid=bgrid, _RC)
-            do i = 1, nqt ! loop over nq in TRADV
-               ! Get field from TRADV and its name
-               call ESMF_FieldBundleGet(bundle, fieldIndex=i, field=field, _RC)
-               field_name = get_short_name(field, _RC)
-               ! Exclude everything that is not cloud/water species
-               if ((AdvCore_Advection >= 1) .and. &
-                    (field_name /= "Q") .and. &
-                    (field_name /= "QLCN") .and. &
-                    (field_name /= "QLLS") .and. &
-                    (field_name /= "QICN") .and. &
-                    (field_name /= "QILS") .and. &
-                    (field_name /= "CLCN") .and. &
-                    (field_name /= "CLLS") .and. &
-                    (field_name /= "NCPL") .and. &
-                    (field_name /= "NCPI") .and. &
-                    (field_name /= "QRAIN") .and. &
-                    (field_name /= "QSNOW") .and. &
-                    (field_name /= "QGRAUPEL")) then
-                  call logger%info("run:: FV3+ADV is excluding " // field_name)
-
-                  n = n + 1
-                  if (n > size(xlist)) then
-                     allocate(biggerlist(2 * n), _STAT)
-                     biggerlist(1:n - 1) = xlist
-                     call move_alloc(from=biggerlist, to=xlist)
-                  end if
-                  xlist(n) = trim(field_name)
-               end if
-               ! Loop over exclude_list
-               exclude = .false.
-               do j = 1, n
-                  if (field_name == xlist(j)) then
-                     exclude = .true.
-                     exit
+            ! Also exclude tracers that are to be advected by AdvCore
+            ! NOTE: DynCore always advects the cloud/water species, even when AdvCore is active
+            if (AdvCore_Advection >= 1) then
+               do i = 1, nqt
+                  call ESMF_FieldBundleGet(bundle, fieldIndex=i, field=field, _RC)
+                  field_name = get_short_name(field, _RC)
+                  if (.not. field_is_cloud_water_species(field_name)) then
+                     call logger%info("run:: DYN is excluding " // field_name)
+                     n = n + 1
+                     if (n > size(xlist)) xlist = resize(xlist, _RC)
+                     xlist(n) = trim(field_name)
                   end if
                end do
-               if (.not.exclude) then
+            end if
+            ! Add non-excluded tracers to the BundleAdv
+            do i = 1, nqt
+               call ESMF_FieldBundleGet(bundle, fieldIndex=i, field=field, _RC)
+               field_name = get_short_name(field, _RC)
+               if (.not. is_name_in_list(field_name, xlist)) then
                   call MAPL_FieldBundleAdd(BundleAdv, [field], _RC)
                end if
             end do
-
             if (allocated(xlist)) deallocate(xlist)
-
-         end if ! firstime
+         end if ! first_run
          bundle = BundleAdv ! replace TRADV
       else
          BundleAdv = bundle ! replace with TRADV
@@ -2708,6 +2686,61 @@ contains
 
       _RETURN(_SUCCESS)
    end function get_short_name
+
+   function field_is_cloud_water_species(field_name) result(is_cloud_water_species)
+      character(len=*), intent(in) :: field_name
+      logical :: is_cloud_water_species
+
+      is_cloud_water_species = .false.
+      if ( &
+           (trim(field_name) == "Q") .or. &
+           (trim(field_name) == "QLCN") .or. &
+           (trim(field_name) == "QLLS") .or. &
+           (trim(field_name) == "QICN") .or. &
+           (trim(field_name) == "QILS") .or. &
+           (trim(field_name) == "CLCN") .or. &
+           (trim(field_name) == "CLLS") .or. &
+           (trim(field_name) == "NCPL") .or. &
+           (trim(field_name) == "NCPI") .or. &
+           (trim(field_name) == "QRAIN") .or. &
+           (trim(field_name) == "QSNOW") .or. &
+           (trim(field_name) == "QGRAUPEL")) then
+         is_cloud_water_species = .true.
+      end if
+   end function field_is_cloud_water_species
+
+   function resize(old_list, factor, rc) result(resized)
+      character(len=ESMF_MAXSTR), intent(in) :: old_list(:)
+      integer, optional, intent(in) :: factor
+      integer, intent(out) :: rc
+      character(len=ESMF_MAXSTR), allocatable :: resized(:)
+
+      integer :: old_size, new_size, status
+
+      old_size = size(old_list)
+      new_size = 2 * old_size
+      if (present(factor)) new_size = factor * old_size
+      allocate(resized(new_size), _STAT)
+      resized(1:old_size) = old_list
+
+      _RETURN(_SUCCESS)
+   end function resize
+
+   function is_name_in_list(name, list) result(is_in_list)
+      character(len=*), intent(in) :: name
+      character(len=ESMF_MAXSTR), intent(in) :: list(:)
+      logical :: is_in_list
+
+      integer :: n
+
+      is_in_list = .false.
+      do n = 1, size(list)
+         if (trim(name) == trim(list(n))) then
+            is_in_list = .true.
+            exit
+         end if
+      end do
+   end function is_name_in_list
 
    !BOP
    !IROUTINE: run_add_incs
