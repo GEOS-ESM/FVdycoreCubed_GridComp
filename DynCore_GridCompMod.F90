@@ -85,12 +85,16 @@ module FVdycoreCubed_GridComp
    ! Include the MPI library definitons:
    include 'mpif.h'
 
-   type(ESMF_FieldBundle), save :: BundleAdv
+   type(ESMF_FieldBundle), save :: bundle_adv
    integer :: NXQ = 0
    logical :: overwrite_Q = .true.
    logical :: DEBUG_TQ_ERRORS
 
    public :: SetServices ! Register component methods
+   public :: get_short_name
+   public :: field_is_cloud_water_species
+   public :: is_name_in_list
+   public :: resize
 
    !DESCRIPTION: This module implements the Dynamical Core as
    !               an ESMF gridded component.
@@ -852,8 +856,8 @@ contains
          if (first_run) then
             first_run = .false.
             call ESMF_FieldBundleGet(bundle, grid=bgrid, fieldCount=nqt, _RC) ! num tracers
-            BundleAdv = ESMF_FieldBundleCreate(name="xTRADV", _RC)
-            call ESMF_FieldBundleSet(BundleAdv, grid=bgrid, _RC)
+            bundle_adv = ESMF_FieldBundleCreate(name="xTRADV", _RC)
+            call ESMF_FieldBundleSet(bundle_adv, grid=bgrid, _RC)
             xlist = ESMF_HConfigAsStringSeq(hconfig, keyString="EXCLUDE_ADVECTION_TRACERS_LIST", stringLen=ESMF_MAXSTR, _RC)
             n = 0
             if (allocated(xlist)) n = size(xlist)
@@ -871,19 +875,19 @@ contains
                   end if
                end do
             end if
-            ! Add non-excluded tracers to the BundleAdv
+            ! Add non-excluded tracers to the bundle_adv
             do i = 1, nqt
                call ESMF_FieldBundleGet(bundle, fieldIndex=i, field=field, _RC)
                field_name = get_short_name(field, _RC)
                if (.not. is_name_in_list(field_name, xlist)) then
-                  call MAPL_FieldBundleAdd(BundleAdv, [field], _RC)
+                  call MAPL_FieldBundleAdd(bundle_adv, [field], _RC)
                end if
             end do
             if (allocated(xlist)) deallocate(xlist)
          end if ! first_run
-         bundle = BundleAdv ! replace TRADV
+         bundle = bundle_adv ! replace TRADV
       else
-         BundleAdv = bundle ! replace with TRADV
+         bundle_adv = bundle ! replace with TRADV
       end if ! adjust_tracers
 
       ! Collect tracer names from the bundle for later use
@@ -2604,7 +2608,7 @@ contains
       jm = self%grid%npy
       km = self%grid%npz
 
-      bundle = BundleAdv
+      bundle = bundle_adv
 
       ! Count the bundles tracers
       call ESMF_FieldBundleGet(bundle, fieldCount=nq, _RC)
