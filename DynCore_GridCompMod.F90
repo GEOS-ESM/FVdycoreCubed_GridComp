@@ -94,7 +94,6 @@ module FVdycoreCubed_GridComp
    public :: get_short_name
    public :: field_is_cloud_water_species
    public :: is_name_in_list
-   public :: resize
 
    !DESCRIPTION: This module implements the Dynamical Core as
    !               an ESMF gridded component.
@@ -424,7 +423,6 @@ contains
       integer, intent(out) :: rc ! Error code, 0 all is well, error otherwise
 
       type(DynState), pointer :: self
-      type(ESMF_Field) :: field
       type(ESMF_State) :: internal
       real(kind=r4), pointer :: pref(:)
       real(kind=r4), pointer :: u(:, :, :), v(:, :, :), t(:, :, :)
@@ -433,12 +431,10 @@ contains
       real(kind=r8), pointer :: ud(:, :, :), vd(:, :, :)
       real(kind=r8), pointer :: pt(:, :, :), pk(:, :, :)
       real(kind=r8), allocatable :: ur(:, :, :), vr(:, :, :) ! rotated winds
-      logical :: ColdRestart, FV3_STANDALONE
-      integer :: ifirst, ilast, jfirst, jlast, km
-      integer :: i, numTracers, status
-      integer :: replay_shutoff_seconds
+      logical :: ColdRestart
       type(ESMF_TimeInterval) :: replay_shutoff_interval
       type(ESMF_Alarm) :: replay_shutoff_alarm
+      integer :: replay_shutoff_seconds, ifirst, ilast, jfirst, jlast, km, status
 
       ! Setup FMS/FV3
       call MAPL_GridCompTimerStart(gc, "DYN_SETUP", _RC)
@@ -556,11 +552,8 @@ contains
       type(DynGrid), pointer :: grid
       type(DynVars), pointer :: vars
 
-      integer :: nq
-      integer :: im, jm, km
-      integer :: numvars
+      integer :: nq, im, jm, km, kend, i, j, k, n
       integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
-      integer :: kend, i, j, k, n
       ! TODO: pchakrab - convt is not used anywhere
       logical, parameter :: convt = .false. ! Until this is run with full physics
       logical :: is_shutoff, is_ringing
@@ -712,11 +705,10 @@ contains
 #ifdef SKIP_TRACERS
       integer :: itracer
 #endif
-      type(ESMF_Alarm) :: predictor_alarm
       type(ESMF_Grid) :: bgrid
       character(len=:), allocatable :: field_name
       character(len=ESMF_MAXSTR), allocatable :: xlist(:), biggerlist(:)
-      character(len=:), allocatable :: adjust_tracer_mode
+      ! character(len=:), allocatable :: adjust_tracer_mode
       real(kind=r8) :: t1, t2, dyn_run_timer
       class(logger_t), pointer :: logger
       logical :: same_tradv_data
@@ -835,60 +827,16 @@ contains
       same_tradv_data = MAPL_FieldBundleSameData(bundle_imp, bundle, _RC)
       _ASSERT(same_tradv_data, "TRADV bundles in import and export do not point to the same data")
 
-      ! ALT: this section attempts to limit the amount of advected tracers
-      adjust_tracers = .false.
-      call MAPL_GridCompGetResource(gc, "EXCLUDE_ADVECTION_TRACERS", adjust_tracer_mode, default="ALWAYS", _RC)
-      select case(trim(adjust_tracer_mode))
-      case ("ALWAYS")
-         adjust_tracers = .true.
-      case ("PREDICTOR")
-         call ESMF_ClockGetAlarm(clock, alarmName="PredictorAlarm", alarm=predictor_alarm, rc=status)
-         if (status == ESMF_SUCCESS) then
-            if (ESMF_AlarmIsRinging(predictor_alarm)) then
-               adjust_tracers = .true.
-            end if
-         end if
-      case default
-         call logger%info("run:: Invalid value specified for EXCLUDE_ADVECTION_TRACERS, ignored")
-         adjust_tracers = .false.
-      end select
+      adjust_tracers = should_adjust_tracers(gc, clock, _RC)
       if (adjust_tracers) then
          if (first_run) then
             first_run = .false.
-            call ESMF_FieldBundleGet(bundle, grid=bgrid, fieldCount=nqt, _RC) ! num tracers
-            bundle_adv = ESMF_FieldBundleCreate(name="xTRADV", _RC)
-            call ESMF_FieldBundleSet(bundle_adv, grid=bgrid, _RC)
-            xlist = ESMF_HConfigAsStringSeq(hconfig, keyString="EXCLUDE_ADVECTION_TRACERS_LIST", stringLen=ESMF_MAXSTR, _RC)
-            n = 0
-            if (allocated(xlist)) n = size(xlist)
-            ! Also exclude tracers that are to be advected by AdvCore
-            ! NOTE: DynCore always advects the cloud/water species, even when AdvCore is active
-            if (AdvCore_Advection >= 1) then
-               do i = 1, nqt
-                  call ESMF_FieldBundleGet(bundle, fieldIndex=i, field=field, _RC)
-                  field_name = get_short_name(field, _RC)
-                  if (.not. field_is_cloud_water_species(field_name)) then
-                     call logger%info("run:: DYN is excluding " // field_name)
-                     n = n + 1
-                     if (n > size(xlist)) xlist = resize(xlist, _RC)
-                     xlist(n) = trim(field_name)
-                  end if
-               end do
-            end if
-            ! Add non-excluded tracers to the bundle_adv
-            do i = 1, nqt
-               call ESMF_FieldBundleGet(bundle, fieldIndex=i, field=field, _RC)
-               field_name = get_short_name(field, _RC)
-               if (.not. is_name_in_list(field_name, xlist)) then
-                  call MAPL_FieldBundleAdd(bundle_adv, [field], _RC)
-               end if
-            end do
-            if (allocated(xlist)) deallocate(xlist)
-         end if ! first_run
+            bundle_adv = get_adjusted_tracer_bundle(bundle, hconfig, _RC) ! save'd
+         end if
          bundle = bundle_adv ! replace TRADV
       else
          bundle_adv = bundle ! replace with TRADV
-      end if ! adjust_tracers
+      end if
 
       ! Collect tracer names from the bundle for later use
       call ESMF_FieldBundleGet(bundle, fieldCount=nq, _RC)
@@ -2654,6 +2602,86 @@ contains
       _UNUSED_DUMMY(import)
    end subroutine PULL_Q
 
+   function should_adjust_tracers(gc, clock, rc) result(adjust_tracers)
+      type(ESMF_GridComp), intent(inout) :: gc
+      type(ESMF_Clock), intent(in) :: clock
+      integer, intent(out) :: rc
+      logical :: adjust_tracers
+
+      class(logger_t), pointer :: logger
+      character(len=:), allocatable :: adjust_tracer_mode
+      type(ESMF_Alarm) :: predictor_alarm
+      integer :: status
+
+      adjust_tracers = .false.
+
+      call MAPL_GridCompGetResource(gc, "EXCLUDE_ADVECTION_TRACERS", adjust_tracer_mode, default="ALWAYS", _RC)
+      select case(trim(adjust_tracer_mode))
+      case ("ALWAYS")
+         adjust_tracers = .true.
+      case ("PREDICTOR")
+         call ESMF_ClockGetAlarm(clock, alarmName="PredictorAlarm", alarm=predictor_alarm, rc=status)
+         if (status == ESMF_SUCCESS) then
+            if (ESMF_AlarmIsRinging(predictor_alarm)) then
+               adjust_tracers = .true.
+            end if
+         end if
+      case default
+         call logger%info("run:: Invalid value specified for EXCLUDE_ADVECTION_TRACERS, ignored")
+         adjust_tracers = .false.
+      end select
+
+      _RETURN(_SUCCESS)
+   end function should_adjust_tracers
+
+   function get_adjusted_tracer_bundle(orig_bundle, hconfig, rc) result(adjusted_bundle)
+      type(ESMF_FieldBundle), intent(in) :: orig_bundle
+      type(ESMF_HConfig), intent(in) :: hconfig
+      integer, intent(out) :: rc
+      type(ESMF_FieldBundle) :: adjusted_bundle
+
+      type(ESMF_Grid) :: grid
+      type(ESMF_Field) :: field
+      character(len=:), allocatable :: field_name
+      character(len=ESMF_MAXSTR), allocatable :: xlist(:), biggerlist(:)
+      integer :: i, nqt, num_excluded, status
+
+      call ESMF_FieldBundleGet(orig_bundle, grid=grid, fieldCount=nqt, _RC)
+      adjusted_bundle = ESMF_FieldBundleCreate(name="xTRADV", _RC)
+      call ESMF_FieldBundleSet(adjusted_bundle, grid=grid, _RC)
+      xlist = ESMF_HConfigAsStringSeq(hconfig, keyString="EXCLUDE_ADVECTION_TRACERS_LIST", stringLen=ESMF_MAXSTR, _RC)
+      num_excluded = 0
+      if (allocated(xlist)) num_excluded = size(xlist)
+      ! Exclude tracers that are to be advected by AdvCore
+      ! NOTE: DynCore always advects the cloud/water species, even when AdvCore is active
+      if (AdvCore_Advection >= 1) then
+         do i = 1, nqt
+            call ESMF_FieldBundleGet(orig_bundle, fieldIndex=i, field=field, _RC)
+            field_name = get_short_name(field, _RC)
+            if (.not. field_is_cloud_water_species(field_name)) then
+               ! call logger%info("run:: DYN is excluding " // field_name)
+               num_excluded = num_excluded + 1
+               if (num_excluded > size(xlist)) then
+                  allocate(biggerlist(2*num_excluded), _STAT)
+                  biggerlist(1:num_excluded-1) = xlist
+                  call move_alloc(from=biggerlist, to=xlist)
+               end if
+               xlist(num_excluded) = trim(field_name)
+            end if
+         end do
+      end if
+      ! Add non-excluded tracers to the bundle_adv
+      do i = 1, nqt
+         call ESMF_FieldBundleGet(orig_bundle, fieldIndex=i, field=field, _RC)
+         field_name = get_short_name(field, _RC)
+         if (.not. is_name_in_list(field_name, xlist)) then
+            call MAPL_FieldBundleAdd(adjusted_bundle, [field], _RC)
+         end if
+      end do
+
+      _RETURN(_SUCCESS)
+   end function get_adjusted_tracer_bundle
+
    function get_short_name(field, rc) result(short_name)
       type(ESMF_Field) :: field
       integer, intent(out) :: rc
@@ -2685,7 +2713,8 @@ contains
       case ("mass_fraction_of_graupel")
          short_name = "QGRAUPEL"
       case default
-         _FAIL("Unrecognized standard_name: " // trim(standard_name))
+         ! _FAIL("Unrecognized standard_name: " // trim(standard_name))
+         short_name = trim(standard_name)
       end select
 
       _RETURN(_SUCCESS)
@@ -2712,23 +2741,6 @@ contains
          is_cloud_water_species = .true.
       end if
    end function field_is_cloud_water_species
-
-   function resize(old_list, factor, rc) result(resized)
-      character(len=ESMF_MAXSTR), intent(in) :: old_list(:)
-      integer, optional, intent(in) :: factor
-      integer, intent(out) :: rc
-      character(len=ESMF_MAXSTR), allocatable :: resized(:)
-
-      integer :: old_size, new_size, status
-
-      old_size = size(old_list)
-      new_size = 2 * old_size
-      if (present(factor)) new_size = factor * old_size
-      allocate(resized(new_size), _STAT)
-      resized(1:old_size) = old_list
-
-      _RETURN(_SUCCESS)
-   end function resize
 
    function is_name_in_list(name, list) result(is_in_list)
       character(len=*), intent(in) :: name
