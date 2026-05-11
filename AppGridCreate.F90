@@ -7,7 +7,6 @@ subroutine AppCSEdgeCreateF(IM_WORLD, LonEdge,LatEdge, LonCenter, LatCenter, rc)
    use MAPL
    use MAPL2, only: MAPL_AllocNodeArray, MAPL_DeAllocNodeArray, &
         MAPL_MemUtilsWrite
-   use mapl3g_GridGet, only: grid_get_interior
    use MAPL_Constants,    only : pi=> MAPL_PI_R8
    use fv_arrays_mod,     only: REAL4, REAL8, R_GRID
    use fv_grid_utils_mod, only: gnomonic_grids, cell_center2, direct_transform
@@ -132,7 +131,7 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
    use MAPL
    use MAPL2, only: MAPL_AllocNodeArray, MAPL_DeAllocNodeArray, &
         MAPL_MemUtilsWrite
-   use mapl3g_GridGet, only: grid_get_interior
+   use mapl3g_GridGet, only: mapl_GridGet => GridGet
    use MAPL_Constants, only: pi => MAPL_PI_R8
 
    use fv_arrays_mod,     only: REAL4, REAL8, R_GRID
@@ -269,7 +268,7 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
 
   block
     integer, allocatable :: interior_(:)
-    call grid_get_interior(esmfgrid, interior_)
+    call mapl_GridGet(esmfgrid, interior=interior_)
     isg=interior_(1); ieg=interior_(2); jsg=interior_(3); jeg=interior_(4)
   end block
 
