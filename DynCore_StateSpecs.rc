@@ -71,8 +71,8 @@ category: EXPORT
   CV             |  northward_accumulated_courant_number                                     |  1                 |  xyz  |  C   |                    |
   MX             |  pressure_weighted_accumulated_eastward_mass_flux                         |  Pa m+2            |  xyz  |  C   |                    |
   MY             |  pressure_weighted_accumulated_northward_mass_flux                        |  Pa m+2            |  xyz  |  C   |                    |
-  MFX            |  pressure_weighted_accumulated_eastward_mass_flux                         |  Pa m+2            |  xyz  |  C   |                    |  R8
-  MFY            |  pressure_weighted_accumulated_northward_mass_flux                        |  Pa m+2            |  xyz  |  C   |                    |  R8
+  MFX            |  pressure_weighted_accumulated_eastward_mass_flux                         |  Pa m+2 s-1        |  xyz  |  C   |                    |  R8
+  MFY            |  pressure_weighted_accumulated_northward_mass_flux                        |  Pa m+2 s-1        |  xyz  |  C   |                    |  R8
   MFZ            |  vertical_mass_flux                                                       |  kg m-2 s-1        |  xyz  |  E   |                    |  R8
   MZ             |  vertical_mass_flux                                                       |  kg m-2 s-1        |  xyz  |  E   |                    |  R4
   PV             |  ertels_isentropic_potential_vorticity                                    |  m+2 kg-1 s-1      |  xyz  |  C   |                    |
