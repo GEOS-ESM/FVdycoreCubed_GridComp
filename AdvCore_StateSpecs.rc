@@ -8,12 +8,12 @@ category: EXPORT
  AREA       | m+2   | xy   | N    |  agrid_cell_area
 
 category: IMPORT
-#--------------------------------------------------------------
- SHORT_NAME | UNITS       | TYPEKIND | DIMS | VLOC | LONG_NAME
-#--------------------------------------------------------------
- MFX        | Pa m+2 s-1  | R8       | xyz  | C    | pressure_weighted_eastward_mass_flux
- MFY        | Pa m+2 s-1  | R8       | xyz  | C    | pressure_weighted_northward_mass_flux
- CX         | 1           | R8       | xyz  | C    | eastward_accumulated_courant_number
- CY         | 1           | R8       | xyz  | C    | northward_accumulated_courant_number
- PLE0       | Pa          | R8       | xyz  | E    | pressure_at_layer_edges_before_advection
- PLE1       | Pa          | R8       | xyz  | E    | pressure_at_layer_edges_after_advection
+#---------------------------------------------------------
+ SHORT_NAME | UNITS  | TYPEKIND | DIMS | VLOC | LONG_NAME
+#---------------------------------------------------------
+ MFX        | Pa m+2 | R8       | xyz  | C    | pressure_weighted_eastward_mass_flux
+ MFY        | Pa m+2 | R8       | xyz  | C    | pressure_weighted_northward_mass_flux
+ CX         | 1      | R8       | xyz  | C    | eastward_accumulated_courant_number
+ CY         | 1      | R8       | xyz  | C    | northward_accumulated_courant_number
+ PLE0       | Pa     | R8       | xyz  | E    | pressure_at_layer_edges_before_advection
+ PLE1       | Pa     | R8       | xyz  | E    | pressure_at_layer_edges_after_advection
