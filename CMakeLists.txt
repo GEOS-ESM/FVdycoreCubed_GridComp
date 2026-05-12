@@ -183,15 +183,6 @@ if (FV_PRECISION STREQUAL R4R8)
   endforeach()
 endif ()
 
-# Install the resource files
-set (resource_files
-  dyn.yaml
-  dyn-sa.yaml
-  data-moist.yaml
-  data-ana.yaml
-)
-install(FILES ${resource_files} DESTINATION etc)
-
 if (BUILD_GEOS_GTFV3_INTERFACE)
   ecbuild_add_executable (
     TARGET fv3_driver.x
@@ -216,3 +207,4 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
 endif ()
 
 add_subdirectory(scripts)
+add_subdirectory(regression)

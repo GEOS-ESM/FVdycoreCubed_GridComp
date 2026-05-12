@@ -1,0 +1,118 @@
+---
+mapl:
+  states: {}
+
+  geometry:
+    kind: from_child
+    provider: DYN
+
+  children:
+    DYN:
+      dso: libFVdycoreCubed_GridComp
+      config_file: dyn.yaml
+
+    ADV:
+      dso: libFVdycoreCubed_GridComp
+      config_file: adv.yaml
+      setservice: advcore_setservices_
+
+    DataTracers:
+      dso: libconfigurable_gridcomp
+      config_file: data-tracers.yaml
+
+    DataPhisVarflt:
+      dso: libconfigurable_gridcomp
+      config_file: data-phis-varflt.yaml
+
+    DataAna:
+      dso: libconfigurable_gridcomp
+      config_file: data-ana.yaml
+
+  connections:
+    - src_name: TRADV
+      dst_name: TRADV
+      src_comp: DYN
+      dst_comp: DataTracers
+
+    - src_name: TRADV
+      dst_name: TRADV
+      src_comp: ADV
+      dst_comp: DataTracers
+
+    - src_name: PHIS
+      src_intent: internal
+      src_comp: DataPhisVarflt
+      dst_name: PHIS
+      dst_comp: DYN
+
+    - src_name: VARFLT
+      src_intent: internal
+      src_comp: DataPhisVarflt
+      dst_name: VARFLT
+      dst_comp: DYN
+
+    - src_name: MFX
+      dst_name: MFX
+      src_comp: DYN
+      dst_comp: ADV
+
+    - src_name: MFY
+      dst_name: MFY
+      src_comp: DYN
+      dst_comp: ADV
+
+    - src_name: CX
+      dst_name: CX
+      src_comp: DYN
+      dst_comp: ADV
+
+    - src_name: CY
+      dst_name: CY
+      src_comp: DYN
+      dst_comp: ADV
+
+    - src_name: PLE0
+      dst_name: PLE0
+      src_comp: DYN
+      dst_comp: ADV
+
+    - src_name: PLE1
+      dst_name: PLE1
+      src_comp: DYN
+      dst_comp: ADV
+
+    - src_name: DQVANA
+      src_intent: internal
+      src_comp: DataAna
+      dst_name: DQVANA
+      dst_comp: DYN
+
+    - src_name: DQLANA
+      src_intent: internal
+      src_comp: DataAna
+      dst_name: DQLANA
+      dst_comp: DYN
+
+    - src_name: DQIANA
+      src_intent: internal
+      src_comp: DataAna
+      dst_name: DQIANA
+      dst_comp: DYN
+
+    - src_name: DQRANA
+      src_intent: internal
+      src_comp: DataAna
+      dst_name: DQRANA
+      dst_comp: DYN
+
+    - src_name: DQSANA
+      src_intent: internal
+      src_comp: DataAna
+      dst_name: DQSANA
+      dst_comp: DYN
+
+    - src_name: DQGANA
+      src_intent: internal
+      src_comp: DataAna
+      dst_name: DQGANA
+      dst_comp: DYN
