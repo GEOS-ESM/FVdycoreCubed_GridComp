@@ -20,7 +20,7 @@ module fv_regrid_c2c
    use mapl3g_CubedSphereGeomSpec
    use MAPL_Constants,           only: MAPL_PI_R8, MAPL_OMEGA, MAPL_GRAV, MAPL_KAPPA, &
                                        MAPL_RGAS, MAPL_RVAP, MAPL_CP, MAPL_PSDRY
-   use mapl_MaplGrid,             only: MAPL_GridGet
+   use mapl3g_Geom_API,           only: mapl_GridGetGlobalCellCountPerDim
    use MAPL_CommsMod,            only: ArrayScatter
    use FileIOSharedMod,          only: ArrDescr, ArrDescrInit, ArrDescrSet
    use NCIOMod,                  only: MAPL_VarRead, MAPL_NCIOGetFileType, &
@@ -78,7 +78,8 @@ contains
       real(REAL32), intent(inout) :: output(:,:)
       integer, intent(out), optional :: rc
 
-      integer :: status,dims(3),funit
+      integer :: status,funit
+      integer, allocatable :: dims(:)
       integer :: rank
       type(ESMF_VM) :: vm
       type(ESMF_Grid) :: grid
@@ -87,7 +88,7 @@ contains
       call ESMF_GeomGet(geom, grid=grid, _RC)
       call ESMF_VMGetCurrent(vm,_RC)
       call ESMF_VMGet(vm,localPet=rank,_RC)
-      call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
+      call mapl_GridGetGlobalCellCountPerDim(grid,globalCellCountPerDim=dims,_RC)
       if (rank ==0) then
          allocate(input(dims(1),dims(2)))
          open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
@@ -106,17 +107,18 @@ contains
       real(REAL64), intent(inout) :: output(:,:)
       integer, intent(out), optional :: rc
 
-      integer :: status,dims(3),funit
+      integer :: status,funit
       real, allocatable :: input(:,:)
       integer :: rank
       type(ESMF_VM) :: vm
       type(ESMF_Grid) :: grid
+      integer, allocatable :: dims(:)
       real(REAL64), allocatable :: input_r8(:,:)
 
       call ESMF_GeomGet(geom, grid=grid, _RC)
       call ESMF_VMGetCurrent(vm,_RC)
       call ESMF_VMGet(vm,localPet=rank,_RC)
-      call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
+      call mapl_GridGetGlobalCellCountPerDim(grid,globalCellCountPerDim=dims,_RC)
       if (rank ==0) then
          allocate(input(dims(1),dims(2)),input_r8(dims(2),dims(2)))
          open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
