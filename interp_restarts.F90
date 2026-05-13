@@ -8,10 +8,10 @@ program interp_restarts
 !--------------------------------------------------------------------!
    use ESMF
    use pfio
-   use NCIOMod,        only: MAPL_VarRead, MAPL_VarWrite, MAPL_NCIOGetFileType, &
-                              MAPL_IOGetNonDimVars, MAPL_IOCountNonDimVars, &
-                              MAPL_IOChangeRes, MAPL_IOCountLevels
-   use FileIOSharedMod,only: ArrDescr, ArrDescrInit, ArrDescrSet
+   use MAPL,           only: MAPL_VarRead, MAPL_VarWrite, MAPL_NCIOGetFileType, &
+                               MAPL_IOGetNonDimVars, MAPL_IOCountNonDimVars, &
+                               MAPL_IOChangeRes, MAPL_IOCountLevels, &
+                               ArrDescr, ArrDescrInit, ArrDescrSet
    use MAPL_ShmemMod,  only: MAPL_GetNodeInfo, MAPL_InitializeShmem, MAPL_FinalizeShmem
    use mapl3g_Geom_API,            only: GeomManager, get_geom_manager, MaplGeom
    use mapl3g_CubedSphereGeomSpec, only: CubedSphereGeomSpec
