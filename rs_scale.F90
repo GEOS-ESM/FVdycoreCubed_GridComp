@@ -1,7 +1,5 @@
       program  main
       use MAPL
-      use MAPL2, only: MAPL_IOCountNonDimVars, MAPL_NCIOGetFileType, &
-           MAPL_VarRead, MAPL_VarWrite
       implicit none
 
 ! ************************************************************************

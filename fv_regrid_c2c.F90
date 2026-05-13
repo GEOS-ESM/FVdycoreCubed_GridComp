@@ -20,11 +20,11 @@ module fv_regrid_c2c
    use mapl3g_CubedSphereGeomSpec
    use MAPL_Constants,           only: MAPL_PI_R8, MAPL_OMEGA, MAPL_GRAV, MAPL_KAPPA, &
                                        MAPL_RGAS, MAPL_RVAP, MAPL_CP, MAPL_PSDRY
-   use MAPL,                      only: mapl_GridGetGlobalCellCountPerDim
+   use MAPL,                      only: mapl_GridGetGlobalCellCountPerDim, &
+                                        ArrDescr, ArrDescrInit, ArrDescrSet, &
+                                        MAPL_VarRead, MAPL_NCIOGetFileType, &
+                                        MAPL_IOGetNonDimVars, MAPL_IOCountNonDimVars
    use MAPL_CommsMod,            only: ArrayScatter
-   use FileIOSharedMod,          only: ArrDescr, ArrDescrInit, ArrDescrSet
-   use NCIOMod,                  only: MAPL_VarRead, MAPL_NCIOGetFileType, &
-                                       MAPL_IOGetNonDimVars, MAPL_IOCountNonDimVars
    use pfio
    use gFTL2_StringVector
    use gFTL2_StringIntegerMap
