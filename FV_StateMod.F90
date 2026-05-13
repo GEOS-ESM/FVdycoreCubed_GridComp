@@ -1425,6 +1425,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
      deallocate ( griddiffs )
 #endif
     ! Set FV3 surface geopotential
+     FV_Atm(1)%phis = 0.0
      FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=FVPRC)
      FV_Atm(1)%varflt(isc:iec,jsc:jec) = real(varflt,kind=FVPRC)
      call mpp_update_domains(FV_Atm(1)%phis, FV_Atm(1)%domain, complete=.true.)
@@ -2724,13 +2725,12 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
     real    :: max_cfl_h, max_cfl_z
     
     ! Updated constraints
-    integer, parameter :: MAX_N_SPLIT  = 10
     real, parameter    :: TARGET_CFL   = 1.05
     real, parameter    :: H_MULTIPLIER = 4.0  ! For acoustic speed scaling
-    real, parameter    :: Z_MULTIPLIER = 1.0  ! Tune this to dictate max_cfl_z's impact
+    real, parameter    :: Z_MULTIPLIER = 0.25 ! Tune this to dictate max_cfl_z's impact
     
-    integer            :: total_acoustic_steps
-    integer            :: new_k_split, new_n_split, new_q_split
+    integer :: new_k_split, new_n_split, new_q_split
+    integer :: target_k_split, base_tot
 
     max_cfl_h = 0.0
     max_cfl_z = 0.0
@@ -2755,16 +2755,40 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
     ! --- 3. DYNAMIC ADJUSTMENT ON ROOT PE ---
     if (mpp_pe() == 0) then
        
-       ! Restrict the total steps using ONLY the namelist baseline and current CFLs
-       total_acoustic_steps = max(state%base_k_split * state%base_n_split, &
-                                  ceiling(max_cfl_h * H_MULTIPLIER), &
-                                  ceiling(max_cfl_z * Z_MULTIPLIER)) 
-
-       ! Calculate new splits purely from the base and total required steps
-       new_k_split = max(state%base_k_split, ceiling(real(total_acoustic_steps) / real(MAX_N_SPLIT)))
-       new_n_split = max(state%base_n_split, ceiling(real(total_acoustic_steps) / real(new_k_split)))
+       ! Calculate total baseline acoustic steps (e.g., 1 * 6 = 6)
+       ! We want to keep (k_split * n_split) as close to this as possible
+       base_tot = state%base_k_split * state%base_n_split
        
-       ! Calculate new q_split (Respecting the internal level-by-level flag: 0)
+       ! Calculate the strictly required k_split
+       target_k_split = max(state%base_k_split, ceiling(max_cfl_z * Z_MULTIPLIER))
+       
+       ! b. RATE LIMITING VIA FACTORS: 
+       ! Step to the next integer that cleanly divides base_tot
+       if (target_k_split > state%k_split) then
+           new_k_split = state%k_split + 1
+           ! Increment until we find a clean factor (or exceed base_tot)
+           do while (new_k_split < base_tot .and. mod(base_tot, new_k_split) /= 0)
+               new_k_split = new_k_split + 1
+           end do
+       elseif (target_k_split < state%k_split) then
+           new_k_split = state%k_split - 1
+           ! Decrement until we find a clean factor
+           do while (new_k_split > state%base_k_split .and. mod(base_tot, new_k_split) /= 0)
+               new_k_split = new_k_split - 1
+           end do
+           ! Safety catch
+           new_k_split = max(state%base_k_split, new_k_split)
+       else
+           new_k_split = state%k_split
+       endif
+       
+       ! c. Calculate n_split
+       ! Because new_k_split is guaranteed to be a factor, this division is exact!
+       ! (Unless max_cfl_h independently forces it higher)
+       new_n_split = ceiling(base_tot / real(new_k_split))
+       new_n_split = max(new_n_split, ceiling(max_cfl_h * H_MULTIPLIER / real(new_k_split)))
+       
+       ! d. Calculate q_split
        if (state%base_q_split == 0) then
            new_q_split = 0
        else
@@ -2778,7 +2802,7 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
            
            print *, "=== FV3 DYNAMIC SPLIT ADJUSTMENT ==="
            print *, "Max Horz CFL: ", max_cfl_h, " | Max Vert CFL: ", max_cfl_z
-           print *, "FV3 k_split: ", new_k_split, " (was ", state%k_split, ")"
+           print *, "FV3 k_split: ", new_k_split, " (was ", state%k_split, ", target was ", target_k_split, ")"
            print *, "FV3 n_split: ", new_n_split, " (was ", state%n_split, ")"
            print *, "FV3 q_split: ", new_q_split, " (was ", state%q_split, ")"
            print *, "===================================="
