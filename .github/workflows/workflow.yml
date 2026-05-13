@@ -29,7 +29,7 @@ jobs:
       cmake-build-type: ${{ matrix.build-type }}
       fail-fast: false
       fixture-repo: GEOS-ESM/GEOSgcm
-      fixture-ref: feature/sdrabenh/gcm_v12
+      fixture-ref: release/MAPL-v3
 
   spack_build:
     uses: GEOS-ESM/CI-workflows/.github/workflows/spack_gcc_build.yml@project/geosgcm
@@ -38,5 +38,5 @@ jobs:
       BUILDCACHE_TOKEN: ${{ secrets.BUILDCACHE_TOKEN }}
     with:
       fixture-repo: GEOS-ESM/GEOSgcm
-      fixture-ref: feature/sdrabenh/gcm_v12
+      fixture-ref: release/MAPL-v3
 
