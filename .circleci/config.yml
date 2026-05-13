@@ -5,7 +5,7 @@ version: 2.1
 #bcs_version: &bcs_version v12.0.0
 
 orbs:
-  ci: geos-esm/circleci-tools@5
+  ci: geos-esm/circleci-tools@dev:25dd8b3ff108bb5a209a77b8a354abd654750639
 
 workflows:
   build-test:
@@ -67,7 +67,9 @@ workflows:
           fixture_branch: feature/sdrabenh/gcm_v12
           mepodevelop: false
           checkout_mapl3_release_branch: true
-          persist_workspace: true # Needs to be true to run fv3/gcm experiment, costs extra
+          run_regression_tests: true
+          ctest_options: "-L REGRESSION"
+          persist_workspace: false # Needs to be true to run fv3/gcm experiment, costs extra
       # We also turn off the FV3 dycore runs for now
       #############################################################################################
       # - ci/run_fv3:                                                                             #
