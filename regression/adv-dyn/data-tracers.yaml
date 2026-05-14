@@ -1,11 +1,6 @@
 mapl:
   states:
     internal:
-      Q:
-        standard_name: "specific_humidity"
-        units: "kg kg-1"
-        vertical_dim_spec: "c"
-        fill_value: 1.0e-6
       Q001:
         standard_name: "Q001"
         units: "unknown"
@@ -20,4 +15,4 @@ mapl:
     import:
       TRADV:
         class: service
-        items: [Q, Q001, Q002]
+        items: [Q001, Q002]
