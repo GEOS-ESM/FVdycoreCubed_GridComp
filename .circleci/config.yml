@@ -74,6 +74,8 @@ workflows:
           run_regression_tests: true
           ctest_options: "-V -L REGRESSION"
           persist_workspace: false # Needs to be true to run fv3/gcm experiment, costs extra
+          # The regression tests need a larger machine to run in a reasonable time, so we set the resource class to xlarge for this job
+          resource_class: xlarge
       - ci/build:
           name: build-GEOSfvdycore-as-R8-on-<< matrix.compiler >>
           context:
