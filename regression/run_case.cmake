@@ -9,6 +9,7 @@ macro(run_case CASE)
     COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${num_procs} ${MPIEXEC_PREFLAGS} ${MY_BINARY_DIR}/GEOS.x cap.yaml
     RESULT_VARIABLE CMD_RESULT
     WORKING_DIRECTORY ${tempdir}
+    COMMAND_ECHO STDOUT
   )
   if(EXISTS ${tempdir}/PET0.ESMF_LogFile)
     execute_process(

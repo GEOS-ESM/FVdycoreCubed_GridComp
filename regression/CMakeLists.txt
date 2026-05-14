@@ -1,6 +1,9 @@
 # Detect if we are using Open MPI and add oversubscribe
 string(REPLACE " " ";" MPI_Fortran_LIBRARY_VERSION_LIST ${MPI_Fortran_LIBRARY_VERSION_STRING})
 list(GET MPI_Fortran_LIBRARY_VERSION_LIST 0 MPI_Fortran_LIBRARY_VERSION_FIRSTWORD)
+if(MPI_Fortran_LIBRARY_VERSION_FIRSTWORD MATCHES "Open")
+  set(MPIEXEC_PREFLAGS "--oversubscribe;--bind-to;core;--map-by;core" CACHE STRING "Flags for mpiexec" FORCE)
+endif()
 
 file(STRINGS "cases.txt" TEST_CASES)
 
@@ -18,7 +21,7 @@ foreach(TEST_CASE ${TEST_CASES})
       -DMPIEXEC_EXECUTABLE=${MPIEXEC_EXECUTABLE}
       -DMPIEXEC_NUMPROC_FLAG=${MPIEXEC_NUMPROC_FLAG}
       -DMY_BINARY_DIR=${CMAKE_BINARY_DIR}/bin
-      -DMPIEXEC_PREFLAGS=${MPIEXEC_PREFLAGS}
+      "-DMPIEXEC_PREFLAGS=${MPIEXEC_PREFLAGS}"
       -P ${CMAKE_CURRENT_SOURCE_DIR}/run_case.cmake
   )
   set_tests_properties("${TEST_CASE}" PROPERTIES LABELS "REGRESSION")

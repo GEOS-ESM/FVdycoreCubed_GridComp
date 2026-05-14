@@ -72,7 +72,7 @@ workflows:
           mepodevelop: false
           checkout_mapl3_release_branch: true
           run_regression_tests: true
-          ctest_options: "-V -L REGRESSION"
+          ctest_options: "-L REGRESSION"
           persist_workspace: false # Needs to be true to run fv3/gcm experiment, costs extra
           # The regression tests need a larger machine to run in a reasonable time, so we set the resource class to xlarge for this job
           resource_class: xlarge
