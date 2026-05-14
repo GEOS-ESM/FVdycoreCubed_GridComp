@@ -77,12 +77,10 @@ workflows:
           # The regression tests need a larger machine to run in a reasonable time, so we set the resource class to xlarge for this job
           resource_class: xlarge
       - ci/build:
-          name: build-GEOSfvdycore-as-R8-on-<< matrix.compiler >>
+          name: build-GEOSfvdycore-as-R8-on-ifort
           context:
             - docker-hub-creds
-          matrix:
-            parameters:
-              compiler: [ifort, gfortran]
+          compiler: ifort
           fv_precision: "R8"
           #baselibs_version: *baselibs_version
           repo: GEOSfvdycore
