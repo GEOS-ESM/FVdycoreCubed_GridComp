@@ -286,12 +286,13 @@ contains
       call ESMF_FieldBundleGet(tradv, fieldCount=nq, _RC)
       _RETURN_UNLESS(nq > 0)
 
-      call logger%info("Advcore is Advecting the following %i tracers", nq)
-      do n = 1, nq
-         call ESMF_FieldBundleGet(tradv, fieldIndex=n, field=field, _RC)
-         field_name = get_short_name(field, _RC)
-         call logger%info(field_name)
-      end do
+      ! TODO: pchakrab - logger is causing issues (hangs) with gfortran
+      ! call logger%info("Advcore is Advecting the following %i tracers", nq)
+      ! do n = 1, nq
+      !    call ESMF_FieldBundleGet(tradv, fieldIndex=n, field=field, _RC)
+      !    field_name = get_short_name(field, _RC)
+      !    call logger%info(field_name)
+      ! end do
 
       ! We allocate a list of tracers big enough to hold all items in the bundle
       call MAPL_GridCompGet(gc, grid=esmfgrid, num_levels=lm, _RC)

@@ -2327,6 +2327,7 @@ contains
          call MAPL_StateGetPointer(export, srh01, 'SRH01', _RC)
          call MAPL_StateGetPointer(export, srh03, 'SRH03', _RC)
          call MAPL_StateGetPointer(export, srh25, 'SRH25', _RC)
+         call MAPL_StateGetPointer(export, shr06, 'SHR06', _RC)
          ! Per WMP, this calculation is not useful if running hydrostatic
          if (associated(uh25) .or. associated(uh03) .or. &
               associated(srh01) .or. associated(srh03) .or. associated(srh25) .or. &
