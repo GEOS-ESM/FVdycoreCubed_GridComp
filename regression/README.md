@@ -23,7 +23,9 @@ Key files:
 - `cap.yaml`, `cap_restart.yaml`
 - `root.yaml`
 - `dyn.yaml`, `adv.yaml`
-- `data-*.yaml`
+- `data-moist.yaml` — `DataMoist` component; owns `Q`, that is advected by DYN
+- `data-tracers.yaml` — `DataTracers` component; owns synthetic tracers `Q001`, `Q002`, that are advected by ADV
+- `data-ana.yaml`
 - `input.nml`
 
 ### `dyn-sa`

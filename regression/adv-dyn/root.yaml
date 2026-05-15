@@ -16,6 +16,10 @@ mapl:
       config_file: adv.yaml
       setservice: advcore_setservices_
 
+    DataMoist:
+      dso: libconfigurable_gridcomp
+      config_file: data-moist.yaml
+
     DataTracers:
       dso: libconfigurable_gridcomp
       config_file: data-tracers.yaml
@@ -29,6 +33,16 @@ mapl:
       config_file: data-ana.yaml
 
   connections:
+    - src_name: TRADV
+      dst_name: TRADV
+      src_comp: DYN
+      dst_comp: DataMoist
+
+    - src_name: TRADV
+      dst_name: TRADV
+      src_comp: ADV
+      dst_comp: DataMoist
+
     - src_name: TRADV
       dst_name: TRADV
       src_comp: DYN
