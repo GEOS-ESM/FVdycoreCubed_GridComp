@@ -392,20 +392,6 @@ contains
 
       ! At this point check if FV is standalone
       call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
-      ! NOTE: pchakrab - Since TRADV is a service, it gets added to both the import and export
-      ! states, so we don't need to explictly export it
-      ! if (FV3_STANDALONE) then
-      !    call MAPL_GridCompAddSpec(gc, &
-      !         state_intent=ESMF_STATEINTENT_EXPORT, &
-      !         short_name='TRADVEX', &
-      !         standard_name='advected_quantities', &
-      !    ! pchakrab - TODO: we shouldn't need dims and vstagger for a bundle
-      !         dims="xyz", &
-      !         vstagger=VERTICAL_STAGGER_NONE, &
-      !         units='unknown', &
-      !         itemtype=MAPL_STATEITEM_SERVICE, _RC)
-      ! end if
-
       call MAPL_GridCompGetResource(gc, "DEBUG_DYN", DEBUG_DYN, default=.false., _RC)
       call MAPL_GridCompGetResource(gc, "DEBUG_ADV", DEBUG_ADV, default=.false., _RC)
       call MAPL_GridCompGetResource(gc, "DEBUG_TQ_ERRORS", DEBUG_TQ_ERRORS, default=.false., _RC)
