@@ -32,7 +32,7 @@ module FVdycoreCubed_GridComp
                    MAPL_GridGetCoordinates, MAPL_StateGetPointer, MAPL_FieldCreate, MAPL_FieldGet, &
                    MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, &
                    MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
-   use mapl_Comms, only: MAPL_ArrayGather => array_gather
+   use mapl3g_Comms, only: MAPL_ArrayGather => array_gather
 
    use pflogger, only: logger_t => logger
    ! use gftl2_StringVector, only: StringVector
