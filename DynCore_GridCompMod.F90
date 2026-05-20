@@ -22,7 +22,8 @@ module FVdycoreCubed_GridComp
    use MAPL_Constants, only: MAPL_VectorField ! pchakrab: TODO - need MAPL3 equivalent
    use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
-   use MAPL, only: WRITE_PARALLEL, MAPL_MaxMin, MAPL_AreaMean, MAPL_Am_I_Root, &
+   use mapl3g_Utilities, only: MAPL_MaxMin, MAPL_AreaMean
+   use MAPL, only: WRITE_PARALLEL, MAPL_Am_I_Root, &
                    MAPL_GridCompSetGeometry, MAPL_GridCompGet, MAPL_GridCompGetResource, &
                    MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState, &
                    MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, &
