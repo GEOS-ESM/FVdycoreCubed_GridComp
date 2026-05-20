@@ -24,20 +24,20 @@ module FVdycoreCubed_GridComp
 
    use MAPL, only: WRITE_PARALLEL
 
-   use mapl3g_Utilities, only: MAPL_MaxMin, MAPL_AreaMean
+   use MAPL, only: MAPL_MaxMin, MAPL_AreaMean
+   use MAPL, only: MAPL_GridCompSetGeometry
+   use MAPL, only: MAPL_GridCompGet, MAPL_GridCompGetResource
+   use MAPL, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
+   use MAPL, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, MAPL_STATEITEM_VECTOR
+   use MAPL, only: MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState
+   use MAPL, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
+   use MAPL, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
+   use MAPL, only: MAPL_GridGetCoordinates
+   use MAPL, only: MAPL_StateGetPointer
+   use MAPL, only: MAPL_FieldCreate, MAPL_FieldGet
+   use MAPL, only: MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, MAPL_FieldBundleGetPointer
+   use MAPL, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
    use mapl3g_Utilities_Comms_API, only: MAPL_Am_I_Root, MAPL_ArrayGather
-   use mapl3g_generic, only: MAPL_GridCompSetGeometry
-   use mapl3g_generic, only: MAPL_GridCompGet, MAPL_GridCompGetResource
-   use mapl3g_generic, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
-   use mapl3g_generic, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE
-   use mapl3g_generic, only: MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState
-   use mapl3g_generic, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
-   use mapl3g_VerticalStaggerLoc, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
-   use mapl3g_Geom_API, only: MAPL_GridGetCoordinates
-   use mapl3g_State_API, only: MAPL_StateGetPointer
-   use mapl3g_Field_API, only: MAPL_FieldCreate, MAPL_FieldGet
-   use mapl3g_FieldBundle_API, only: MAPL_FieldBundleAdd, MAPL_FieldBundleSameData
-   use mapl3g_RestartModes, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
 
    use pflogger, only: logger_t => logger
    ! use gftl2_StringVector, only: StringVector
@@ -340,6 +340,29 @@ contains
 #include "DynCore_Export___.h"
 #include "DynCore_Internal___.h"
 
+      ! TODO: pchakrab - till we have a way to specify a VECTOR in acg
+      call MAPL_GridCompAddSpec(gc, &
+           state_intent=ESMF_STATEINTENT_INTERNAL, &
+           short_name="UV", &
+           vector_component_names=["U", "V"], &
+           standard_name="(eastward_wind, northward_wind)", &
+           dims="xyz", &
+           vstagger=VERTICAL_STAGGER_CENTER, &
+           units='m/s', &
+           typekind=ESMF_TYPEKIND_R8, &
+           itemtype=MAPL_STATEITEM_VECTOR, &
+           restart=MAPL_RESTART_REQUIRED, _RC)
+
+      call MAPL_GridCompAddSpec(gc, &
+           state_intent=ESMF_STATEINTENT_EXPORT, &
+           short_name="UV", &
+           vector_component_names=["U", "V"], &
+           standard_name="(eastward_wind, northward_wind)", &
+           dims="xyz", &
+           vstagger=VERTICAL_STAGGER_CENTER, &
+           units='m/s', &
+           itemtype=MAPL_STATEITEM_VECTOR, _RC)
+
       ! pchakrab - DynCore is the provider here, so the service items are not needed
       ! NOTE: SERVICE, irrespective of whether you are a provider or subscriber, adds the bundle
       ! to BOTH the export and import states
@@ -385,7 +408,7 @@ contains
       call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Run, run, phase_name="run", _RC)
       call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Run, run_add_incs, phase_name="run_add_incs", _RC)
       call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Finalize, Finalize, _RC)
-      !  call MAPL_GridCompSetEntryPoint(gc, ESMF_SETREADRESTART, Coldstart, _RC)
+      ! call MAPL_GridCompSetEntryPoint(gc, ESMF_SETREADRESTART, Coldstart, _RC)
 
       ! Setup geometry
       call MAPL_GridCompSetGeometry(gc, _RC)
@@ -410,6 +433,7 @@ contains
 
       type(DynState), pointer :: self
       type(ESMF_State) :: internal
+      type(ESMF_FieldBundle) :: uv, uv_exp
       real(kind=r4), pointer :: pref(:)
       real(kind=r4), pointer :: u(:, :, :), v(:, :, :), t(:, :, :)
       real(kind=r4), pointer :: temp2d(:, :)
@@ -420,7 +444,7 @@ contains
       logical :: ColdRestart
       type(ESMF_TimeInterval) :: replay_shutoff_interval
       type(ESMF_Alarm) :: replay_shutoff_alarm
-      integer :: replay_shutoff_seconds, ifirst, ilast, jfirst, jlast, km, status
+      integer :: replay_shutoff_seconds, ifirst, ilast, jfirst, jlast, km, field_count, status
 
       ! Setup FMS/FV3
       call MAPL_GridCompTimerStart(gc, "DYN_SETUP", _RC)
@@ -452,8 +476,13 @@ contains
       if (associated(pref)) pref = ak + bk * P00
 
       ! Create A-Grid Winds
-      call MAPL_StateGetPointer(export, u, "U", _RC)
-      call MAPL_StateGetPointer(export, v, "V", _RC)
+      call ESMF_StateGet(export, "UV", uv_exp, _RC)
+      call ESMF_FieldBundleGet(uv_exp, fieldCount=field_count, _RC)
+      nullify(u, v)
+      if (field_count == 2) then ! export bundle is connected
+         call MAPL_FieldBundleGetPointer(uv_exp, 1, u, _RC)
+         call MAPL_FieldBundleGetPointer(uv_exp, 2, v, _RC)
+      end if
       if (associated(u) .and. associated(v)) then
          ifirst = self%grid%is
          ilast = self%grid%ie
@@ -462,8 +491,9 @@ contains
          km = self%grid%npz
          allocate(ur(ifirst:ilast, jfirst:jlast, km))
          allocate(vr(ifirst:ilast, jfirst:jlast, km))
-         call MAPL_StateGetPointer(internal, ud, "U", _RC)
-         call MAPL_StateGetPointer(internal, vd, "V", _RC)
+         call ESMF_StateGet(internal, "UV", uv, _RC)
+         call MAPL_FieldBundleGetPointer(uv, 1, ud, _RC)
+         call MAPL_FieldBundleGetPointer(uv, 2, vd, _RC)
          call getAllWinds(ud, vd, ur=ur, vr=vr)
          u = ur
          v = vr
@@ -1829,8 +1859,8 @@ contains
          call FILLOUT3r8(export, 'MFZ', mfzxyz, _RC)
          call FILLOUT3(export, 'MZ', mfzxyz, _RC)
 
-         call FILLOUT3(export, 'U', ur, _RC)
-         call FILLOUT3(export, 'V', vr, _RC)
+         ! call FILLOUT3(export, 'U', ur, _RC)
+         ! call FILLOUT3(export, 'V', vr, _RC)
          call FILLOUT3(export, 'T', tempxy, _RC)
          call FILLOUT3(export, 'Q', qv, _RC)
          call FILLOUT3(export, 'PL', pl, _RC)
@@ -4058,6 +4088,7 @@ contains
       type(ESMF_State) :: internal
 
       real(kind=REAL8), pointer :: ak1(:), bk1(:), ak(:), bk(:)
+      type(ESMF_FieldBundle) :: uv
       real(kind=REAL8), pointer :: u(:, :, :), v(:, :, :), pt(:, :, :)
       real(kind=REAL8), pointer :: pe1(:, :, :), pkz(:, :, :)
       real(kind=REAL8), allocatable :: pe(:, :, :)
@@ -4114,7 +4145,9 @@ contains
          lats(:, :) = 15.0 * PI / 180.0
       end if
 
-      call MAPL_StateGetPointer(internal, u, "U", _RC) ! A-Grid U Wind
+      call ESMF_StateGet(internal, "UV", uv, _RC)
+      call MAPL_FieldBundleGetPointer(uv, 1, u, _RC) ! A-Grid U Wind
+      call MAPL_FieldBundleGetPointer(uv, 2, v, _RC) ! A-Grid V Wind
       is = lbound(u, 1)
       ie = ubound(u, 1)
       js = lbound(u, 2)
@@ -4122,11 +4155,10 @@ contains
       ks = lbound(u, 3)
       ke = ubound(u, 3)
       km = ke - ks + 1
-      call MAPL_StateGetPointer(internal, v, "V", _RC) ! A-Grid V Wind
       call MAPL_StateGetPointer(internal, pt, "PT", _RC) ! potential temperature
       ! call MAPL_StateGetPointer(internal, PE1, "PE", _RC) ! edge pressures - 1 based
       ! pchakrab - gfortran has issues with the following rank
-      ! remapping (ifort doesn't) , so we allocate a new array
+      ! remapping (ifort doesn't), so we allocate a new array
       ! PE(is:ie, js:je, 0:km) => PE1(is:ie, js:je, 1:km+1)
       allocate(pe(is:ie, js:je, 0:km), _STAT)
       call MAPL_StateGetPointer(internal, pkz, "PKZ", _RC) ! presssure ^ kappa at mid-layers

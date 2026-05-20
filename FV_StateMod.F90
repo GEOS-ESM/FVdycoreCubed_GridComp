@@ -11,11 +11,11 @@ module FV_StateMod
    use mapl_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY
    use MAPL, only: WRITE_PARALLEL
 
-   use mapl3g_generic, only: MAPL_GridCompGetResource, MAPL_GridCompGet, MAPL_GridCompGetInternalState
-   use mapl3g_generic, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
-   use mapl3g_Geom_API, only: MAPL_GridGet
-   use mapl3g_State_API, only: MAPL_StateGetPointer
-   use mapl3g_utilities, only: MAPL_MemInfoWrite
+   use MAPL, only: MAPL_GridCompGetResource, MAPL_GridCompGet, MAPL_GridCompGetInternalState
+   use MAPL, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
+   use MAPL, only: MAPL_GridGet
+   use MAPL, only: MAPL_StateGetPointer, MAPL_FieldBundleGetPointer
+   use MAPL, only: MAPL_MemInfoWrite
 #endif
 
    use MAPL_Constants, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
@@ -869,6 +869,7 @@ contains
 
   real(REAL8), pointer                   :: AK(:) => NULL(), AK1(:) => NULL()
   real(REAL8), pointer                   :: BK(:) => NULL(), BK1(:) => NULL()
+  type(ESMF_FieldBundle) :: uv
   real(REAL8), dimension(:,:,:), pointer :: U     => NULL()
   real(REAL8), dimension(:,:,:), pointer :: V     => NULL()
   real(REAL8), dimension(:,:,:), pointer :: PT    => NULL()
@@ -927,10 +928,9 @@ contains
   VERIFY_(STATUS)
   call MAPL_StateGetPointer(internal, bk1, "BK",rc=status)
   VERIFY_(STATUS)
-  call MAPL_StateGetPointer(internal, u, "U",rc=status)
-  VERIFY_(STATUS)
-  call MAPL_StateGetPointer(internal, v, "V",rc=status)
-  VERIFY_(STATUS)
+  call ESMF_StateGet(internal, "UV", uv, _RC)
+  call MAPL_FieldBundleGetPointer(uv, 1, u, _RC)
+  call MAPL_FieldBundleGetPointer(uv, 2, v, _RC)
   call MAPL_StateGetPointer(internal, pt, "PT",rc=status)
   VERIFY_(STATUS)
   call MAPL_StateGetPointer(internal, pe, "PE",rc=status)
