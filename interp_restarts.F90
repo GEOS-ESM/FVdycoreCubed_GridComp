@@ -13,9 +13,9 @@ program interp_restarts
                                MAPL_IOChangeRes, MAPL_IOCountLevels, &
                                ArrDescr, ArrDescrInit, ArrDescrSet
    use MAPL_ShmemMod,  only: MAPL_GetNodeInfo, MAPL_InitializeShmem, MAPL_FinalizeShmem
-   use mapl3g_Geom_API,            only: GeomManager, get_geom_manager, MaplGeom
-   use mapl3g_CubedSphereGeomSpec, only: CubedSphereGeomSpec
-   use mapl3g_CubedSphereDecomposition, only: CubedSphereDecomposition
+   use mapl_Geom_API,            only: GeomManager, get_geom_manager, MaplGeom
+   use mapl_CubedSphereGeomSpec, only: CubedSphereGeomSpec
+   use mapl_CubedSphereDecomposition, only: CubedSphereDecomposition
    use mpp_mod,        only: mpp_error, FATAL, NOTE, mpp_root_pe, mpp_broadcast
    use fms_mod,        only: print_memory_usage, fms_init, fms_end, file_exist
    use fv_control_mod, only: fv_init1, fv_init2, fv_end

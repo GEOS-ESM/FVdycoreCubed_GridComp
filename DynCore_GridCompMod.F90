@@ -22,22 +22,17 @@ module FVdycoreCubed_GridComp
    use MAPL_Constants, only: MAPL_VectorField ! pchakrab: TODO - need MAPL3 equivalent
    use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
-   use MAPL, only: WRITE_PARALLEL
-
-   use mapl3g_Utilities, only: MAPL_MaxMin, MAPL_AreaMean
-   use mapl3g_Utilities_Comms_API, only: MAPL_Am_I_Root, MAPL_ArrayGather
-   use mapl3g_generic, only: MAPL_GridCompSetGeometry
-   use mapl3g_generic, only: MAPL_GridCompGet, MAPL_GridCompGetResource
-   use mapl3g_generic, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
-   use mapl3g_generic, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE
-   use mapl3g_generic, only: MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState
-   use mapl3g_generic, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
-   use mapl3g_VerticalStaggerLoc, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
-   use mapl3g_Geom_API, only: MAPL_GridGetCoordinates
-   use mapl3g_State_API, only: MAPL_StateGetPointer
-   use mapl3g_Field_API, only: MAPL_FieldCreate, MAPL_FieldGet
-   use mapl3g_FieldBundle_API, only: MAPL_FieldBundleAdd, MAPL_FieldBundleSameData
-   use mapl3g_RestartModes, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
+   use MAPL, only: WRITE_PARALLEL, MAPL_MaxMin, MAPL_AreaMean, MAPL_Am_I_Root, &
+                   MAPL_GridCompSetGeometry, MAPL_GridCompGet, MAPL_GridCompGetResource, &
+                   MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState, &
+                   MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, &
+                   MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState, &
+                   MAPL_GridCompTimerStart, MAPL_GridCompTimerStop, &
+                   VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE, &
+                   MAPL_GridGetCoordinates, MAPL_StateGetPointer, MAPL_FieldCreate, MAPL_FieldGet, &
+                   MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, &
+                   MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
+   use mapl_Comms, only: MAPL_ArrayGather => array_gather
 
    use pflogger, only: logger_t => logger
    ! use gftl2_StringVector, only: StringVector

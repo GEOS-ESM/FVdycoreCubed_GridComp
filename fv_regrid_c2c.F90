@@ -11,13 +11,13 @@ module fv_regrid_c2c
    use tracer_manager_mod, only: get_tracer_names, get_number_tracers, get_tracer_index
    use field_manager_mod,  only: MODEL_ATMOS
 
-   use mapl3g_regridder_mgr
-   use mapl3g_Regridder,         only: Regridder
-   use mapl3g_RegridderMethods,  only: REGRID_METHOD_BILINEAR, generate_esmf_regrid_param
-   use mapl3g_RegridderManager,  only: get_regridder_manager, RegridderManager
-   use mapl3g_RegridderSpec,     only: RegridderSpec
+   use mapl_regridder_mgr
+   use mapl_Regridder,         only: Regridder
+   use mapl_RegridderMethods,  only: REGRID_METHOD_BILINEAR, generate_esmf_regrid_param
+   use mapl_RegridderManager,  only: get_regridder_manager, RegridderManager
+   use mapl_RegridderSpec,     only: RegridderSpec
    use mapl_ErrorHandlingMod
-   use mapl3g_CubedSphereGeomSpec
+   use mapl_CubedSphereGeomSpec
    use MAPL_Constants,           only: MAPL_PI_R8, MAPL_OMEGA, MAPL_GRAV, MAPL_KAPPA, &
                                        MAPL_RGAS, MAPL_RVAP, MAPL_CP, MAPL_PSDRY
    use MAPL,                      only: mapl_GridGetGlobalCellCountPerDim, &
