@@ -126,7 +126,6 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
 
    use ESMF
    use MAPL, pi => MAPL_PI_R8
-   use mapl3g_GridGet, only: mapl_GridGet => GridGet
 
    use fv_arrays_mod,     only: REAL4, REAL8, R_GRID
    use fv_grid_utils_mod, only: gnomonic_grids, cell_center2, direct_transform
