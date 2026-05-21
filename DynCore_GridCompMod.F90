@@ -15,28 +15,21 @@ module FVdycoreCubed_GridComp
 
    !USES:
    use ESMF
-   use mapl_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return
-
+   use MAPL, only: MAPL_Verify, MAPL_Assert, MAPL_Return, &
+                   WRITE_PARALLEL, MAPL_Am_I_Root, MAPL_MaxMin, MAPL_AreaMean, &
+                   MAPL_GridCompSetGeometry, MAPL_GridCompGet, MAPL_GridCompGetResource, &
+                   MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState, &
+                   MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, MAPL_STATEITEM_VECTOR, &
+                   MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState, &
+                   MAPL_GridCompTimerStart, MAPL_GridCompTimerStop, &
+                   VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE, &
+                   MAPL_GridGetCoordinates, MAPL_StateGetPointer, MAPL_FieldCreate, MAPL_FieldGet, &
+                   MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, MAPL_FieldBundleGetPointer, &
+                   MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED, MAPL_ArrayGather
    use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
    use MAPL_Constants, only: MAPL_VectorField ! pchakrab: TODO - need MAPL3 equivalent
    use MAPL_Constants, only: MAPL_UNDEFINED_REAL
-
-   use MAPL, only: write_parallel
-   use MAPL, only: MAPL_MaxMin, MAPL_AreaMean
-   use MAPL, only: MAPL_GridCompSetGeometry
-   use MAPL, only: MAPL_GridCompGet, MAPL_GridCompGetResource
-   use MAPL, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
-   use MAPL, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, MAPL_STATEITEM_VECTOR
-   use MAPL, only: MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState
-   use MAPL, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
-   use MAPL, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
-   use MAPL, only: MAPL_GridGetCoordinates
-   use MAPL, only: MAPL_StateGetPointer
-   use MAPL, only: MAPL_FieldCreate, MAPL_FieldGet
-   use MAPL, only: MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, MAPL_FieldBundleGetPointer
-   use MAPL, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
-   use mapl3g_Utilities_Comms_API, only: MAPL_Am_I_Root, MAPL_ArrayGather
 
    use pflogger, only: logger_t => logger
    ! use gftl2_StringVector, only: StringVector
