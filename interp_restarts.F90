@@ -39,7 +39,6 @@ program interp_restarts
 
    real(ESMF_KIND_R8), allocatable :: r8_ak(:)
    real(ESMF_KIND_R8), allocatable :: r8_bk(:)
-   real(ESMF_KIND_R8), allocatable :: r8_akbk(:)
 
    real(ESMF_KIND_R4), pointer :: r4_local(:,:,:)
    real(ESMF_KIND_R8), pointer :: r8_local(:,:,:), pt_local(:,:,:)
@@ -302,7 +301,6 @@ program interp_restarts
    call set_eta(npz,ks,ptop,pint,r8_ak,r8_bk)
    Atm(1)%ak = r8_ak
    Atm(1)%bk = r8_bk
-   deallocate ( r8_ak,r8_bk )
    nq = nmoist
    Atm(1)%ncnst = nq/km
    if( is_master() ) then
@@ -503,12 +501,8 @@ program interp_restarts
 
 
 ! AK and BK
-      allocate ( r8_akbk(npz+1) )
-      r8_akbk = Atm(1)%ak
-      if (AmWriter) call MAPL_VarWrite(OutFmt,"AK",r8_akbk)
-      r8_akbk = Atm(1)%bk
-      if (AmWriter) call MAPL_VarWrite(OutFmt,"BK",r8_akbk)
-      deallocate ( r8_akbk )
+      if (AmWriter) call MAPL_VarWrite(OutFmt,"AK",r8_ak)
+      if (AmWriter) call MAPL_VarWrite(OutFmt,"BK",r8_bk)
 
       allocate(r4_local(is:ie,js:je,npz+1))
       allocate(r8_local(is:ie,js:je,npz+1))
