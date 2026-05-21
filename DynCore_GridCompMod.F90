@@ -19,12 +19,12 @@ module FVdycoreCubed_GridComp
                    WRITE_PARALLEL, MAPL_Am_I_Root, MAPL_MaxMin, MAPL_AreaMean, &
                    MAPL_GridCompSetGeometry, MAPL_GridCompGet, MAPL_GridCompGetResource, &
                    MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState, &
-                   MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, &
+                   MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, MAPL_STATEITEM_VECTOR, &
                    MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState, &
                    MAPL_GridCompTimerStart, MAPL_GridCompTimerStop, &
                    VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE, &
                    MAPL_GridGetCoordinates, MAPL_StateGetPointer, MAPL_FieldCreate, MAPL_FieldGet, &
-                   MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, &
+                   MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, MAPL_FieldBundleGetPointer, &
                    MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED, MAPL_ArrayGather
    use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
@@ -332,6 +332,29 @@ contains
 #include "DynCore_Export___.h"
 #include "DynCore_Internal___.h"
 
+      ! TODO: pchakrab - till we have a way to specify a VECTOR in acg
+      call MAPL_GridCompAddSpec(gc, &
+           state_intent=ESMF_STATEINTENT_INTERNAL, &
+           short_name="UV", &
+           vector_component_names=["U", "V"], &
+           standard_name="(eastward_wind, northward_wind)", &
+           dims="xyz", &
+           vstagger=VERTICAL_STAGGER_CENTER, &
+           units='m/s', &
+           typekind=ESMF_TYPEKIND_R8, &
+           itemtype=MAPL_STATEITEM_VECTOR, &
+           restart=MAPL_RESTART_REQUIRED, _RC)
+
+      call MAPL_GridCompAddSpec(gc, &
+           state_intent=ESMF_STATEINTENT_EXPORT, &
+           short_name="UV", &
+           vector_component_names=["U", "V"], &
+           standard_name="(eastward_wind, northward_wind)", &
+           dims="xyz", &
+           vstagger=VERTICAL_STAGGER_CENTER, &
+           units='m/s', &
+           itemtype=MAPL_STATEITEM_VECTOR, _RC)
+
       ! pchakrab - DynCore is the provider here, so the service items are not needed
       ! NOTE: SERVICE, irrespective of whether you are a provider or subscriber, adds the bundle
       ! to BOTH the export and import states
@@ -377,27 +400,13 @@ contains
       call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Run, run, phase_name="run", _RC)
       call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Run, run_add_incs, phase_name="run_add_incs", _RC)
       call MAPL_GridCompSetEntryPoint(gc, ESMF_Method_Finalize, Finalize, _RC)
-      !  call MAPL_GridCompSetEntryPoint(gc, ESMF_SETREADRESTART, Coldstart, _RC)
+      ! call MAPL_GridCompSetEntryPoint(gc, ESMF_SETREADRESTART, Coldstart, _RC)
 
       ! Setup geometry
       call MAPL_GridCompSetGeometry(gc, _RC)
 
       ! At this point check if FV is standalone
       call MAPL_GridCompGetResource(gc, "FV3_STANDALONE", FV3_STANDALONE, default=.false., _RC)
-      ! NOTE: pchakrab - Since TRADV is a service, it gets added to both the import and export
-      ! states, so we don't need to explictly export it
-      ! if (FV3_STANDALONE) then
-      !    call MAPL_GridCompAddSpec(gc, &
-      !         state_intent=ESMF_STATEINTENT_EXPORT, &
-      !         short_name='TRADVEX', &
-      !         standard_name='advected_quantities', &
-      !    ! pchakrab - TODO: we shouldn't need dims and vstagger for a bundle
-      !         dims="xyz", &
-      !         vstagger=VERTICAL_STAGGER_NONE, &
-      !         units='unknown', &
-      !         itemtype=MAPL_STATEITEM_SERVICE, _RC)
-      ! end if
-
       call MAPL_GridCompGetResource(gc, "DEBUG_DYN", DEBUG_DYN, default=.false., _RC)
       call MAPL_GridCompGetResource(gc, "DEBUG_ADV", DEBUG_ADV, default=.false., _RC)
       call MAPL_GridCompGetResource(gc, "DEBUG_TQ_ERRORS", DEBUG_TQ_ERRORS, default=.false., _RC)
@@ -416,6 +425,7 @@ contains
 
       type(DynState), pointer :: self
       type(ESMF_State) :: internal
+      type(ESMF_FieldBundle) :: uv, uv_exp
       real(kind=r4), pointer :: pref(:)
       real(kind=r4), pointer :: u(:, :, :), v(:, :, :), t(:, :, :)
       real(kind=r4), pointer :: temp2d(:, :)
@@ -426,7 +436,7 @@ contains
       logical :: ColdRestart
       type(ESMF_TimeInterval) :: replay_shutoff_interval
       type(ESMF_Alarm) :: replay_shutoff_alarm
-      integer :: replay_shutoff_seconds, ifirst, ilast, jfirst, jlast, km, status
+      integer :: replay_shutoff_seconds, ifirst, ilast, jfirst, jlast, km, field_count, status
 
       ! Setup FMS/FV3
       call MAPL_GridCompTimerStart(gc, "DYN_SETUP", _RC)
@@ -458,8 +468,13 @@ contains
       if (associated(pref)) pref = ak + bk * P00
 
       ! Create A-Grid Winds
-      call MAPL_StateGetPointer(export, u, "U", _RC)
-      call MAPL_StateGetPointer(export, v, "V", _RC)
+      call ESMF_StateGet(export, "UV", uv_exp, _RC)
+      call ESMF_FieldBundleGet(uv_exp, fieldCount=field_count, _RC)
+      nullify(u, v)
+      if (field_count == 2) then ! export bundle is connected
+         call MAPL_FieldBundleGetPointer(uv_exp, 1, u, _RC)
+         call MAPL_FieldBundleGetPointer(uv_exp, 2, v, _RC)
+      end if
       if (associated(u) .and. associated(v)) then
          ifirst = self%grid%is
          ilast = self%grid%ie
@@ -468,8 +483,9 @@ contains
          km = self%grid%npz
          allocate(ur(ifirst:ilast, jfirst:jlast, km))
          allocate(vr(ifirst:ilast, jfirst:jlast, km))
-         call MAPL_StateGetPointer(internal, ud, "U", _RC)
-         call MAPL_StateGetPointer(internal, vd, "V", _RC)
+         call ESMF_StateGet(internal, "UV", uv, _RC)
+         call MAPL_FieldBundleGetPointer(uv, 1, ud, _RC)
+         call MAPL_FieldBundleGetPointer(uv, 2, vd, _RC)
          call getAllWinds(ud, vd, ur=ur, vr=vr)
          u = ur
          v = vr
@@ -1835,8 +1851,8 @@ contains
          call FILLOUT3r8(export, 'MFZ', mfzxyz, _RC)
          call FILLOUT3(export, 'MZ', mfzxyz, _RC)
 
-         call FILLOUT3(export, 'U', ur, _RC)
-         call FILLOUT3(export, 'V', vr, _RC)
+         ! call FILLOUT3(export, 'U', ur, _RC)
+         ! call FILLOUT3(export, 'V', vr, _RC)
          call FILLOUT3(export, 'T', tempxy, _RC)
          call FILLOUT3(export, 'Q', qv, _RC)
          call FILLOUT3(export, 'PL', pl, _RC)
@@ -4064,6 +4080,7 @@ contains
       type(ESMF_State) :: internal
 
       real(kind=REAL8), pointer :: ak1(:), bk1(:), ak(:), bk(:)
+      type(ESMF_FieldBundle) :: uv
       real(kind=REAL8), pointer :: u(:, :, :), v(:, :, :), pt(:, :, :)
       real(kind=REAL8), pointer :: pe1(:, :, :), pkz(:, :, :)
       real(kind=REAL8), allocatable :: pe(:, :, :)
@@ -4120,7 +4137,9 @@ contains
          lats(:, :) = 15.0 * PI / 180.0
       end if
 
-      call MAPL_StateGetPointer(internal, u, "U", _RC) ! A-Grid U Wind
+      call ESMF_StateGet(internal, "UV", uv, _RC)
+      call MAPL_FieldBundleGetPointer(uv, 1, u, _RC) ! A-Grid U Wind
+      call MAPL_FieldBundleGetPointer(uv, 2, v, _RC) ! A-Grid V Wind
       is = lbound(u, 1)
       ie = ubound(u, 1)
       js = lbound(u, 2)
@@ -4128,11 +4147,10 @@ contains
       ks = lbound(u, 3)
       ke = ubound(u, 3)
       km = ke - ks + 1
-      call MAPL_StateGetPointer(internal, v, "V", _RC) ! A-Grid V Wind
       call MAPL_StateGetPointer(internal, pt, "PT", _RC) ! potential temperature
       ! call MAPL_StateGetPointer(internal, PE1, "PE", _RC) ! edge pressures - 1 based
       ! pchakrab - gfortran has issues with the following rank
-      ! remapping (ifort doesn't) , so we allocate a new array
+      ! remapping (ifort doesn't), so we allocate a new array
       ! PE(is:ie, js:je, 0:km) => PE1(is:ie, js:je, 1:km+1)
       allocate(pe(is:ie, js:je, 0:km), _STAT)
       call MAPL_StateGetPointer(internal, pkz, "PKZ", _RC) ! presssure ^ kappa at mid-layers

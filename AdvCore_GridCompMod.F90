@@ -67,7 +67,7 @@ module AdvCore_GridCompMod
    use fv_mp_mod, only: is, ie, js, je, is_master, tile
    use fv_grid_utils_mod, only: g_sum_r8
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
-   use FV_StateMod, only: FV_Atm, get_im_world_and_topology
+   use FV_StateMod, only: FV_Atm, setup_fv_dimensions_and_topology
    use FV_StateMod, only: AdvCoreTracers => T_TRACERS
    use FVdycoreCubed_GridComp, only: field_is_cloud_water_species
    use FVdycoreCubed_GridComp, only: get_short_name, is_name_in_list
@@ -555,36 +555,17 @@ contains
       integer :: p_split = 1
       integer :: comm, im_world, topology(2), num_levels, status
 
-      call MAPL_GridCompGet(gc, hconfig=hconfig, num_levels=num_levels, _RC)
-
       call ESMF_VMGetCurrent(vm, _RC)
       call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
       call fms_init(comm)
 
       call fv_init1(FV_Atm, dt, grids_on_my_pe, p_split)
-      call get_im_world_and_topology(hconfig, im_world, topology, _RC)
-      associate(layout => FV_Atm(1)%layout, flags => FV_Atm(1)%flagstruct)
-         ! Domain decomposition
-         layout = topology
-         if (flags%grid_type == 4) then
-            layout(2) = layout(2) * 6
-         end if
-         ! Grid dimensions
-         flags%npx = im_world
-         flags%npy = im_world * 6
-         flags%npz = num_levels
-         ! TODO: pchakrab - check this! npy is always set to 6*npx!
-         if (flags%npy == 6 * flags%npx) then
-            flags%npy = flags%npx + 1
-            flags%npx = flags%npx + 1
-            flags%ntiles = 6
-         else
-            flags%npy = flags%npy + 1
-            flags%npx = flags%npx + 1
-            flags%ntiles = 1
-         end if
-      end associate
+
+      call MAPL_GridCompGet(gc, hconfig=hconfig, num_levels=num_levels, _RC)
+      call setup_fv_dimensions_and_topology(hconfig, num_levels, FV_Atm(1)%flagstruct, FV_Atm(1)%layout, _RC)
       call fv_init2(FV_Atm, dt, grids_on_my_pe, p_split)
+
+      _RETURN(_SUCCESS)
    end subroutine fv_setup
 
 end module AdvCore_GridCompMod

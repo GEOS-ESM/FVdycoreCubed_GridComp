@@ -50,8 +50,6 @@ category: EXPORT
   CONVTHV        |  vertically_integrated_thetav_convergence                                 |  W m-2             |  xy   |  N   |                    |
   CONVCPT        |  vertically_integrated_enthalpy_convergence                               |  W m-2             |  xy   |  N   |                    |
   CONVPHI        |  vertically_integrated_geopotential_convergence                           |  W m-2             |  xy   |  N   |                    |
-  U              |  eastward_wind                                                            |  m s-1             |  xyz  |  C   |  MAPL_VectorField  |
-  V              |  northward_wind                                                           |  m s-1             |  xyz  |  C   |  MAPL_VectorField  |
   T              |  air_temperature                                                          |  K                 |  xyz  |  C   |                    |
   PL             |  mid_level_pressure                                                       |  Pa                |  xyz  |  C   |                    |
   ZLE0           |  edge_heights_above_surface                                               |  m                 |  xyz  |  E   |                    |
@@ -263,8 +261,6 @@ category: INTERNAL
 #--------------------------------------------------------------------------------------------------------------------------------------
   AK        |  hybrid_sigma_pressure_a       |  Pa                |  R8        |    z  |  REQUIRED  |  E   |    T       |
   BK        |  hybrid_sigma_pressure_b       |  1                 |  R8        |    z  |  REQUIRED  |  E   |    T       |
-  U         |  eastward_wind                 |  m s-1             |  R8        |  xyz  |  REQUIRED  |  C   |    F       |
-  V         |  northward_wind                |  m s-1             |  R8        |  xyz  |  REQUIRED  |  C   |    F       |
   W         |  vertical_velocity             |  m s-1             |  R8        |  xyz  |            |  C   |    F       |
   PT        |  scaled_potential_temperature  |  K Pa$^{-\kappa}$  |  R8        |  xyz  |  REQUIRED  |  C   |    F       |
   PE        |  air_pressure                  |  Pa                |  R8        |  xyz  |  REQUIRED  |  E   |    T       |    PLE

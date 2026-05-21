@@ -70,7 +70,7 @@ workflows:
           # MAPL3 code uses a special branch for now.
           fixture_branch: release/MAPL-v3
           mepodevelop: false
-          checkout_mapl3_release_branch: true
+          # checkout_mapl3_release_branch: true
           run_regression_tests: true
           ctest_options: "-L REGRESSION"
           persist_workspace: false # Needs to be true to run fv3/gcm experiment, costs extra
@@ -88,7 +88,7 @@ workflows:
           # MAPL3 code uses a special branch for now.
           fixture_branch: release/MAPL-v3
           mepodevelop: false
-          checkout_mapl3_release_branch: true
+          # checkout_mapl3_release_branch: true
           persist_workspace: false # Needs to be true to run fv3/gcm experiment, costs extra
       # We also turn off the FV3 dycore runs for now
       #############################################################################################

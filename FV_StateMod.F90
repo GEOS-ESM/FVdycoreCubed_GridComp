@@ -1,4 +1,4 @@
-#include "MAPL_Generic.h"
+#include "MAPL.h"
 
 module FV_StateMod
 !BOP
@@ -11,7 +11,7 @@ module FV_StateMod
    use MAPL, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY, &
                    WRITE_PARALLEL, MAPL_GridCompGetResource, MAPL_GridCompGet, &
                    MAPL_GridCompGetInternalState, MAPL_GridCompTimerStart, MAPL_GridCompTimerStop, &
-                   MAPL_GridGet, MAPL_StateGetPointer, MAPL_MemInfoWrite
+                   MAPL_GridGet, MAPL_StateGetPointer, MAPL_FieldBundleGetPointer, MAPL_MemInfoWrite
 #endif
 
    use MAPL_Constants, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
@@ -101,7 +101,7 @@ private
 
   public fv_getAllWinds
   public INTERP_AGRID_TO_DGRID
-  public get_im_world_and_topology
+  public setup_fv_dimensions_and_topology
 
   interface fv_computeMassFluxes
      module procedure fv_computeMassFluxes_r4
@@ -370,30 +370,7 @@ contains
 
 ! FV grid dimensions setup from MAPL
       call MAPL_GridCompGet(gc, hconfig=hconfig, num_levels=num_levels, _RC)
-      ! call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'AGCM_IM:', default= 32, RC=STATUS )
-      ! VERIFY_(STATUS)
-      ! call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npy, 'AGCM_JM:', default=192, RC=STATUS )
-      ! VERIFY_(STATUS)
-      ! call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'AGCM_LM:', default= 72, RC=STATUS )
-      ! VERIFY_(STATUS)
-      call get_im_world_and_topology(hconfig, im_world, topology, _RC)
-      associate(flags => FV_Atm(1)%flagstruct)
-        flags%npx = im_world
-        flags%npy = im_world * 6
-        flags%npz = num_levels
-! FV likes npx;npy in terms of cell vertices
-        ! TODO: pchakrab - check this! npy is always set to 6*npx, so the if
-        ! statement is always true and the else branch is never taken. Is this intentional?
-        if (flags%npy == 6*flags%npx) then
-           flags%npy = flags%npx+1
-           flags%npx = flags%npx+1
-           flags%ntiles = 6
-        else
-           flags%npy = flags%npy+1
-           flags%npx = flags%npx+1
-           flags%ntiles = 1
-        endif
-      end associate
+      call setup_fv_dimensions_and_topology(hconfig, num_levels, FV_Atm(1)%flagstruct, FV_Atm(1)%layout, _RC)
       if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
       ! stretch_fac is kind(R_GRID) in FV, so to prevent a MAPL failure on RC check, we pull
       ! AGCM.STRETCH_FACTOR: as a REAL32 and then cast it to REAL64. This is because
@@ -405,13 +382,6 @@ contains
 ! Check for Doubly Periodic Domain Info
       call MAPL_GridCompGetResource( gc, 'FIXED_LATS', FV_Atm(1)%flagstruct%deglat, default=FV_Atm(1)%flagstruct%deglat, rc=status )
       VERIFY_(STATUS)
-! MPI decomp setup
-      associate(layout => FV_Atm(1)%layout)
-        layout = topology
-        if (FV_Atm(1)%flagstruct%grid_type == 4) then
-           layout(2) = layout(2) * 6
-        end if
-      end associate
 
 ! Get other scalars
 ! -----------------
@@ -790,11 +760,45 @@ contains
 
  end subroutine FV_Setup
 
-    subroutine get_im_world_and_topology(hconfig, im_world, topology, rc)
+   subroutine setup_fv_dimensions_and_topology(hconfig, num_levels, flags, layout, rc)
+      use fv_arrays_mod, only: fv_flags_type
       type(ESMF_HConfig), intent(in) :: hconfig
+      integer, intent(in) :: num_levels
+      type(FV_Flags_Type), intent(inout) :: flags
+      integer, intent(inout) :: layout(2)
       integer, optional, intent(out) :: rc
+
+      integer :: im_world, topology(2), status
+
+      call get_im_world_and_topology(hconfig, im_world, topology, _RC)
+      flags%npx = im_world
+      flags%npy = im_world * 6
+      flags%npz = num_levels
+      ! FV likes npx;npy in terms of cell vertices
+      ! TODO: pchakrab - check this! npy is always set to 6*npx, so the if
+      ! statement is always true and the else branch is never taken. Is this intentional?
+      if (flags%npy == 6*flags%npx) then
+         flags%npy = flags%npx+1
+         flags%npx = flags%npx+1
+         flags%ntiles = 6
+      else
+         flags%npy = flags%npy+1
+         flags%npx = flags%npx+1
+         flags%ntiles = 1
+      endif
+      layout = topology
+      if (FV_Atm(1)%flagstruct%grid_type == 4) then
+         layout(2) = layout(2) * 6
+      end if
+
+      _RETURN(_SUCCESS)
+   end subroutine setup_fv_dimensions_and_topology
+
+   subroutine get_im_world_and_topology(hconfig, im_world, topology, rc)
+      type(ESMF_HConfig), intent(in) :: hconfig
       integer, intent(out) :: im_world
       integer, intent(out) :: topology(2)
+      integer, optional, intent(out) :: rc
 
       type(ESMF_HConfig) :: geometry_cfg, geom_cfg
       logical :: has_section
@@ -861,6 +865,7 @@ contains
 
   real(REAL8), pointer                   :: AK(:) => NULL(), AK1(:) => NULL()
   real(REAL8), pointer                   :: BK(:) => NULL(), BK1(:) => NULL()
+  type(ESMF_FieldBundle) :: uv
   real(REAL8), dimension(:,:,:), pointer :: U     => NULL()
   real(REAL8), dimension(:,:,:), pointer :: V     => NULL()
   real(REAL8), dimension(:,:,:), pointer :: PT    => NULL()
@@ -919,10 +924,9 @@ contains
   VERIFY_(STATUS)
   call MAPL_StateGetPointer(internal, bk1, "BK",rc=status)
   VERIFY_(STATUS)
-  call MAPL_StateGetPointer(internal, u, "U",rc=status)
-  VERIFY_(STATUS)
-  call MAPL_StateGetPointer(internal, v, "V",rc=status)
-  VERIFY_(STATUS)
+  call ESMF_StateGet(internal, "UV", uv, _RC)
+  call MAPL_FieldBundleGetPointer(uv, 1, u, _RC)
+  call MAPL_FieldBundleGetPointer(uv, 2, v, _RC)
   call MAPL_StateGetPointer(internal, pt, "PT",rc=status)
   VERIFY_(STATUS)
   call MAPL_StateGetPointer(internal, pe, "PE",rc=status)
