@@ -8,11 +8,10 @@ module FV_StateMod
 ! !USES:
 #if defined( MAPL_MODE )
    use ESMF                ! ESMF base class
-   use mapl_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY
-   use mapl3g_Utilities, only: MAPL_MemInfoWrite
-   use MAPL, only: WRITE_PARALLEL, MAPL_GridCompGetResource, MAPL_GridCompGet, &
+   use MAPL, only: MAPL_Verify, MAPL_Assert, MAPL_Return, MAPL_VRFY, &
+                   WRITE_PARALLEL, MAPL_GridCompGetResource, MAPL_GridCompGet, &
                    MAPL_GridCompGetInternalState, MAPL_GridCompTimerStart, MAPL_GridCompTimerStop, &
-                   MAPL_GridGet, MAPL_StateGetPointer
+                   MAPL_GridGet, MAPL_StateGetPointer, MAPL_MemInfoWrite
 #endif
 
    use MAPL_Constants, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS

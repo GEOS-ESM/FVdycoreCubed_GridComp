@@ -15,15 +15,8 @@ module FVdycoreCubed_GridComp
 
    !USES:
    use ESMF
-   use mapl_ErrorHandlingMod, only: MAPL_Verify, MAPL_Assert, MAPL_Return
-
-   use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
-   use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
-   use MAPL_Constants, only: MAPL_VectorField ! pchakrab: TODO - need MAPL3 equivalent
-   use MAPL_Constants, only: MAPL_UNDEFINED_REAL
-
-   use mapl3g_Utilities, only: MAPL_MaxMin, MAPL_AreaMean
-   use MAPL, only: WRITE_PARALLEL, MAPL_Am_I_Root, &
+   use MAPL, only: MAPL_Verify, MAPL_Assert, MAPL_Return, &
+                   WRITE_PARALLEL, MAPL_Am_I_Root, MAPL_MaxMin, MAPL_AreaMean, &
                    MAPL_GridCompSetGeometry, MAPL_GridCompGet, MAPL_GridCompGetResource, &
                    MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState, &
                    MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, &
@@ -32,8 +25,11 @@ module FVdycoreCubed_GridComp
                    VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE, &
                    MAPL_GridGetCoordinates, MAPL_StateGetPointer, MAPL_FieldCreate, MAPL_FieldGet, &
                    MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, &
-                   MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED
-   use mapl3g_Comms, only: MAPL_ArrayGather => array_gather
+                   MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED, MAPL_ArrayGather
+   use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
+   use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
+   use MAPL_Constants, only: MAPL_VectorField ! pchakrab: TODO - need MAPL3 equivalent
+   use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
    use pflogger, only: logger_t => logger
    ! use gftl2_StringVector, only: StringVector
