@@ -9,10 +9,10 @@ program interp_restarts
    use ESMF
    use pfio
    use MAPL,           only: MAPL_VarRead, MAPL_VarWrite, MAPL_NCIOGetFileType, &
-                               MAPL_IOGetNonDimVars, MAPL_IOCountNonDimVars, &
-                               MAPL_IOChangeRes, MAPL_IOCountLevels, &
-                               ArrDescr, ArrDescrInit, ArrDescrSet
-   use MAPL_ShmemMod,  only: MAPL_GetNodeInfo, MAPL_InitializeShmem, MAPL_FinalizeShmem
+                                MAPL_IOGetNonDimVars, MAPL_IOCountNonDimVars, &
+                                MAPL_IOChangeRes, MAPL_IOCountLevels, &
+                                ArrDescr, ArrDescrInit, ArrDescrSet, &
+                                MAPL_GetNodeInfo, MAPL_InitializeShmem, MAPL_FinalizeShmem
    use MAPL, only: GeomManager, get_geom_manager, MaplGeom, &
                    CubedSphereGeomSpec, CubedSphereDecomposition
    use mpp_mod,        only: mpp_error, FATAL, NOTE, mpp_root_pe, mpp_broadcast
