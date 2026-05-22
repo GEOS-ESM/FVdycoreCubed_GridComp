@@ -77,16 +77,18 @@ category: EXPORT
   EPV            |  ertels_potential_vorticity                                               |  K m+2 kg-1 s-1    |  xyz  |  C   |                    |
   Q              |  specific_humidity                                                        |  1                 |  xyz  |  C   |                    |
   QC             |  specific_mass_of_condensate                                              |  1                 |  xyz  |  C   |                    |
-  DUDTSUBZ       |  tendency_of_eastward_wind_due_to_subgrid_dz                              |  m/s/s             |  xyz  |  C   |  MAPL_VectorField  |
-  DVDTSUBZ       |  tendency_of_northward_wind_due_to_subgrid_dz                             |  m/s/s             |  xyz  |  C   |  MAPL_VectorField  |
-  DTDTSUBZ       |  tendency_of_air_temperature_due_to_subgrid_dz                            |  K s-1             |  xyz  |  C   |                    |
-  DWDTSUBZ       |  tendency_of_vertical_velocity_due_to_subgrid_dz                          |  m/s/s             |  xyz  |  C   |                    |
+# DUDTSUBZ       |  tendency_of_eastward_wind_due_to_subgrid_dz                              |  m/s/s             |  xyz  |  C   |  MAPL_VectorField  |
+# DVDTSUBZ       |  tendency_of_northward_wind_due_to_subgrid_dz                             |  m/s/s             |  xyz  |  C   |  MAPL_VectorField  |
+# DTDTSUBZ       |  tendency_of_air_temperature_due_to_subgrid_dz                            |  K s-1             |  xyz  |  C   |                    |
+# DWDTSUBZ       |  tendency_of_vertical_velocity_due_to_subgrid_dz                          |  m/s/s             |  xyz  |  C   |                    |
   DTDT_RAY       |  air_temperature_tendency_due_to_Rayleigh_friction                        |  K s-1             |  xyz  |  C   |                    |
   DUDT_RAY       |  tendency_of_eastward_wind_due_to_Rayleigh_friction                       |  m s-2             |  xyz  |  C   |  MAPL_VectorField  |
   DVDT_RAY       |  tendency_of_northward_wind_due_to_Rayleigh_friction                      |  m s-2             |  xyz  |  C   |  MAPL_VectorField  |
   DWDT_RAY       |  vertical_velocity_tendency_due_to_Rayleigh_friction                      |  m/s/s             |  xyz  |  C   |                    |
-  DUDTANA        |  tendency_of_eastward_wind_due_to_analysis                                |  m/s/s             |  xyz  |  C   |  MAPL_VectorField  |
-  DVDTANA        |  tendency_of_northward_wind_due_to_analysis                               |  m/s/s             |  xyz  |  C   |  MAPL_VectorField  |
+#
+# DUDTANA        |  tendency_of_eastward_wind_due_to_analysis                                |  m/s/s             |  xyz  |  C   |  MAPL_VectorField  |
+# DVDTANA        |  tendency_of_northward_wind_due_to_analysis                               |  m/s/s             |  xyz  |  C   |  MAPL_VectorField  |
+#
   DTDTANA        |  tendency_of_air_temperature_due_to_analysis                              |  K s-1             |  xyz  |  C   |                    |
   DDELPDTANA     |  tendency_of_pressure_thickness_due_to_analysis                           |  K s-1             |  xyz  |  C   |                    |
   DUDTDYN        |  tendency_of_eastward_wind_due_to_dynamics                                |  m/s/s             |  xyz  |  C   |                    |
@@ -101,8 +103,10 @@ category: EXPORT
   PS             |  surface_pressure                                                         |  Pa                |  xy   |  N   |                    |
   TA             |  surface_air_temperature                                                  |  K                 |  xy   |  N   |                    |
   QA             |  surface_specific_humidity                                                |  1                 |  xy   |  N   |                    |
+#
   US             |  surface_eastward_wind                                                    |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
   VS             |  surface_northward_wind                                                   |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+#
   SPEED          |  surface_wind_speed                                                       |  m s-1             |  xy   |  N   |                    |
   WSPD_10M       |  wind_speed_at_10m                                                        |  m s-1             |  xy   |  N   |                    |
   VVEL_UP_100_1000  | max_vertical_velocity_up_between_100_1000_hPa                          |  m s-1             |  xy   |  N   |                    |
@@ -130,18 +134,25 @@ category: EXPORT
   THV            |  scaled_virtual_potential_temperature                                     |  K/Pa$^\kappa$     |  xyz  |  C   |                    |
   DPLEDTDYN      |  tendency_of_edge_pressure_due_to_dynamics                                |  Pa s-1            |  xyz  |  C   |                    |
   DDELPDTDYN     |  tendency_of_pressure_thickness_due_to_dynamics                           |  Pa s-1            |  xyz  |  C   |                    |
-  UKE            |  eastward_flux_of_atmospheric_kinetic_energy                              |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
-  VKE            |  northward_flux_of_atmospheric_kinetic_energy                             |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
+#
+# UKE            |  eastward_flux_of_atmospheric_kinetic_energy                              |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
+# VKE            |  northward_flux_of_atmospheric_kinetic_energy                             |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
+#
   UCPT           |  eastward_flux_of_atmospheric_enthalpy                                    |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
   VCPT           |  northward_flux_of_atmospheric_enthalpy                                   |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
-  UPHI           |  eastward_flux_of_atmospheric_potential_energy                            |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
-  VPHI           |  northward_flux_of_atmospheric_potential_energy                           |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
-  UQV            |  eastward_flux_of_atmospheric_water_vapor                                 |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
-  VQV            |  northward_flux_of_atmospheric_water_vapor                                |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
+#
+# UPHI           |  eastward_flux_of_atmospheric_potential_energy                            |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
+# VPHI           |  northward_flux_of_atmospheric_potential_energy                           |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
+#
+# UQV            |  eastward_flux_of_atmospheric_water_vapor                                 |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
+# VQV            |  northward_flux_of_atmospheric_water_vapor                                |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
+#
   UQL            |  eastward_flux_of_atmospheric_liquid_water                                |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
   VQL            |  northward_flux_of_atmospheric_liquid_water                               |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
+#
   UQI            |  eastward_flux_of_atmospheric_ice                                         |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
   VQI            |  northward_flux_of_atmospheric_ice                                        |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
+#
   DKE            |  tendency_of_atmosphere_kinetic_energy_content_due_to_dynamics            |  W m-2             |  xy   |  N   |                    |
   DCPT           |  tendency_of_atmosphere_dry_energy_content_due_to_dynamics                |  W m-2             |  xy   |  N   |                    |
   DPET           |  tendency_of_atmosphere_topographic_potential_energy_due_to_dynamics      |  W m-2             |  xy   |  N   |                    |
@@ -166,37 +177,46 @@ category: EXPORT
   DIVG700        |  divergence_at_700_hPa                                                    |  s-1               |  xy   |  N   |                    |
   DIVG500        |  divergence_at_500_hPa                                                    |  s-1               |  xy   |  N   |                    |
   DIVG200        |  divergence_at_200_hPa                                                    |  s-1               |  xy   |  N   |                    |
+#
   U850           |  eastward_wind_at_850_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  U700           |  eastward_wind_at_700_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  U500           |  eastward_wind_at_500_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  U300           |  eastward_wind_at_300_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  U250           |  eastward_wind_at_250_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  U200           |  eastward_wind_at_200_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  U100           |  eastward_wind_at_100_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  UTOP           |  eastward_wind_at_model_top                                               |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
   V850           |  northward_wind_at_850_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V700           |  northward_wind_at_700_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V500           |  northward_wind_at_500_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V300           |  northward_wind_at_300_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V250           |  northward_wind_at_250_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V200           |  northward_wind_at_200_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V100           |  northward_wind_at_100_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  VTOP           |  northward_wind_at_model_top                                              |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
   T850           |  air_temperature_at_850_hPa                                               |  K                 |  xy   |  N   |                    |
-  T700           |  air_temperature_at_700_hPa                                               |  K                 |  xy   |  N   |                    |
-  T500           |  air_temperature_at_500_hPa                                               |  K                 |  xy   |  N   |                    |
-  T300           |  air_temperature_at_300_hPa                                               |  K                 |  xy   |  N   |                    |
-  T250           |  air_temperature_at_250_hPa                                               |  K                 |  xy   |  N   |                    |
-  T200           |  air_temperature_at_200_hPa                                               |  K                 |  xy   |  N   |                    |
-  T100           |  air_temperature_at_100_hPa                                               |  K                 |  xy   |  N   |                    |
-  TTOP           |  air_temperature_at_model_top                                             |  K                 |  xy   |  N   |                    |
   Q850           |  specific_humidity_at_850_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
+#
+  U700           |  eastward_wind_at_700_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  V700           |  northward_wind_at_700_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  T700           |  air_temperature_at_700_hPa                                               |  K                 |  xy   |  N   |                    |
   Q700           |  specific_humidity_at_700_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
+#
+  U500           |  eastward_wind_at_500_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  V500           |  northward_wind_at_500_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  T500           |  air_temperature_at_500_hPa                                               |  K                 |  xy   |  N   |                    |
   Q500           |  specific_humidity_at_500_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
+#
+  U300           |  eastward_wind_at_300_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  V300           |  northward_wind_at_300_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  T300           |  air_temperature_at_300_hPa                                               |  K                 |  xy   |  N   |                    |
   Q300           |  specific_humidity_at_300_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
+#
+  U250           |  eastward_wind_at_250_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  V250           |  northward_wind_at_250_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  T250           |  air_temperature_at_250_hPa                                               |  K                 |  xy   |  N   |                    |
   Q250           |  specific_humidity_at_250_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
+#
+  U200           |  eastward_wind_at_200_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  V200           |  northward_wind_at_200_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  T200           |  air_temperature_at_200_hPa                                               |  K                 |  xy   |  N   |                    |
   Q200           |  specific_humidity_at_200_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
+#
+  U100           |  eastward_wind_at_100_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  V100           |  northward_wind_at_100_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  T100           |  air_temperature_at_100_hPa                                               |  K                 |  xy   |  N   |                    |
   Q100           |  specific_humidity_at_100_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
+#
+  UTOP           |  eastward_wind_at_model_top                                               |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  VTOP           |  northward_wind_at_model_top                                              |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+  TTOP           |  air_temperature_at_model_top                                             |  K                 |  xy   |  N   |                    |
+#
   Z700           |  geopotential_height_at_700_hPa                                           |  m                 |  xy   |  N   |                    |
   Z500           |  geopotential_height_at_500_hPa                                           |  m                 |  xy   |  N   |                    |
   Z300           |  geopotential_height_at_300_hPa                                           |  m                 |  xy   |  N   |                    |
@@ -216,8 +236,10 @@ category: EXPORT
   W500           |  w_at_500_hPa                                                             |  m s-1             |  xy   |  N   |                    |
   W200           |  w_at_200_hPa                                                             |  m s-1             |  xy   |  N   |                    |
   W10            |  w_at_10_hPa                                                              |  m s-1             |  xy   |  N   |                    |
+#
   U50M           |  eastward_wind_at_50_meters                                               |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
   V50M           |  northward_wind_at_50_meters                                              |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
+#
   DXC            |  cgrid_delta_x                                                            |  m                 |  xy   |  N   |                    |
   DYC            |  cgrid_delta_y                                                            |  m                 |  xy   |  N   |                    |
   AREA           |  agrid_cell_area                                                          |  m+2               |  xy   |  N   |                    |

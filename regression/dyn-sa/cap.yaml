@@ -10,14 +10,17 @@ cap:
     segment_duration: PT1H  # P1DT
 
   run_extdata: false
-  run_history: false
-  root_name: root
+  history_name: History
+  root_name: Root
 
   mapl:
     children:
-      root:
+      Root:
         dso: libconfigurable_gridcomp
         config_file: root.yaml
+      History:
+        dso: libMAPL.history
+        config_file: history.yaml
 
   checkpointing:
     enabled: true
