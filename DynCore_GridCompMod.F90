@@ -15,17 +15,17 @@ module FVdycoreCubed_GridComp
 
    !USES:
    use ESMF
-   use MAPL, only: MAPL_Verify, MAPL_Assert, MAPL_Return, &
-                   WRITE_PARALLEL, MAPL_Am_I_Root, MAPL_MaxMin, MAPL_AreaMean, &
-                   MAPL_GridCompSetGeometry, MAPL_GridCompGet, MAPL_GridCompGetResource, &
-                   MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState, &
-                   MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, MAPL_STATEITEM_VECTOR, &
-                   MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState, &
-                   MAPL_GridCompTimerStart, MAPL_GridCompTimerStop, &
-                   VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE, &
-                   MAPL_GridGetCoordinates, MAPL_StateGetPointer, MAPL_FieldCreate, MAPL_FieldGet, &
-                   MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, MAPL_FieldBundleGetPointer, &
-                   MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED, MAPL_ArrayGather
+   use MAPL, only: MAPL_Verify, MAPL_Assert, MAPL_Return
+   use MAPL, only: WRITE_PARALLEL, MAPL_Am_I_Root, MAPL_MaxMin, MAPL_AreaMean
+   use MAPL, only: MAPL_GridCompSetGeometry, MAPL_GridCompGet, MAPL_GridCompGetResource
+   use MAPL, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
+   use MAPL, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, MAPL_STATEITEM_VECTOR
+   use MAPL, only: MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState
+   use MAPL, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
+   use MAPL, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
+   use MAPL, only: MAPL_GridGetCoordinates, MAPL_StateGetPointer, MAPL_FieldCreate, MAPL_FieldGet
+   use MAPL, only: MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, MAPL_FieldBundleGetPointer
+   use MAPL, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED, MAPL_ArrayGather
    use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
    use MAPL_Constants, only: MAPL_VectorField ! pchakrab: TODO - need MAPL3 equivalent
@@ -336,11 +336,10 @@ contains
       call MAPL_GridCompAddSpec(gc, &
            state_intent=ESMF_STATEINTENT_INTERNAL, &
            short_name="UV", &
-           vector_component_names=["U", "V"], &
            standard_name="(eastward_wind, northward_wind)", &
            dims="xyz", &
            vstagger=VERTICAL_STAGGER_CENTER, &
-           units='m/s', &
+           units="m/s", &
            typekind=ESMF_TYPEKIND_R8, &
            itemtype=MAPL_STATEITEM_VECTOR, &
            restart=MAPL_RESTART_REQUIRED, _RC)
@@ -348,11 +347,50 @@ contains
       call MAPL_GridCompAddSpec(gc, &
            state_intent=ESMF_STATEINTENT_EXPORT, &
            short_name="UV", &
-           vector_component_names=["U", "V"], &
            standard_name="(eastward_wind, northward_wind)", &
            dims="xyz", &
            vstagger=VERTICAL_STAGGER_CENTER, &
-           units='m/s', &
+           units="m/s", &
+           itemtype=MAPL_STATEITEM_VECTOR, _RC)
+
+      call MAPL_GridCompAddSpec(gc, &
+           state_intent=ESMF_STATEINTENT_EXPORT, &
+           short_name="D_UV_DTANA", &
+           standard_name="(tendency_of_eastward_wind_due_to_analysis, &
+           tendency_of_northward_wind_due_to_analysis)", &
+           dims="xyz", &
+           vstagger=VERTICAL_STAGGER_CENTER, &
+           units="m/s/s", &
+           itemtype=MAPL_STATEITEM_VECTOR, _RC)
+
+      call MAPL_GridCompAddSpec(gc, &
+           state_intent=ESMF_STATEINTENT_EXPORT, &
+           short_name="UV_KE", &
+           standard_name="(eastward_flux_of_atmospheric_kinetic_energy, &
+           northward_flux_of_atmospheric_kinetic_energy)", &
+           dims="xy", &
+           vstagger=VERTICAL_STAGGER_NONE, &
+           units="J m-1 s-1", &
+           itemtype=MAPL_STATEITEM_VECTOR, _RC)
+
+      call MAPL_GridCompAddSpec(gc, &
+           state_intent=ESMF_STATEINTENT_EXPORT, &
+           short_name="UV_PHI", &
+           standard_name="(eastward_flux_of_atmospheric_potential_energy, &
+           northward_flux_of_atmospheric_potential_energy)", &
+           dims="xy", &
+           vstagger=VERTICAL_STAGGER_NONE, &
+           units="J m-1 s-1", &
+           itemtype=MAPL_STATEITEM_VECTOR, _RC)
+
+      call MAPL_GridCompAddSpec(gc, &
+           state_intent=ESMF_STATEINTENT_EXPORT, &
+           short_name="UV_QV", &
+           standard_name="(eastward_flux_of_atmospheric_water_vapor, &
+           northward_flux_of_atmospheric_water_vapor)", &
+           dims="xy", &
+           vstagger=VERTICAL_STAGGER_NONE, &
+           units="kg m-1 s-1", &
            itemtype=MAPL_STATEITEM_VECTOR, _RC)
 
       ! pchakrab - DynCore is the provider here, so the service items are not needed
@@ -470,12 +508,9 @@ contains
       ! Create A-Grid Winds
       call ESMF_StateGet(export, "UV", uv_exp, _RC)
       call ESMF_FieldBundleGet(uv_exp, fieldCount=field_count, _RC)
-      nullify(u, v)
       if (field_count == 2) then ! export bundle is connected
          call MAPL_FieldBundleGetPointer(uv_exp, 1, u, _RC)
          call MAPL_FieldBundleGetPointer(uv_exp, 2, v, _RC)
-      end if
-      if (associated(u) .and. associated(v)) then
          ifirst = self%grid%is
          ilast = self%grid%ie
          jfirst = self%grid%js
@@ -550,7 +585,7 @@ contains
 
       integer :: status, comm
       type(ESMF_VM) :: vm
-      type(ESMF_FieldBundle) :: bundle_imp, bundle
+      type(ESMF_FieldBundle) :: bundle_imp, bundle, tmp_bundle
       type(ESMF_Field) :: field
       type(ESMF_Alarm) :: alarm
       type(ESMF_Grid) :: esmfgrid
@@ -560,7 +595,7 @@ contains
       type(DynGrid), pointer :: grid
       type(DynVars), pointer :: vars
 
-      integer :: nq, im, jm, km, kend, i, j, k, n
+      integer :: nq, im, jm, km, kend, i, j, k, n, field_count
       integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
       ! TODO: pchakrab - convt is not used anywhere
       logical, parameter :: convt = .false. ! Until this is run with full physics
@@ -678,8 +713,9 @@ contains
       real(kind=r4), pointer :: vtmp3d(:, :, :)
       real(kind=r4), pointer :: area(:, :)
       real(kind=r4), pointer :: temp2d(:, :)
-      real(kind=r4), pointer :: tempu(:, :)
-      real(kind=r4), pointer :: tempv(:, :)
+      real(kind=r4), pointer :: uke(:, :), vke(:, :)
+      real(kind=r4), pointer :: uphi(:, :), vphi(:, :)
+      real(kind=r4), pointer :: uqv(:, :), vqv(:, :)
 
       real(kind=r4), pointer :: uh25(:, :), uh03(:, :)
       real(kind=r4), pointer :: srh01(:, :), srh03(:, :), srh25(:, :), shr06(:, :)
@@ -1006,13 +1042,15 @@ contains
             call Energetics(ur, vr, tempxy, vars%pe, delp, vars%pkz, phisxy, kenrg, penrg, tenrg)
          end if
 
-         ! DUDTANA
-         call MAPL_StateGetPointer(export, dudtana, "DUDTANA", _RC)
-         if (associated(dudtana)) dudtana = ur
-
-         ! DVDTANA
-         call MAPL_StateGetPointer(export, dvdtana, "DVDTANA", _RC)
-         if (associated(dvdtana)) dvdtana = vr
+         ! DUDTANA/DVDTANA
+         call ESMF_StateGet(export, "D_UV_DTANA", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, dudtana, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, dvdtana, _RC)
+            dudtana = ur
+            dvdtana = vr
+         end if
 
          ! DTDTANA
          call MAPL_StateGetPointer(export, dtdtana, "DTDTANA", _RC)
@@ -1276,14 +1314,10 @@ contains
 
          dmdt = vars%pe(:, :, km + 1) - vars%pe(:, :, 1) ! Psurf-Ptop
 
-         ! DUDTANA
-         call MAPL_StateGetPointer(export, dudtana, "DUDTANA", _RC)
+         ! Update DUDTANA/DVDTANA
          if (associated(dudtana)) then
             dudtana = (ur - dudtana) / dt
          end if
-
-         ! DVDTANA
-         call MAPL_StateGetPointer(export, dvdtana, "DVDTANA", _RC)
          if (associated(dvdtana)) then
             dvdtana = (vr - dvdtana) / dt
          end if
@@ -1301,7 +1335,6 @@ contains
          end if
 
          ! DTHVDTANAINT
-         ! ------------
          call MAPL_StateGetPointer(export, temp2d, "DTHVDTANAINT", _RC)
          if (associated(temp2d)) then
             tempxy = vars%pt * (1 + EPS * qv) ! Set tempxy = TH*QVnew (After Analysis Update)
@@ -2072,46 +2105,40 @@ contains
          call getOmega(omaxyz)
 
          ! Fluxes: UKE & VKE
-         call MAPL_StateGetPointer(export, tempu, 'UKE', _RC)
-         call MAPL_StateGetPointer(export, tempv, 'VKE', _RC)
-
-         if (associated(tempu) .or. associated(tempv)) then
+         call ESMF_StateGet(export, "UV_KE", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, uke, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, vke, _RC)
             tmp3d = 0.5 * (ur**2 + vr**2)
-         end if
-
-         if (associated(tempu)) then
-            tempu = 0.0
+            uke = 0.0
             do k = 1, km
-               tempu = tempu + ur(:, :, k) * tmp3d(:, :, k) * delp(:, :, k)
+               uke = uke + ur(:, :, k) * tmp3d(:, :, k) * delp(:, :, k)
             end do
-            tempu = tempu / GRAV
-         end if
-
-         if (associated(tempv)) then
-            tempv = 0.0
+            uke = uke / GRAV
+            vke = 0.0
             do k = 1, km
-               tempv = tempv + vr(:, :, k) * tmp3d(:, :, k) * delp(:, :, k)
+               vke = vke + vr(:, :, k) * tmp3d(:, :, k) * delp(:, :, k)
             end do
-            tempv = tempv / GRAV
+            vke = vke / GRAV
          end if
 
          ! Fluxes: UQV & VQV
-         call MAPL_StateGetPointer(export, temp2d, 'UQV', _RC)
-         if (associated(temp2d)) then
-            temp2d = 0.0
+         call ESMF_StateGet(export, "UV_QV", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, uqv, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, vqv, _RC)
+            uqv = 0.0
             do k = 1, km
-               temp2d = temp2d + ur(:, :, k) * qv(:, :, k) * delp(:, :, k)
+               uqv = uqv + ur(:, :, k) * qv(:, :, k) * delp(:, :, k)
             end do
-            temp2d = temp2d / GRAV
-         end if
-
-         call MAPL_StateGetPointer(export, temp2d, 'VQV', _RC)
-         if (associated(temp2d)) then
-            temp2d = 0.0
+            uqv = uqv / GRAV
+            vqv = 0.0
             do k = 1, km
-               temp2d = temp2d + vr(:, :, k) * qv(:, :, k) * delp(:, :, k)
+               vqv = vqv + vr(:, :, k) * qv(:, :, k) * delp(:, :, k)
             end do
-            temp2d = temp2d / GRAV
+            vqv = vqv / GRAV
          end if
 
          ! Fluxes: UQL & VQL
@@ -2205,22 +2232,19 @@ contains
          if (associated(temp3d)) temp3d = temp3d + GRAV * (0.5 * (zle(:, :, :km) + zle(:, :, 2:)))
 
          ! Fluxes: UPHI & VPHI
-         call MAPL_StateGetPointer(export, tempu, 'UPHI', _RC)
-         call MAPL_StateGetPointer(export, tempv, 'VPHI', _RC)
-
-         if (associated(tempu) .or. associated(tempv)) zl = 0.5 * (zle(:, :, :km) + zle(:, :, 2:))
-
-         if (associated(tempu)) then
-            tempu = 0.0
+         call ESMF_StateGet(export, "UV_PHI", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, uphi, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, vphi, _RC)
+            zl = 0.5 * (zle(:, :, :km) + zle(:, :, 2:))
+            uphi = 0.0
             do k = 1, km
-               tempu = tempu + ur(:, :, k) * zl(:, :, k) * delp(:, :, k)
+               uphi = uphi + ur(:, :, k) * zl(:, :, k) * delp(:, :, k)
             end do
-         end if
-
-         if (associated(tempv)) then
-            tempv = 0.0
+            vphi = 0.0
             do k = 1, km
-               tempv = tempv + vr(:, :, k) * zl(:, :, k) * delp(:, :, k)
+               vphi = vphi + vr(:, :, k) * zl(:, :, k) * delp(:, :, k)
             end do
          end if
 
