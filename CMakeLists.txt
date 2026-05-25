@@ -98,7 +98,7 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
 endif ()
 
 set(dependencies
-  esmf MAPL MAPL.shared MAPL.utilities
+  esmf MAPL
   GFTL_SHARED::gftl-shared-v2 GMAO_hermes GEOS_Shared
   OpenMP::OpenMP_Fortran)
 
