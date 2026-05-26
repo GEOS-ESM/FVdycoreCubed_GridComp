@@ -17,13 +17,27 @@ string(ASCII 27 ESC)
 set(ORANGE "${ESC}[1;38;5;214m")
 set(RESET  "${ESC}[0m")
 
-# Sync regression test data from S3 (skipped if aws CLI or API key is not available)
+# Sync regression test data from S3 (skipped if aws CLI, API key, or internet is not available)
 find_program(AWS_CLI aws)
+
 set(_api_key_exists FALSE)
 if(DEFINED ENV{AWS_API_KEY_GMAO_SITEAM_S3} AND NOT "$ENV{AWS_API_KEY_GMAO_SITEAM_S3}" STREQUAL "")
   set(_api_key_exists TRUE)
 endif()
-if(AWS_CLI AND _api_key_exists)
+
+set(_internet_is_available FALSE)
+find_program(PING_CLI ping REQUIRED)
+execute_process(
+  COMMAND ${PING_CLI} -c 1 -W 5 www.nasa.gov
+  RESULT_VARIABLE _ping_result
+  OUTPUT_QUIET
+  ERROR_QUIET
+)
+if(_ping_result EQUAL 0)
+  set(_internet_is_available TRUE)
+endif()
+
+if(AWS_CLI AND _api_key_exists AND _internet_is_available)
   set(S3_URI "s3://gmao-usw2-si-team/regression-data")
   set(LOCAL_DIR "${CMAKE_BINARY_DIR}/regression-data")
   add_custom_target(sync_regression_data ALL
