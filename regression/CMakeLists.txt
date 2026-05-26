@@ -26,16 +26,15 @@ if(DEFINED ENV{AWS_API_KEY_GMAO_SITEAM_S3} AND NOT "$ENV{AWS_API_KEY_GMAO_SITEAM
 endif()
 
 set(_internet_is_available FALSE)
-find_program(PING_CLI ping REQUIRED)
-execute_process(
-  COMMAND ${PING_CLI} -c 1 -W 5 www.nasa.gov
-  RESULT_VARIABLE _ping_result
-  OUTPUT_QUIET
-  ERROR_QUIET
+file(DOWNLOAD https://www.nasa.gov/ ${CMAKE_BINARY_DIR}/.nasa_connectivity_test
+  TIMEOUT 10
+  STATUS _download_status
 )
-if(_ping_result EQUAL 0)
+list(GET _download_status 0 _download_result)
+if(_download_result EQUAL 0)
   set(_internet_is_available TRUE)
 endif()
+file(REMOVE ${CMAKE_BINARY_DIR}/.nasa_connectivity_test)
 
 if(AWS_CLI AND _api_key_exists AND _internet_is_available)
   set(S3_URI "s3://gmao-usw2-si-team/regression-data")
