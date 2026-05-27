@@ -120,22 +120,22 @@ else ()
 endif ()
 
 if (FV_PRECISION STREQUAL R4)
-  target_link_libraries (${this} PUBLIC fms_r4)
+  target_link_libraries (${this} PUBLIC FMS::fms_r4)
   target_compile_definitions (${this} PRIVATE SINGLE_FV OVERLOAD_R4)
 elseif (FV_PRECISION STREQUAL R4R8) # FV is R4 but FMS is R8
   # fvdycore needs r4 .mod interfaces
-  get_target_property(inc_r4 fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
+  get_target_property(inc_r4 FMS::fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
   target_include_directories(${this} PRIVATE $<BUILD_INTERFACE:${inc_r4}>)
 
   # But fvdycore should not *compile* with fms_r8 includes
-  target_link_libraries(${this} PUBLIC $<LINK_ONLY:fms_r8>)
+  target_link_libraries(${this} PUBLIC $<LINK_ONLY:FMS::fms_r8>)
 
   target_compile_definitions (${this} PRIVATE SINGLE_FV OVERLOAD_R4)
 
   # This tells CMake that we need these targets built before we can build
-  add_dependencies(${this} fms_r4 fms_r8)
+  add_dependencies(${this} FMS::fms_r4 FMS::fms_r8)
 elseif (FV_PRECISION STREQUAL R8)
-  target_link_libraries (${this} PUBLIC fms_r8)
+  target_link_libraries (${this} PUBLIC FMS::fms_r8)
   string(REPLACE " " ";" tmp ${FREAL8})
   foreach(flag ${tmp})
     target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
@@ -156,6 +156,12 @@ ecbuild_add_executable (
   TARGET StandAlone_FV3_Dycore.x
   SOURCES StandAlone_FV3_Dycore.F90
   LIBS ${this} OpenMP::OpenMP_Fortran)
+
+find_package (JeMalloc)
+if(JeMalloc_FOUND)
+  message(STATUS "JeMalloc found, using for StandAlone_FV3_Dycore.x")
+  target_link_libraries (StandAlone_FV3_Dycore.x JeMalloc::JeMalloc)
+endif()
 
 ecbuild_add_executable (
   TARGET rs_scale.x
@@ -201,14 +207,14 @@ if (FV_PRECISION STREQUAL R4R8)
     interp_restarts_bin.x)
 
     # fvdycore needs r4 .mod interfaces
-    get_target_property(inc_r4 fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
+    get_target_property(inc_r4 FMS::fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
     target_include_directories(${executable} PRIVATE $<BUILD_INTERFACE:${inc_r4}>)
 
-    # But fvdycore should not *compile* with fms_r8 includes
-    target_link_libraries(${executable} $<LINK_ONLY:fms_r8>)
+    # But fvdycore should not *compile* with FMS::fms_r8 includes
+    target_link_libraries(${executable} $<LINK_ONLY:FMS::fms_r8>)
 
     # This tells CMake that we need these targets built before we can build
-    add_dependencies(${executable} fms_r4 fms_r8)
+    add_dependencies(${executable} FMS::fms_r4 FMS::fms_r8)
   endforeach()
 endif ()
 
@@ -226,13 +232,13 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
     LIBS ${this})
   if (FV_PRECISION STREQUAL R4R8)
     # fvdycore needs r4 .mod interfaces
-    get_target_property(inc_r4 fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
+    get_target_property(inc_r4 FMS::fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
     target_include_directories(fv3_driver.x PRIVATE $<BUILD_INTERFACE:${inc_r4}>)
 
-    # But fvdycore should not *compile* with fms_r8 includes
-    target_link_libraries(fv3_driver.x PUBLIC $<LINK_ONLY:fms_r8>)
+    # But fvdycore should not *compile* with FMS::fms_r8 includes
+    target_link_libraries(fv3_driver.x PUBLIC $<LINK_ONLY:FMS::fms_r8>)
 
-    add_dependencies(fv3_driver.x fms_r4 fms_r8)
+    add_dependencies(fv3_driver.x FMS::fms_r4 FMS::fms_r8)
   endif ()
 endif ()
 
