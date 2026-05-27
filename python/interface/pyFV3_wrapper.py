@@ -8,15 +8,13 @@ import numpy as np
 from gt4py.cartesian.config import build_settings as gt_build_settings
 from mpi4py import MPI
 
-import pyFV3
+import pyfv3
 from ndsl import (
     CompilationConfig,
     CubedSphereCommunicator,
     CubedSpherePartitioner,
     DaceConfig,
-    DaCeOrchestration,
     GridIndexing,
-    NullComm,
     PerformanceCollector,
     QuantityFactory,
     StencilConfig,
@@ -24,11 +22,11 @@ from ndsl import (
     SubtileGridSizer,
     TilePartitioner,
     orchestrate,
+    Backend,
 )
 import ndsl.constants
 from ndsl.comm.comm_abc import Comm
 from ndsl.dsl.dace.build import set_distributed_caches
-from ndsl.dsl.gt4py_utils import is_gpu_backend
 from ndsl.dsl.typing import get_precision
 from ndsl.grid import DampingCoefficients, GridData, MetricTerms
 from ndsl.logging import ndsl_log
@@ -69,9 +67,7 @@ class StencilBackendCompilerOverride:
 
         # We abuse the DaCe build system
         if not self.no_op:
-            config._orchestrate = DaCeOrchestration.Build
             set_distributed_caches(config)
-            config._orchestrate = DaCeOrchestration.Python
 
         # We remove warnings from the stencils compiling when in critical and/or
         # error
@@ -118,28 +114,21 @@ class GeosDycoreWrapper:
         phis: np.ndarray,
         bdt: float,
         comm: Comm,
-        backend: str,
+        backend: Backend,
         tracer_count: int,
         fortran_mem_space: MemorySpace = MemorySpace.HOST,
     ):
-        # pyFV3 does not support any tracers
-        if tracer_count < 7:
+        # pyfv3 support only 0 and 7 tracers run
+        if tracer_count < 7 or tracer_count == 0:
             raise NotImplementedError(
-                "pyFV3 requires more than 7 tracers to be advected,"
-                f" {tracer_count} given. Abort."
+                f"pyFV3 requires more than 7 tracers to be advected, {tracer_count} given. Abort."
             )
-
-        # Look for an override to run on a single node
-        single_rank_override = int(os.getenv("GEOS_PYFV3_SINGLE_RANK_OVERRIDE", -1))
-        if single_rank_override >= 0:
-            comm = NullComm(single_rank_override, 6, 42)
         comm = MPIComm()
 
         # Make a custom performance collector for the GEOS wrapper
         self.perf_collector = PerformanceCollector("GEOS wrapper", comm)
 
-        self.backend = backend
-        self.dycore_config = pyFV3._config.DynamicalCoreConfig()
+        self.dycore_config = pyfv3._config.DynamicalCoreConfig()
         FVFlags_to_DycoreConfig(fv_flags, self.dycore_config)
 
         self.dycore_config.dt_atmos = int(bdt)
@@ -157,12 +146,12 @@ class GeosDycoreWrapper:
             ny_tile=self.dycore_config.npy - 1,  # NX/NY from config are cell-centers
             nz=self.dycore_config.npz,
             n_halo=ndsl.constants.N_HALO_DEFAULT,
-            extra_dim_lengths={},
             layout=self.dycore_config.layout,
             tile_partitioner=partitioner.tile,
             tile_rank=self.communicator.tile.rank,
+            backend=backend,
         )
-        quantity_factory = QuantityFactory.from_backend(sizer=sizer, backend=backend)
+        quantity_factory = QuantityFactory(sizer=sizer, backend=backend)
 
         # set up the metric terms and grid data
         metric_terms = MetricTerms(
@@ -199,30 +188,22 @@ class GeosDycoreWrapper:
             method_to_orchestrate="_critical_path",
         )
 
-        self._grid_indexing = GridIndexing.from_sizer_and_communicator(
-            sizer=sizer, comm=self.communicator
-        )
-        stencil_factory = StencilFactory(
-            config=stencil_config, grid_indexing=self._grid_indexing
-        )
+        self._grid_indexing = GridIndexing.from_sizer_and_communicator(sizer=sizer, comm=self.communicator)
+        stencil_factory = StencilFactory(config=stencil_config, grid_indexing=self._grid_indexing)
 
         self.tracer_count = tracer_count
         tracer_names = [name for name in TRACERS_IN_FORTRAN.keys()]
-        tracer_names += [
-            f"Tracer_{idx}" for idx in range(tracer_count - len(TRACERS_IN_FORTRAN))
-        ]
+        tracer_names += [f"Tracer_{idx}" for idx in range(tracer_count - len(TRACERS_IN_FORTRAN))]
+        pyfv3.tracers.setup_tracers(tracer_count, quantity_factory, tracer_names)
 
-        self.dycore_state = pyFV3.DycoreState.init_zeros(
-            quantity_factory=quantity_factory,
-            tracer_count=tracer_count,
-        )
+        self.dycore_state = pyfv3.DycoreState.init_zeros(quantity_factory=quantity_factory)
         self.dycore_state.bdt = self.dycore_config.dt_atmos
         self.dycore_state.phis.data[:-1, :-1] = phis[:]
 
         damping_coefficients = DampingCoefficients.new_from_metric_terms(metric_terms)
 
         with StencilBackendCompilerOverride(MPI.COMM_WORLD, stencil_config.dace_config):
-            self.dynamical_core = pyFV3.DynamicalCore(
+            self.dynamical_core = pyfv3.DynamicalCore(
                 comm=self.communicator,
                 grid_data=grid_data,
                 stencil_factory=stencil_factory,
@@ -236,23 +217,19 @@ class GeosDycoreWrapper:
             )
 
         self._fortran_mem_space = fortran_mem_space
-        self._pace_mem_space = (
-            MemorySpace.DEVICE if is_gpu_backend(backend) else MemorySpace.HOST
-        )
+        self._pace_mem_space = MemorySpace.DEVICE if backend.is_gpu_backend() else MemorySpace.HOST
 
         self.output_dict: Dict[str, np.ndarray] = {}
         self._allocate_output_dir()
 
         # Feedback information
         device_ordinal_info = (
-            f"  Device PCI bus id: {cp.cuda.Device(0).pci_bus_id}\n"
-            if is_gpu_backend(backend)
-            else "N/A"
+            f"  Device PCI bus id: {cp.cuda.Device(0).pci_bus_id}\n" if backend.is_gpu_backend() else "N/A"
         )
         MPS_pipe_directory = os.getenv("CUDA_MPS_PIPE_DIRECTORY", None)
         MPS_is_on = (
             MPS_pipe_directory is not None
-            and is_gpu_backend(backend)
+            and backend.is_gpu_backend()
             and os.path.exists(f"{MPS_pipe_directory}/log")
         )
         ndsl_log.info(
@@ -374,7 +351,7 @@ class GeosDycoreWrapper:
         cxd: np.ndarray,
         cyd: np.ndarray,
         diss_estd: np.ndarray,
-    ) -> pyFV3.DycoreState:
+    ) -> pyfv3.DycoreState:
         isc = self._grid_indexing.isc
         jsc = self._grid_indexing.jsc
         iec = self._grid_indexing.iec + 1
@@ -414,7 +391,7 @@ class GeosDycoreWrapper:
         # vapor, liquid, ice, rain, snow, graupel, cloud
         # This codes works because Fortran as moved all those tracers at the top of the list
         # it will fail if they are not contiguous (second loop)
-        state.tracers.quantity.data[isc:iec,jsc:jec,:-1,:] = q[isc:iec, jsc:jec, :, :]
+        state.tracers.quantity.data[isc:iec, jsc:jec, :-1, :] = q[isc:iec, jsc:jec, :, :]
 
         return state
 
@@ -429,24 +406,14 @@ class GeosDycoreWrapper:
             safe_assign_array(output_dict["u"], self.dycore_state.u.data[:-1, :, :-1])
             safe_assign_array(output_dict["v"], self.dycore_state.v.data[:, :-1, :-1])
             safe_assign_array(output_dict["w"], self.dycore_state.w.data[:-1, :-1, :-1])
-            safe_assign_array(
-                output_dict["ua"], self.dycore_state.ua.data[:-1, :-1, :-1]
-            )
-            safe_assign_array(
-                output_dict["va"], self.dycore_state.va.data[:-1, :-1, :-1]
-            )
+            safe_assign_array(output_dict["ua"], self.dycore_state.ua.data[:-1, :-1, :-1])
+            safe_assign_array(output_dict["va"], self.dycore_state.va.data[:-1, :-1, :-1])
             safe_assign_array(output_dict["uc"], self.dycore_state.uc.data[:, :-1, :-1])
             safe_assign_array(output_dict["vc"], self.dycore_state.vc.data[:-1, :, :-1])
 
-            safe_assign_array(
-                output_dict["delz"], self.dycore_state.delz.data[:-1, :-1, :-1]
-            )
-            safe_assign_array(
-                output_dict["pt"], self.dycore_state.pt.data[:-1, :-1, :-1]
-            )
-            safe_assign_array(
-                output_dict["delp"], self.dycore_state.delp.data[:-1, :-1, :-1]
-            )
+            safe_assign_array(output_dict["delz"], self.dycore_state.delz.data[:-1, :-1, :-1])
+            safe_assign_array(output_dict["pt"], self.dycore_state.pt.data[:-1, :-1, :-1])
+            safe_assign_array(output_dict["delp"], self.dycore_state.delp.data[:-1, :-1, :-1])
 
             safe_assign_array(
                 output_dict["mfxd"],
@@ -456,36 +423,20 @@ class GeosDycoreWrapper:
                 output_dict["mfyd"],
                 self.dycore_state.mfyd.data[isc:iec, jsc : jec + 1, :-1],
             )
-            safe_assign_array(
-                output_dict["cxd"], self.dycore_state.cxd.data[isc : iec + 1, :-1, :-1]
-            )
-            safe_assign_array(
-                output_dict["cyd"], self.dycore_state.cyd.data[:-1, jsc : jec + 1, :-1]
-            )
+            safe_assign_array(output_dict["cxd"], self.dycore_state.cxd.data[isc : iec + 1, :-1, :-1])
+            safe_assign_array(output_dict["cyd"], self.dycore_state.cyd.data[:-1, jsc : jec + 1, :-1])
 
             safe_assign_array(output_dict["ps"], self.dycore_state.ps.data[:-1, :-1])
             safe_assign_array(
                 output_dict["pe"],
                 self.dycore_state.pe.data[isc - 1 : iec + 1, jsc - 1 : jec + 1, :],
             )
-            safe_assign_array(
-                output_dict["pk"], self.dycore_state.pk.data[isc:iec, jsc:jec, :]
-            )
-            safe_assign_array(
-                output_dict["peln"], self.dycore_state.peln.data[isc:iec, jsc:jec, :]
-            )
-            safe_assign_array(
-                output_dict["pkz"], self.dycore_state.pkz.data[isc:iec, jsc:jec, :-1]
-            )
-            safe_assign_array(
-                output_dict["phis"], self.dycore_state.phis.data[:-1, :-1]
-            )
-            safe_assign_array(
-                output_dict["q_con"], self.dycore_state.q_con.data[:-1, :-1, :-1]
-            )
-            safe_assign_array(
-                output_dict["omga"], self.dycore_state.omga.data[:-1, :-1, :-1]
-            )
+            safe_assign_array(output_dict["pk"], self.dycore_state.pk.data[isc:iec, jsc:jec, :])
+            safe_assign_array(output_dict["peln"], self.dycore_state.peln.data[isc:iec, jsc:jec, :])
+            safe_assign_array(output_dict["pkz"], self.dycore_state.pkz.data[isc:iec, jsc:jec, :-1])
+            safe_assign_array(output_dict["phis"], self.dycore_state.phis.data[:-1, :-1])
+            safe_assign_array(output_dict["q_con"], self.dycore_state.q_con.data[:-1, :-1, :-1])
+            safe_assign_array(output_dict["omga"], self.dycore_state.omga.data[:-1, :-1, :-1])
             safe_assign_array(
                 output_dict["diss_estd"],
                 self.dycore_state.diss_estd.data[:-1, :-1, :-1],
@@ -507,18 +458,12 @@ class GeosDycoreWrapper:
             output_dict["delz"] = self.dycore_state.delz.data[:-1, :-1, :-1]
             output_dict["pt"] = self.dycore_state.pt.data[:-1, :-1, :-1]
             output_dict["delp"] = self.dycore_state.delp.data[:-1, :-1, :-1]
-            output_dict["mfxd"] = self.dycore_state.mfxd.data[
-                isc : iec + 1, jsc:jec, :-1
-            ]
-            output_dict["mfyd"] = self.dycore_state.mfyd.data[
-                isc:iec, jsc : jec + 1, :-1
-            ]
+            output_dict["mfxd"] = self.dycore_state.mfxd.data[isc : iec + 1, jsc:jec, :-1]
+            output_dict["mfyd"] = self.dycore_state.mfyd.data[isc:iec, jsc : jec + 1, :-1]
             output_dict["cxd"] = self.dycore_state.cxd.data[isc : iec + 1, :-1, :-1]
             output_dict["cyd"] = self.dycore_state.cyd.data[:-1, jsc : jec + 1, :-1]
             output_dict["ps"] = self.dycore_state.ps.data[:-1, :-1]
-            output_dict["pe"] = self.dycore_state.pe.data[
-                isc - 1 : iec + 1, jsc - 1 : jec + 1, :
-            ]
+            output_dict["pe"] = self.dycore_state.pe.data[isc - 1 : iec + 1, jsc - 1 : jec + 1, :]
             output_dict["pk"] = self.dycore_state.pk.data[isc:iec, jsc:jec, :]
             output_dict["peln"] = self.dycore_state.peln.data[isc:iec, jsc:jec, :]
             output_dict["pkz"] = self.dycore_state.pkz.data[isc:iec, jsc:jec, :-1]
@@ -528,7 +473,7 @@ class GeosDycoreWrapper:
             output_dict["diss_estd"] = self.dycore_state.diss_estd.data[:-1, :-1, :-1]
 
             # Tracers
-            output_dict["tracers"] = self.dycore_state.tracers.quantity.data[:-1,:-1,:-1,:]
+            output_dict["tracers"] = self.dycore_state.tracers.quantity.data[:-1, :-1, :-1, :]
         return output_dict
 
     def _allocate_output_dir(self):
@@ -558,12 +503,8 @@ class GeosDycoreWrapper:
             self.output_dict["mfyd"] = np.empty(
                 (self._grid_indexing.domain_full(add=(-2 * nhalo, 1 - 2 * nhalo, 0)))
             )
-            self.output_dict["cxd"] = np.empty(
-                (self._grid_indexing.domain_full(add=(1 - 2 * nhalo, 0, 0)))
-            )
-            self.output_dict["cyd"] = np.empty(
-                (self._grid_indexing.domain_full(add=(0, 1 - 2 * nhalo, 0)))
-            )
+            self.output_dict["cxd"] = np.empty((self._grid_indexing.domain_full(add=(1 - 2 * nhalo, 0, 0))))
+            self.output_dict["cyd"] = np.empty((self._grid_indexing.domain_full(add=(0, 1 - 2 * nhalo, 0))))
 
             self.output_dict["ps"] = np.empty((shape_2d))
             self.output_dict["pe"] = np.empty(

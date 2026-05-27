@@ -5,11 +5,11 @@ from cuda_profiler import CUDAProfiler, TimedCUDAProfiler
 from mpi4py import MPI
 from ndsl.optional_imports import cupy as cp
 import numpy as np
-from ndsl.dsl.gt4py_utils import is_gpu_backend
 from typing import Dict
 from pyFV3_wrapper import GeosDycoreWrapper, MemorySpace
 from fv_flags import FVFlags
 import cffi
+from ndsl import Backend
 
 
 class PYFV3_WRAPPER:
@@ -33,12 +33,12 @@ class PYFV3_WRAPPER:
         ak_cdata: cffi.FFI.CData,
         bk_cdata: cffi.FFI.CData,
         phis_cdata: cffi.FFI.CData,
-        backend: str = "dace:gpu",
+        backend: str = "st:dace:cpu:KJI",
     ) -> None:
         self.rank = comm.Get_rank()
-        self.backend = backend
+        self.backend = Backend(backend)
         # For Fortran<->NumPy conversion
-        if is_gpu_backend(self.backend):
+        if self.backend.is_gpu_backend():
             numpy_module = cp
             fortran_mem_space = MemorySpace.DEVICE
         else:
@@ -335,7 +335,7 @@ def pyfv3_init(
     phis: cffi.FFI.CData,
 ):
     # Read in the backend
-    BACKEND = os.environ.get("GEOS_PYFV3_BACKEND", "gt:gpu")
+    BACKEND = os.environ.get("GEOS_PYFV3_BACKEND", "st:dace:cpu:IJK")
 
     global WRAPPER
     if WRAPPER is not None:
