@@ -5120,8 +5120,8 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Fill Surface and Near-Surface Variables
 ! ----------------------------------------------
-                   HGT_SURFACE = 50.0
-   if (km .eq. 72) HGT_SURFACE =  0.0
+                   HGT_SURFACE = 0.0
+   if (km .eq. 72) HGT_SURFACE = 0.0
    call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT=HGT_SURFACE, RC=STATUS)
    VERIFY_(STATUS)
    if ( HGT_SURFACE .gt. 0.0 ) then
