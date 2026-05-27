@@ -1,6 +1,6 @@
 import dataclasses
 from typing import Union
-from pyFV3._config import (
+from pyfv3._config import (
     DynamicalCoreConfig,
     RiemannConfig,
     SatAdjustConfig,
