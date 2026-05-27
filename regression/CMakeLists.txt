@@ -1,16 +1,15 @@
-# Detect if we are using Open MPI and add oversubscribe/bind-to/map-by flags
-string(REPLACE " " ";" MPI_Fortran_LIBRARY_VERSION_LIST ${MPI_Fortran_LIBRARY_VERSION_STRING})
-list(GET MPI_Fortran_LIBRARY_VERSION_LIST 0 MPI_Fortran_LIBRARY_VERSION_FIRSTWORD)
-if(MPI_Fortran_LIBRARY_VERSION_FIRSTWORD MATCHES "Open")
-  set(MPIEXEC_PREFLAGS "--oversubscribe;--bind-to;core;--map-by;core" CACHE STRING "Flags for mpiexec" FORCE)
-endif()
-
 file(STRINGS "cases.txt" TEST_CASES)
 
 if(APPLE)
   set(LD_PATH "DYLD_LIBRARY_PATH")
 else()
   set(LD_PATH "LD_LIBRARY_PATH")
+  # OpenMPI flags
+  string(REPLACE " " ";" MPI_Fortran_LIBRARY_VERSION_LIST ${MPI_Fortran_LIBRARY_VERSION_STRING})
+  list(GET MPI_Fortran_LIBRARY_VERSION_LIST 0 MPI_Fortran_LIBRARY_VERSION_FIRSTWORD)
+  if(MPI_Fortran_LIBRARY_VERSION_FIRSTWORD MATCHES "Open")
+    set(MPIEXEC_PREFLAGS "--oversubscribe;--bind-to;core;--map-by;core" CACHE STRING "Flags for mpiexec" FORCE)
+  endif()
 endif()
 
 string(ASCII 27 ESC)

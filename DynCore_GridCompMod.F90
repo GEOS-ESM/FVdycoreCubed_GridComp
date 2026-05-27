@@ -2816,6 +2816,7 @@ contains
       type(DynVars), pointer :: vars
       type(DynTracers) :: qqq ! Specific Humidity
       type(ESMF_Grid) :: esmfgrid
+      type(ESMF_FieldBundle) :: uv
 
       real(kind=r8), allocatable :: penrg(:, :) ! Vertically Integrated Cp*T
       real(kind=r8), allocatable :: kenrg(:, :) ! Vertically Integrated K
@@ -2826,6 +2827,7 @@ contains
 
       real(kind=r8), pointer :: phisxy(:, :)
       real(kind=r4), pointer :: phis(:, :)
+      real(kind=r4), pointer :: u(:, :, :), v(:, :, :)
       real(kind=r8), allocatable :: slp(:, :)
       real(kind=r8), allocatable :: H1000(:, :)
       real(kind=r8), allocatable :: H850(:, :)
@@ -2865,7 +2867,7 @@ contains
       real(kind=FVPRC) :: dt
       logical :: do_energetics
       integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
-      integer :: im, jm, km, iNXQ
+      integer :: im, jm, km, iNXQ, field_count
       integer :: i, j, k, status
       class(logger_t), pointer :: logger
 
@@ -3058,8 +3060,15 @@ contains
          ! end if
 
          call FILLOUT3(export, "DELP", dp, _RC)
-         call FILLOUT3(export, "U", ur, _RC)
-         call FILLOUT3(export, "V", vr, _RC)
+         ! TODO: pchakrab - we need another FILLOUT3 routine for vectors
+         call ESMF_StateGet(export, "UV", uv, _RC)
+         call ESMF_FieldBundleGet(uv, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(uv, 1, u, _RC)
+            call MAPL_FieldBundleGetPointer(uv, 2, v, _RC)
+            u = ur
+            v = vr
+         end if
          call FILLOUT3(export, "T", tempxy, _RC)
          call FILLOUT3(export, "Q", qv, _RC)
          call FILLOUT3(export, "PL", pl, _RC)
