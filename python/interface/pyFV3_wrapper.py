@@ -67,7 +67,7 @@ class StencilBackendCompilerOverride:
 
         # We abuse the DaCe build system
         if not self.no_op:
-            set_distributed_caches(config)
+            set_distributed_caches(config, force_build=True)
 
         # We remove warnings from the stencils compiling when in critical and/or
         # error
@@ -119,9 +119,9 @@ class GeosDycoreWrapper:
         fortran_mem_space: MemorySpace = MemorySpace.HOST,
     ):
         # pyfv3 support only 0 and 7 tracers run
-        if tracer_count < 7 or tracer_count == 0:
+        if fv_flags.nwat not in [6, 0]:
             raise NotImplementedError(
-                f"pyFV3 requires more than 7 tracers to be advected, {tracer_count} given. Abort."
+                f"pyFV3 requires 6 or 0 water tracers to be advected, {fv_flags.nwat} given. Abort."
             )
         comm = MPIComm()
 
@@ -192,13 +192,15 @@ class GeosDycoreWrapper:
         stencil_factory = StencilFactory(config=stencil_config, grid_indexing=self._grid_indexing)
 
         self.tracer_count = tracer_count
-        tracer_names = [name for name in TRACERS_IN_FORTRAN.keys()]
-        tracer_names += [f"Tracer_{idx}" for idx in range(tracer_count - len(TRACERS_IN_FORTRAN))]
-        pyfv3.tracers.setup_tracers(tracer_count, quantity_factory, tracer_names)
+        if fv_flags.nwat == 6:
+            tracer_names = TRACERS_IN_FORTRAN
+        elif fv_flags.nwat == 0:
+            tracer_names = {"vapor": 0}
+        pyfv3.tracers.setup_fvtracers(quantity_factory, tracer_count, tracer_names)
 
         self.dycore_state = pyfv3.DycoreState.init_zeros(quantity_factory=quantity_factory)
         self.dycore_state.bdt = self.dycore_config.dt_atmos
-        self.dycore_state.phis.data[:-1, :-1] = phis[:]
+        self.dycore_state.phis[:-1, :-1] = phis[:]
 
         damping_coefficients = DampingCoefficients.new_from_metric_terms(metric_terms)
 
@@ -213,7 +215,6 @@ class GeosDycoreWrapper:
                 timestep=timedelta(seconds=self.dycore_state.bdt),
                 phis=self.dycore_state.phis,
                 state=self.dycore_state,
-                exclude_tracers=[],
             )
 
         self._fortran_mem_space = fortran_mem_space
@@ -391,7 +392,7 @@ class GeosDycoreWrapper:
         # vapor, liquid, ice, rain, snow, graupel, cloud
         # This codes works because Fortran as moved all those tracers at the top of the list
         # it will fail if they are not contiguous (second loop)
-        state.tracers.quantity.data[isc:iec, jsc:jec, :-1, :] = q[isc:iec, jsc:jec, :, :]
+        state.tracers[isc:iec, jsc:jec, :-1, :] = q[isc:iec, jsc:jec, :, :]
 
         return state
 
@@ -473,7 +474,7 @@ class GeosDycoreWrapper:
             output_dict["diss_estd"] = self.dycore_state.diss_estd.data[:-1, :-1, :-1]
 
             # Tracers
-            output_dict["tracers"] = self.dycore_state.tracers.quantity.data[:-1, :-1, :-1, :]
+            output_dict["tracers"] = self.dycore_state.tracers[:-1, :-1, :-1, :]
         return output_dict
 
     def _allocate_output_dir(self):
