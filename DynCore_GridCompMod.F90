@@ -25,6 +25,7 @@ module FVdycoreCubed_GridComp
    use MAPL, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
    use MAPL, only: MAPL_GridGetCoordinates, MAPL_StateGetPointer, MAPL_FieldCreate, MAPL_FieldGet
    use MAPL, only: MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, MAPL_FieldBundleGetPointer
+   use MAPL, only: MAPL_FieldBundleGet
    use MAPL, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED, MAPL_ArrayGather
    use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
@@ -1848,7 +1849,8 @@ contains
          call FILLOUT3(export, 'DQVDTDYN', dqdt, _RC)
          call FILLOUT3(export, 'DDELPDTDYN', ddpdt, _RC)
          ! pchakrab - TODO: figure out the issue with DPLEDTDYN
-         ! call FILLOUT3(export, 'DPLEDTDYN' , dpedt, _RC)
+         ! Updated DPLEDTDYN in StateSpecs to be an edge variable
+         call FILLOUT3(export, 'DPLEDTDYN' , dpedt, _RC)
 
          ! fill pressure exports (PLE0: Before) & (PLE1: After) from FV3
          call FILLOUT3r8(export, 'PLE0', pe0, _RC)
@@ -1884,8 +1886,7 @@ contains
          call FILLOUT3r8(export, 'MFZ', mfzxyz, _RC)
          call FILLOUT3(export, 'MZ', mfzxyz, _RC)
 
-         ! call FILLOUT3(export, 'U', ur, _RC)
-         ! call FILLOUT3(export, 'V', vr, _RC)
+         call fillout_vector_r8(export, "UV", ur, vr, _RC)
          call FILLOUT3(export, 'T', tempxy, _RC)
          call FILLOUT3(export, 'Q', qv, _RC)
          call FILLOUT3(export, 'PL', pl, _RC)
@@ -3060,15 +3061,7 @@ contains
          ! end if
 
          call FILLOUT3(export, "DELP", dp, _RC)
-         ! TODO: pchakrab - we need another FILLOUT3 routine for vectors
-         call ESMF_StateGet(export, "UV", uv, _RC)
-         call ESMF_FieldBundleGet(uv, fieldCount=field_count, _RC)
-         if (field_count == 2) then ! export bundle is connected
-            call MAPL_FieldBundleGetPointer(uv, 1, u, _RC)
-            call MAPL_FieldBundleGetPointer(uv, 2, v, _RC)
-            u = ur
-            v = vr
-         end if
+         call fillout_vector_r8(export, "UV", ur, vr, _RC)
          call FILLOUT3(export, "T", tempxy, _RC)
          call FILLOUT3(export, "Q", qv, _RC)
          call FILLOUT3(export, "PL", pl, _RC)
@@ -3855,6 +3848,66 @@ contains
 
       _RETURN(_SUCCESS)
    end subroutine FILLOUT3
+
+   subroutine fillout_vector_r8(export, vector_name, v1, v2, rc)
+      type(ESMF_State), intent(inout) :: export
+      character(len=*), intent(in) :: vector_name
+      real(kind=r8), intent(in) :: v1(:, :, :), v2(:, :, :)
+      integer, optional, intent(out) :: rc
+
+      real(kind=r4), pointer :: x1(:, :, :), x2(:, :, :)
+      real(kind=r8), pointer :: x1_r8(:, :, :), x2_r8(:, :, :)
+      type(ESMF_FieldBundle) :: bundle
+      type(ESMF_Field), allocatable :: field_list(:)
+      type(ESMF_TypeKind_Flag) :: typekind
+      integer :: field_count, status
+
+      call ESMF_StateGet(export, vector_name, bundle, _RC)
+      ! field_list is in the order they were added to the bundle
+      call MAPL_FieldBundleGet(bundle, fieldCount=field_count, fieldList=field_list, _RC)
+      _RETURN_UNLESS(field_count == 2)
+      ! Both fields are expected to have the same typekind, so just check one
+      call MAPL_FieldGet(field_list(1), typekind=typekind, _RC)
+      if (typekind == ESMF_TYPEKIND_R4) then
+         call ESMF_FieldGet(field_list(1), farrayPtr=x1, _RC)
+         call ESMF_FieldGet(field_list(2), farrayPtr=x2, _RC)
+         x1 = v1
+         x2 = v2
+      else if (typekind == ESMF_TYPEKIND_R8) then
+         call ESMF_FieldGet(field_list(1), farrayPtr=x1_r8, _RC)
+         call ESMF_FieldGet(field_list(2), farrayPtr=x2_r8, _RC)
+         x1_r8 = v1
+         x2_r8 = v2
+      else
+         _FAIL("Unsupported typekind in fillout_vector_r8")
+      end if
+
+      _RETURN(_SUCCESS)
+   end subroutine fillout_vector_r8
+
+   ! subroutine fillout_vector_r4(export, name, v1, v2, rc)
+   !    type(ESMF_State), intent(inout) :: export
+   !    character(len=*), intent(in) :: name
+   !    real(kind=r4), intent(in) :: v1(:, :, :), v2(:, :, :)
+   !    integer, optional, intent(out) :: rc
+
+   !    real(kind=r4), pointer :: x1(:, :, :), x2(:, :, :)
+   !    real(kind=r8), pointer :: x1_r8(:, :, :), x2_r8(:, :, :)
+   !    type(ESMF_FieldBundle) :: bundle
+   !    integer :: field_count, status
+
+   !    call ESMF_StateGet(export, name, bundle, _RC)
+   !    call ESMF_FieldBundleGet(bundle, fieldCount=field_count, _RC)
+   !    if (field_count == 2) then ! export bundle is connected
+   !       ! TODO: pchakrab - check the typekind of the fields first
+   !       call MAPL_FieldBundleGetPointer(bundle, 1, x1, _RC)
+   !       call MAPL_FieldBundleGetPointer(bundle, 2, x2, _RC)
+   !       x1 = v1
+   !       x2 = v2
+   !    end if
+
+   !    _RETURN(_SUCCESS)
+   ! end subroutine fillout_vector_r4
 
    subroutine FILLOUT2(export, name, v, rc)
       type(ESMF_State), intent(inout) :: export

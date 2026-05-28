@@ -132,7 +132,7 @@ VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          |max_ve
   V_DGRID        | m s-1            | xyz  |  C   |           |          | northward_wind_on_native_D-Grid
   TV             | K                | xyz  |  C   |           |          | air_virtual_temperature
   THV            | K/Pa$^\kappa$    | xyz  |  C   |           |          | scaled_virtual_potential_temperature
-  DPLEDTDYN      | Pa s-1           | xyz  |  C   |           |          | tendency_of_edge_pressure_due_to_dynamics
+  DPLEDTDYN      | Pa s-1           | xyz  |  E   |           |          | tendency_of_edge_pressure_due_to_dynamics
   DDELPDTDYN     | Pa s-1           | xyz  |  C   |           |          | tendency_of_pressure_thickness_due_to_dynamics
 #
 # UKE            | J m-1 s-1        | xy   |  N   | V         |          | eastward_flux_of_atmospheric_kinetic_energy

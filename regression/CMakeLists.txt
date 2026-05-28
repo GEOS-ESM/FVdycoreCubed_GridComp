@@ -65,6 +65,5 @@ foreach(TEST_CASE ${TEST_CASES})
   set_tests_properties("${TEST_CASE}" PROPERTIES
     LABELS "REGRESSION"
     ENVIRONMENT "${LD_PATH}=${CMAKE_BINARY_DIR}/lib:$ENV{${LD_PATH}}"
-    # DEPENDS sync_regression_data
   )
 endforeach()
