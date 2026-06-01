@@ -333,67 +333,6 @@ contains
 #include "DynCore_Export___.h"
 #include "DynCore_Internal___.h"
 
-      ! TODO: pchakrab - till we have a way to specify a VECTOR in acg
-      call MAPL_GridCompAddSpec(gc, &
-           state_intent=ESMF_STATEINTENT_INTERNAL, &
-           short_name="UV", &
-           standard_name="(eastward_wind, northward_wind)", &
-           dims="xyz", &
-           vstagger=VERTICAL_STAGGER_CENTER, &
-           units="m/s", &
-           typekind=ESMF_TYPEKIND_R8, &
-           itemtype=MAPL_STATEITEM_VECTOR, &
-           restart=MAPL_RESTART_REQUIRED, _RC)
-
-      call MAPL_GridCompAddSpec(gc, &
-           state_intent=ESMF_STATEINTENT_EXPORT, &
-           short_name="UV", &
-           standard_name="(eastward_wind, northward_wind)", &
-           dims="xyz", &
-           vstagger=VERTICAL_STAGGER_CENTER, &
-           units="m/s", &
-           itemtype=MAPL_STATEITEM_VECTOR, _RC)
-
-      call MAPL_GridCompAddSpec(gc, &
-           state_intent=ESMF_STATEINTENT_EXPORT, &
-           short_name="D_UV_DTANA", &
-           standard_name="(tendency_of_eastward_wind_due_to_analysis, &
-           tendency_of_northward_wind_due_to_analysis)", &
-           dims="xyz", &
-           vstagger=VERTICAL_STAGGER_CENTER, &
-           units="m/s/s", &
-           itemtype=MAPL_STATEITEM_VECTOR, _RC)
-
-      call MAPL_GridCompAddSpec(gc, &
-           state_intent=ESMF_STATEINTENT_EXPORT, &
-           short_name="UV_KE", &
-           standard_name="(eastward_flux_of_atmospheric_kinetic_energy, &
-           northward_flux_of_atmospheric_kinetic_energy)", &
-           dims="xy", &
-           vstagger=VERTICAL_STAGGER_NONE, &
-           units="J m-1 s-1", &
-           itemtype=MAPL_STATEITEM_VECTOR, _RC)
-
-      call MAPL_GridCompAddSpec(gc, &
-           state_intent=ESMF_STATEINTENT_EXPORT, &
-           short_name="UV_PHI", &
-           standard_name="(eastward_flux_of_atmospheric_potential_energy, &
-           northward_flux_of_atmospheric_potential_energy)", &
-           dims="xy", &
-           vstagger=VERTICAL_STAGGER_NONE, &
-           units="J m-1 s-1", &
-           itemtype=MAPL_STATEITEM_VECTOR, _RC)
-
-      call MAPL_GridCompAddSpec(gc, &
-           state_intent=ESMF_STATEINTENT_EXPORT, &
-           short_name="UV_QV", &
-           standard_name="(eastward_flux_of_atmospheric_water_vapor, &
-           northward_flux_of_atmospheric_water_vapor)", &
-           dims="xy", &
-           vstagger=VERTICAL_STAGGER_NONE, &
-           units="kg m-1 s-1", &
-           itemtype=MAPL_STATEITEM_VECTOR, _RC)
-
       ! pchakrab - DynCore is the provider here, so the service items are not needed
       ! NOTE: SERVICE, irrespective of whether you are a provider or subscriber, adds the bundle
       ! to BOTH the export and import states
@@ -3860,12 +3799,11 @@ contains
       type(ESMF_FieldBundle) :: bundle
       type(ESMF_Field), allocatable :: field_list(:)
       type(ESMF_TypeKind_Flag) :: typekind
-      integer :: field_count, status
+      integer :: status
 
       call ESMF_StateGet(export, vector_name, bundle, _RC)
-      ! field_list is in the order they were added to the bundle
-      call MAPL_FieldBundleGet(bundle, fieldCount=field_count, fieldList=field_list, _RC)
-      _RETURN_UNLESS(field_count == 2)
+      call MAPL_FieldBundleGet(bundle, fieldList=field_list, _RC) ! addorder
+      _RETURN_UNLESS(size(field_list) == 2)
       ! Both fields are expected to have the same typekind, so just check one
       call MAPL_FieldGet(field_list(1), typekind=typekind, _RC)
       if (typekind == ESMF_TYPEKIND_R4) then
