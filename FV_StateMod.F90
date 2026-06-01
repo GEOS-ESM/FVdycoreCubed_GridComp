@@ -1244,6 +1244,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   real(FVPRC) :: FQC
 
   real(REAL4), pointer     :: PTR3D(:,:,:)
+  real(REAL4), pointer     :: dudt_ray(:,:,:), dvdt_ray(:,:,:)
+  type(ESMF_FieldBundle)   :: ray_bundle
+  integer                  :: ray_field_count
 
   real(FVPRC), allocatable :: DEBUG_ARRAY(:,:,:)
   real(FVPRC) :: fac1    = 1.0
@@ -2015,10 +2018,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     allocate ( vdt(isc:iec,jsc:jec,npz) )
     ! go from native D-Grid tendencies to A-grid rotated exports
     call fv_getAllWinds(u_dt, v_dt, ur=udt, vr=vdt)
-    call MAPL_StateGetPointer ( export, PTR3D, 'DUDT_RAY', rc=status ); VERIFY_(STATUS)
-    if( associated(PTR3D) ) PTR3D = udt
-    call MAPL_StateGetPointer ( export, PTR3D, 'DVDT_RAY', rc=status ); VERIFY_(STATUS)
-    if( associated(PTR3D) ) PTR3D = vdt
+    call ESMF_StateGet(export, 'D_UV_DT_RAY', ray_bundle, rc=status); VERIFY_(STATUS)
+    call ESMF_FieldBundleGet(ray_bundle, fieldCount=ray_field_count, rc=status); VERIFY_(STATUS)
+    if (ray_field_count == 2) then
+       call MAPL_FieldBundleGetPointer(ray_bundle, 1, dudt_ray, rc=status); VERIFY_(STATUS)
+       call MAPL_FieldBundleGetPointer(ray_bundle, 2, dvdt_ray, rc=status); VERIFY_(STATUS)
+       dudt_ray = udt
+       dvdt_ray = vdt
+    end if
     deallocate ( udt )
     deallocate ( vdt )
     call MAPL_StateGetPointer ( export, PTR3D, 'DTDT_RAY', rc=status ); VERIFY_(STATUS)

@@ -83,8 +83,7 @@ category: EXPORT
 # DTDTSUBZ       | K s-1            | xyz  |  C   |           |          | tendency_of_air_temperature_due_to_subgrid_dz
 # DWDTSUBZ       | m/s/s            | xyz  |  C   |           |          | tendency_of_vertical_velocity_due_to_subgrid_dz
   DTDT_RAY       | K s-1            | xyz  |  C   |           |          | air_temperature_tendency_due_to_Rayleigh_friction
-  DUDT_RAY       | m s-2            | xyz  |  C   |           |          | tendency_of_eastward_wind_due_to_Rayleigh_friction
-  DVDT_RAY       | m s-2            | xyz  |  C   |           |          | tendency_of_northward_wind_due_to_Rayleigh_friction
+  D_UV_DT_RAY    | m s-2            | xyz  |  C   | V         |          | tendency_of_(eastward, northward)_wind_due_to_Rayleigh_friction
   DWDT_RAY       | m/s/s            | xyz  |  C   |           |          | vertical_velocity_tendency_due_to_Rayleigh_friction
   D_UV_DTANA     | m/s/s            | xyz  |  C   | V         |          | tendency_of_(eastward, northward)_wind_due_to_analysis
   DTDTANA        | K s-1            | xyz  |  C   |           |          | tendency_of_air_temperature_due_to_analysis
