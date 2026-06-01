@@ -86,11 +86,7 @@ category: EXPORT
   DUDT_RAY       | m s-2            | xyz  |  C   |           |          | tendency_of_eastward_wind_due_to_Rayleigh_friction
   DVDT_RAY       | m s-2            | xyz  |  C   |           |          | tendency_of_northward_wind_due_to_Rayleigh_friction
   DWDT_RAY       | m/s/s            | xyz  |  C   |           |          | vertical_velocity_tendency_due_to_Rayleigh_friction
-#
-# DUDTANA        | m/s/s            | xyz  |  C   |           |          | tendency_of_eastward_wind_due_to_analysis
-# DVDTANA        | m/s/s            | xyz  |  C   |           |          | tendency_of_northward_wind_due_to_analysis
   D_UV_DTANA     | m/s/s            | xyz  |  C   | V         |          | tendency_of_(eastward, northward)_wind_due_to_analysis
-#
   DTDTANA        | K s-1            | xyz  |  C   |           |          | tendency_of_air_temperature_due_to_analysis
   DDELPDTANA     | K s-1            | xyz  |  C   |           |          | tendency_of_pressure_thickness_due_to_analysis
   DUDTDYN        | m/s/s            | xyz  |  C   |           |          | tendency_of_eastward_wind_due_to_dynamics
@@ -136,28 +132,13 @@ VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          |max_ve
   THV            | K/Pa$^\kappa$    | xyz  |  C   |           |          | scaled_virtual_potential_temperature
   DPLEDTDYN      | Pa s-1           | xyz  |  E   |           |          | tendency_of_edge_pressure_due_to_dynamics
   DDELPDTDYN     | Pa s-1           | xyz  |  C   |           |          | tendency_of_pressure_thickness_due_to_dynamics
-#
-# UKE            | J m-1 s-1        | xy   |  N   |           |          | eastward_flux_of_atmospheric_kinetic_energy
-# VKE            | J m-1 s-1        | xy   |  N   |           |          | northward_flux_of_atmospheric_kinetic_energy
   UV_KE          | J m-1 s-1        | xy   |  N   | V         |          | (eastward, northward)_flux_of_atmospheric_kinetic_energy)
-#
   UCPT           | J m-1 s-1        | xy   |  N   |           |          | eastward_flux_of_atmospheric_enthalpy
   VCPT           | J m-1 s-1        | xy   |  N   |           |          | northward_flux_of_atmospheric_enthalpy
-#
-# UPHI           | J m-1 s-1        | xy   |  N   |           |          | eastward_flux_of_atmospheric_potential_energy
-# VPHI           | J m-1 s-1        | xy   |  N   |           |          | northward_flux_of_atmospheric_potential_energy
   UV_PHI         | J m-1 s-1        | xy   |  N   | V         |          | (eastward, northward)_flux_of_atmospheric_potential_energy
-#
-# UQV            | kg m-1 s-1       | xy   |  N   |           |          | eastward_flux_of_atmospheric_water_vapor
-# VQV            | kg m-1 s-1       | xy   |  N   |           |          | northward_flux_of_atmospheric_water_vapor
   UV_QV          | kg m-1 s-1       | xy   |  N   | V         |          | (eastward, northward)_flux_of_atmospheric_water_vapor
-#
-  UQL            | kg m-1 s-1       | xy   |  N   |           |          | eastward_flux_of_atmospheric_liquid_water
-  VQL            | kg m-1 s-1       | xy   |  N   |           |          | northward_flux_of_atmospheric_liquid_water
-#
-  UQI            | kg m-1 s-1       | xy   |  N   |           |          | eastward_flux_of_atmospheric_ice
-  VQI            | kg m-1 s-1       | xy   |  N   |           |          | northward_flux_of_atmospheric_ice
-#
+  UV_QL          | kg m-1 s-1       | xy   |  N   | V         |          | (eastward, northward)_flux_of_atmospheric_liquid_water
+  UV_QI          | kg m-1 s-1       | xy   |  N   | V         |          | (eastward, northward)_flux_of_atmospheric_ice
   DKE            | W m-2            | xy   |  N   |           |          | tendency_of_atmosphere_kinetic_energy_content_due_to_dynamics
   DCPT           | W m-2            | xy   |  N   |           |          | tendency_of_atmosphere_dry_energy_content_due_to_dynamics
   DPET           | W m-2            | xy   |  N   |           |          | tendency_of_atmosphere_topographic_potential_energy_due_to_dynamics

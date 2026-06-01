@@ -656,6 +656,8 @@ contains
       real(kind=r4), pointer :: uke(:, :), vke(:, :)
       real(kind=r4), pointer :: uphi(:, :), vphi(:, :)
       real(kind=r4), pointer :: uqv(:, :), vqv(:, :)
+      real(kind=r4), pointer :: uql(:, :), vql(:, :)
+      real(kind=r4), pointer :: uqi(:, :), vqi(:, :)
 
       real(kind=r4), pointer :: uh25(:, :), uh03(:, :)
       real(kind=r4), pointer :: srh01(:, :), srh03(:, :), srh25(:, :), shr06(:, :)
@@ -2082,77 +2084,79 @@ contains
          end if
 
          ! Fluxes: UQL & VQL
-         call MAPL_StateGetPointer(export, temp2d, 'UQL', _RC)
-         if (associated(temp2d)) then
-            temp2d = 0.0
+         call ESMF_StateGet(export, "UV_QL", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            ! UQL
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, uql, _RC)
+            uql = 0.0
             do n = 1, size(names)
                if (trim(names(n)) == 'QLCN' .or. &
                     trim(names(n)) == 'QLLS') then
                   do k = 1, km
                      if (self%vars%tracer(n)%is_r4) then
-                        temp2d = temp2d + ur(:, :, k) * self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
+                        uql = uql + ur(:, :, k) * self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
                      else
-                        temp2d = temp2d + ur(:, :, k) * self%vars%tracer(n)%content(:, :, k) * delp(:, :, k)
+                        uql = uql + ur(:, :, k) * self%vars%tracer(n)%content(:, :, k) * delp(:, :, k)
                      end if
                   end do
                end if
             end do
-            temp2d = temp2d / GRAV
-         end if
-
-         call MAPL_StateGetPointer(export, temp2d, 'VQL', _RC)
-         if (associated(temp2d)) then
-            temp2d = 0.0
+            uql = uql / GRAV
+            ! VQL
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, vql, _RC)
+            vql = 0.0
             do n = 1, size(names)
                if (trim(names(n)) == 'QLCN' .or. &
                     trim(names(n)) == 'QLLS') then
                   do k = 1, km
                      if (self%vars%tracer(n)%is_r4) then
-                        temp2d = temp2d + vr(:, :, k) * self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
+                        vql = vql + vr(:, :, k) * self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
                      else
-                        temp2d = temp2d + vr(:, :, k) * self%vars%tracer(n)%content(:, :, k) * delp(:, :, k)
+                        vql = vql + vr(:, :, k) * self%vars%tracer(n)%content(:, :, k) * delp(:, :, k)
                      end if
                   end do
                end if
             end do
-            temp2d = temp2d / GRAV
+            vql = vql / GRAV
          end if
 
          ! Fluxes: UQI & VQI
-         call MAPL_StateGetPointer(export, temp2d, 'UQI', _RC)
-         if (associated(temp2d)) then
-            temp2d = 0.0
+         call ESMF_StateGet(export, "UV_QI", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            ! UQI
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, uqi, _RC)
+            uqi = 0.0
             do n = 1, size(names)
                if (trim(names(n)) == 'QICN' .or. &
                     trim(names(n)) == 'QILS') then
                   do k = 1, km
                      if (self%vars%tracer(n)%is_r4) then
-                        temp2d = temp2d + ur(:, :, k) * self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
+                        uqi = uqi + ur(:, :, k) * self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
                      else
-                        temp2d = temp2d + ur(:, :, k) * self%vars%tracer(n)%content(:, :, k) * delp(:, :, k)
+                        uqi = uqi + ur(:, :, k) * self%vars%tracer(n)%content(:, :, k) * delp(:, :, k)
                      end if
                   end do
                end if
             end do
-            temp2d = temp2d / GRAV
-         end if
-
-         call MAPL_StateGetPointer(export, temp2d, 'VQI', _RC)
-         if (associated(temp2d)) then
-            temp2d = 0.0
+            uqi = uqi / GRAV
+            ! VQI
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, vqi, _RC)
+            vqi = 0.0
             do n = 1, size(names)
                if (trim(names(n)) == 'QICN' .or. &
                     trim(names(n)) == 'QILS') then
                   do k = 1, km
                      if (self%vars%tracer(n)%is_r4) then
-                        temp2d = temp2d + vr(:, :, k) * self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
+                        vqi = vqi + vr(:, :, k) * self%vars%tracer(n)%content_r4(:, :, k) * delp(:, :, k)
                      else
-                        temp2d = temp2d + vr(:, :, k) * self%vars%tracer(n)%content(:, :, k) * delp(:, :, k)
+                        vqi = vqi + vr(:, :, k) * self%vars%tracer(n)%content(:, :, k) * delp(:, :, k)
                      end if
                   end do
                end if
             end do
-            temp2d = temp2d / GRAV
+            vqi = vqi / GRAV
          end if
 
          ! Height related diagnostics
