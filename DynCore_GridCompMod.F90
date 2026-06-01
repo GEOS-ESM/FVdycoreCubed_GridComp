@@ -658,6 +658,8 @@ contains
       real(kind=r4), pointer :: uqv(:, :), vqv(:, :)
       real(kind=r4), pointer :: uql(:, :), vql(:, :)
       real(kind=r4), pointer :: uqi(:, :), vqi(:, :)
+      real(kind=r4), pointer :: ucpt(:, :), vcpt(:, :)
+      real(kind=r4), pointer :: us(:, :), vs(:, :)
 
       real(kind=r4), pointer :: uh25(:, :), uh03(:, :)
       real(kind=r4), pointer :: srh01(:, :), srh03(:, :), srh25(:, :), shr06(:, :)
@@ -2005,23 +2007,21 @@ contains
          if (associated(temp3d)) temp3d = tempxy
 
          ! Fluxes: UCPT & VCPT
-         !--------------------
-         call MAPL_StateGetPointer(export, temp2d, 'UCPT', _RC)
-         if (associated(temp2d)) then
-            temp2d = 0.0
+         call ESMF_StateGet(export, "UV_CPT", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, ucpt, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, vcpt, _RC)
+            ucpt = 0.0
             do k = 1, km
-               temp2d = temp2d + ur(:, :, k) * tempxy(:, :, k) * delp(:, :, k)
+               ucpt = ucpt + ur(:, :, k) * tempxy(:, :, k) * delp(:, :, k)
             end do
-            temp2d = temp2d * (CP / GRAV)
-         end if
-
-         call MAPL_StateGetPointer(export, temp2d, 'VCPT', _RC)
-         if (associated(temp2d)) then
-            temp2d = 0.0
+            ucpt = ucpt * (CP / GRAV)
+            vcpt = 0.0
             do k = 1, km
-               temp2d = temp2d + vr(:, :, k) * tempxy(:, :, k) * delp(:, :, k)
+               vcpt = vcpt + vr(:, :, k) * tempxy(:, :, k) * delp(:, :, k)
             end do
-            temp2d = temp2d * (CP / GRAV)
+            vcpt = vcpt * (CP / GRAV)
          end if
 
          ! Compute Energetics After Dycore
@@ -2209,14 +2209,13 @@ contains
             call MAPL_StateGetPointer(export, temp2d, 'PS', _RC)
             if (associated(temp2d)) temp2d = vars%pe(:, :, km + 1)
 
-            call MAPL_StateGetPointer(export, temp2d, 'US', _RC)
-            if (associated(temp2d)) then
-               call VertInterp(temp2d, ur, -zle, -HGT_SURFACE, _RC)
-            end if
-
-            call MAPL_StateGetPointer(export, temp2d, 'VS', _RC)
-            if (associated(temp2d)) then
-               call VertInterp(temp2d, vr, -zle, -HGT_SURFACE, _RC)
+            call ESMF_StateGet(export, 'UV_S', tmp_bundle, _RC)
+            call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+            if (field_count == 2) then ! export bundle is connected
+               call MAPL_FieldBundleGetPointer(tmp_bundle, 1, us, _RC)
+               call MAPL_FieldBundleGetPointer(tmp_bundle, 2, vs, _RC)
+               call VertInterp(us, ur, -zle, -HGT_SURFACE, _RC)
+               call VertInterp(vs, vr, -zle, -HGT_SURFACE, _RC)
             end if
 
             call MAPL_StateGetPointer(export, temp2d, 'TA', _RC)
@@ -2242,11 +2241,14 @@ contains
             call MAPL_StateGetPointer(export, temp2d, 'PS', _RC)
             if (associated(temp2d)) temp2d = vars%pe(:, :, km + 1)
 
-            call MAPL_StateGetPointer(export, temp2d, 'US', _RC)
-            if (associated(temp2d)) temp2d = ur(:, :, km)
-
-            call MAPL_StateGetPointer(export, temp2d, 'VS', _RC)
-            if (associated(temp2d)) temp2d = vr(:, :, km)
+            call ESMF_StateGet(export, 'UV_S', tmp_bundle, _RC)
+            call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+            if (field_count == 2) then ! export bundle is connected
+               call MAPL_FieldBundleGetPointer(tmp_bundle, 1, us, _RC)
+               call MAPL_FieldBundleGetPointer(tmp_bundle, 2, vs, _RC)
+               us = ur(:, :, km)
+               vs = vr(:, :, km)
+            end if
 
             call MAPL_StateGetPointer(export, temp2d, 'TA', _RC)
             if (associated(temp2d)) then
@@ -2760,7 +2762,7 @@ contains
       type(DynVars), pointer :: vars
       type(DynTracers) :: qqq ! Specific Humidity
       type(ESMF_Grid) :: esmfgrid
-      type(ESMF_FieldBundle) :: uv
+      type(ESMF_FieldBundle) :: tmp_bundle
 
       real(kind=r8), allocatable :: penrg(:, :) ! Vertically Integrated Cp*T
       real(kind=r8), allocatable :: kenrg(:, :) ! Vertically Integrated K
@@ -2800,6 +2802,15 @@ contains
       real(kind=r4), pointer :: qold(:, :, :)
       real(kind=r4), pointer :: temp3d(:, :, :)
       real(kind=r4), pointer :: temp2d(:, :)
+      real(kind=r4), pointer :: u50m(:, :), v50m(:, :)
+      real(kind=r4), pointer :: u100(:, :), v100(:, :)
+      real(kind=r4), pointer :: u200(:, :), v200(:, :)
+      real(kind=r4), pointer :: u250(:, :), v250(:, :)
+      real(kind=r4), pointer :: u300(:, :), v300(:, :)
+      real(kind=r4), pointer :: u500(:, :), v500(:, :)
+      real(kind=r4), pointer :: u700(:, :), v700(:, :)
+      real(kind=r4), pointer :: utop(:, :), vtop(:, :)
+      real(kind=r4), pointer :: u850(:, :), v850(:, :)
 
       real(kind=r4), pointer :: ztemp1(:, :)
       real(kind=r4), pointer :: ztemp2(:, :)
@@ -3101,84 +3112,76 @@ contains
             call VertInterp(temp2d, zle, logpe, log(100000.), _RC)
          end if
 
-         call MAPL_StateGetPointer(export, temp2d, "U50M", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, ur, -zle, -50., _RC)
+         call ESMF_StateGet(export, "UV_50M", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, u50m, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, v50m, _RC)
+            call VertInterp(u50m, ur, -zle, -50., _RC)
+            call VertInterp(v50m, vr, -zle, -50., _RC)
          end if
 
-         call MAPL_StateGetPointer(export, temp2d, "V50M", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, vr, -zle, -50., _RC)
+         call ESMF_StateGet(export, "UV_100", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, u100, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, v100, _RC)
+            call VertInterp(u100, ur, logpe, log(10000.), _RC)
+            call VertInterp(v100, vr, logpe, log(10000.), _RC)
          end if
 
-         call MAPL_StateGetPointer(export, temp2d, "U100", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, ur, logpe, log(10000.), _RC)
+         call ESMF_StateGet(export, "UV_200", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, u200, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, v200, _RC)
+            call VertInterp(u200, ur, logpe, log(20000.), _RC)
+            call VertInterp(v200, vr, logpe, log(20000.), _RC)
          end if
 
-         call MAPL_StateGetPointer(export, temp2d, "U200", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, ur, logpe, log(20000.), _RC)
+         call ESMF_StateGet(export, "UV_250", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, u250, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, v250, _RC)
+            call VertInterp(u250, ur, logpe, log(25000.), _RC)
+            call VertInterp(v250, vr, logpe, log(25000.), _RC)
          end if
 
-         call MAPL_StateGetPointer(export, temp2d, "U250", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, ur, logpe, log(25000.), _RC)
+         call ESMF_StateGet(export, "UV_300", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, u300, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, v300, _RC)
+            call VertInterp(u300, ur, logpe, log(30000.), _RC)
+            call VertInterp(v300, vr, logpe, log(30000.), _RC)
          end if
 
-         call MAPL_StateGetPointer(export, temp2d, "U300", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, ur, logpe, log(30000.), _RC)
+         call ESMF_StateGet(export, "UV_500", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, u500, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, v500, _RC)
+            call VertInterp(u500, ur, logpe, log(50000.), _RC)
+            call VertInterp(v500, vr, logpe, log(50000.), _RC)
          end if
 
-         call MAPL_StateGetPointer(export, temp2d, "U500", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, ur, logpe, log(50000.), _RC)
+         call ESMF_StateGet(export, "UV_700", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, u700, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, v700, _RC)
+            call VertInterp(u700, ur, logpe, log(70000.), _RC)
+            call VertInterp(v700, vr, logpe, log(70000.), _RC)
          end if
 
-         call MAPL_StateGetPointer(export, temp2d, "U700", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, ur, logpe, log(70000.), _RC)
-         end if
-
-         call MAPL_StateGetPointer(export, temp2d, "U850", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, ur, logpe, log(85000.), _RC)
-         end if
-
-         call MAPL_StateGetPointer(export, temp2d, "V100", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, vr, logpe, log(10000.), _RC)
-         end if
-
-         call MAPL_StateGetPointer(export, temp2d, "V200", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, vr, logpe, log(20000.), _RC)
-         end if
-
-         call MAPL_StateGetPointer(export, temp2d, "V250", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, vr, logpe, log(25000.), _RC)
-         end if
-
-         call MAPL_StateGetPointer(export, temp2d, "V300", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, vr, logpe, log(30000.), _RC)
-         end if
-
-         call MAPL_StateGetPointer(export, temp2d, "V500", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, vr, logpe, log(50000.), _RC)
-         end if
-
-         call MAPL_StateGetPointer(export, temp2d, "V700", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, vr, logpe, log(70000.), _RC)
-         end if
-
-         call MAPL_StateGetPointer(export, temp2d, "V850", _RC)
-         if (associated(temp2d)) then
-            call VertInterp(temp2d, vr, logpe, log(85000.), _RC)
+         call ESMF_StateGet(export, "UV_850", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, u850, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, v850, _RC)
+            call VertInterp(u850, ur, logpe, log(85000.), _RC)
+            call VertInterp(v850, vr, logpe, log(85000.), _RC)
          end if
 
          call MAPL_StateGetPointer(export, temp2d, "T100", _RC)
@@ -3252,11 +3255,14 @@ contains
          end if
 
          ! Fill Model Top Level Variables
-         call MAPL_StateGetPointer(export, temp2d, "UTOP", _RC)
-         if (associated(temp2d)) temp2d = ur(:, :, 1)
-
-         call MAPL_StateGetPointer(export, temp2d, "VTOP", _RC)
-         if (associated(temp2d)) temp2d = vr(:, :, 1)
+         call ESMF_StateGet(export, "UV_TOP", tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! export bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, utop, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, vtop, _RC)
+            utop = ur(:, :, 1)
+            vtop = vr(:, :, 1)
+         end if
 
          call MAPL_StateGetPointer(export, temp2d, "TTOP", _RC)
          if (associated(temp2d)) temp2d = tempxy(:, :, 1)

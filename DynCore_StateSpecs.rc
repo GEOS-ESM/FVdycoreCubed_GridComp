@@ -102,13 +102,12 @@ category: EXPORT
   TA             | K                | xy   |  N   |           |          | surface_air_temperature
   QA             | 1                | xy   |  N   |           |          | surface_specific_humidity
 #
-  US             | m s-1            | xy   |  N   |           |          | surface_eastward_wind
-  VS             | m s-1            | xy   |  N   |           |          | surface_northward_wind
+  UV_S           | m s-1            | xy   |  N   | V         |          | (surface_eastward_wind, surface_northward_wind)
 #
   SPEED          | m s-1            | xy   |  N   |           |          | surface_wind_speed
   WSPD_10M       | m s-1            | xy   |  N   |           |          | wind_speed_at_10m
-VVEL_UP_100_1000 | m s-1            | xy   |  N   |           |          |max_vertical_velocity_up_between_100_1000_hPa
-VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          |max_vertical_velocity_down_between_100_1000_hPa
+VVEL_UP_100_1000 | m s-1            | xy   |  N   |           |          | max_vertical_velocity_up_between_100_1000_hPa
+VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          | max_vertical_velocity_down_between_100_1000_hPa
   DZ             | m                | xy   |  N   |           |          | surface_layer_height
   SLP            | Pa               | xy   |  N   |           |          | sea_level_pressure
   H1000          | m                | xy   |  N   |           |          | height_at_1000_mb
@@ -133,8 +132,7 @@ VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          |max_ve
   DPLEDTDYN      | Pa s-1           | xyz  |  E   |           |          | tendency_of_edge_pressure_due_to_dynamics
   DDELPDTDYN     | Pa s-1           | xyz  |  C   |           |          | tendency_of_pressure_thickness_due_to_dynamics
   UV_KE          | J m-1 s-1        | xy   |  N   | V         |          | (eastward, northward)_flux_of_atmospheric_kinetic_energy)
-  UCPT           | J m-1 s-1        | xy   |  N   |           |          | eastward_flux_of_atmospheric_enthalpy
-  VCPT           | J m-1 s-1        | xy   |  N   |           |          | northward_flux_of_atmospheric_enthalpy
+  UV_CPT         | J m-1 s-1        | xy   |  N   | V         |          | (eastward, northward)_flux_of_atmospheric_enthalpy
   UV_PHI         | J m-1 s-1        | xy   |  N   | V         |          | (eastward, northward)_flux_of_atmospheric_potential_energy
   UV_QV          | kg m-1 s-1       | xy   |  N   | V         |          | (eastward, northward)_flux_of_atmospheric_water_vapor
   UV_QL          | kg m-1 s-1       | xy   |  N   | V         |          | (eastward, northward)_flux_of_atmospheric_liquid_water
@@ -163,46 +161,29 @@ VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          |max_ve
   DIVG700        | s-1              | xy   |  N   |           |          | divergence_at_700_hPa
   DIVG500        | s-1              | xy   |  N   |           |          | divergence_at_500_hPa
   DIVG200        | s-1              | xy   |  N   |           |          | divergence_at_200_hPa
-#
-  U850           | m s-1            | xy   |  N   |           |          | eastward_wind_at_850_hPa
-  V850           | m s-1            | xy   |  N   |           |          | northward_wind_at_850_hPa
+  UV_850         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_850_hPa
   T850           | K                | xy   |  N   |           |          | air_temperature_at_850_hPa
   Q850           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_850_hPa
-#
-  U700           | m s-1            | xy   |  N   |           |          | eastward_wind_at_700_hPa
-  V700           | m s-1            | xy   |  N   |           |          | northward_wind_at_700_hPa
+  UV_700         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_700_hPa
   T700           | K                | xy   |  N   |           |          | air_temperature_at_700_hPa
   Q700           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_700_hPa
-#
-  U500           | m s-1            | xy   |  N   |           |          | eastward_wind_at_500_hPa
-  V500           | m s-1            | xy   |  N   |           |          | northward_wind_at_500_hPa
+  UV_500         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_500_hPa
   T500           | K                | xy   |  N   |           |          | air_temperature_at_500_hPa
   Q500           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_500_hPa
-#
-  U300           | m s-1            | xy   |  N   |           |          | eastward_wind_at_300_hPa
-  V300           | m s-1            | xy   |  N   |           |          | northward_wind_at_300_hPa
+  UV_300         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_300_hPa
   T300           | K                | xy   |  N   |           |          | air_temperature_at_300_hPa
   Q300           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_300_hPa
-#
-  U250           | m s-1            | xy   |  N   |           |          | eastward_wind_at_250_hPa
-  V250           | m s-1            | xy   |  N   |           |          | northward_wind_at_250_hPa
+  UV_250         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_250_hPa
   T250           | K                | xy   |  N   |           |          | air_temperature_at_250_hPa
   Q250           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_250_hPa
-#
-  U200           | m s-1            | xy   |  N   |           |          | eastward_wind_at_200_hPa
-  V200           | m s-1            | xy   |  N   |           |          | northward_wind_at_200_hPa
+  UV_200         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_200_hPa
   T200           | K                | xy   |  N   |           |          | air_temperature_at_200_hPa
   Q200           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_200_hPa
-#
-  U100           | m s-1            | xy   |  N   |           |          | eastward_wind_at_100_hPa
-  V100           | m s-1            | xy   |  N   |           |          | northward_wind_at_100_hPa
+  UV_100         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_100_hPa
   T100           | K                | xy   |  N   |           |          | air_temperature_at_100_hPa
   Q100           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_100_hPa
-#
-  UTOP           | m s-1            | xy   |  N   |           |          | eastward_wind_at_model_top
-  VTOP           | m s-1            | xy   |  N   |           |          | northward_wind_at_model_top
+  UV_TOP         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_model_top
   TTOP           | K                | xy   |  N   |           |          | air_temperature_at_model_top
-#
   Z700           | m                | xy   |  N   |           |          | geopotential_height_at_700_hPa
   Z500           | m                | xy   |  N   |           |          | geopotential_height_at_500_hPa
   Z300           | m                | xy   |  N   |           |          | geopotential_height_at_300_hPa
@@ -222,10 +203,7 @@ VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          |max_ve
   W500           | m s-1            | xy   |  N   |           |          | w_at_500_hPa
   W200           | m s-1            | xy   |  N   |           |          | w_at_200_hPa
   W10            | m s-1            | xy   |  N   |           |          | w_at_10_hPa
-#
-  U50M           | m s-1            | xy   |  N   |           |          | eastward_wind_at_50_meters
-  V50M           | m s-1            | xy   |  N   |           |          | northward_wind_at_50_meters
-#
+  UV_50M         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_50_meters
   DXC            | m                | xy   |  N   |           |          | cgrid_delta_x
   DYC            | m                | xy   |  N   |           |          | cgrid_delta_y
   AREA           | m+2              | xy   |  N   |           |          | agrid_cell_area
