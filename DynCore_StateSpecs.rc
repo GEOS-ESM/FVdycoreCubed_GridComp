@@ -100,9 +100,7 @@ category: EXPORT
   PS             | Pa               | xy   |  N   |           |          | surface_pressure
   TA             | K                | xy   |  N   |           |          | surface_air_temperature
   QA             | 1                | xy   |  N   |           |          | surface_specific_humidity
-#
   UV_S           | m s-1            | xy   |  N   | V         |          | (surface_eastward_wind, surface_northward_wind)
-#
   SPEED          | m s-1            | xy   |  N   |           |          | surface_wind_speed
   WSPD_10M       | m s-1            | xy   |  N   |           |          | wind_speed_at_10m
 VVEL_UP_100_1000 | m s-1            | xy   |  N   |           |          | max_vertical_velocity_up_between_100_1000_hPa
@@ -161,14 +159,19 @@ VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          | max_v
   DIVG500        | s-1              | xy   |  N   |           |          | divergence_at_500_hPa
   DIVG200        | s-1              | xy   |  N   |           |          | divergence_at_200_hPa
   UV_850         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_850_hPa
+  W850           | m s-1            | xy   |  N   |           |          | w_at_850_hPa
   T850           | K                | xy   |  N   |           |          | air_temperature_at_850_hPa
   Q850           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_850_hPa
+  OMEGA850       | Pa s-1           | xy   |  N   |           |          | omega_at_850_hPa
   UV_700         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_700_hPa
   T700           | K                | xy   |  N   |           |          | air_temperature_at_700_hPa
   Q700           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_700_hPa
+  OMEGA700       | Pa s-1           | xy   |  N   |           |          | omega_at_700_hPa
   UV_500         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_500_hPa
+  W500           | m s-1            | xy   |  N   |           |          | w_at_500_hPa
   T500           | K                | xy   |  N   |           |          | air_temperature_at_500_hPa
   Q500           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_500_hPa
+  OMEGA500       | Pa s-1           | xy   |  N   |           |          | omega_at_500_hPa
   UV_300         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_300_hPa
   T300           | K                | xy   |  N   |           |          | air_temperature_at_300_hPa
   Q300           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_300_hPa
@@ -176,8 +179,10 @@ VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          | max_v
   T250           | K                | xy   |  N   |           |          | air_temperature_at_250_hPa
   Q250           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_250_hPa
   UV_200         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_200_hPa
+  W200           | m s-1            | xy   |  N   |           |          | w_at_200_hPa
   T200           | K                | xy   |  N   |           |          | air_temperature_at_200_hPa
   Q200           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_200_hPa
+  OMEGA200       | Pa s-1           | xy   |  N   |           |          | omega_at_200_hPa
   UV_100         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_100_hPa
   T100           | K                | xy   |  N   |           |          | air_temperature_at_100_hPa
   Q100           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_100_hPa
@@ -193,14 +198,7 @@ VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          | max_v
   H250           | m                | xy   |  N   |           |          | height_at_250_hPa
   H200           | m                | xy   |  N   |           |          | height_at_200_hPa
   H100           | m                | xy   |  N   |           |          | height_at_100_hPa
-  OMEGA850       | Pa s-1           | xy   |  N   |           |          | omega_at_850_hPa
-  OMEGA700       | Pa s-1           | xy   |  N   |           |          | omega_at_700_hPa
-  OMEGA500       | Pa s-1           | xy   |  N   |           |          | omega_at_500_hPa
-  OMEGA200       | Pa s-1           | xy   |  N   |           |          | omega_at_200_hPa
   OMEGA10        | Pa s-1           | xy   |  N   |           |          | omega_at_10_hPa
-  W850           | m s-1            | xy   |  N   |           |          | w_at_850_hPa
-  W500           | m s-1            | xy   |  N   |           |          | w_at_500_hPa
-  W200           | m s-1            | xy   |  N   |           |          | w_at_200_hPa
   W10            | m s-1            | xy   |  N   |           |          | w_at_10_hPa
   UV_50M         | m s-1            | xy   |  N   | V         |          | (eastward, northward)_wind_at_50_meters
   DXC            | m                | xy   |  N   |           |          | cgrid_delta_x
@@ -217,7 +215,7 @@ VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          | max_v
   U_DYN_IN       | m s-1            | xyz  |  C   |           |          | u_wind_at_begin_of_time_step
   V_DYN_IN       | m s-1            | xyz  |  C   |           |          | v_wind_at_begin_of_time_step
   PLE_DYN_IN     | Pa               | xyz  |  E   |           |          | edge_pressure_at_begin_of_time_step
-  PLE4           | Pa               | xyz  |  E   |           |          | blah_blah_blah
+  PLE4           | Pa               | xyz  |  E   |           |          | pressure_at_layer_edges_r4
 
 
 category: IMPORT
