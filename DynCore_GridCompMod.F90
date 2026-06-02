@@ -25,7 +25,7 @@
    use fv_arrays_mod,  only: REAL4, REAL8, FVPRC
    !use fv_grid_tools_mod, only: grid_type
    use FV_StateMod, only : FV_Atm,                                   &
-                           FV_To_State, State_To_FV, DEBUG_FV_STATE, &
+                           DEBUG_FV_STATE,                           &
                            DynTracers      => T_TRACERS,             &
                            DynVars         => T_FVDYCORE_VARS,       &
                            DynGrid         => T_FVDYCORE_GRID,       &
