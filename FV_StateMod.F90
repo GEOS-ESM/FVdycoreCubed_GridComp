@@ -865,7 +865,6 @@ contains
 
   real(REAL8), pointer                   :: AK(:) => NULL(), AK1(:) => NULL()
   real(REAL8), pointer                   :: BK(:) => NULL(), BK1(:) => NULL()
-  type(ESMF_FieldBundle) :: uv
   real(REAL8), dimension(:,:,:), pointer :: U     => NULL()
   real(REAL8), dimension(:,:,:), pointer :: V     => NULL()
   real(REAL8), dimension(:,:,:), pointer :: PT    => NULL()
@@ -924,9 +923,10 @@ contains
   VERIFY_(STATUS)
   call MAPL_StateGetPointer(internal, bk1, "BK",rc=status)
   VERIFY_(STATUS)
-  call ESMF_StateGet(internal, "UV", uv, _RC)
-  call MAPL_FieldBundleGetPointer(uv, 1, u, _RC)
-  call MAPL_FieldBundleGetPointer(uv, 2, v, _RC)
+  call MAPL_StateGetPointer(internal, u, "U",rc=status)
+  VERIFY_(STATUS)
+  call MAPL_StateGetPointer(internal, v, "V",rc=status)
+  VERIFY_(STATUS)
   call MAPL_StateGetPointer(internal, pt, "PT",rc=status)
   VERIFY_(STATUS)
   call MAPL_StateGetPointer(internal, pe, "PE",rc=status)

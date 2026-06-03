@@ -403,7 +403,7 @@ contains
 
       type(DynState), pointer :: self
       type(ESMF_State) :: internal
-      type(ESMF_FieldBundle) :: uv, uv_exp
+      type(ESMF_FieldBundle) :: uv_exp
       real(kind=r4), pointer :: pref(:)
       real(kind=r4), pointer :: u(:, :, :), v(:, :, :), t(:, :, :)
       real(kind=r4), pointer :: temp2d(:, :)
@@ -458,9 +458,8 @@ contains
          km = self%grid%npz
          allocate(ur(ifirst:ilast, jfirst:jlast, km))
          allocate(vr(ifirst:ilast, jfirst:jlast, km))
-         call ESMF_StateGet(internal, "UV", uv, _RC)
-         call MAPL_FieldBundleGetPointer(uv, 1, ud, _RC)
-         call MAPL_FieldBundleGetPointer(uv, 2, vd, _RC)
+         call MAPL_StateGetPointer(internal, ud, "U", _RC)
+         call MAPL_StateGetPointer(internal, vd, "V", _RC)
          call getAllWinds(ud, vd, ur=ur, vr=vr)
          u = ur
          v = vr
@@ -636,8 +635,6 @@ contains
 
       real(kind=r4), pointer :: dudtana(:, :, :)
       real(kind=r4), pointer :: dvdtana(:, :, :)
-      real(kind=r4), pointer :: u_dyn_in(:, :, :)
-      real(kind=r4), pointer :: v_dyn_in(:, :, :)
       real(kind=r4), pointer :: dtdtana(:, :, :)
       real(kind=r4), pointer :: ddpdtana(:, :, :)
       real(kind=r4), pointer :: qctmp(:, :, :)
@@ -655,6 +652,7 @@ contains
       real(kind=r4), pointer :: vtmp3d(:, :, :)
       real(kind=r4), pointer :: area(:, :)
       real(kind=r4), pointer :: temp2d(:, :)
+      real(kind=r4), pointer :: u_dyn_in(:, :, :), v_dyn_in(:, :, :)
       real(kind=r4), pointer :: uke(:, :), vke(:, :)
       real(kind=r4), pointer :: uphi(:, :), vphi(:, :)
       real(kind=r4), pointer :: uqv(:, :), vqv(:, :)
@@ -1434,7 +1432,7 @@ contains
 
       call FILLOUT3(export, "QV_DYN_IN", qv, _RC)
       call FILLOUT3(export, "T_DYN_IN", tempxy, _RC)
-      call fillout_vector_r8(export, "UV_DYN_IN", ur, vr, _RC)
+      call FILLOUT3r8_VECTOR(export, "UV_DYN_IN", ur, vr, _RC)
       call FILLOUT3(export, "PLE_DYN_IN", vars%pe, _RC)
       call FILLOUT3(export, "PLE4", vars%pe, _RC)
 
@@ -1628,8 +1626,7 @@ contains
          call FILLOUT3(export, "V_DGRID", vars%v, _RC)
          call FILLOUT3(export, "U_CGRID", uc, _RC)
          call FILLOUT3(export, "V_CGRID", vc, _RC)
-         call FILLOUT3(export, "U_AGRID", ua, _RC)
-         call FILLOUT3(export, "V_AGRID", va, _RC)
+         call FILLOUT3r8_VECTOR(export, 'UV_AGRID', ua, va, _RC)
 
          call FILLOUT3(export, "U", ur, _RC)
          call FILLOUT3(export, "V", vr, _RC)
@@ -1757,8 +1754,7 @@ contains
          call FILLOUT3(export, 'V_DGRID', vars%v, _RC)
          call FILLOUT3(export, 'U_CGRID', uc, _RC)
          call FILLOUT3(export, 'V_CGRID', vc, _RC)
-         call FILLOUT3(export, 'U_AGRID', ua, _RC)
-         call FILLOUT3(export, 'V_AGRID', va, _RC)
+         call FILLOUT3r8_VECTOR(export, 'UV_AGRID', ua, va, _RC)
 
          ! if (DEBUG_DYN) then
          !    block
@@ -1830,7 +1826,7 @@ contains
          call FILLOUT3r8(export, 'MFZ', mfzxyz, _RC)
          call FILLOUT3(export, 'MZ', mfzxyz, _RC)
 
-         call fillout_vector_r8(export, "UV", ur, vr, _RC)
+         call FILLOUT3r8_VECTOR(export, "UV", ur, vr, _RC)
          call FILLOUT3(export, 'T', tempxy, _RC)
          call FILLOUT3(export, 'Q', qv, _RC)
          call FILLOUT3(export, 'PL', pl, _RC)
@@ -2955,8 +2951,7 @@ contains
          call FILLOUT3(export, 'V_DGRID', vars%v, _RC)
          call FILLOUT3(export, 'U_CGRID', uc, _RC)
          call FILLOUT3(export, 'V_CGRID', vc, _RC)
-         call FILLOUT3(export, 'U_AGRID', ua, _RC)
-         call FILLOUT3(export, 'V_AGRID', va, _RC)
+         call FILLOUT3r8_VECTOR(export, 'UV_AGRID', ua, va, _RC)
 
          ! Compute Energetics After Diabatic Forcing
          thv = vars%pt * (1.0 + EPS * qv)
@@ -3016,7 +3011,7 @@ contains
          ! end if
 
          call FILLOUT3(export, "DELP", dp, _RC)
-         call fillout_vector_r8(export, "UV", ur, vr, _RC)
+         call FILLOUT3r8_VECTOR(export, "UV", ur, vr, _RC)
          call FILLOUT3(export, "T", tempxy, _RC)
          call FILLOUT3(export, "Q", qv, _RC)
          call FILLOUT3(export, "PL", pl, _RC)
@@ -3805,7 +3800,7 @@ contains
       _RETURN(_SUCCESS)
    end subroutine FILLOUT3
 
-   subroutine fillout_vector_r8(export, vector_name, v1, v2, rc)
+   subroutine FILLOUT3r8_VECTOR(export, vector_name, v1, v2, rc)
       type(ESMF_State), intent(inout) :: export
       character(len=*), intent(in) :: vector_name
       real(kind=r8), intent(in) :: v1(:, :, :), v2(:, :, :)
@@ -3834,11 +3829,11 @@ contains
          x1_r8 = v1
          x2_r8 = v2
       else
-         _FAIL("Unsupported typekind in fillout_vector_r8")
+         _FAIL("Unsupported typekind in FILLOUT3r8_VECTOR")
       end if
 
       _RETURN(_SUCCESS)
-   end subroutine fillout_vector_r8
+   end subroutine FILLOUT3r8_VECTOR
 
    subroutine FILLOUT2(export, name, v, rc)
       type(ESMF_State), intent(inout) :: export
@@ -4097,7 +4092,6 @@ contains
       type(ESMF_State) :: internal
 
       real(kind=REAL8), pointer :: ak1(:), bk1(:), ak(:), bk(:)
-      type(ESMF_FieldBundle) :: uv
       real(kind=REAL8), pointer :: u(:, :, :), v(:, :, :), pt(:, :, :)
       real(kind=REAL8), pointer :: pe1(:, :, :), pkz(:, :, :)
       real(kind=REAL8), allocatable :: pe(:, :, :)
@@ -4154,9 +4148,8 @@ contains
          lats(:, :) = 15.0 * PI / 180.0
       end if
 
-      call ESMF_StateGet(internal, "UV", uv, _RC)
-      call MAPL_FieldBundleGetPointer(uv, 1, u, _RC) ! A-Grid U Wind
-      call MAPL_FieldBundleGetPointer(uv, 2, v, _RC) ! A-Grid V Wind
+      call MAPL_StateGetPointer(internal, u, "U", _RC) ! A-Grid U Wind
+      call MAPL_StateGetPointer(internal, v, "V", _RC) ! A-Grid V Wind
       is = lbound(u, 1)
       ie = ubound(u, 1)
       js = lbound(u, 2)
