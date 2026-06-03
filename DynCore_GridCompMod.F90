@@ -636,6 +636,8 @@ contains
 
       real(kind=r4), pointer :: dudtana(:, :, :)
       real(kind=r4), pointer :: dvdtana(:, :, :)
+      real(kind=r4), pointer :: u_dyn_in(:, :, :)
+      real(kind=r4), pointer :: v_dyn_in(:, :, :)
       real(kind=r4), pointer :: dtdtana(:, :, :)
       real(kind=r4), pointer :: ddpdtana(:, :, :)
       real(kind=r4), pointer :: qctmp(:, :, :)
@@ -1432,8 +1434,7 @@ contains
 
       call FILLOUT3(export, "QV_DYN_IN", qv, _RC)
       call FILLOUT3(export, "T_DYN_IN", tempxy, _RC)
-      call FILLOUT3(export, "U_DYN_IN", ur, _RC)
-      call FILLOUT3(export, "V_DYN_IN", vr, _RC)
+      call fillout_vector_r8(export, "UV_DYN_IN", ur, vr, _RC)
       call FILLOUT3(export, "PLE_DYN_IN", vars%pe, _RC)
       call FILLOUT3(export, "PLE4", vars%pe, _RC)
 
@@ -3415,7 +3416,10 @@ contains
       integer :: II, JJ, i, j, k, L
       integer :: is, ie, js, je, km
       integer :: isd, ied, jsd, jed
+      integer :: field_count
+      type(ESMF_FieldBundle) :: tmp_bundle
       real(kind=r4), pointer :: tend(:, :, :)
+      real(kind=r4), pointer :: dudt(:, :, :), dvdt(:, :, :)
       real(kind=r4), allocatable, dimension(:, :) :: lons, lats
       real(kind=r8), allocatable :: DPNEW(:, :, :), DPOLD(:, :, :)
       real(kind=r8), allocatable :: tend_ua(:, :, :), tend_va(:, :, :)
@@ -3600,11 +3604,14 @@ contains
          allocate(tend_un(is:ie, js:je + 1, km))
          allocate(tend_vn(is:ie + 1, js:je, km))
 
-         call MAPL_StateGetPointer(import, tend, "DUDT", _RC)
-         tend_ua(is:ie, js:je, 1:km) = tend
-
-         call MAPL_StateGetPointer(import, tend, "DVDT", _RC)
-         tend_va(is:ie, js:je, 1:km) = tend
+         call ESMF_StateGet(import, 'D_UV_DT', tmp_bundle, _RC)
+         call ESMF_FieldBundleGet(tmp_bundle, fieldCount=field_count, _RC)
+         if (field_count == 2) then ! import bundle is connected
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 1, dudt, _RC)
+            call MAPL_FieldBundleGetPointer(tmp_bundle, 2, dvdt, _RC)
+            tend_ua(is:ie, js:je, 1:km) = dudt
+            tend_va(is:ie, js:je, 1:km) = dvdt
+         end if
 
          !if (.not. HYDROSTATIC ) then
          !  call MAPL_StateGetPointer(import, TEND, 'DWDT', _RC)
@@ -3819,8 +3826,8 @@ contains
       if (typekind == ESMF_TYPEKIND_R4) then
          call ESMF_FieldGet(field_list(1), farrayPtr=x1, _RC)
          call ESMF_FieldGet(field_list(2), farrayPtr=x2, _RC)
-         x1 = v1
-         x2 = v2
+         x1 = real(v1, kind=r4)
+         x2 = real(v2, kind=r4)
       else if (typekind == ESMF_TYPEKIND_R8) then
          call ESMF_FieldGet(field_list(1), farrayPtr=x1_r8, _RC)
          call ESMF_FieldGet(field_list(2), farrayPtr=x2_r8, _RC)
@@ -3832,30 +3839,6 @@ contains
 
       _RETURN(_SUCCESS)
    end subroutine fillout_vector_r8
-
-   ! subroutine fillout_vector_r4(export, name, v1, v2, rc)
-   !    type(ESMF_State), intent(inout) :: export
-   !    character(len=*), intent(in) :: name
-   !    real(kind=r4), intent(in) :: v1(:, :, :), v2(:, :, :)
-   !    integer, optional, intent(out) :: rc
-
-   !    real(kind=r4), pointer :: x1(:, :, :), x2(:, :, :)
-   !    real(kind=r8), pointer :: x1_r8(:, :, :), x2_r8(:, :, :)
-   !    type(ESMF_FieldBundle) :: bundle
-   !    integer :: field_count, status
-
-   !    call ESMF_StateGet(export, name, bundle, _RC)
-   !    call ESMF_FieldBundleGet(bundle, fieldCount=field_count, _RC)
-   !    if (field_count == 2) then ! export bundle is connected
-   !       ! TODO: pchakrab - check the typekind of the fields first
-   !       call MAPL_FieldBundleGetPointer(bundle, 1, x1, _RC)
-   !       call MAPL_FieldBundleGetPointer(bundle, 2, x2, _RC)
-   !       x1 = v1
-   !       x2 = v2
-   !    end if
-
-   !    _RETURN(_SUCCESS)
-   ! end subroutine fillout_vector_r4
 
    subroutine FILLOUT2(export, name, v, rc)
       type(ESMF_State), intent(inout) :: export

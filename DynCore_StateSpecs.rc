@@ -212,8 +212,7 @@ VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          | max_v
   PID            | 1                | xy   |  N   |           |          | process_id
   QV_DYN_IN      | kg kg-1          | xyz  |  C   |           |          | spec_humidity_at_begin_of_time_step
   T_DYN_IN       | K                | xyz  |  C   |           |          | temperature_at_begin_of_time_step
-  U_DYN_IN       | m s-1            | xyz  |  C   |           |          | u_wind_at_begin_of_time_step
-  V_DYN_IN       | m s-1            | xyz  |  C   |           |          | v_wind_at_begin_of_time_step
+  UV_DYN_IN      | m s-1            | xyz  |  C   | V         |          | (u, v)_wind_at_begin_of_time_step
   PLE_DYN_IN     | Pa               | xyz  |  E   |           |          | edge_pressure_at_begin_of_time_step
   PLE4           | Pa               | xyz  |  E   |           |          | pressure_at_layer_edges_r4
 
@@ -222,9 +221,8 @@ category: IMPORT
 #----------------------------------------------------------------------
  SHORT_NAME |  UNITS   | DIMS | StateItem | VLOC | RESTART | LONG_NAME
 #----------------------------------------------------------------------
-  DUDT      | m s-2    | xyz  | V         |  C   |         | eastward_wind_tendency
-  DVDT      | m s-2    | xyz  | V         |  C   |         | northward_wind_tendency
-  DWDT      | m s-2    | xyz  | V         |  C   |         | vertical_velocity_tendency
+  D_UV_DT   | m s-2    | xyz  | V         |  C   |         | (eastward, northward)_wind_tendency
+  DWDT      | m s-2    | xyz  |           |  C   |         | vertical_velocity_tendency
   DTDT      | Pa K s-1 | xyz  |           |  C   |         | delta-p_weighted_temperature_tendency
   DQVANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_increment_from_analysis
   DQLANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_liquid_increment_from_analysis
