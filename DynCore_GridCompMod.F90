@@ -4148,8 +4148,8 @@ contains
          lats(:, :) = 15.0 * PI / 180.0
       end if
 
-      call MAPL_StateGetPointer(internal, u, "U", _RC) ! A-Grid U Wind
-      call MAPL_StateGetPointer(internal, v, "V", _RC) ! A-Grid V Wind
+      call MAPL_StateGetPointer(internal, u, "U", _RC) ! D-Grid U Wind
+      call MAPL_StateGetPointer(internal, v, "V", _RC) ! D-Grid V Wind
       is = lbound(u, 1)
       ie = ubound(u, 1)
       js = lbound(u, 2)
