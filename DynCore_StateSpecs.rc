@@ -2,289 +2,249 @@ schema_version: 2.0.0
 component: DynCore
 
 category: EXPORT
-#------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  SHORT_NAME     |  LONG_NAME                                                                |  UNITS             |  DIMS | VLOC |  FIELD_TYPE        | TYPEKIND
-#------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  KE             |  vertically_integrated_kinetic_energy                                     |  J m-2             |  xy   |  N   |                    |
-  TAVE           |  vertically_averaged_dry_temperature                                      |  K                 |  xy   |  N   |                    |
-  UAVE           |  vertically_averaged_zonal_wind                                           |  m sec-1           |  xy   |  N   |  MAPL_VectorField  |
-  KEPHY          |  vertically_integrated_kinetic_energy_tendency_due_to_physics             |  W m-2             |  xy   |  N   |                    |
-  PEPHY          |  total_potential_energy_tendency_due_to_physics                           |  W m-2             |  xy   |  N   |                    |
-  TEPHY          |  mountain_work_tendency_due_to_physics                                    |  W m-2             |  xy   |  N   |                    |
-  KEANA          |  total_kinetic_energy_tendency_due_to_analysis                            |  W m-2             |  xy   |  N   |                    |
-  PEANA          |  total_potential_energy_tendency_due_to_analysis                          |  W m-2             |  xy   |  N   |                    |
-  TEANA          |  mountain_work_tendency_due_to_analysis                                   |  W m-2             |  xy   |  N   |                    |
-  KEHOT          |  vertically_integrated_kinetic_energy_tendency_due_to_HOT                 |  W m-2             |  xy   |  N   |                    |
-  KEDP           |  vertically_integrated_kinetic_energy_tendency_due_to_pressure_change     |  W m-2             |  xy   |  N   |                    |
-  KEADV          |  vertically_integrated_kinetic_energy_tendency_due_to_dynamics_advection  |  W m-2             |  xy   |  N   |                    |
-  KEPG           |  vertically_integrated_kinetic_energy_tendency_due_to_pressure_gradient   |  W m-2             |  xy   |  N   |                    |
-  KEDYN          |  vertically_integrated_kinetic_energy_tendency_due_to_dynamics            |  W m-2             |  xy   |  N   |                    |
-  PEDYN          |  vertically_integrated_potential_energy_tendency_due_to_dynamics          |  W m-2             |  xy   |  N   |                    |
-  TEDYN          |  mountain_work_tendency_due_to_dynamics                                   |  W m-2             |  xy   |  N   |                    |
-  KECDCOR        |  vertically_integrated_kinetic_energy_tendency_due_to_cdcore              |  W m-2             |  xy   |  N   |                    |
-  PECDCOR        |  vertically_integrated_potential_energy_tendency_due_to_cdcore            |  W m-2             |  xy   |  N   |                    |
-  TECDCOR        |  mountain_work_tendency_due_to_cdcore                                     |  W m-2             |  xy   |  N   |                    |
-  QFIXER         |  vertically_integrated_potential_energy_tendency_due_to_CONSV             |  W m-2             |  xy   |  N   |                    |
-  KEREMAP        |  vertically_integrated_kinetic_energy_tendency_due_to_remap               |  W m-2             |  xy   |  N   |                    |
-  PEREMAP        |  vertically_integrated_potential_energy_tendency_due_to_remap             |  W m-2             |  xy   |  N   |                    |
-  TEREMAP        |  mountain_work_tendency_due_to_remap                                      |  W m-2             |  xy   |  N   |                    |
-  KEGEN          |  vertically_integrated_generation_of_kinetic_energy                       |  W m-2             |  xy   |  N   |                    |
-  DKERESIN       |  vertically_integrated_kinetic_energy_residual_from_inertial_terms        |  W m-2             |  xy   |  N   |                    |
-  DKERESPG       |  vertically_integrated_kinetic_energy_residual_from_PG_terms              |  W m-2             |  xy   |  N   |                    |
-  DMDTANA        |  vertically_integrated_mass_tendency_due_to_analysis                      |  kg m-2 s-1        |  xy   |  N   |                    |
-  DOXDTANAINT    |  vertically_integrated_ozone_tendency_due_to_analysis                     |  kg m-2 s-1        |  xy   |  N   |                    |
-  DQVDTANAINT    |  vertically_integrated_water_vapor_tendency_due_to_analysis               |  kg m-2 s-1        |  xy   |  N   |                    |
-  DQLDTANAINT    |  vertically_integrated_liquid_water_tendency_due_to_analysis              |  kg m-2 s-1        |  xy   |  N   |                    |
-  DQIDTANAINT    |  vertically_integrated_ice_water_tendency_due_to_analysis                 |  kg m-2 s-1        |  xy   |  N   |                    |
-  DMDTDYN        |  vertically_integrated_mass_tendency_due_to_dynamics                      |  kg m-2 s-1        |  xy   |  N   |                    |
-  DOXDTDYNINT    |  vertically_integrated_ozone_tendency_due_to_dynamics                     |  kg m-2 s-1        |  xy   |  N   |                    |
-  DTHVDTDYNINT   |  vertically_integrated_THV_tendency_due_to_dynamics                       |  K kg m-2 s-1      |  xy   |  N   |                    |
-  DTHVDTREMAP    |  vertically_integrated_THV_tendency_due_to_vertical_remapping             |  K kg m-2 s-1      |  xy   |  N   |                    |
-  DTHVDTCONSV    |  vertically_integrated_THV_tendency_due_to_TE_conservation                |  K kg m-2 s-1      |  xy   |  N   |                    |
-  DTHVDTPHYINT   |  vertically_integrated_THV_tendency_due_to_physics                        |  K kg m-2 s-1      |  xy   |  N   |                    |
-  DTHVDTANAINT   |  vertically_integrated_THV_tendency_due_to_analysis                       |  K kg m-2 s-1      |  xy   |  N   |                    |
-  DQVDTDYNINT    |  vertically_integrated_water_vapor_tendency_due_to_dynamics               |  kg m-2 s-1        |  xy   |  N   |                    |
-  DQLDTDYNINT    |  vertically_integrated_liquid_water_tendency_due_to_dynamics              |  kg m-2 s-1        |  xy   |  N   |                    |
-  DQIDTDYNINT    |  vertically_integrated_ice_water_tendency_due_to_dynamics                 |  kg m-2 s-1        |  xy   |  N   |                    |
-  CONVKE         |  vertically_integrated_kinetic_energy_convergence                         |  W m-2             |  xy   |  N   |                    |
-  CONVTHV        |  vertically_integrated_thetav_convergence                                 |  W m-2             |  xy   |  N   |                    |
-  CONVCPT        |  vertically_integrated_enthalpy_convergence                               |  W m-2             |  xy   |  N   |                    |
-  CONVPHI        |  vertically_integrated_geopotential_convergence                           |  W m-2             |  xy   |  N   |                    |
-  T              |  air_temperature                                                          |  K                 |  xyz  |  C   |                    |
-  PL             |  mid_level_pressure                                                       |  Pa                |  xyz  |  C   |                    |
-  ZLE0           |  edge_heights_above_surface                                               |  m                 |  xyz  |  E   |                    |
-  ZL0            |  mid_layer_heights_above_surface                                          |  m                 |  xyz  |  C   |                    |
-  ZLE            |  edge_heights                                                             |  m                 |  xyz  |  E   |                    |
-  ZL             |  mid_layer_heights                                                        |  m                 |  xyz  |  C   |                    |
-  S              |  mid_layer_dry_static_energy                                              |  m                 |  xyz  |  C   |                    |
-  TH             |  potential_temperature                                                    |  K                 |  xyz  |  C   |                    |
-  PLK            |  mid-layer_p$^\kappa$                                                     |  Pa$^\kappa$       |  xyz  |  C   |                    |
-  PKE            |  edge_p$^\kappa$                                                          |  Pa$^\kappa$       |  xyz  |  E   |                    |
-  DELZ           |  nonhydrostatic_layer_thickness                                           |  m s-1             |  xyz  |  C   |                    |
-  W              |  vertical_velocity                                                        |  m s-1             |  xyz  |  C   |                    |
-  OMEGA          |  hydrostatic_vertical_pressure_velocity                                   |  Pa s-1            |  xyz  |  C   |                    |
-  CX             |  eastward_accumulated_courant_number                                      |  1                 |  xyz  |  C   |                    |  R8
-  CY             |  northward_accumulated_courant_number                                     |  1                 |  xyz  |  C   |                    |  R8
-  CU             |  eastward_accumulated_courant_number                                      |  1                 |  xyz  |  C   |                    |
-  CV             |  northward_accumulated_courant_number                                     |  1                 |  xyz  |  C   |                    |
-  MX             |  pressure_weighted_accumulated_eastward_mass_flux                         |  Pa m+2            |  xyz  |  C   |                    |
-  MY             |  pressure_weighted_accumulated_northward_mass_flux                        |  Pa m+2            |  xyz  |  C   |                    |
-  MFX            |  pressure_weighted_accumulated_eastward_mass_flux                         |  Pa m+2            |  xyz  |  C   |                    |  R8
-  MFY            |  pressure_weighted_accumulated_northward_mass_flux                        |  Pa m+2            |  xyz  |  C   |                    |  R8
-  MFZ            |  vertical_mass_flux                                                       |  kg m-2 s-1        |  xyz  |  E   |                    |  R8
-  MZ             |  vertical_mass_flux                                                       |  kg m-2 s-1        |  xyz  |  E   |                    |  R4
-  PV             |  ertels_isentropic_potential_vorticity                                    |  m+2 kg-1 s-1      |  xyz  |  C   |                    |
-  EPV            |  ertels_potential_vorticity                                               |  K m+2 kg-1 s-1    |  xyz  |  C   |                    |
-  Q              |  specific_humidity                                                        |  1                 |  xyz  |  C   |                    |
-  QC             |  specific_mass_of_condensate                                              |  1                 |  xyz  |  C   |                    |
-# DUDTSUBZ       |  tendency_of_eastward_wind_due_to_subgrid_dz                              |  m/s/s             |  xyz  |  C   |  MAPL_VectorField  |
-# DVDTSUBZ       |  tendency_of_northward_wind_due_to_subgrid_dz                             |  m/s/s             |  xyz  |  C   |  MAPL_VectorField  |
-# DTDTSUBZ       |  tendency_of_air_temperature_due_to_subgrid_dz                            |  K s-1             |  xyz  |  C   |                    |
-# DWDTSUBZ       |  tendency_of_vertical_velocity_due_to_subgrid_dz                          |  m/s/s             |  xyz  |  C   |                    |
-  DTDT_RAY       |  air_temperature_tendency_due_to_Rayleigh_friction                        |  K s-1             |  xyz  |  C   |                    |
-  DUDT_RAY       |  tendency_of_eastward_wind_due_to_Rayleigh_friction                       |  m s-2             |  xyz  |  C   |  MAPL_VectorField  |
-  DVDT_RAY       |  tendency_of_northward_wind_due_to_Rayleigh_friction                      |  m s-2             |  xyz  |  C   |  MAPL_VectorField  |
-  DWDT_RAY       |  vertical_velocity_tendency_due_to_Rayleigh_friction                      |  m/s/s             |  xyz  |  C   |                    |
-#
-# DUDTANA        |  tendency_of_eastward_wind_due_to_analysis                                |  m/s/s             |  xyz  |  C   |  MAPL_VectorField  |
-# DVDTANA        |  tendency_of_northward_wind_due_to_analysis                               |  m/s/s             |  xyz  |  C   |  MAPL_VectorField  |
-#
-  DTDTANA        |  tendency_of_air_temperature_due_to_analysis                              |  K s-1             |  xyz  |  C   |                    |
-  DDELPDTANA     |  tendency_of_pressure_thickness_due_to_analysis                           |  K s-1             |  xyz  |  C   |                    |
-  DUDTDYN        |  tendency_of_eastward_wind_due_to_dynamics                                |  m/s/s             |  xyz  |  C   |                    |
-  DVDTDYN        |  tendency_of_northward_wind_due_to_dynamics                               |  m/s/s             |  xyz  |  C   |                    |
-  DTDTDYN        |  tendency_of_air_temperature_due_to_dynamics                              |  K s-1             |  xyz  |  C   |                    |
-  DQVDTDYN       |  tendency_of_specific_humidity_due_to_dynamics                            |  kg/kg/s           |  xyz  |  C   |                    |
-  DQIDTDYN       |  tendency_of_ice_water_due_to_dynamics                                    |  kg/kg/s           |  xyz  |  C   |                    |
-  DQLDTDYN       |  tendency_of_liquid_water_due_to_dynamics                                 |  kg/kg/s           |  xyz  |  C   |                    |
-  DOXDTDYN       |  tendency_of_ozone_due_to_dynamics                                        |  mol mol-1 s-1     |  xyz  |  C   |                    |
-  PREF           |  reference_air_pressure                                                   |  Pa                |    z  |  E   |                    |
-  PHIS           |  surface_height                                                           |  m                 |  xy   |  N   |                    |
-  PS             |  surface_pressure                                                         |  Pa                |  xy   |  N   |                    |
-  TA             |  surface_air_temperature                                                  |  K                 |  xy   |  N   |                    |
-  QA             |  surface_specific_humidity                                                |  1                 |  xy   |  N   |                    |
-#
-  US             |  surface_eastward_wind                                                    |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  VS             |  surface_northward_wind                                                   |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-#
-  SPEED          |  surface_wind_speed                                                       |  m s-1             |  xy   |  N   |                    |
-  WSPD_10M       |  wind_speed_at_10m                                                        |  m s-1             |  xy   |  N   |                    |
-  VVEL_UP_100_1000  | max_vertical_velocity_up_between_100_1000_hPa                          |  m s-1             |  xy   |  N   |                    |
-  VVEL_DN_100_1000  | max_vertical_velocity_down_between_100_1000_hPa                        |  m s-1             |  xy   |  N   |                    |
-  DZ             |  surface_layer_height                                                     |  m                 |  xy   |  N   |                    |
-  SLP            |  sea_level_pressure                                                       |  Pa                |  xy   |  N   |                    |
-  H1000          |  height_at_1000_mb                                                        |  m                 |  xy   |  N   |                    |
-  TROPP_EPV      |  tropopause_pressure_based_on_EPV_estimate                                |  Pa                |  xy   |  N   |                    |
-  TROPP_THERMAL  |  tropopause_pressure_based_on_thermal_estimate                            |  Pa                |  xy   |  N   |                    |
-  TROPP_BLENDED  |  tropopause_pressure_based_on_blended_estimate                            |  Pa                |  xy   |  N   |                    |
-  TROPK_BLENDED  |  tropopause_index_based_on_blended_estimate                               |  unitless          |  xy   |  N   |                    |
-  TROPT          |  tropopause_temperature_using_blended_TROPP_estimate                      |  K                 |  xy   |  N   |                    |
-  TROPQ          |  tropopause_specific_humidity_using_blended_TROPP_estimate                |  kg/kg             |  xy   |  N   |                    |
-  PLE0           |  pressure_at_layer_edges_before_dynamics                                  |  Pa                |  xyz  |  E   |                    |  R8
-  PLE1           |  pressure_at_layer_edges_after_dynamics                                   |  Pa                |  xyz  |  E   |                    |  R8
-  DELP           |  pressure_thickness                                                       |  Pa                |  xyz  |  C   |                    |
-  DELPTOP        |  pressure_thickness_at_model_top                                          |  Pa                |  xy   |  N   |                    |
-  U_AGRID        |  eastward_wind_on_A-Grid                                                  |  m s-1             |  xyz  |  C   |                    |
-  V_AGRID        |  northward_wind_on_A-Grid                                                 |  m s-1             |  xyz  |  C   |                    |
-  U_CGRID        |  eastward_wind_on_C-Grid                                                  |  m s-1             |  xyz  |  C   |                    |
-  V_CGRID        |  northward_wind_on_C-Grid                                                 |  m s-1             |  xyz  |  C   |                    |
-  U_DGRID        |  eastward_wind_on_native_D-Grid                                           |  m s-1             |  xyz  |  C   |                    |
-  V_DGRID        |  northward_wind_on_native_D-Grid                                          |  m s-1             |  xyz  |  C   |                    |
-  TV             |  air_virtual_temperature                                                  |  K                 |  xyz  |  C   |                    |
-  THV            |  scaled_virtual_potential_temperature                                     |  K/Pa$^\kappa$     |  xyz  |  C   |                    |
-  DPLEDTDYN      |  tendency_of_edge_pressure_due_to_dynamics                                |  Pa s-1            |  xyz  |  C   |                    |
-  DDELPDTDYN     |  tendency_of_pressure_thickness_due_to_dynamics                           |  Pa s-1            |  xyz  |  C   |                    |
-#
-# UKE            |  eastward_flux_of_atmospheric_kinetic_energy                              |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
-# VKE            |  northward_flux_of_atmospheric_kinetic_energy                             |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
-#
-  UCPT           |  eastward_flux_of_atmospheric_enthalpy                                    |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
-  VCPT           |  northward_flux_of_atmospheric_enthalpy                                   |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
-#
-# UPHI           |  eastward_flux_of_atmospheric_potential_energy                            |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
-# VPHI           |  northward_flux_of_atmospheric_potential_energy                           |  J m-1 s-1         |  xy   |  N   |  MAPL_VectorField  |
-#
-# UQV            |  eastward_flux_of_atmospheric_water_vapor                                 |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
-# VQV            |  northward_flux_of_atmospheric_water_vapor                                |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
-#
-  UQL            |  eastward_flux_of_atmospheric_liquid_water                                |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
-  VQL            |  northward_flux_of_atmospheric_liquid_water                               |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
-#
-  UQI            |  eastward_flux_of_atmospheric_ice                                         |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
-  VQI            |  northward_flux_of_atmospheric_ice                                        |  kg m-1 s-1        |  xy   |  N   |  MAPL_VectorField  |
-#
-  DKE            |  tendency_of_atmosphere_kinetic_energy_content_due_to_dynamics            |  W m-2             |  xy   |  N   |                    |
-  DCPT           |  tendency_of_atmosphere_dry_energy_content_due_to_dynamics                |  W m-2             |  xy   |  N   |                    |
-  DPET           |  tendency_of_atmosphere_topographic_potential_energy_due_to_dynamics      |  W m-2             |  xy   |  N   |                    |
-  WRKT           |  work_done_by_atmosphere_at_top                                           |  W m-2             |  xy   |  N   |                    |
-  DQV            |  tendency_of_atmosphere_water_vapor_content_due_to_dynamics               |  kg m-2 s-1        |  xy   |  N   |                    |
-  DQL            |  tendency_of_atmosphere_liquid_water_content_due_to_dynamics              |  kg m-2 s-1        |  xy   |  N   |                    |
-  DQI            |  tendency_of_atmosphere_ice_content_due_to_dynamics                       |  kg m-2 s-1        |  xy   |  N   |                    |
-  CNV            |  generation_of_atmosphere_kinetic_energy_content                          |  W m-2             |  xy   |  N   |                    |
-  UH25           |  updraft_helicity_2_to_5_km                                               |  m+2 s-2           |  xy   |  N   |                    |
-  UH03           |  updraft_helicity_0_to_3_km                                               |  m+2 s-2           |  xy   |  N   |                    |
-  SRH01          |  storm_relative_helicity_0_to_1_km                                        |  m+2 s-2           |  xy   |  N   |                    |
-  SRH03          |  storm_relative_helicity_0_to_3_km                                        |  m+2 s-2           |  xy   |  N   |                    |
-  SRH25          |  storm_relative_helicity_2_to_5_km                                        |  m+2 s-2           |  xy   |  N   |                    |
-  SHR06          |  wind_shear_0_to_6_km                                                     |  m s-1             |  xy   |  N   |                    |
-  VORT           |  vorticity_at_mid_layer_heights                                           |  s-1               |  xyz  |  C   |                    |
-  VORT850        |  vorticity_at_850_hPa                                                     |  s-1               |  xy   |  N   |                    |
-  VORT700        |  vorticity_at_700_hPa                                                     |  s-1               |  xy   |  N   |                    |
-  VORT500        |  vorticity_at_500_hPa                                                     |  s-1               |  xy   |  N   |                    |
-  VORT200        |  vorticity_at_200_hPa                                                     |  s-1               |  xy   |  N   |                    |
-  DIVG           |  divergence_at_mid_layer_heights                                          |  s-1               |  xyz  |  C   |                    |
-  DIVG850        |  divergence_at_850_hPa                                                    |  s-1               |  xy   |  N   |                    |
-  DIVG700        |  divergence_at_700_hPa                                                    |  s-1               |  xy   |  N   |                    |
-  DIVG500        |  divergence_at_500_hPa                                                    |  s-1               |  xy   |  N   |                    |
-  DIVG200        |  divergence_at_200_hPa                                                    |  s-1               |  xy   |  N   |                    |
-#
-  U850           |  eastward_wind_at_850_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V850           |  northward_wind_at_850_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  T850           |  air_temperature_at_850_hPa                                               |  K                 |  xy   |  N   |                    |
-  Q850           |  specific_humidity_at_850_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
-#
-  U700           |  eastward_wind_at_700_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V700           |  northward_wind_at_700_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  T700           |  air_temperature_at_700_hPa                                               |  K                 |  xy   |  N   |                    |
-  Q700           |  specific_humidity_at_700_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
-#
-  U500           |  eastward_wind_at_500_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V500           |  northward_wind_at_500_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  T500           |  air_temperature_at_500_hPa                                               |  K                 |  xy   |  N   |                    |
-  Q500           |  specific_humidity_at_500_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
-#
-  U300           |  eastward_wind_at_300_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V300           |  northward_wind_at_300_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  T300           |  air_temperature_at_300_hPa                                               |  K                 |  xy   |  N   |                    |
-  Q300           |  specific_humidity_at_300_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
-#
-  U250           |  eastward_wind_at_250_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V250           |  northward_wind_at_250_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  T250           |  air_temperature_at_250_hPa                                               |  K                 |  xy   |  N   |                    |
-  Q250           |  specific_humidity_at_250_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
-#
-  U200           |  eastward_wind_at_200_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V200           |  northward_wind_at_200_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  T200           |  air_temperature_at_200_hPa                                               |  K                 |  xy   |  N   |                    |
-  Q200           |  specific_humidity_at_200_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
-#
-  U100           |  eastward_wind_at_100_hPa                                                 |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V100           |  northward_wind_at_100_hPa                                                |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  T100           |  air_temperature_at_100_hPa                                               |  K                 |  xy   |  N   |                    |
-  Q100           |  specific_humidity_at_100_hPa                                             |  kg kg-1           |  xy   |  N   |                    |
-#
-  UTOP           |  eastward_wind_at_model_top                                               |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  VTOP           |  northward_wind_at_model_top                                              |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  TTOP           |  air_temperature_at_model_top                                             |  K                 |  xy   |  N   |                    |
-#
-  Z700           |  geopotential_height_at_700_hPa                                           |  m                 |  xy   |  N   |                    |
-  Z500           |  geopotential_height_at_500_hPa                                           |  m                 |  xy   |  N   |                    |
-  Z300           |  geopotential_height_at_300_hPa                                           |  m                 |  xy   |  N   |                    |
-  H850           |  height_at_850_hPa                                                        |  m                 |  xy   |  N   |                    |
-  H700           |  height_at_700_hPa                                                        |  m                 |  xy   |  N   |                    |
-  H500           |  height_at_500_hPa                                                        |  m                 |  xy   |  N   |                    |
-  H300           |  height_at_300_hPa                                                        |  m                 |  xy   |  N   |                    |
-  H250           |  height_at_250_hPa                                                        |  m                 |  xy   |  N   |                    |
-  H200           |  height_at_200_hPa                                                        |  m                 |  xy   |  N   |                    |
-  H100           |  height_at_100_hPa                                                        |  m                 |  xy   |  N   |                    |
-  OMEGA850       |  omega_at_850_hPa                                                         |  Pa s-1            |  xy   |  N   |                    |
-  OMEGA700       |  omega_at_700_hPa                                                         |  Pa s-1            |  xy   |  N   |                    |
-  OMEGA500       |  omega_at_500_hPa                                                         |  Pa s-1            |  xy   |  N   |                    |
-  OMEGA200       |  omega_at_200_hPa                                                         |  Pa s-1            |  xy   |  N   |                    |
-  OMEGA10        |  omega_at_10_hPa                                                          |  Pa s-1            |  xy   |  N   |                    |
-  W850           |  w_at_850_hPa                                                             |  m s-1             |  xy   |  N   |                    |
-  W500           |  w_at_500_hPa                                                             |  m s-1             |  xy   |  N   |                    |
-  W200           |  w_at_200_hPa                                                             |  m s-1             |  xy   |  N   |                    |
-  W10            |  w_at_10_hPa                                                              |  m s-1             |  xy   |  N   |                    |
-#
-  U50M           |  eastward_wind_at_50_meters                                               |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-  V50M           |  northward_wind_at_50_meters                                              |  m s-1             |  xy   |  N   |  MAPL_VectorField  |
-#
-  DXC            |  cgrid_delta_x                                                            |  m                 |  xy   |  N   |                    |
-  DYC            |  cgrid_delta_y                                                            |  m                 |  xy   |  N   |                    |
-  AREA           |  agrid_cell_area                                                          |  m+2               |  xy   |  N   |                    |
-  PT             |  scaled_potential_temperature                                             |  K Pa$^{-\kappa}$  |  xyz  |  C   |                    |
-  PE             |  air_pressure                                                             |  Pa                |  xyz  |  E   |                    |
-  LONS           |  Center_longitudes                                                        |  radians           |  xy   |  N   |                    |
-  LATS           |  Center_latitudes                                                         |  radians           |  xy   |  N   |                    |
-  TIME_IN_DYN    |  timer_for_main_dynamics_run                                              |  seconds           |  xy   |  N   |                    |
-  PID            |  process_id                                                               |  1                 |  xy   |  N   |                    |
-  QV_DYN_IN      |  spec_humidity_at_begin_of_time_step                                      |  kg kg-1           |  xyz  |  C   |                    |
-  T_DYN_IN       |  temperature_at_begin_of_time_step                                        |  K                 |  xyz  |  C   |                    |
-  U_DYN_IN       |  u_wind_at_begin_of_time_step                                             |  m s-1             |  xyz  |  C   |                    |
-  V_DYN_IN       |  v_wind_at_begin_of_time_step                                             |  m s-1             |  xyz  |  C   |                    |
-  PLE_DYN_IN     |  edge_pressure_at_begin_of_time_step                                      |  Pa                |  xyz  |  E   |                    |
-  PLE4           | blah_blah_blah                                                            | Pa                 |  xyz  |  E   |                    |
+#------------------------------------------------------------------------------------
+  SHORT_NAME     | UNITS            | DIMS | VLOC | itemtype  | TYPEKIND | LONG_NAME
+#------------------------------------------------------------------------------------
+  KE             | J m-2            | xy   |  N   |           |          | vertically_integrated_kinetic_energy
+  TAVE           | K                | xy   |  N   |           |          | vertically_averaged_dry_temperature
+  UAVE           | m sec-1          | xy   |  N   |           |          | vertically_averaged_zonal_wind
+  KEPHY          | W m-2            | xy   |  N   |           |          | vertically_integrated_kinetic_energy_tendency_due_to_physics
+  PEPHY          | W m-2            | xy   |  N   |           |          | total_potential_energy_tendency_due_to_physics
+  TEPHY          | W m-2            | xy   |  N   |           |          | mountain_work_tendency_due_to_physics
+  KEANA          | W m-2            | xy   |  N   |           |          | total_kinetic_energy_tendency_due_to_analysis
+  PEANA          | W m-2            | xy   |  N   |           |          | total_potential_energy_tendency_due_to_analysis
+  TEANA          | W m-2            | xy   |  N   |           |          | mountain_work_tendency_due_to_analysis
+  KEHOT          | W m-2            | xy   |  N   |           |          | vertically_integrated_kinetic_energy_tendency_due_to_HOT
+  KEDP           | W m-2            | xy   |  N   |           |          | vertically_integrated_kinetic_energy_tendency_due_to_pressure_change
+  KEADV          | W m-2            | xy   |  N   |           |          | vertically_integrated_kinetic_energy_tendency_due_to_dynamics_advection
+  KEPG           | W m-2            | xy   |  N   |           |          | vertically_integrated_kinetic_energy_tendency_due_to_pressure_gradient
+  KEDYN          | W m-2            | xy   |  N   |           |          | vertically_integrated_kinetic_energy_tendency_due_to_dynamics
+  PEDYN          | W m-2            | xy   |  N   |           |          | vertically_integrated_potential_energy_tendency_due_to_dynamics
+  TEDYN          | W m-2            | xy   |  N   |           |          | mountain_work_tendency_due_to_dynamics
+  KECDCOR        | W m-2            | xy   |  N   |           |          | vertically_integrated_kinetic_energy_tendency_due_to_cdcore
+  PECDCOR        | W m-2            | xy   |  N   |           |          | vertically_integrated_potential_energy_tendency_due_to_cdcore
+  TECDCOR        | W m-2            | xy   |  N   |           |          | mountain_work_tendency_due_to_cdcore
+  QFIXER         | W m-2            | xy   |  N   |           |          | vertically_integrated_potential_energy_tendency_due_to_CONSV
+  KEREMAP        | W m-2            | xy   |  N   |           |          | vertically_integrated_kinetic_energy_tendency_due_to_remap
+  PEREMAP        | W m-2            | xy   |  N   |           |          | vertically_integrated_potential_energy_tendency_due_to_remap
+  TEREMAP        | W m-2            | xy   |  N   |           |          | mountain_work_tendency_due_to_remap
+  KEGEN          | W m-2            | xy   |  N   |           |          | vertically_integrated_generation_of_kinetic_energy
+  DKERESIN       | W m-2            | xy   |  N   |           |          | vertically_integrated_kinetic_energy_residual_from_inertial_terms
+  DKERESPG       | W m-2            | xy   |  N   |           |          | vertically_integrated_kinetic_energy_residual_from_PG_terms
+  DMDTANA        | kg m-2 s-1       | xy   |  N   |           |          | vertically_integrated_mass_tendency_due_to_analysis
+  DOXDTANAINT    | kg m-2 s-1       | xy   |  N   |           |          | vertically_integrated_ozone_tendency_due_to_analysis
+  DQVDTANAINT    | kg m-2 s-1       | xy   |  N   |           |          | vertically_integrated_water_vapor_tendency_due_to_analysis
+  DQLDTANAINT    | kg m-2 s-1       | xy   |  N   |           |          | vertically_integrated_liquid_water_tendency_due_to_analysis
+  DQIDTANAINT    | kg m-2 s-1       | xy   |  N   |           |          | vertically_integrated_ice_water_tendency_due_to_analysis
+  DMDTDYN        | kg m-2 s-1       | xy   |  N   |           |          | vertically_integrated_mass_tendency_due_to_dynamics
+  DOXDTDYNINT    | kg m-2 s-1       | xy   |  N   |           |          | vertically_integrated_ozone_tendency_due_to_dynamics
+  DTHVDTDYNINT   | K kg m-2 s-1     | xy   |  N   |           |          | vertically_integrated_THV_tendency_due_to_dynamics
+  DTHVDTREMAP    | K kg m-2 s-1     | xy   |  N   |           |          | vertically_integrated_THV_tendency_due_to_vertical_remapping
+  DTHVDTCONSV    | K kg m-2 s-1     | xy   |  N   |           |          | vertically_integrated_THV_tendency_due_to_TE_conservation
+  DTHVDTPHYINT   | K kg m-2 s-1     | xy   |  N   |           |          | vertically_integrated_THV_tendency_due_to_physics
+  DTHVDTANAINT   | K kg m-2 s-1     | xy   |  N   |           |          | vertically_integrated_THV_tendency_due_to_analysis
+  DQVDTDYNINT    | kg m-2 s-1       | xy   |  N   |           |          | vertically_integrated_water_vapor_tendency_due_to_dynamics
+  DQLDTDYNINT    | kg m-2 s-1       | xy   |  N   |           |          | vertically_integrated_liquid_water_tendency_due_to_dynamics
+  DQIDTDYNINT    | kg m-2 s-1       | xy   |  N   |           |          | vertically_integrated_ice_water_tendency_due_to_dynamics
+  CONVKE         | W m-2            | xy   |  N   |           |          | vertically_integrated_kinetic_energy_convergence
+  CONVTHV        | W m-2            | xy   |  N   |           |          | vertically_integrated_thetav_convergence
+  CONVCPT        | W m-2            | xy   |  N   |           |          | vertically_integrated_enthalpy_convergence
+  CONVPHI        | W m-2            | xy   |  N   |           |          | vertically_integrated_geopotential_convergence
+  UV             | m s-1            | xyz  |  C   | V         |          | (eastward,northward)_wind
+  T              | K                | xyz  |  C   |           |          | air_temperature
+  PL             | Pa               | xyz  |  C   |           |          | mid_level_pressure
+  ZLE0           | m                | xyz  |  E   |           |          | edge_heights_above_surface
+  ZL0            | m                | xyz  |  C   |           |          | mid_layer_heights_above_surface
+  ZLE            | m                | xyz  |  E   |           |          | edge_heights
+  ZL             | m                | xyz  |  C   |           |          | mid_layer_heights
+  S              | m                | xyz  |  C   |           |          | mid_layer_dry_static_energy
+  TH             | K                | xyz  |  C   |           |          | potential_temperature
+  PLK            | Pa$^\kappa$      | xyz  |  C   |           |          | mid-layer_p$^\kappa$
+  PKE            | Pa$^\kappa$      | xyz  |  E   |           |          | edge_p$^\kappa$
+  DELZ           | m s-1            | xyz  |  C   |           |          | nonhydrostatic_layer_thickness
+  W              | m s-1            | xyz  |  C   |           |          | vertical_velocity
+  OMEGA          | Pa s-1           | xyz  |  C   |           |          | hydrostatic_vertical_pressure_velocity
+  CX             | 1                | xyz  |  C   |           | R8       | eastward_accumulated_courant_number
+  CY             | 1                | xyz  |  C   |           | R8       | northward_accumulated_courant_number
+  CU             | 1                | xyz  |  C   |           |          | eastward_accumulated_courant_number
+  CV             | 1                | xyz  |  C   |           |          | northward_accumulated_courant_number
+  MX             | Pa m+2           | xyz  |  C   |           |          | pressure_weighted_accumulated_eastward_mass_flux
+  MY             | Pa m+2           | xyz  |  C   |           |          | pressure_weighted_accumulated_northward_mass_flux
+  MFX            | Pa m+2           | xyz  |  C   |           | R8       | pressure_weighted_accumulated_eastward_mass_flux
+  MFY            | Pa m+2           | xyz  |  C   |           | R8       | pressure_weighted_accumulated_northward_mass_flux
+  MFZ            | kg m-2 s-1       | xyz  |  E   |           | R8       | vertical_mass_flux
+  MZ             | kg m-2 s-1       | xyz  |  E   |           | R4       | vertical_mass_flux
+  PV             | m+2 kg-1 s-1     | xyz  |  C   |           |          | ertels_isentropic_potential_vorticity
+  EPV            | K m+2 kg-1 s-1   | xyz  |  C   |           |          | ertels_potential_vorticity
+  Q              | 1                | xyz  |  C   |           |          | specific_humidity
+  QC             | 1                | xyz  |  C   |           |          | specific_mass_of_condensate
+# DUDTSUBZ       | m/s/s            | xyz  |  C   |           |          | tendency_of_eastward_wind_due_to_subgrid_dz
+# DVDTSUBZ       | m/s/s            | xyz  |  C   |           |          | tendency_of_northward_wind_due_to_subgrid_dz
+# DTDTSUBZ       | K s-1            | xyz  |  C   |           |          | tendency_of_air_temperature_due_to_subgrid_dz
+# DWDTSUBZ       | m/s/s            | xyz  |  C   |           |          | tendency_of_vertical_velocity_due_to_subgrid_dz
+  DTDT_RAY       | K s-1            | xyz  |  C   |           |          | air_temperature_tendency_due_to_Rayleigh_friction
+  D_UV_DT_RAY    | m s-2            | xyz  |  C   | V         |          | tendency_of_(eastward,northward)_wind_due_to_Rayleigh_friction
+  DWDT_RAY       | m/s/s            | xyz  |  C   |           |          | vertical_velocity_tendency_due_to_Rayleigh_friction
+  D_UV_DTANA     | m/s/s            | xyz  |  C   | V         |          | tendency_of_(eastward,northward)_wind_due_to_analysis
+  DTDTANA        | K s-1            | xyz  |  C   |           |          | tendency_of_air_temperature_due_to_analysis
+  DDELPDTANA     | K s-1            | xyz  |  C   |           |          | tendency_of_pressure_thickness_due_to_analysis
+  DUDTDYN        | m/s/s            | xyz  |  C   |           |          | tendency_of_eastward_wind_due_to_dynamics
+  DVDTDYN        | m/s/s            | xyz  |  C   |           |          | tendency_of_northward_wind_due_to_dynamics
+  DTDTDYN        | K s-1            | xyz  |  C   |           |          | tendency_of_air_temperature_due_to_dynamics
+  DQVDTDYN       | kg/kg/s          | xyz  |  C   |           |          | tendency_of_specific_humidity_due_to_dynamics
+  DQIDTDYN       | kg/kg/s          | xyz  |  C   |           |          | tendency_of_ice_water_due_to_dynamics
+  DQLDTDYN       | kg/kg/s          | xyz  |  C   |           |          | tendency_of_liquid_water_due_to_dynamics
+  DOXDTDYN       | mol mol-1 s-1    | xyz  |  C   |           |          | tendency_of_ozone_due_to_dynamics
+  PREF           | Pa               |   z  |  E   |           |          | reference_air_pressure
+  PHIS           | m                | xy   |  N   |           |          | surface_height
+  PS             | Pa               | xy   |  N   |           |          | surface_pressure
+  TA             | K                | xy   |  N   |           |          | surface_air_temperature
+  QA             | 1                | xy   |  N   |           |          | surface_specific_humidity
+  UV_S           | m s-1            | xy   |  N   | V         |          | surface_(eastward,northward)_wind
+  SPEED          | m s-1            | xy   |  N   |           |          | surface_wind_speed
+  WSPD_10M       | m s-1            | xy   |  N   |           |          | wind_speed_at_10m
+VVEL_UP_100_1000 | m s-1            | xy   |  N   |           |          | max_vertical_velocity_up_between_100_1000_hPa
+VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          | max_vertical_velocity_down_between_100_1000_hPa
+  DZ             | m                | xy   |  N   |           |          | surface_layer_height
+  SLP            | Pa               | xy   |  N   |           |          | sea_level_pressure
+  H1000          | m                | xy   |  N   |           |          | height_at_1000_mb
+  TROPP_EPV      | Pa               | xy   |  N   |           |          | tropopause_pressure_based_on_EPV_estimate
+  TROPP_THERMAL  | Pa               | xy   |  N   |           |          | tropopause_pressure_based_on_thermal_estimate
+  TROPP_BLENDED  | Pa               | xy   |  N   |           |          | tropopause_pressure_based_on_blended_estimate
+  TROPK_BLENDED  | unitless         | xy   |  N   |           |          | tropopause_index_based_on_blended_estimate
+  TROPT          | K                | xy   |  N   |           |          | tropopause_temperature_using_blended_TROPP_estimate
+  TROPQ          | kg/kg            | xy   |  N   |           |          | tropopause_specific_humidity_using_blended_TROPP_estimate
+  PLE0           | Pa               | xyz  |  E   |           | R8       | pressure_at_layer_edges_before_dynamics
+  PLE1           | Pa               | xyz  |  E   |           | R8       | pressure_at_layer_edges_after_dynamics
+  DELP           | Pa               | xyz  |  C   |           |          | pressure_thickness
+  DELPTOP        | Pa               | xy   |  N   |           |          | pressure_thickness_at_model_top
+  UV_AGRID       | m s-1            | xyz  |  C   | V         |          | (eastward,northward)_wind_on_A-Grid
+  U_CGRID        | m s-1            | xyz  |  C   |           |          | x_wind_on_C-Grid
+  V_CGRID        | m s-1            | xyz  |  C   |           |          | y_wind_on_C-Grid
+  U_DGRID        | m s-1            | xyz  |  C   |           |          | x_wind_on_native_D-Grid
+  V_DGRID        | m s-1            | xyz  |  C   |           |          | y_wind_on_native_D-Grid
+  TV             | K                | xyz  |  C   |           |          | air_virtual_temperature
+  THV            | K/Pa$^\kappa$    | xyz  |  C   |           |          | scaled_virtual_potential_temperature
+  DPLEDTDYN      | Pa s-1           | xyz  |  E   |           |          | tendency_of_edge_pressure_due_to_dynamics
+  DDELPDTDYN     | Pa s-1           | xyz  |  C   |           |          | tendency_of_pressure_thickness_due_to_dynamics
+  UV_KE          | J m-1 s-1        | xy   |  N   | V         |          | (eastward,northward)_flux_of_atmospheric_kinetic_energy
+  UV_CPT         | J m-1 s-1        | xy   |  N   | V         |          | (eastward,northward)_flux_of_atmospheric_enthalpy
+  UV_PHI         | J m-1 s-1        | xy   |  N   | V         |          | (eastward,northward)_flux_of_atmospheric_potential_energy
+  UV_QV          | kg m-1 s-1       | xy   |  N   | V         |          | (eastward,northward)_flux_of_atmospheric_water_vapor
+  UV_QL          | kg m-1 s-1       | xy   |  N   | V         |          | (eastward,northward)_flux_of_atmospheric_liquid_water
+  UV_QI          | kg m-1 s-1       | xy   |  N   | V         |          | (eastward,northward)_flux_of_atmospheric_ice
+  DKE            | W m-2            | xy   |  N   |           |          | tendency_of_atmosphere_kinetic_energy_content_due_to_dynamics
+  DCPT           | W m-2            | xy   |  N   |           |          | tendency_of_atmosphere_dry_energy_content_due_to_dynamics
+  DPET           | W m-2            | xy   |  N   |           |          | tendency_of_atmosphere_topographic_potential_energy_due_to_dynamics
+  WRKT           | W m-2            | xy   |  N   |           |          | work_done_by_atmosphere_at_top
+  DQV            | kg m-2 s-1       | xy   |  N   |           |          | tendency_of_atmosphere_water_vapor_content_due_to_dynamics
+  DQL            | kg m-2 s-1       | xy   |  N   |           |          | tendency_of_atmosphere_liquid_water_content_due_to_dynamics
+  DQI            | kg m-2 s-1       | xy   |  N   |           |          | tendency_of_atmosphere_ice_content_due_to_dynamics
+  CNV            | W m-2            | xy   |  N   |           |          | generation_of_atmosphere_kinetic_energy_content
+  UH25           | m+2 s-2          | xy   |  N   |           |          | updraft_helicity_2_to_5_km
+  UH03           | m+2 s-2          | xy   |  N   |           |          | updraft_helicity_0_to_3_km
+  SRH01          | m+2 s-2          | xy   |  N   |           |          | storm_relative_helicity_0_to_1_km
+  SRH03          | m+2 s-2          | xy   |  N   |           |          | storm_relative_helicity_0_to_3_km
+  SRH25          | m+2 s-2          | xy   |  N   |           |          | storm_relative_helicity_2_to_5_km
+  SHR06          | m s-1            | xy   |  N   |           |          | wind_shear_0_to_6_km
+  VORT           | s-1              | xyz  |  C   |           |          | vorticity_at_mid_layer_heights
+  VORT850        | s-1              | xy   |  N   |           |          | vorticity_at_850_hPa
+  VORT700        | s-1              | xy   |  N   |           |          | vorticity_at_700_hPa
+  VORT500        | s-1              | xy   |  N   |           |          | vorticity_at_500_hPa
+  VORT200        | s-1              | xy   |  N   |           |          | vorticity_at_200_hPa
+  DIVG           | s-1              | xyz  |  C   |           |          | divergence_at_mid_layer_heights
+  DIVG850        | s-1              | xy   |  N   |           |          | divergence_at_850_hPa
+  DIVG700        | s-1              | xy   |  N   |           |          | divergence_at_700_hPa
+  DIVG500        | s-1              | xy   |  N   |           |          | divergence_at_500_hPa
+  DIVG200        | s-1              | xy   |  N   |           |          | divergence_at_200_hPa
+  UV_850         | m s-1            | xy   |  N   | V         |          | (eastward,northward)_wind_at_850_hPa
+  W850           | m s-1            | xy   |  N   |           |          | w_at_850_hPa
+  T850           | K                | xy   |  N   |           |          | air_temperature_at_850_hPa
+  Q850           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_850_hPa
+  OMEGA850       | Pa s-1           | xy   |  N   |           |          | omega_at_850_hPa
+  UV_700         | m s-1            | xy   |  N   | V         |          | (eastward,northward)_wind_at_700_hPa
+  T700           | K                | xy   |  N   |           |          | air_temperature_at_700_hPa
+  Q700           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_700_hPa
+  OMEGA700       | Pa s-1           | xy   |  N   |           |          | omega_at_700_hPa
+  UV_500         | m s-1            | xy   |  N   | V         |          | (eastward,northward)_wind_at_500_hPa
+  W500           | m s-1            | xy   |  N   |           |          | w_at_500_hPa
+  T500           | K                | xy   |  N   |           |          | air_temperature_at_500_hPa
+  Q500           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_500_hPa
+  OMEGA500       | Pa s-1           | xy   |  N   |           |          | omega_at_500_hPa
+  UV_300         | m s-1            | xy   |  N   | V         |          | (eastward,northward)_wind_at_300_hPa
+  T300           | K                | xy   |  N   |           |          | air_temperature_at_300_hPa
+  Q300           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_300_hPa
+  UV_250         | m s-1            | xy   |  N   | V         |          | (eastward,northward)_wind_at_250_hPa
+  T250           | K                | xy   |  N   |           |          | air_temperature_at_250_hPa
+  Q250           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_250_hPa
+  UV_200         | m s-1            | xy   |  N   | V         |          | (eastward,northward)_wind_at_200_hPa
+  W200           | m s-1            | xy   |  N   |           |          | w_at_200_hPa
+  T200           | K                | xy   |  N   |           |          | air_temperature_at_200_hPa
+  Q200           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_200_hPa
+  OMEGA200       | Pa s-1           | xy   |  N   |           |          | omega_at_200_hPa
+  UV_100         | m s-1            | xy   |  N   | V         |          | (eastward,northward)_wind_at_100_hPa
+  T100           | K                | xy   |  N   |           |          | air_temperature_at_100_hPa
+  Q100           | kg kg-1          | xy   |  N   |           |          | specific_humidity_at_100_hPa
+  UV_TOP         | m s-1            | xy   |  N   | V         |          | (eastward,northward)_wind_at_model_top
+  TTOP           | K                | xy   |  N   |           |          | air_temperature_at_model_top
+  Z700           | m                | xy   |  N   |           |          | geopotential_height_at_700_hPa
+  Z500           | m                | xy   |  N   |           |          | geopotential_height_at_500_hPa
+  Z300           | m                | xy   |  N   |           |          | geopotential_height_at_300_hPa
+  H850           | m                | xy   |  N   |           |          | height_at_850_hPa
+  H700           | m                | xy   |  N   |           |          | height_at_700_hPa
+  H500           | m                | xy   |  N   |           |          | height_at_500_hPa
+  H300           | m                | xy   |  N   |           |          | height_at_300_hPa
+  H250           | m                | xy   |  N   |           |          | height_at_250_hPa
+  H200           | m                | xy   |  N   |           |          | height_at_200_hPa
+  H100           | m                | xy   |  N   |           |          | height_at_100_hPa
+  OMEGA10        | Pa s-1           | xy   |  N   |           |          | omega_at_10_hPa
+  W10            | m s-1            | xy   |  N   |           |          | w_at_10_hPa
+  UV_50M         | m s-1            | xy   |  N   | V         |          | (eastward,northward)_wind_at_50_meters
+  DXC            | m                | xy   |  N   |           |          | cgrid_delta_x
+  DYC            | m                | xy   |  N   |           |          | cgrid_delta_y
+  AREA           | m+2              | xy   |  N   |           |          | agrid_cell_area
+  PT             | K Pa$^{-\kappa}$ | xyz  |  C   |           |          | scaled_potential_temperature
+  PE             | Pa               | xyz  |  E   |           |          | air_pressure
+  LONS           | radians          | xy   |  N   |           |          | Center_longitudes
+  LATS           | radians          | xy   |  N   |           |          | Center_latitudes
+  TIME_IN_DYN    | seconds          | xy   |  N   |           |          | timer_for_main_dynamics_run
+  PID            | 1                | xy   |  N   |           |          | process_id
+  QV_DYN_IN      | kg kg-1          | xyz  |  C   |           |          | spec_humidity_at_begin_of_time_step
+  T_DYN_IN       | K                | xyz  |  C   |           |          | temperature_at_begin_of_time_step
+  UV_DYN_IN      | m s-1            | xyz  |  C   | V         |          | (u, v)_wind_at_begin_of_time_step
+  PLE_DYN_IN     | Pa               | xyz  |  E   |           |          | edge_pressure_at_begin_of_time_step
+  PLE4           | Pa               | xyz  |  E   |           |          | pressure_at_layer_edges_r4
 
 
 category: IMPORT
-#------------------------------------------------------------------------------------------------------------------------------
- SHORT_NAME |  LONG_NAME                                          |   UNITS    |  DIMS |     FIELD_TYPE     | VLOC |  RESTART
-#------------------------------------------------------------------------------------------------------------------------------
-  DUDT      |  eastward_wind_tendency                             |  m s-2     |  xyz  |  MAPL_VectorField  |  C   |
-  DVDT      |  northward_wind_tendency                            |  m s-2     |  xyz  |  MAPL_VectorField  |  C   |
-  DWDT      |  vertical_velocity_tendency                         |  m s-2     |  xyz  |  MAPL_VectorField  |  C   |
-  DTDT      |  delta-p_weighted_temperature_tendency              |  Pa K s-1  |  xyz  |                    |  C   |
-  DQVANA    |  specific_humidity_increment_from_analysis          |  kg kg-1   |  xyz  |                    |  C   |
-  DQLANA    |  specific_humidity_liquid_increment_from_analysis   |  kg kg-1   |  xyz  |                    |  C   |
-  DQIANA    |  specific_humidity_ice_increment_from_analysis      |  kg kg-1   |  xyz  |                    |  C   |
-  DQRANA    |  specific_humidity_rain_increment_from_analysis     |  kg kg-1   |  xyz  |                    |  C   |
-  DQSANA    |  specific_humidity_snow_increment_from_analysis     |  kg kg-1   |  xyz  |                    |  C   |
-  DQGANA    |  specific_humidity_graupel_increment_from_analysis  |  kg kg-1   |  xyz  |                    |  C   |
-  DOXANA    |  ozone_increment_from_analysis                      |  kg kg-1   |  xyz  |                    |  C   |
-  DPEDT     |  edge_pressure_tendency                             |  Pa s-1    |  xyz  |                    |  E   |
-  PHIS      |  surface_geopotential_height                        |  m+2 s-2   |  xy   |                    |  N   |
-  VARFLT    |  variance_of_filtered_topography                    |  m+2       |  xy   |                    |  N   |  SKIP
+#----------------------------------------------------------------------
+ SHORT_NAME |  UNITS   | DIMS | StateItem | VLOC | RESTART | LONG_NAME
+#----------------------------------------------------------------------
+  D_UV_DT   | m s-2    | xyz  | V         |  C   |         | (eastward,northward)_wind_tendency
+  DWDT      | m s-2    | xyz  |           |  C   |         | vertical_velocity_tendency
+  DTDT      | Pa K s-1 | xyz  |           |  C   |         | delta-p_weighted_temperature_tendency
+  DQVANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_increment_from_analysis
+  DQLANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_liquid_increment_from_analysis
+  DQIANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_ice_increment_from_analysis
+  DQRANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_rain_increment_from_analysis
+  DQSANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_snow_increment_from_analysis
+  DQGANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_graupel_increment_from_analysis
+  DOXANA    | kg kg-1  | xyz  |           |  C   |         | ozone_increment_from_analysis
+  DPEDT     | Pa s-1   | xyz  |           |  E   |         | edge_pressure_tendency
+  PHIS      | m+2 s-2  | xy   |           |  N   |         | surface_geopotential_height
+  VARFLT    | m+2      | xy   |           |  N   | SKIP    | variance_of_filtered_topography
 
 
 category: INTERNAL
-#--------------------------------------------------------------------------------------------------------------------------------------
- SHORT_NAME |  LONG_NAME                     |  UNITS             |  TYPEKIND  |  DIMS |   RESTART  | VLOC | ADD2EXPORT | EXPORT_NAME
-#--------------------------------------------------------------------------------------------------------------------------------------
-  AK        |  hybrid_sigma_pressure_a       |  Pa                |  R8        |    z  |  REQUIRED  |  E   |    T       |
-  BK        |  hybrid_sigma_pressure_b       |  1                 |  R8        |    z  |  REQUIRED  |  E   |    T       |
-  W         |  vertical_velocity             |  m s-1             |  R8        |  xyz  |            |  C   |    F       |
-  PT        |  scaled_potential_temperature  |  K Pa$^{-\kappa}$  |  R8        |  xyz  |  REQUIRED  |  C   |    F       |
-  PE        |  air_pressure                  |  Pa                |  R8        |  xyz  |  REQUIRED  |  E   |    T       |    PLE
-  PKZ       |  pressure_to_kappa             |  Pa$^\kappa$       |  R8        |  xyz  |  REQUIRED  |  C   |    F       |
-  DZ        |  height_thickness              |  m                 |  R8        |  xyz  |            |  C   |    F       |
+#--------------------------------------------------------------------------------------------------------------------
+ SHORT_NAME | UNITS            | TYPEKIND | DIMS | RESTART  | VLOC | itemtype | ADD2EXPORT | EXPORT_NAME | LONG_NAME
+#--------------------------------------------------------------------------------------------------------------------
+  AK        | Pa               | R8       |   z  | REQUIRED |  E   |          | T          |             | hybrid_sigma_pressure_a
+  BK        | 1                | R8       |   z  | REQUIRED |  E   |          | T          |             | hybrid_sigma_pressure_b
+  U         | m s-1            | R8       | xyz  | REQUIRED |  C   |          | F          |             | x_wind
+  V         | m s-1            | R8       | xyz  | REQUIRED |  C   |          | F          |             | y_wind
+  W         | m s-1            | R8       | xyz  |          |  C   |          | F          |             | vertical_velocity
+  PT        | K Pa$^{-\kappa}$ | R8       | xyz  | REQUIRED |  C   |          | F          |             | scaled_potential_temperature
+  PE        | Pa               | R8       | xyz  | REQUIRED |  E   |          | T          | PLE         | air_pressure
+  PKZ       | Pa$^\kappa$      | R8       | xyz  | REQUIRED |  C   |          | F          |             | pressure_to_kappa
+  DZ        | m                | R8       | xyz  |          |  C   |          | F          |             | height_thickness

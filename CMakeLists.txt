@@ -117,8 +117,8 @@ else ()
   )
 endif ()
 
-mapl_acg (${this} DynCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS INTERNAL_SPECS 3g)
-mapl_acg (${this} AdvCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS GET_POINTERS DECLARE_POINTERS 3g)
+mapl_acg (${this} DynCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS INTERNAL_SPECS)
+mapl_acg (${this} AdvCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS GET_POINTERS DECLARE_POINTERS)
 
 if (FV_PRECISION STREQUAL R4)
   target_link_libraries (${this} PUBLIC FMS::fms_r4)
