@@ -401,7 +401,9 @@ contains
       type(ESMF_State) :: internal
       type(ESMF_FieldBundle) :: uv_exp
       real(kind=r4), pointer :: pref(:)
-      real(kind=r4), pointer :: u(:, :, :), v(:, :, :), t(:, :, :)
+      real(kind=r4), pointer :: u(:, :, :), v(:, :, :)
+      real(kind=r4), pointer :: t(:, :, :)
+
       real(kind=r4), pointer :: temp2d(:, :)
       real(kind=r8), pointer :: ak(:), bk(:)
       real(kind=r8), pointer :: ud(:, :, :), vd(:, :, :)
@@ -481,6 +483,9 @@ contains
       if (associated(temp2d)) temp2d = self%grid%area
 
       ! Replay shutoff alarm
+      ! Set the intermittent replay alarm, if needed.
+      ! Note that it is a non-sticky alarm and is set to ringing on first step
+      ! So it will work whether the clock is backed-up and ticked or not
       call MAPL_GridCompGetResource(gc, "REPLAY_SHUTOFF", replay_shutoff_seconds, default=-3600, _RC)
       call ESMF_TimeIntervalSet(replay_shutoff_interval, s=abs(replay_shutoff_seconds), _RC)
       replay_shutoff_alarm = ESMF_AlarmCreate( &
@@ -1430,7 +1435,6 @@ contains
       call FILLOUT3(export, "T_DYN_IN", tempxy, _RC)
       call FILLOUT3r8_VECTOR(export, "UV_DYN_IN", ur, vr, _RC)
       call FILLOUT3(export, "PLE_DYN_IN", vars%pe, _RC)
-      call FILLOUT3(export, "PLE4", vars%pe, _RC)
 
       ! Initialize 3-D Tracer Dynamics Tendencies
       call MAPL_StateGetPointer(export, dqldt, "DQLDTDYN", _RC)
@@ -1582,8 +1586,6 @@ contains
       pe0 = vars%pe
 
       call MAPL_GridCompTimerStop(gc, "DYN_PROLOGUE", _RC)
-
-      !-------------------------------------------------------
 
       call MAPL_GridCompTimerStart(gc, "DYN_CORE", _RC)
       t1 = MPI_Wtime(status)
@@ -1826,6 +1828,7 @@ contains
          call FILLOUT3(export, 'T', tempxy, _RC)
          call FILLOUT3(export, 'Q', qv, _RC)
          call FILLOUT3(export, 'PL', pl, _RC)
+         call FILLOUT3(export, 'PLE4', vars%pe, _RC)
          call FILLOUT3(export, 'PLK', plk, _RC)
          call FILLOUT3(export, 'PKE', pkxy, _RC)
          call FILLOUT3(export, 'PT', vars%pt, _RC)
@@ -3011,6 +3014,7 @@ contains
          call FILLOUT3(export, "T", tempxy, _RC)
          call FILLOUT3(export, "Q", qv, _RC)
          call FILLOUT3(export, "PL", pl, _RC)
+         call FILLOUT3(export, "PLE4", vars%pe, _RC)
          call FILLOUT3(export, "PLK", plk, _RC)
          call FILLOUT3(export, "PKE", pke, _RC)
          call FILLOUT3(export, "THV", thv, _RC)
@@ -5061,10 +5065,10 @@ contains
 
 end module FVdycoreCubed_GridComp
 
-subroutine SetServices(gc, rc)
+subroutine FVdycoreCubed_SetServices(gc, rc)
    use ESMF
    use FVdycoreCubed_GridComp, only : mySetservices => SetServices
    type(ESMF_GridComp) :: gc
    integer, intent(out) :: rc
    call mySetservices(gc, rc=rc)
-end subroutine SetServices
+end subroutine FVdycoreCubed_SetServices
