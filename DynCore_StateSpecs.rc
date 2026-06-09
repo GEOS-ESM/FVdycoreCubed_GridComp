@@ -213,26 +213,26 @@ VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          | max_v
   T_DYN_IN       | K                | xyz  |  C   |           |          | temperature_at_begin_of_time_step
   UV_DYN_IN      | m s-1            | xyz  |  C   | V         |          | (u, v)_wind_at_begin_of_time_step
   PLE_DYN_IN     | Pa               | xyz  |  E   |           |          | edge_pressure_at_begin_of_time_step
-  PLE4           | Pa               | xyz  |  E   |           |          | pressure_at_layer_edges_r4
+  PLE4           | Pa               | xyz  |  E   |           |          | edge_pressure
 
 
 category: IMPORT
-#----------------------------------------------------------------------
- SHORT_NAME |  UNITS   | DIMS | StateItem | VLOC | RESTART | LONG_NAME
-#----------------------------------------------------------------------
-  D_UV_DT   | m s-2    | xyz  | V         |  C   |         | (eastward,northward)_wind_tendency
-  DWDT      | m s-2    | xyz  |           |  C   |         | vertical_velocity_tendency
-  DTDT      | Pa K s-1 | xyz  |           |  C   |         | delta-p_weighted_temperature_tendency
-  DQVANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_increment_from_analysis
-  DQLANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_liquid_increment_from_analysis
-  DQIANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_ice_increment_from_analysis
-  DQRANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_rain_increment_from_analysis
-  DQSANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_snow_increment_from_analysis
-  DQGANA    | kg kg-1  | xyz  |           |  C   |         | specific_humidity_graupel_increment_from_analysis
-  DOXANA    | kg kg-1  | xyz  |           |  C   |         | ozone_increment_from_analysis
-  DPEDT     | Pa s-1   | xyz  |           |  E   |         | edge_pressure_tendency
-  PHIS      | m+2 s-2  | xy   |           |  N   |         | surface_geopotential_height
-  VARFLT    | m+2      | xy   |           |  N   | SKIP    | variance_of_filtered_topography
+#---------------------------------------------------------------------
+ SHORT_NAME |  UNITS   | DIMS | itemtype | VLOC | RESTART | LONG_NAME
+#---------------------------------------------------------------------
+  D_UV_DT   | m s-2    | xyz  | V        |  C   |         | (eastward,northward)_wind_tendency
+  DWDT      | m s-2    | xyz  |          |  C   |         | vertical_velocity_tendency
+  DTDT      | Pa K s-1 | xyz  |          |  C   |         | delta-p_weighted_temperature_tendency
+  DQVANA    | kg kg-1  | xyz  |          |  C   |         | specific_humidity_increment_from_analysis
+  DQLANA    | kg kg-1  | xyz  |          |  C   |         | specific_humidity_liquid_increment_from_analysis
+  DQIANA    | kg kg-1  | xyz  |          |  C   |         | specific_humidity_ice_increment_from_analysis
+  DQRANA    | kg kg-1  | xyz  |          |  C   |         | specific_humidity_rain_increment_from_analysis
+  DQSANA    | kg kg-1  | xyz  |          |  C   |         | specific_humidity_snow_increment_from_analysis
+  DQGANA    | kg kg-1  | xyz  |          |  C   |         | specific_humidity_graupel_increment_from_analysis
+  DOXANA    | kg kg-1  | xyz  |          |  C   |         | ozone_increment_from_analysis
+  DPEDT     | Pa s-1   | xyz  |          |  E   |         | edge_pressure_tendency
+  PHIS      | m+2 s-2  | xy   |          |  N   |         | surface_geopotential_height
+  VARFLT    | m+2      | xy   |          |  N   | SKIP    | variance_of_filtered_topography
 
 
 category: INTERNAL
