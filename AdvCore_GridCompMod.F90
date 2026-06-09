@@ -121,10 +121,6 @@ contains
            state_intent=ESMF_STATEINTENT_EXPORT, &
            short_name="TRADV", &
            standard_name="advected_quantities", &
-      ! TODO: pchakrab - we shouldn't need dims and vstagger for a bundle
-           dims="xyz", &
-           vstagger=VERTICAL_STAGGER_NONE, &
-           units="unknown", &
            itemtype=MAPL_STATEITEM_SERVICE, _RC)
 
       ! 3D Tracers, for diagnostics
@@ -136,7 +132,7 @@ contains
               standard_name=trim(my_tracer), &
               units='1', &
               dims="xyz", &
-              vstagger=VERTICAL_STAGGER_CENTER, _RC)
+              vertical_stagger=VERTICAL_STAGGER_CENTER, _RC)
       end do
 
       ! Register methods

@@ -340,10 +340,6 @@ contains
            state_intent=ESMF_STATEINTENT_EXPORT, &
            short_name='TRADV', &
            standard_name='advected_quantities', &
-      ! pchakrab: TODO - we shouldn't need dims and vstagger for a bundle
-           dims="xyz", &
-           vstagger=VERTICAL_STAGGER_NONE, &
-           units='unknown', &
            itemtype=MAPL_STATEITEM_SERVICE, _RC)
 
 #ifdef SKIP_TRACERS
