@@ -22,7 +22,7 @@ module FVdycoreCubed_GridComp
    use MAPL, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, MAPL_STATEITEM_VECTOR
    use MAPL, only: MAPL_UserCompSetInternalState, MAPL_UserCompGetInternalState
    use MAPL, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
-   use MAPL, only: VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE
+   use MAPL, only: MAPL_VERTICAL_STAGGER_NONE, MAPL_VERTICAL_STAGGER_CENTER, MAPL_VERTICAL_STAGGER_EDGE
    use MAPL, only: MAPL_GridGetCoordinates, MAPL_StateGetPointer, MAPL_FieldCreate, MAPL_FieldGet
    use MAPL, only: MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, MAPL_FieldBundleGetPointer
    use MAPL, only: MAPL_FieldBundleGet

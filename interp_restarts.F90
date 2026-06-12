@@ -55,8 +55,8 @@ program interp_restarts
    integer :: status
 
    integer :: nmoist
-   type(Netcdf4_Fileformatter) :: InFmt,OutFmt
-   type(FileMetadata), allocatable :: InCfg(:),OutCfg(:)
+   type(mapl_Netcdf4_Fileformatter) :: InFmt,OutFmt
+   type(mapl_FileMetadata), allocatable :: InCfg(:),OutCfg(:)
    integer :: nVars,imc,jmc
    character(62) :: vname
    type(StringVector) :: moist_variables,all_moist_vars
@@ -74,15 +74,15 @@ program interp_restarts
    type(ESMF_Geom) :: geom_in, geom_out
    logical :: in_hydrostatic, scale_rst
    character(len=:), pointer :: var_name
-   type(StringVariableMap), pointer :: variables
-   type(Variable), pointer :: myVariable
-   type(StringVariableMapIterator) :: var_iter
+   type(mapl_StringVariableMap), pointer :: variables
+   type(mapl_Variable), pointer :: myVariable
+   type(mapl_StringVariableMapIterator) :: var_iter
    type(StringVector), pointer :: var_dimensions
    character(len=:), pointer :: dname
    integer :: dim1,ndims
-   type(CubedSphereGeomSpec) :: cs_spec
-   type(MaplGeom), pointer :: mapl_geom_ptr
-   type(GeomManager), pointer :: geom_mgr
+   type(mapl_CubedSphereGeomSpec) :: cs_spec
+   type(mapl_MaplGeom), pointer :: mapl_geom_ptr
+   type(mapl_GeomManager), pointer :: geom_mgr
    real, allocatable :: schmidt_parameters_out(:)
    real, allocatable :: schmidt_parameters_in(:)
 
@@ -223,7 +223,7 @@ program interp_restarts
 
 ! Need to get input grid and ak/bk
    if( file_exist("fvcore_internal_restart_in") ) then
-      call InFmt%open("fvcore_internal_restart_in",pFIO_READ,rc=status)
+      call InFmt%open("fvcore_internal_restart_in",MAPL_PFIO_READ,rc=status)
       allocate(InCfg(1))
       InCfg(1) = InFmt%read()
       im = InCfg(1)%get_dimension('lon')
@@ -263,7 +263,7 @@ program interp_restarts
 
    nmoist  = 0
    if( file_exist("moist_internal_restart_in") ) then
-      call InFmt%open("moist_internal_restart_in",pFIO_READ,rc=status)
+      call InFmt%open("moist_internal_restart_in",MAPL_PFIO_READ,rc=status)
       allocate(InCfg(1))
       InCfg(1) = InFmt%read()
       call MAPL_IOCountLevels(InCfg(1),nmoist)
@@ -337,7 +337,7 @@ program interp_restarts
       if (file_exist(trim(extra_files(i)))) then
          rst_files(i)%file_name=trim(extra_files(i))
 
-         call InFmt%open(trim(extra_files(i)),pFIO_READ,rc=status)
+         call InFmt%open(trim(extra_files(i)),MAPL_PFIO_READ,rc=status)
          allocate(InCfg(1))
          InCfg(1) = InFmt%read()
          call MAPL_IOCountNonDimVars(InCfg(1),nVars)
@@ -410,23 +410,23 @@ program interp_restarts
 
 
 ! Input Geom
-   geom_mgr => get_geom_manager()
+   geom_mgr => mapl_get_geom_manager()
    if (allocated(schmidt_parameters_in)) then
-      cs_spec = CubedSphereGeomSpec( &
+      cs_spec = mapl_CubedSphereGeomSpec( &
            im_world=im, &
            schmidt_parameters=ESMF_CubedSphereTransform_Args( &
                 target_lon=dble(schmidt_parameters_in(1)), &
                 target_lat=dble(schmidt_parameters_in(2)), &
                 stretch_factor=dble(schmidt_parameters_in(3))), &
-           decomposition=CubedSphereDecomposition( &
+           decomposition=mapl_CubedSphereDecomposition( &
                 dims=[Atm_i(1)%layout(1), Atm_i(1)%layout(2)*6], &
                 topology=[Atm_i(1)%layout(1), Atm_i(1)%layout(2)]))
    else
-      cs_spec = CubedSphereGeomSpec( &
+      cs_spec = mapl_CubedSphereGeomSpec( &
            im_world=im, &
            schmidt_parameters=ESMF_CubedSphereTransform_Args( &
                 target_lon=0d0, target_lat=0d0, stretch_factor=1d0), &
-           decomposition=CubedSphereDecomposition( &
+           decomposition=mapl_CubedSphereDecomposition( &
                 dims=[Atm_i(1)%layout(1), Atm_i(1)%layout(2)*6], &
                 topology=[Atm_i(1)%layout(1), Atm_i(1)%layout(2)]))
    end if
@@ -448,21 +448,21 @@ program interp_restarts
 
 ! Output Geom
    if (allocated(schmidt_parameters_out)) then
-      cs_spec = CubedSphereGeomSpec( &
+      cs_spec = mapl_CubedSphereGeomSpec( &
            im_world=npx-1, &
            schmidt_parameters=ESMF_CubedSphereTransform_Args( &
                 target_lon=dble(schmidt_parameters_out(1)), &
                 target_lat=dble(schmidt_parameters_out(2)), &
                 stretch_factor=dble(schmidt_parameters_out(3))), &
-           decomposition=CubedSphereDecomposition( &
+           decomposition=mapl_CubedSphereDecomposition( &
                 dims=[Atm(1)%layout(1), Atm(1)%layout(2)*6], &
                 topology=[Atm(1)%layout(1), Atm(1)%layout(2)]))
    else
-      cs_spec = CubedSphereGeomSpec( &
+      cs_spec = mapl_CubedSphereGeomSpec( &
            im_world=npx-1, &
            schmidt_parameters=ESMF_CubedSphereTransform_Args( &
                 target_lon=0d0, target_lat=0d0, stretch_factor=1d0), &
-           decomposition=CubedSphereDecomposition( &
+           decomposition=mapl_CubedSphereDecomposition( &
                 dims=[Atm(1)%layout(1), Atm(1)%layout(2)*6], &
                 topology=[Atm(1)%layout(1), Atm(1)%layout(2)]))
    end if
@@ -502,7 +502,7 @@ program interp_restarts
       write(fname1, "('fvcore_internal_rst_c',i4.4,'_',i3.3,'L')") npx-1,npz
       if (is_master()) print*, 'Writing : ', TRIM(fname1)
 
-      call InFmt%open("fvcore_internal_restart_in",pFIO_READ,rc=status)
+      call InFmt%open("fvcore_internal_restart_in",MAPL_PFIO_READ,rc=status)
       allocate(InCfg(1),OutCfg(1))
       InCfg(1)=InFmt%read(rc=status)
       call MAPL_IOCountNonDimVars(InCfg(1),nVars)
@@ -615,7 +615,7 @@ program interp_restarts
          if (is_master()) print*, 'Writing : ', TRIM(fname1)
          imc = npx-1
          jmc = imc*6
-         call InFmt%open("moist_internal_restart_in",pFIO_READ,rc=status)
+         call InFmt%open("moist_internal_restart_in",MAPL_PFIO_READ,rc=status)
          allocate(InCfg(1),OutCfg(1))
          InCfg(1)=InFmt%read(rc=status)
          call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev'/),(/imc,jmc,npz/),rc=status)
@@ -697,7 +697,7 @@ program interp_restarts
          if (AmWriter) then
             imc = npx-1
             jmc = imc*6
-            call InFmt%open(trim(rst_files(ifile)%file_name),pFIO_READ,rc=status)
+            call InFmt%open(trim(rst_files(ifile)%file_name),MAPL_PFIO_READ,rc=status)
             allocate(InCfg(1),OutCfg(1))
             InCfg(1)=InFmt%read(rc=status)
 
@@ -789,7 +789,7 @@ contains
    end subroutine rs_count
 
    subroutine add_stretch_params(meta,stretch_parameters)
-      type(FileMetadata), intent(inout) :: meta
+      type(mapl_FileMetadata), intent(inout) :: meta
       real, intent(in) :: stretch_parameters(3)
 
       call meta%add_attribute('TARGET_LON',stretch_parameters(1))
@@ -799,7 +799,7 @@ contains
    end subroutine add_stretch_params
 
    subroutine reset_stretch_params(meta)
-      type(FileMetadata), intent(inout) :: meta
+      type(mapl_FileMetadata), intent(inout) :: meta
 
       logical :: has_attr
       has_attr = meta%has_attribute('TARGET_LON')
