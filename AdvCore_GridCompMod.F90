@@ -50,7 +50,7 @@ module AdvCore_GridCompMod
    !USES:
    use ESMF
    use MAPL, only: MAPL_GridCompAddSpec, MAPL_GridCompSetEntryPoint
-   use MAPL, only: VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_NONE, VERTICAL_STAGGER_EDGE
+   use MAPL, only: MAPL_VERTICAL_STAGGER_CENTER, MAPL_VERTICAL_STAGGER_NONE, MAPL_VERTICAL_STAGGER_EDGE
    use MAPL, only: MAPL_GridCompGetResource, MAPL_GridCompGet, MAPL_GridGet
    use MAPL, only: MAPL_GridCompSetGeometry
    use MAPL, only: MAPL_StateGetPointer
@@ -132,7 +132,7 @@ contains
               standard_name=trim(my_tracer), &
               units='1', &
               dims="xyz", &
-              vertical_stagger=VERTICAL_STAGGER_CENTER, _RC)
+              vertical_stagger=MAPL_VERTICAL_STAGGER_CENTER, _RC)
       end do
 
       ! Register methods

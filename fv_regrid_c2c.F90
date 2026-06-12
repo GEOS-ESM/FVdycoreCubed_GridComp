@@ -83,7 +83,7 @@ contains
       else
          allocate(input(0,0))
       end if
-      call ArrayScatter(local_array=output,global_array=input,grid=grid,_RC)
+      call mapl_ArrayScatter(local_array=output,global_array=input,grid=grid,_RC)
       _RETURN(_SUCCESS)
    end subroutine read_topo_file_r4
 
@@ -114,7 +114,7 @@ contains
       else
          allocate(input(0,0),input_r8(0,0))
       end if
-      call ArrayScatter(local_array=output,global_array=input_r8,grid=grid,_RC)
+      call mapl_ArrayScatter(local_array=output,global_array=input_r8,grid=grid,_RC)
       _RETURN(_SUCCESS)
    end subroutine read_topo_file_r8
 
@@ -184,8 +184,8 @@ contains
       real(FVPRC), allocatable :: sbuffer(:,:)
 
       integer            :: filetype
-      type(Netcdf4_Fileformatter) :: formatter
-      type(FileMetadata), allocatable :: cfg(:)
+      type(mapl_Netcdf4_Fileformatter) :: formatter
+      type(mapl_FileMetadata), allocatable :: cfg(:)
       integer            :: nDims, nVars, ivar, n_ungrid
       character(len=128) :: vname
       integer            :: lvar_cnt,ifile,nlev
@@ -193,8 +193,8 @@ contains
 
 !bma added
       character(len=:), pointer :: var_name
-      type(StringVariableMap), pointer :: variables
-      type(Variable), pointer :: myVariable
+      type(mapl_StringVariableMap), pointer :: variables
+      type(mapl_Variable), pointer :: myVariable
       type(StringVector) :: all_moist_vars
       type(StringVector), pointer :: var_dimensions
       type(StringVectorIterator) :: siter
@@ -204,15 +204,15 @@ contains
       character(len=:), pointer :: cptr
       type(StringIntegerMapIterator) :: iter
       type(ESMF_Grid) :: gridIn
-      class(Regridder), pointer :: regridder=>null()
-      type(RegridderManager), pointer :: regr_mgr
+      class(mapl_Regridder), pointer :: regridder=>null()
+      type(mapl_RegridderManager), pointer :: regr_mgr
 
 !--------------------------------------------------------------------!
 ! create ESMF regridder
 !--------------------------------------------------------------------!
-      regr_mgr => get_regridder_manager()
+      regr_mgr => mapl_get_regridder_manager()
       regridder => regr_mgr%get_regridder( &
-           RegridderSpec(generate_esmf_regrid_param(REGRID_METHOD_BILINEAR, ESMF_TYPEKIND_R4, rc=status), &
+           mapl_RegridderSpec(mapl_generate_esmf_regrid_param(MAPL_REGRID_METHOD_BILINEAR, ESMF_TYPEKIND_R4, rc=status), &
                          geom_in, geom_out), rc=status)
 
 !--------------------------------------------------------------------!
@@ -252,7 +252,7 @@ contains
       if( file_exist(fname) ) then
 
          allocate(cfg(1))
-         call formatter%open(fname,pFIO_READ,rc=status)
+         call formatter%open(fname,MAPL_PFIO_READ,rc=status)
          cfg(1) = formatter%read(rc=status)
          im =cfg(1)%get_dimension('lon',rc=status)
          jm =cfg(1)%get_dimension('lat',rc=status)
@@ -474,7 +474,7 @@ contains
 
             lvar_cnt = 0
             allocate(cfg(1))
-            call formatter%open("moist_internal_restart_in",pFIO_READ,rc=status)
+            call formatter%open("moist_internal_restart_in",MAPL_PFIO_READ,rc=status)
             cfg(1) = formatter%read(rc=status)
             all_moist_vars = MAPL_IOGetNonDimVars(cfg(1))
             siter = all_moist_vars%begin()
@@ -573,7 +573,7 @@ contains
             if (is_master()) print*, 'Regridding: ',trim(tracer_bundles(ifile)%file_name)
 
             allocate(cfg(1))
-            call formatter%open(trim(tracer_bundles(ifile)%file_name),pFIO_READ,rc=status)
+            call formatter%open(trim(tracer_bundles(ifile)%file_name),MAPL_PFIO_READ,rc=status)
             cfg(1) = formatter%read(rc=status)
             call MAPL_IOCountNonDimVars(cfg(1),nvars,rc=status)
 
@@ -971,7 +971,7 @@ end subroutine xyz_to_dgrid
 
     type(fv_atmos_type), intent(inout) :: Atm_i, Atm
 
-    class(Regridder), pointer :: regrdr
+    class(mapl_Regridder), pointer :: regrdr
 
     real(FVPRC), dimension(Atm_i%bd%isd:Atm_i%bd%ied  ,Atm_i%bd%jsd:Atm_i%bd%jed+1), intent(in) :: ui
     real(FVPRC), dimension(Atm_i%bd%isd:Atm_i%bd%ied+1,Atm_i%bd%jsd:Atm_i%bd%jed  ), intent(in) :: vi
