@@ -38,7 +38,7 @@ module FV_StateMod
 
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check, &
                                  get_vorticity, updraft_helicity, bunkers_vector, helicity_relative_CAPS
-#ifdef RUN_PYFV3
+#ifdef BUILD_PYFV3
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
    use pyfv3_interface_mod, only: pyfv3_interface_f_run
    use pyfv3_interface_mod, only: pyfv3_interface_f_init, pyfv3_interface_f_finalize, &
@@ -265,8 +265,8 @@ private
    real(REAL8), parameter ::  D180_0                  = 180.0
    real(REAL8), parameter ::  ratmax                  =  0.81
 
-#ifdef RUN_PYFV3
-   integer :: run_pyfv3 = 0
+#ifdef BUILD_PYFV3
+   logical :: USE_PYFV3 = .FALSE.
 #endif
 
 contains
@@ -758,9 +758,8 @@ contains
   call MAPL_MemUtilsWrite(VM, trim(Iam), RC=STATUS )
   VERIFY_(STATUS)
 
-#ifdef RUN_PYFV3
-  call MAPL_GetResource(MAPL, run_pyfv3, 'RUN_PYFV3:', default=0, RC=STATUS)
-  VERIFY_(STATUS)
+#ifdef BUILD_PYFV3
+  call MAPL_GetResource(MAPL, USE_PYFV3, 'USE_PYFV3:', default=.FALSE., RC=STATUS); VERIFY_(STATUS)
 #endif
 
   RETURN_(ESMF_SUCCESS)
@@ -1247,7 +1246,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   logical :: NWAT_TEST
 
-#ifdef RUN_PYFV3
+#ifdef BUILD_PYFV3
   type(ESMF_VM) :: vm
   integer :: comm, rank, mpierr
   real :: start, finish
@@ -1257,7 +1256,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
 ! Begin
 
-#ifdef RUN_PYFV3
+#ifdef BUILD_PYFV3
   call ESMF_VMGetCurrent(vm, rc=status) ! pchakrab: replace with ESMF_GridCompGet(gc, VM=VM, _RC)
   call ESMF_VMGet(vm, mpiCommunicator=comm)
   call MPI_Comm_rank(comm, rank, mpierr)
@@ -1386,8 +1385,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
      call echo_fv3_setup()
      ! Setup pyFV3 here since we need to know the exact nwat
      ! We can do this because this is trigger _only once_.
-#ifdef RUN_PYFV3
-     if (run_pyfv3 /= 0) then
+#ifdef BUILD_PYFV3
+     if (USE_PYFV3) then
       ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
       ! disable trapping of FPEs temporarily, call the Python interface and resume trapping
       call ieee_get_halting_mode(ieee_all, halting_mode)
@@ -2013,8 +2012,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     t_dt(:,:,:) = 0.0
     w_dt(:,:,:) = 0.0
 
-#ifdef RUN_PYFV3
-    if (run_pyfv3 == 0) then
+#ifdef BUILD_PYFV3
+    if (.not. USE_PYFV3) then
        call cpu_time(start)
 #endif
        call fv_dynamics( &
@@ -2035,7 +2034,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
             FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
             time_total)
-#ifdef RUN_PYFV3
+#ifdef BUILD_PYFV3
        call cpu_time(finish)
        if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
     else
@@ -2454,8 +2453,8 @@ end subroutine FV_Run
    !    call ESMF_GridDestroy  (STATE%GRID%GRID)
 #endif
 
-#ifdef RUN_PYFV3
-   if (run_pyfv3 /= 0) call pyfv3_interface_f_finalize()
+#ifdef BUILD_PYFV3
+   if (USE_PYFV3) call pyfv3_interface_f_finalize()
 #endif
 
  end subroutine FV_Finalize

@@ -32,7 +32,7 @@ if (BUILD_PYFV3_INTERFACE)
 
   message(STATUS "Building pyFV3 interface")
 
-  add_definitions(-DRUN_PYFV3)
+  add_definitions(-DBUILD_PYFV3)
   
   # The Python library creation requires mpiexec/mpirun to run on a
   # compute node. Probably a weird SLURM thing?
