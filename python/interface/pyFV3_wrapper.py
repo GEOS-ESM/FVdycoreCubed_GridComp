@@ -238,7 +238,7 @@ class GeosDycoreWrapper:
         )
         build_status = f"Build : {os.environ["FV3_DACEMODE"]}\n" if backend.is_orchestrated() and "FV3_DACEMODE" in os.environ else ""
         ndsl_log_on_rank_0.info(
-            "pyMoist <> GEOS wrapper initialized (Rank 0):\n"
+            "pyFV3 <> GEOS wrapper initialized (Rank 0):\n"
             f"     Memory space : {fortran_mem_space} <> {self._ndsl_mem_space}\n"
             f"          Backend : {backend}\n"
             f"            {build_status}"
@@ -366,32 +366,32 @@ class GeosDycoreWrapper:
         state = self.dycore_state
 
         # Assign compute domain:
-        safe_assign_array(state.u.view[:], u[isc:iec, jsc : jec + 1, :])
-        safe_assign_array(state.v.view[:], v[isc : iec + 1, jsc:jec, :])
-        safe_assign_array(state.w.view[:], w[isc:iec, jsc:jec, :])
-        safe_assign_array(state.ua.view[:], ua[isc:iec, jsc:jec, :])
-        safe_assign_array(state.va.view[:], va[isc:iec, jsc:jec, :])
-        safe_assign_array(state.uc.view[:], uc[isc : iec + 1, jsc:jec, :])
-        safe_assign_array(state.vc.view[:], vc[isc:iec, jsc : jec + 1, :])
+        safe_assign_array(state.u.field[:], u[isc:iec, jsc : jec + 1, :])
+        safe_assign_array(state.v.field[:], v[isc : iec + 1, jsc:jec, :])
+        safe_assign_array(state.w.field[:], w[isc:iec, jsc:jec, :])
+        safe_assign_array(state.ua.field[:], ua[isc:iec, jsc:jec, :])
+        safe_assign_array(state.va.field[:], va[isc:iec, jsc:jec, :])
+        safe_assign_array(state.uc.field[:], uc[isc : iec + 1, jsc:jec, :])
+        safe_assign_array(state.vc.field[:], vc[isc:iec, jsc : jec + 1, :])
 
-        safe_assign_array(state.delz.view[:], delz[isc:iec, jsc:jec, :])
-        safe_assign_array(state.pt.view[:], pt[isc:iec, jsc:jec, :])
-        safe_assign_array(state.delp.view[:], delp[isc:iec, jsc:jec, :])
+        safe_assign_array(state.delz.field[:], delz[isc:iec, jsc:jec, :])
+        safe_assign_array(state.pt.field[:], pt[isc:iec, jsc:jec, :])
+        safe_assign_array(state.delp.field[:], delp[isc:iec, jsc:jec, :])
 
-        safe_assign_array(state.mfxd.view[:], mfxd)
-        safe_assign_array(state.mfyd.view[:], mfyd)
-        safe_assign_array(state.cxd.view[:], cxd[:, jsc:jec, :])
-        safe_assign_array(state.cyd.view[:], cyd[isc:iec, :, :])
+        safe_assign_array(state.mfxd.field[:], mfxd)
+        safe_assign_array(state.mfyd.field[:], mfyd)
+        safe_assign_array(state.cxd.field[:], cxd[:, jsc:jec, :])
+        safe_assign_array(state.cyd.field[:], cyd[isc:iec, :, :])
 
-        safe_assign_array(state.ps.view[:], ps[isc:iec, jsc:jec])
-        safe_assign_array(state.pe.data[isc - 1 : iec + 1, jsc - 1 : jec + 1, :], pe)
-        safe_assign_array(state.pk.view[:], pk)
-        safe_assign_array(state.peln.view[:], peln)
-        safe_assign_array(state.pkz.view[:], pkz)
-        safe_assign_array(state.phis.view[:], phis[isc:iec, jsc:jec])
-        safe_assign_array(state.q_con.view[:], q_con[isc:iec, jsc:jec, :])
-        safe_assign_array(state.omga.view[:], omga[isc:iec, jsc:jec, :])
-        safe_assign_array(state.diss_estd.view[:], diss_estd[isc:iec, jsc:jec, :])
+        safe_assign_array(state.ps.field[:], ps[isc:iec, jsc:jec])
+        safe_assign_array(state.pe[isc - 1 : iec + 1, jsc - 1 : jec + 1, :], pe)
+        safe_assign_array(state.pk.field[:], pk)
+        safe_assign_array(state.peln.field[:], peln)
+        safe_assign_array(state.pkz.field[:], pkz)
+        safe_assign_array(state.phis.field[:], phis[isc:iec, jsc:jec])
+        safe_assign_array(state.q_con.field[:], q_con[isc:iec, jsc:jec, :])
+        safe_assign_array(state.omga.field[:], omga[isc:iec, jsc:jec, :])
+        safe_assign_array(state.diss_estd.field[:], diss_estd[isc:iec, jsc:jec, :])
 
         # tracer quantities should be a 4d array in order:
         # vapor, liquid, ice, rain, snow, graupel, cloud
