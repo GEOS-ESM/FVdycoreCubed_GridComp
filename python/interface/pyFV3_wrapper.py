@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import Dict, List, Tuple
 
 import numpy as np
-from gt4py.cartesian.config import build_settings as gt_build_settings
+from gt4py.cartesian.config import build_settings as gt_build_settings, GT4PY_COMPILE_OPT_LEVEL
 from mpi4py import MPI
 
 import pyfv3
@@ -29,7 +29,7 @@ from ndsl.comm.comm_abc import Comm
 from ndsl.dsl.dace.build import set_distributed_caches
 from ndsl.dsl.typing import get_precision
 from ndsl.grid import DampingCoefficients, GridData, MetricTerms
-from ndsl.logging import ndsl_log
+from ndsl.logging import ndsl_log, ndsl_log_on_rank_0
 from ndsl.optional_imports import cupy as cp
 from ndsl.utils import safe_assign_array
 from fv_flags import FVFlags, FVFlags_to_DycoreConfig
@@ -96,9 +96,14 @@ class StencilBackendCompilerOverride:
 
 @enum.unique
 class MemorySpace(enum.Enum):
-    HOST = 0
-    DEVICE = 1
+    CPU = 0
+    GPU = 1
 
+class InterfaceTransferType(enum.Enum):
+    CPU_COPY = enum.auto()  # Copies because of layout mismatch
+    CPU_ZERO_COPY = enum.auto()  # No copy - reuse the memory given (case of same layout)
+    GPU_TRANSFER = enum.auto()  # Upload from central RAM to device, then download
+    GPU_MAPPING = enum.auto()  # Paged memory mapped onto GPU memory space (HMM, ATS, ...)
 
 class GeosDycoreWrapper:
     """
@@ -116,7 +121,7 @@ class GeosDycoreWrapper:
         comm: Comm,
         backend: Backend,
         tracer_count: int,
-        fortran_mem_space: MemorySpace = MemorySpace.HOST,
+        fortran_mem_space: MemorySpace = MemorySpace.CPU,
     ):
         # pyfv3 support only 0 and 7 tracers run
         if fv_flags.nwat not in [6, 0]:
@@ -179,7 +184,6 @@ class GeosDycoreWrapper:
             tile_nx=self.dycore_config.npx,
             tile_nz=self.dycore_config.npz,
         )
-        self._is_orchestrated = stencil_config.dace_config.is_dace_orchestrated()
 
         # Orchestrate all code called from this function
         orchestrate(
@@ -218,10 +222,9 @@ class GeosDycoreWrapper:
             )
 
         self._fortran_mem_space = fortran_mem_space
-        self._pace_mem_space = MemorySpace.DEVICE if backend.is_gpu_backend() else MemorySpace.HOST
+        self._ndsl_mem_space = MemorySpace.GPU if backend.is_gpu_backend() else MemorySpace.CPU
 
-        self.output_dict: Dict[str, np.ndarray] = {}
-        self._allocate_output_dir()
+        self.output_dict = self._allocate_output_dir()
 
         # Feedback information
         device_ordinal_info = (
@@ -233,17 +236,19 @@ class GeosDycoreWrapper:
             and backend.is_gpu_backend()
             and os.path.exists(f"{MPS_pipe_directory}/log")
         )
-        ndsl_log.info(
-            "Pace GEOS wrapper initialized: \n"
-            f"             dt : {self.dycore_state.bdt}\n"
-            f"         bridge : {self._fortran_mem_space} > {self._pace_mem_space}\n"
-            f"        backend : {backend}\n"
-            f"          float : {get_precision()}bit"
-            f"  orchestration : {self._is_orchestrated}\n"
-            f"          sizer : {sizer.nx}x{sizer.ny}x{sizer.nz}"
+        build_status = f"Build : {os.environ["FV3_DACEMODE"]}\n" if backend.is_orchestrated() and "FV3_DACEMODE" in os.environ else ""
+        ndsl_log_on_rank_0.info(
+            "pyMoist <> GEOS wrapper initialized (Rank 0):\n"
+            f"     Memory space : {fortran_mem_space} <> {self._ndsl_mem_space}\n"
+            f"          Backend : {backend}\n"
+            f"            {build_status}"
+            f"        Precision : {get_precision()} bit\n"
+            f"     Optimization : -O{GT4PY_COMPILE_OPT_LEVEL}\n"
+            f"     Local domain : {sizer.nx}x{sizer.ny}x{sizer.nz}"
             f"(halo: {sizer.n_halo})\n"
-            f"     Device ord : {device_ordinal_info}\n"
-            f"     Nvidia MPS : {MPS_is_on}"
+            f"           Layout : {partitioner.layout}\n"
+            f"       Device ord : {device_ordinal_info}\n"
+            f"       Nvidia MPS : {MPS_is_on}\n"
         )
 
     def _critical_path(self):
@@ -256,7 +261,7 @@ class GeosDycoreWrapper:
 
     def __call__(
         self,
-        timings: Dict[str, List[float]],
+        timings: dict[str, list[float|int]],
         u: np.ndarray,
         v: np.ndarray,
         w: np.ndarray,
@@ -396,51 +401,51 @@ class GeosDycoreWrapper:
 
         return state
 
-    def _prep_outputs_for_geos(self) -> Dict[str, np.ndarray]:
+    def _prep_outputs_for_geos(self) -> dict[str, np.ndarray]:
         output_dict = self.output_dict
         isc = self._grid_indexing.isc
         jsc = self._grid_indexing.jsc
         iec = self._grid_indexing.iec + 1
         jec = self._grid_indexing.jec + 1
 
-        if self._fortran_mem_space != self._pace_mem_space:
-            safe_assign_array(output_dict["u"], self.dycore_state.u.data[:-1, :, :-1])
-            safe_assign_array(output_dict["v"], self.dycore_state.v.data[:, :-1, :-1])
-            safe_assign_array(output_dict["w"], self.dycore_state.w.data[:-1, :-1, :-1])
-            safe_assign_array(output_dict["ua"], self.dycore_state.ua.data[:-1, :-1, :-1])
-            safe_assign_array(output_dict["va"], self.dycore_state.va.data[:-1, :-1, :-1])
-            safe_assign_array(output_dict["uc"], self.dycore_state.uc.data[:, :-1, :-1])
-            safe_assign_array(output_dict["vc"], self.dycore_state.vc.data[:-1, :, :-1])
+        if self._fortran_mem_space != self._ndsl_mem_space:
+            safe_assign_array(output_dict["u"], self.dycore_state.u[:-1, :, :-1])
+            safe_assign_array(output_dict["v"], self.dycore_state.v[:, :-1, :-1])
+            safe_assign_array(output_dict["w"], self.dycore_state.w[:-1, :-1, :-1])
+            safe_assign_array(output_dict["ua"], self.dycore_state.ua[:-1, :-1, :-1])
+            safe_assign_array(output_dict["va"], self.dycore_state.va[:-1, :-1, :-1])
+            safe_assign_array(output_dict["uc"], self.dycore_state.uc[:, :-1, :-1])
+            safe_assign_array(output_dict["vc"], self.dycore_state.vc[:-1, :, :-1])
 
-            safe_assign_array(output_dict["delz"], self.dycore_state.delz.data[:-1, :-1, :-1])
-            safe_assign_array(output_dict["pt"], self.dycore_state.pt.data[:-1, :-1, :-1])
-            safe_assign_array(output_dict["delp"], self.dycore_state.delp.data[:-1, :-1, :-1])
+            safe_assign_array(output_dict["delz"], self.dycore_state.delz[:-1, :-1, :-1])
+            safe_assign_array(output_dict["pt"], self.dycore_state.pt[:-1, :-1, :-1])
+            safe_assign_array(output_dict["delp"], self.dycore_state.delp[:-1, :-1, :-1])
 
             safe_assign_array(
                 output_dict["mfxd"],
-                self.dycore_state.mfxd.data[isc : iec + 1, jsc:jec, :-1],
+                self.dycore_state.mfxd[isc : iec + 1, jsc:jec, :-1],
             )
             safe_assign_array(
                 output_dict["mfyd"],
-                self.dycore_state.mfyd.data[isc:iec, jsc : jec + 1, :-1],
+                self.dycore_state.mfyd[isc:iec, jsc : jec + 1, :-1],
             )
-            safe_assign_array(output_dict["cxd"], self.dycore_state.cxd.data[isc : iec + 1, :-1, :-1])
-            safe_assign_array(output_dict["cyd"], self.dycore_state.cyd.data[:-1, jsc : jec + 1, :-1])
+            safe_assign_array(output_dict["cxd"], self.dycore_state.cxd[isc : iec + 1, :-1, :-1])
+            safe_assign_array(output_dict["cyd"], self.dycore_state.cyd[:-1, jsc : jec + 1, :-1])
 
-            safe_assign_array(output_dict["ps"], self.dycore_state.ps.data[:-1, :-1])
+            safe_assign_array(output_dict["ps"], self.dycore_state.ps[:-1, :-1])
             safe_assign_array(
                 output_dict["pe"],
-                self.dycore_state.pe.data[isc - 1 : iec + 1, jsc - 1 : jec + 1, :],
+                self.dycore_state.pe[isc - 1 : iec + 1, jsc - 1 : jec + 1, :],
             )
-            safe_assign_array(output_dict["pk"], self.dycore_state.pk.data[isc:iec, jsc:jec, :])
-            safe_assign_array(output_dict["peln"], self.dycore_state.peln.data[isc:iec, jsc:jec, :])
-            safe_assign_array(output_dict["pkz"], self.dycore_state.pkz.data[isc:iec, jsc:jec, :-1])
-            safe_assign_array(output_dict["phis"], self.dycore_state.phis.data[:-1, :-1])
-            safe_assign_array(output_dict["q_con"], self.dycore_state.q_con.data[:-1, :-1, :-1])
-            safe_assign_array(output_dict["omga"], self.dycore_state.omga.data[:-1, :-1, :-1])
+            safe_assign_array(output_dict["pk"], self.dycore_state.pk[isc:iec, jsc:jec, :])
+            safe_assign_array(output_dict["peln"], self.dycore_state.peln[isc:iec, jsc:jec, :])
+            safe_assign_array(output_dict["pkz"], self.dycore_state.pkz[isc:iec, jsc:jec, :-1])
+            safe_assign_array(output_dict["phis"], self.dycore_state.phis[:-1, :-1])
+            safe_assign_array(output_dict["q_con"], self.dycore_state.q_con[:-1, :-1, :-1])
+            safe_assign_array(output_dict["omga"], self.dycore_state.omga[:-1, :-1, :-1])
             safe_assign_array(
                 output_dict["diss_estd"],
-                self.dycore_state.diss_estd.data[:-1, :-1, :-1],
+                self.dycore_state.diss_estd[:-1, :-1, :-1],
             )
 
             # Tracers
@@ -449,112 +454,91 @@ class GeosDycoreWrapper:
                 self.dycore_state.tracers.as_4D_array(),
             )
         else:
-            output_dict["u"] = self.dycore_state.u.data[:-1, :, :-1]
-            output_dict["v"] = self.dycore_state.v.data[:, :-1, :-1]
-            output_dict["w"] = self.dycore_state.w.data[:-1, :-1, :-1]
-            output_dict["ua"] = self.dycore_state.ua.data[:-1, :-1, :-1]
-            output_dict["va"] = self.dycore_state.va.data[:-1, :-1, :-1]
-            output_dict["uc"] = self.dycore_state.uc.data[:, :-1, :-1]
-            output_dict["vc"] = self.dycore_state.vc.data[:-1, :, :-1]
-            output_dict["delz"] = self.dycore_state.delz.data[:-1, :-1, :-1]
-            output_dict["pt"] = self.dycore_state.pt.data[:-1, :-1, :-1]
-            output_dict["delp"] = self.dycore_state.delp.data[:-1, :-1, :-1]
-            output_dict["mfxd"] = self.dycore_state.mfxd.data[isc : iec + 1, jsc:jec, :-1]
-            output_dict["mfyd"] = self.dycore_state.mfyd.data[isc:iec, jsc : jec + 1, :-1]
-            output_dict["cxd"] = self.dycore_state.cxd.data[isc : iec + 1, :-1, :-1]
-            output_dict["cyd"] = self.dycore_state.cyd.data[:-1, jsc : jec + 1, :-1]
-            output_dict["ps"] = self.dycore_state.ps.data[:-1, :-1]
-            output_dict["pe"] = self.dycore_state.pe.data[isc - 1 : iec + 1, jsc - 1 : jec + 1, :]
-            output_dict["pk"] = self.dycore_state.pk.data[isc:iec, jsc:jec, :]
-            output_dict["peln"] = self.dycore_state.peln.data[isc:iec, jsc:jec, :]
-            output_dict["pkz"] = self.dycore_state.pkz.data[isc:iec, jsc:jec, :-1]
-            output_dict["phis"] = self.dycore_state.phis.data[:-1, :-1]
-            output_dict["q_con"] = self.dycore_state.q_con.data[:-1, :-1, :-1]
-            output_dict["omga"] = self.dycore_state.omga.data[:-1, :-1, :-1]
-            output_dict["diss_estd"] = self.dycore_state.diss_estd.data[:-1, :-1, :-1]
+            output_dict["u"] = self.dycore_state.u[:-1, :, :-1]
+            output_dict["v"] = self.dycore_state.v[:, :-1, :-1]
+            output_dict["w"] = self.dycore_state.w[:-1, :-1, :-1]
+            output_dict["ua"] = self.dycore_state.ua[:-1, :-1, :-1]
+            output_dict["va"] = self.dycore_state.va[:-1, :-1, :-1]
+            output_dict["uc"] = self.dycore_state.uc[:, :-1, :-1]
+            output_dict["vc"] = self.dycore_state.vc[:-1, :, :-1]
+            output_dict["delz"] = self.dycore_state.delz[:-1, :-1, :-1]
+            output_dict["pt"] = self.dycore_state.pt[:-1, :-1, :-1]
+            output_dict["delp"] = self.dycore_state.delp[:-1, :-1, :-1]
+            output_dict["mfxd"] = self.dycore_state.mfxd[isc : iec + 1, jsc:jec, :-1]
+            output_dict["mfyd"] = self.dycore_state.mfyd[isc:iec, jsc : jec + 1, :-1]
+            output_dict["cxd"] = self.dycore_state.cxd[isc : iec + 1, :-1, :-1]
+            output_dict["cyd"] = self.dycore_state.cyd[:-1, jsc : jec + 1, :-1]
+            output_dict["ps"] = self.dycore_state.ps[:-1, :-1]
+            output_dict["pe"] = self.dycore_state.pe[isc - 1 : iec + 1, jsc - 1 : jec + 1, :]
+            output_dict["pk"] = self.dycore_state.pk[isc:iec, jsc:jec, :]
+            output_dict["peln"] = self.dycore_state.peln[isc:iec, jsc:jec, :]
+            output_dict["pkz"] = self.dycore_state.pkz[isc:iec, jsc:jec, :-1]
+            output_dict["phis"] = self.dycore_state.phis[:-1, :-1]
+            output_dict["q_con"] = self.dycore_state.q_con[:-1, :-1, :-1]
+            output_dict["omga"] = self.dycore_state.omga[:-1, :-1, :-1]
+            output_dict["diss_estd"] = self.dycore_state.diss_estd[:-1, :-1, :-1]
 
             # Tracers
             output_dict["tracers"] = self.dycore_state.tracers[:-1, :-1, :-1, :]
         return output_dict
 
-    def _allocate_output_dir(self):
-        if self._fortran_mem_space != self._pace_mem_space:
-            nhalo = self._grid_indexing.n_halo
-            shape_centered = self._grid_indexing.domain_full(add=(0, 0, 0))
-            shape_x_interface = self._grid_indexing.domain_full(add=(1, 0, 0))
-            shape_y_interface = self._grid_indexing.domain_full(add=(0, 1, 0))
-            shape_z_interface = self._grid_indexing.domain_full(add=(0, 0, 1))
-            shape_2d = shape_centered[:-1]
+    def _allocate_output_dir(self) -> dict[str, np.ndarray]:
+        if self._fortran_mem_space == self._ndsl_mem_space:
+            return {}
 
-            self.output_dict["u"] = np.empty((shape_y_interface))
-            self.output_dict["v"] = np.empty((shape_x_interface))
-            self.output_dict["w"] = np.empty((shape_centered))
-            self.output_dict["ua"] = np.empty((shape_centered))
-            self.output_dict["va"] = np.empty((shape_centered))
-            self.output_dict["uc"] = np.empty((shape_x_interface))
-            self.output_dict["vc"] = np.empty((shape_y_interface))
+        nhalo = self._grid_indexing.n_halo
+        shape_centered = self._grid_indexing.domain_full(add=(0, 0, 0))
+        shape_x_interface = self._grid_indexing.domain_full(add=(1, 0, 0))
+        shape_y_interface = self._grid_indexing.domain_full(add=(0, 1, 0))
+        shape_2d = shape_centered[:-1]
 
-            self.output_dict["delz"] = np.empty((shape_centered))
-            self.output_dict["pt"] = np.empty((shape_centered))
-            self.output_dict["delp"] = np.empty((shape_centered))
+        output_dict = {}
+        output_dict["u"] = np.empty((shape_y_interface))
+        output_dict["v"] = np.empty((shape_x_interface))
+        output_dict["w"] = np.empty((shape_centered))
+        output_dict["ua"] = np.empty((shape_centered))
+        output_dict["va"] = np.empty((shape_centered))
+        output_dict["uc"] = np.empty((shape_x_interface))
+        output_dict["vc"] = np.empty((shape_y_interface))
 
-            self.output_dict["mfxd"] = np.empty(
-                (self._grid_indexing.domain_full(add=(1 - 2 * nhalo, -2 * nhalo, 0)))
-            )
-            self.output_dict["mfyd"] = np.empty(
-                (self._grid_indexing.domain_full(add=(-2 * nhalo, 1 - 2 * nhalo, 0)))
-            )
-            self.output_dict["cxd"] = np.empty((self._grid_indexing.domain_full(add=(1 - 2 * nhalo, 0, 0))))
-            self.output_dict["cyd"] = np.empty((self._grid_indexing.domain_full(add=(0, 1 - 2 * nhalo, 0))))
+        output_dict["delz"] = np.empty((shape_centered))
+        output_dict["pt"] = np.empty((shape_centered))
+        output_dict["delp"] = np.empty((shape_centered))
 
-            self.output_dict["ps"] = np.empty((shape_2d))
-            self.output_dict["pe"] = np.empty(
-                (self._grid_indexing.domain_full(add=(2 - 2 * nhalo, 2 - 2 * nhalo, 1)))
-            )
-            self.output_dict["pk"] = np.empty(
-                (self._grid_indexing.domain_full(add=(-2 * nhalo, -2 * nhalo, 1)))
-            )
-            self.output_dict["peln"] = np.empty(
-                (self._grid_indexing.domain_full(add=(-2 * nhalo, -2 * nhalo, 1)))
-            )
-            self.output_dict["pkz"] = np.empty(
-                (self._grid_indexing.domain_full(add=(-2 * nhalo, -2 * nhalo, 0)))
-            )
-            self.output_dict["phis"] = np.empty((shape_2d))
-            self.output_dict["q_con"] = np.empty((shape_centered))
-            self.output_dict["omga"] = np.empty((shape_centered))
-            self.output_dict["diss_estd"] = np.empty((shape_centered))
+        output_dict["mfxd"] = np.empty(
+            (self._grid_indexing.domain_full(add=(1 - 2 * nhalo, -2 * nhalo, 0)))
+        )
+        output_dict["mfyd"] = np.empty(
+            (self._grid_indexing.domain_full(add=(-2 * nhalo, 1 - 2 * nhalo, 0)))
+        )
+        output_dict["cxd"] = np.empty((self._grid_indexing.domain_full(add=(1 - 2 * nhalo, 0, 0))))
+        output_dict["cyd"] = np.empty((self._grid_indexing.domain_full(add=(0, 1 - 2 * nhalo, 0))))
 
-            self.output_dict["tracers"] = np.empty(
-                (
-                    shape_centered[0],
-                    shape_centered[1],
-                    shape_centered[2],
-                    self.tracer_count,
-                )
+        output_dict["ps"] = np.empty((shape_2d))
+        output_dict["pe"] = np.empty(
+            (self._grid_indexing.domain_full(add=(2 - 2 * nhalo, 2 - 2 * nhalo, 1)))
+        )
+        output_dict["pk"] = np.empty(
+            (self._grid_indexing.domain_full(add=(-2 * nhalo, -2 * nhalo, 1)))
+        )
+        output_dict["peln"] = np.empty(
+            (self._grid_indexing.domain_full(add=(-2 * nhalo, -2 * nhalo, 1)))
+        )
+        output_dict["pkz"] = np.empty(
+            (self._grid_indexing.domain_full(add=(-2 * nhalo, -2 * nhalo, 0)))
+        )
+        output_dict["phis"] = np.empty((shape_2d))
+        output_dict["q_con"] = np.empty((shape_centered))
+        output_dict["omga"] = np.empty((shape_centered))
+        output_dict["diss_estd"] = np.empty((shape_centered))
+
+        output_dict["tracers"] = np.empty(
+            (
+                shape_centered[0],
+                shape_centered[1],
+                shape_centered[2],
+                self.tracer_count,
             )
-        else:
-            self.output_dict["u"] = None
-            self.output_dict["v"] = None
-            self.output_dict["w"] = None
-            self.output_dict["ua"] = None
-            self.output_dict["va"] = None
-            self.output_dict["uc"] = None
-            self.output_dict["vc"] = None
-            self.output_dict["delz"] = None
-            self.output_dict["pt"] = None
-            self.output_dict["delp"] = None
-            self.output_dict["mfxd"] = None
-            self.output_dict["mfyd"] = None
-            self.output_dict["cxd"] = None
-            self.output_dict["cyd"] = None
-            self.output_dict["ps"] = None
-            self.output_dict["pe"] = None
-            self.output_dict["pk"] = None
-            self.output_dict["peln"] = None
-            self.output_dict["pkz"] = None
-            self.output_dict["phis"] = None
-            self.output_dict["q_con"] = None
-            self.output_dict["omga"] = None
-            self.output_dict["diss_estd"] = None
-            self.output_dict["tracers"] = None
+        )
+        return output_dict
+        

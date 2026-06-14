@@ -40,10 +40,10 @@ class PYFV3_WRAPPER:
         # For Fortran<->NumPy conversion
         if self.backend.is_gpu_backend():
             numpy_module = cp
-            fortran_mem_space = MemorySpace.DEVICE
+            fortran_mem_space = MemorySpace.GPU
         else:
             numpy_module = np
-            fortran_mem_space = MemorySpace.HOST
+            fortran_mem_space = MemorySpace.CPU
         self.f_py = FortranPythonConversion(
             npx,
             npy,
@@ -335,7 +335,7 @@ def pyfv3_init(
     phis: cffi.FFI.CData,
 ):
     # Read in the backend
-    BACKEND = os.environ.get("GEOS_PYFV3_BACKEND", "st:dace:cpu:IJK")
+    BACKEND = os.environ.get("GEOS_DSL_PYFV3_BACKEND", "st:dace:cpu:IJK")
 
     global WRAPPER
     if WRAPPER is not None:
