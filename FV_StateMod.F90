@@ -8,10 +8,10 @@ module FV_StateMod
 ! !USES:
 #if defined( MAPL_MODE )
    use ESMF                ! ESMF base class
-   use MAPL, only: MAPL_Verify, MAPL_Assert, MAPL_Return, &
-                   WRITE_PARALLEL, MAPL_GridCompGetResource, MAPL_GridCompGet, &
-                   MAPL_GridCompGetInternalState, MAPL_GridCompTimerStart, MAPL_GridCompTimerStop, &
-                   MAPL_GridGet, MAPL_StateGetPointer, MAPL_FieldBundleGetPointer, MAPL_MemInfoWrite
+   use MAPL, only: MAPL_Verify, MAPL_Assert, MAPL_Return
+   use MAPL, only: WRITE_PARALLEL, MAPL_GridCompGetResource, MAPL_GridCompGet
+   use MAPL, only: MAPL_GridCompGetInternalState, MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
+   use MAPL, only: MAPL_GridGet, MAPL_StateGetPointer, MAPL_FieldBundleGetPointer, MAPL_MemInfoWrite
 #endif
 
    use MAPL_Constants, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
@@ -20,6 +20,7 @@ module FV_StateMod
 
    use fv_mp_mod,         only: start_group_halo_update, complete_group_halo_update
    use fv_mp_mod,         only: group_halo_update_type
+   use fv_mp_mod,         only: mp_bcst, mp_reduce_max
 
    use fms_mod, only: fms_init, set_domain, nullify_domain
    use mpp_domains_mod, only: mpp_update_domains, CGRID_NE, DGRID_NE, mpp_get_boundary
@@ -63,7 +64,7 @@ private
 ! !PUBLIC DATA MEMBERS:
 
   logical :: FV_OFF = .false.
-  logical :: ADJUST_DT = .false.
+  logical :: ADJUST_SPLITS = .false.
   logical :: DEBUG = .false.
   logical :: DEBUG_DYN = .false.
   logical :: DEBUG_ADV = .false.
@@ -75,8 +76,7 @@ private
   logical :: fix_mass = .true.
   integer :: CASE_ID = 11
   integer :: AdvCore_Advection = 0
-  integer :: FV3_QSPLIT = 0
-  character(LEN=:), allocatable :: FV3_CONFIG
+  character(len=:), allocatable :: FV3_CONFIG
 
   public FV_Atm
   public FV_Setup, FV_InitState, FV_Run, FV_Finalize, FV_DA_Incs
@@ -211,12 +211,15 @@ private
     type (ESMF_Alarm)                    :: ALARMS(NUM_FVDYCORE_ALARMS)
 
 #endif
-    integer(kind=8)                      :: RUN_TIMES(4,NUM_TIMES)
-    logical                              :: DOTIME, DODYN
     real(REAL8)                          :: DT          ! Large time step
-    integer                              :: KSPLIT
-    integer                              :: NSPLIT
-    integer                              :: NUM_CALLS
+    ! Dynamically adjusted FV3 splits (active for this timestep)
+    integer                              :: k_split
+    integer                              :: n_split
+    integer                              :: q_split
+    ! Original namelist baselines (never change)
+    integer                              :: base_k_split
+    integer                              :: base_n_split
+    integer                              :: base_q_split
   end type T_FVDYCORE_STATE
 
 ! Constants used by fvcore
@@ -404,9 +407,7 @@ contains
   call MAPL_GridCompGetResource( gc, 'AdvCore_Advection', AdvCore_Advection, default=AdvCore_Advection, RC=STATUS )
   VERIFY_(STATUS)
 
-  call MAPL_GridCompGetResource( gc, 'FV3_QSPLIT', FV3_QSPLIT, default=FV3_QSPLIT, RC=STATUS )
-  VERIFY_(STATUS)
-  call MAPL_GridCompGetResource( gc, 'ADJUST_DT', ADJUST_DT, default=ADJUST_DT, RC=STATUS )
+  call MAPL_GridCompGetResource( gc, 'ADJUST_SPLITS', ADJUST_SPLITS, default=ADJUST_SPLITS, RC=STATUS )
   VERIFY_(STATUS)
   call MAPL_GridCompGetResource( gc, 'fix_mass', fix_mass, default=fix_mass, RC=STATUS )
   VERIFY_(STATUS)
@@ -540,31 +541,31 @@ contains
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1120) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 250.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.75
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1440) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 30.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 500.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.5
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 2880) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 35.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.25
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 40.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.125
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 10800) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  4.6875 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 50.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.0625
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
@@ -573,31 +574,31 @@ contains
      !              based on ideal remapping DT
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 540) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+              FV_Atm(1)%flagstruct%rf_cutoff = 100.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 2.0
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1080) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 30.0 ! Pa
+              FV_Atm(1)%flagstruct%rf_cutoff = 500.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 1.0
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2160) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 35.0 ! Pa
+              FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 0.5
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  15.0 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 40.0 ! Pa
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
+              FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 0.25
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 8640) then
-              FV_Atm(1)%flagstruct%k_split = CEILING(DT/   7.5 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 45.0 ! Pa
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375 )
+              FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 0.125
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
@@ -632,7 +633,7 @@ contains
       FV_Atm(1)%flagstruct%beta = 0.0
       FV_Atm(1)%flagstruct%a_imp = 1.0
      ! dz_min is a NH delta-z limiter increasing may improve stability
-      FV_Atm(1)%flagstruct%dz_min = 2.0
+      FV_Atm(1)%flagstruct%dz_min = 3.0
      ! p_fac is a NH pressure fraction limiter near model top (0:0.25)
       FV_Atm(1)%flagstruct%p_fac = 0.05
      ! General defaults
@@ -895,10 +896,17 @@ contains
   DT = ndt
 
   GRID => STATE%GRID     ! For convenience
-  STATE%DOTIME= .TRUE.
-  STATE%DT        = DT
-  STATE%KSPLIT    = FV_Atm(1)%flagstruct%K_SPLIT
-  STATE%NSPLIT    = FV_Atm(1)%flagstruct%N_SPLIT
+
+  STATE%DT      = DT
+
+  STATE%q_split = FV_Atm(1)%flagstruct%q_split
+  STATE%k_split = FV_Atm(1)%flagstruct%k_split
+  STATE%n_split = FV_Atm(1)%flagstruct%n_split
+
+  STATE%base_q_split = FV_Atm(1)%flagstruct%q_split
+  STATE%base_k_split = FV_Atm(1)%flagstruct%k_split
+  STATE%base_n_split = FV_Atm(1)%flagstruct%n_split
+
   GRID%NG     = 3 ; ng = 3
   GRID%NPX    = FV_Atm(1)%flagstruct%NPX-1
   GRID%NPY    = FV_Atm(1)%flagstruct%NPY-1
@@ -1035,9 +1043,6 @@ contains
 
 !  Clear wall clock time clocks and global budgets
 
-  STATE%RUN_TIMES = 0
-  STATE%NUM_CALLS = 0
-
   call ESMF_ClockGet( CLOCK, currTime=fv_time, rc=STATUS )
   VERIFY_(STATUS)
   call ESMF_TimeGet( fv_time, dayOfYear=days, s=seconds, rc=STATUS )
@@ -1096,7 +1101,9 @@ contains
                                  FV_Atm(1)%flagstruct%moist_phys, FV_Atm(1)%flagstruct%hydrostatic, hybrid, FV_Atm(1)%delz, FV_Atm(1)%ze0, &
                                  FV_Atm(1)%ks, FV_Atm(1)%ptop, FV_Atm(1)%domain, tile_in, FV_Atm(1)%bd)
      ! Copy FV to internal State
+       call MAPL_GridCompTimerStart(gc, "fv_to_state", _RC)
        call FV_To_State ( STATE )
+       call MAPL_GridCompTimerStop(gc, "fv_to_state", _RC)
        if( gid==masterproc ) write(*,*) 'Doubly Periodic IC generated LAT:', FV_Atm(1)%flagstruct%deglat
    else
      ALLOCATE( UA(isc:iec  ,jsc:jec  ,1:FV_Atm(1)%npz) )
@@ -1119,7 +1126,9 @@ contains
         call fv_getDELZ(DZ,PT,PE)
         PT = PT/PKZ
      endif
+     call MAPL_GridCompTimerStart(gc, "state_to_fv", _RC)
      call State_To_FV( STATE )
+     call MAPL_GridCompTimerStop(gc, "state_to_fv", _RC)
    endif ! doubly-periodic
 
   else ! COLDSTART
@@ -1131,7 +1140,9 @@ contains
     !   call fv_getDELZ(DZ,PT,PE)
     !   PT = PT/PKZ
     !endif
+     call MAPL_GridCompTimerStart(gc, "state_to_fv", _RC)
      call State_To_FV( STATE )
+     call MAPL_GridCompTimerStop(gc, "state_to_fv", _RC)
 
   endif
 
@@ -1412,6 +1423,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
      deallocate ( griddiffs )
 #endif
     ! Set FV3 surface geopotential
+     FV_Atm(1)%phis = 0.0
      FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=FVPRC)
      FV_Atm(1)%varflt(isc:iec,jsc:jec) = real(varflt,kind=FVPRC)
      call mpp_update_domains(FV_Atm(1)%phis, FV_Atm(1)%domain, complete=.true.)
@@ -1463,6 +1475,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
    cnvfrc = 0.0
 
  ! Pull Tracers
+  call MAPL_GridCompTimerStart(gc, "pull_tracers" , _RC)
   nn = 0
   if (.not. ADIABATIC) then
     select case ( FV_Atm(1)%flagstruct%nwat )
@@ -1789,6 +1802,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
       _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
 
   endif
+  call MAPL_GridCompTimerStop(gc, "pull_tracers")
 
     myDT = state%dt
 
@@ -1968,13 +1982,12 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (run_gtfv3 == 0) then
        call cpu_time(start)
 #endif
-       if (FV3_QSPLIT == 0) FV3_QSPLIT = FV_Atm(1)%flagstruct%q_split
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
             FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
-            state%ksplit, state%nsplit, FV3_QSPLIT, &
+            STATE%k_split, STATE%n_split, STATE%q_split, &
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
             FV_Atm(1)%flagstruct%hydrostatic, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
@@ -2079,6 +2092,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   CLCN_FILLED = .FALSE.
 
  ! Push Tracers
+  call MAPL_GridCompTimerStart(gc, "push_tracers", _RC)
   nn = 0
   if (.not. ADIABATIC) then
 
@@ -2378,9 +2392,12 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (mpp_pe()==0) print*,''
     prt_minmax     = .false.
   endif
+  call MAPL_GridCompTimerStop(gc, "push_tracers", _RC)
 
 ! Copy FV to internal State
+   call MAPL_GridCompTimerStart(gc, "fv_to_state", _RC)
    call FV_To_State ( STATE )
+   call MAPL_GridCompTimerStop(gc, "fv_to_state", _RC)
 
     if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
 
@@ -2455,8 +2472,9 @@ subroutine State_To_FV ( STATE )
     logical :: bad_range_V
     logical :: bad_range_T
 
-    integer :: rc
-    character(len=ESMF_MAXSTR)          :: ERRSTR
+    integer :: rc, status
+    character(len=ESMF_MAXSTR)  :: IAm='FV_StateMod:State_To_FV'
+    character(len=ESMF_MAXSTR)  :: ERRSTR
 
     ISC = state%grid%is
     IEC = state%grid%ie
@@ -2506,22 +2524,6 @@ subroutine State_To_FV ( STATE )
           FV_Atm(1)%v(iec+1,j,k) = ebuffer(j,k)
        enddo
     enddo
-  endif
-
-  if ( ADJUST_DT ) then
-    call range_check('U_S2F', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                      -200., 200., bad_range=bad_range_U)
-    call range_check('V_S2F', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                      -200., 200., bad_range=bad_range_V)
-    if ((bad_range_U .or. bad_range_V) .and. (ADJUST_DT)) then
-       STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
-       STATE%NSPLIT = MIN(2*FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT*1.25))
-    elseif (ADJUST_DT) then
-       STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
-       STATE%NSPLIT = MAX(  FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT/1.25))
-    endif
-    if (STATE%NSPLIT /= FV_Atm(1)%flagstruct%n_split) &
-    call WRITE_PARALLEL( STATE%DT/real(STATE%KSPLIT*STATE%NSPLIT)   ,format='("Adjusted Dynamics time step : ",(F10.4))')
   endif
 
   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%w(isc:iec,jsc:jec,:) = STATE%VARS%W
@@ -2602,6 +2604,18 @@ subroutine State_To_FV ( STATE )
 
     endif
 
+    if ( ADJUST_SPLITS ) then
+      call adjust_fv3_splits(STATE, &
+                             isc, iec, jsc, jec, &       ! Compute domain bounds
+                             isd, ied, jsd, jed, &       ! Data/Memory domain bounds
+                             km, &                       ! Number of vertical levels
+                             FV_Atm(1)%u, &              ! D-grid U-wind
+                             FV_Atm(1)%v, &              ! D-grid V-wind
+                             FV_Atm(1)%w, &              ! W-wind
+                             FV_Atm(1)%delz, &           ! Layer thickness
+                             FV_Atm(1)%gridstruct%dxa, & ! Cell center dx (dxa)
+                             FV_Atm(1)%gridstruct%dya)   ! Cell center dy (dya)
+    endif
 
    return
 
@@ -2617,9 +2631,8 @@ subroutine FV_To_State ( STATE )
     logical :: bad_range = .false.
     integer               :: ISC,IEC, JSC,JEC, KM, NG
     integer               :: I,J,K
-    real                  :: courant_range
     character(len=ESMF_MAXSTR)          :: ERRSTR
-    integer :: rc
+    integer :: status
 
     ISC = state%grid%is
     IEC = state%grid%ie
@@ -2680,6 +2693,121 @@ subroutine FV_To_State ( STATE )
    return
 
 end subroutine FV_To_State
+
+subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz, &
+                             u, v, w, delz, dx, dy)
+    implicit none
+
+    type(T_FVDYCORE_STATE), intent(inout) :: state
+
+    integer, intent(in) :: isc, iec, jsc, jec
+    integer, intent(in) :: isd, ied, jsd, jed
+    integer, intent(in) :: npz
+
+    real, intent(in), dimension(isd:ied,   jsd:jed+1, npz) :: u
+    real, intent(in), dimension(isd:ied+1, jsd:jed,   npz) :: v
+    real, intent(in), dimension(isd:ied,   jsd:jed,   npz) :: w, delz
+    real, intent(in), dimension(isd:ied, jsd:jed) :: dx, dy
+
+    integer :: i, j, k
+    real    :: u_c, v_c
+    real    :: max_cfl_h, max_cfl_z
+
+    ! Updated constraints
+    real, parameter    :: TARGET_CFL   = 1.05
+    real, parameter    :: H_MULTIPLIER = 4.0  ! For acoustic speed scaling
+    real, parameter    :: Z_MULTIPLIER = 0.25 ! Tune this to dictate max_cfl_z's impact
+
+    integer :: new_k_split, new_n_split, new_q_split
+    integer :: target_k_split, base_tot
+
+    max_cfl_h = 0.0
+    max_cfl_z = 0.0
+
+    ! --- 1. FIND LOCAL MAXIMUMS ---
+    do k = 1, npz
+       do j = jsc, jec
+          do i = isc, iec
+             u_c = 0.5 * (u(i,j,k) + u(i,j+1,k))
+             v_c = 0.5 * (v(i,j,k) + v(i+1,j,k))
+
+             max_cfl_h = max(max_cfl_h, abs((u_c/dx(i,j)) + (v_c/dy(i,j))) * state%DT)
+             max_cfl_z = max(max_cfl_z, abs(w(i,j,k) / delz(i,j,k)) * state%DT)
+          enddo
+       enddo
+    enddo
+
+    ! --- 2. GLOBAL REDUCTION ---
+    call mp_reduce_max(max_cfl_h)
+    call mp_reduce_max(max_cfl_z)
+
+    ! --- 3. DYNAMIC ADJUSTMENT ON ROOT PE ---
+    if (mpp_pe() == 0) then
+
+       ! Calculate total baseline acoustic steps (e.g., 1 * 6 = 6)
+       ! We want to keep (k_split * n_split) as close to this as possible
+       base_tot = state%base_k_split * state%base_n_split
+
+       ! Calculate the strictly required k_split
+       target_k_split = max(state%base_k_split, ceiling(max_cfl_z * Z_MULTIPLIER))
+
+       ! b. RATE LIMITING VIA FACTORS:
+       ! Step to the next integer that cleanly divides base_tot
+       if (target_k_split > state%k_split) then
+           new_k_split = state%k_split + 1
+           ! Increment until we find a clean factor (or exceed base_tot)
+           do while (new_k_split < base_tot .and. mod(base_tot, new_k_split) /= 0)
+               new_k_split = new_k_split + 1
+           end do
+       elseif (target_k_split < state%k_split) then
+           new_k_split = state%k_split - 1
+           ! Decrement until we find a clean factor
+           do while (new_k_split > state%base_k_split .and. mod(base_tot, new_k_split) /= 0)
+               new_k_split = new_k_split - 1
+           end do
+           ! Safety catch
+           new_k_split = max(state%base_k_split, new_k_split)
+       else
+           new_k_split = state%k_split
+       endif
+
+       ! c. Calculate n_split
+       ! Because new_k_split is guaranteed to be a factor, this division is exact!
+       ! (Unless max_cfl_h independently forces it higher)
+       new_n_split = ceiling(base_tot / real(new_k_split))
+       new_n_split = max(new_n_split, ceiling(max_cfl_h * H_MULTIPLIER / real(new_k_split)))
+
+       ! d. Calculate q_split
+       if (state%base_q_split == 0) then
+           new_q_split = 0
+       else
+           new_q_split = max(state%base_q_split, ceiling((max_cfl_h / real(new_k_split)) / TARGET_CFL))
+       endif
+
+       ! Apply and report if adjusted
+       if (state%k_split /= new_k_split .or. &
+           state%n_split /= new_n_split .or. &
+           state%q_split /= new_q_split) then
+
+           print *, "=== FV3 DYNAMIC SPLIT ADJUSTMENT ==="
+           print *, "Max Horz CFL: ", max_cfl_h, " | Max Vert CFL: ", max_cfl_z
+           print *, "FV3 k_split: ", new_k_split, " (was ", state%k_split, ", target was ", target_k_split, ")"
+           print *, "FV3 n_split: ", new_n_split, " (was ", state%n_split, ")"
+           print *, "FV3 q_split: ", new_q_split, " (was ", state%q_split, ")"
+           print *, "===================================="
+
+           state%k_split = new_k_split
+           state%n_split = new_n_split
+           state%q_split = new_q_split
+       endif
+    endif
+
+    ! --- 4. BROADCAST ---
+    call mp_bcst(state%k_split)
+    call mp_bcst(state%n_split)
+    call mp_bcst(state%q_split)
+
+end subroutine adjust_fv3_splits
 
 subroutine fv_getDELZ(delz,temp,pe)
   real(REAL8), intent(OUT) :: delz(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
@@ -3187,7 +3315,7 @@ end subroutine a2d2d
 
 subroutine fv_computeMassFluxes_r4(ucI, vcI, ple, mfx, mfy, cx, cy, dt)
   use tp_core_mod,       only: fv_tp_2d
-  use fv_mp_mod,         only: is,js,ie,je, isd,jsd,ied,jed, mp_reduce_max
+  use fv_mp_mod,         only: is,js,ie,je, isd,jsd,ied,jed
   real(REAL4), intent(IN   ) ::  ucI(is:ie,js:je,1:FV_Atm(1)%flagstruct%npz)
   real(REAL4), intent(IN   ) ::  vcI(is:ie,js:je,1:FV_Atm(1)%flagstruct%npz)
   real(REAL4), intent(IN   ) ::  ple(is:ie,js:je,1:FV_Atm(1)%flagstruct%npz+1)
@@ -3370,7 +3498,7 @@ end subroutine fv_computeMassFluxes_r4
 
 subroutine fv_computeMassFluxes_r8(ucI, vcI, ple, mfx, mfy, cx, cy, dt)
   use tp_core_mod,       only: fv_tp_2d
-  use fv_mp_mod,         only: is,js,ie,je, isd,jsd,ied,jed, mp_reduce_max
+  use fv_mp_mod,         only: is,js,ie,je, isd,jsd,ied,jed
   real(REAL8), intent(IN   ) ::  ucI(is:ie,js:je,1:FV_Atm(1)%flagstruct%npz)
   real(REAL8), intent(IN   ) ::  vcI(is:ie,js:je,1:FV_Atm(1)%flagstruct%npz)
   real(REAL8), intent(IN   ) ::  ple(is:ie,js:je,1:FV_Atm(1)%flagstruct%npz+1)
