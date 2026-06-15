@@ -23,13 +23,14 @@ jobs:
       matrix:
         compiler: [ifort, gfortran-14, gfortran-15, ifx]
         build-type: [Debug]
+      fail-fast: false
     uses: GEOS-ESM/CI-workflows/.github/workflows/geosgcm_build_tests.yml@project/geosgcm
     with:
       compiler: ${{ matrix.compiler }}
       cmake-build-type: ${{ matrix.build-type }}
-      fail-fast: false
       fixture-repo: GEOS-ESM/GEOSgcm
       fixture-ref: release/MAPL-v3
+      run-mepo-develop: false
 
   spack_build:
     uses: GEOS-ESM/CI-workflows/.github/workflows/spack_gcc_build.yml@project/geosgcm
@@ -39,4 +40,6 @@ jobs:
     with:
       fixture-repo: GEOS-ESM/GEOSgcm
       fixture-ref: release/MAPL-v3
+      run-mepo-develop: false
+      load-fms: true
 
