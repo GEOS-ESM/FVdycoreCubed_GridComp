@@ -41,4 +41,5 @@ jobs:
       fixture-repo: GEOS-ESM/GEOSgcm
       fixture-ref: release/MAPL-v3
       run-mepo-develop: false
+      load-fms: true
 
