@@ -185,13 +185,6 @@ class GeosDycoreWrapper:
             tile_nz=self.dycore_config.npz,
         )
 
-        # Orchestrate all code called from this function
-        orchestrate(
-            obj=self,
-            config=stencil_config.dace_config,
-            method_to_orchestrate="_critical_path",
-        )
-
         self._grid_indexing = GridIndexing.from_sizer_and_communicator(sizer=sizer, comm=self.communicator)
         stencil_factory = StencilFactory(config=stencil_config, grid_indexing=self._grid_indexing)
 
@@ -251,8 +244,7 @@ class GeosDycoreWrapper:
             f"       Nvidia MPS : {MPS_is_on}\n"
         )
 
-    def _critical_path(self):
-        """Top-level orchestration function"""
+    def _run(self):
         with self.perf_collector.timestep_timer.clock("step_dynamics"):
             self.dynamical_core.step_dynamics(
                 state=self.dycore_state,
@@ -315,7 +307,7 @@ class GeosDycoreWrapper:
                 diss_estd,
             )
         # Enter orchestrated code - if applicable
-        self._critical_path()
+        self._run()
 
         with self.perf_collector.timestep_timer.clock("dycore-to-numpy"):
             self.output_dict = self._prep_outputs_for_geos()
