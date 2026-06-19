@@ -1406,6 +1406,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 #endif
 
    endif
+   call MAPL_TimerOff(MAPL,"--FV_FIRST_RUN")
    call MAPL_TimerOff(MAPL,"--MASS_FIX")
 
    select case ( FV_Atm(1)%flagstruct%nwat )
