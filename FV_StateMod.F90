@@ -1288,6 +1288,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   ng  = FV_Atm(1)%ng
   domain = FV_Atm(1)%domain
 
+  call MAPL_TimerOn(MAPL,"--FV_FIRST_RUN")
   ! Be sure we have the correct PHIS and number of tracers for this run
    if (fv_first_run) then
     ! Determine how many water species we have
@@ -1405,6 +1406,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 #endif
 
    endif
+   call MAPL_TimerOff(MAPL,"--MASS_FIX")
+
    select case ( FV_Atm(1)%flagstruct%nwat )
   ! Assign Tracer Indices for FV3
    case (6:7)
@@ -1435,6 +1438,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     qils = 5
    end select
 
+  call MAPL_TimerOn(MAPL,"--PULL_TRACERS")
  ! Pull Tracers
   nn = 0
   if (.not. ADIABATIC) then
@@ -1827,6 +1831,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
       _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
 
   endif
+   call MAPL_TimerOff(MAPL,"--PULL_TRACERS")
+   call MAPL_TimerOn(MAPL,"--STATE_TO_FV")
 
     myDT = state%dt
 
@@ -1864,6 +1870,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
      ! Mark FV setup complete
       fv_first_run = .false.
     endif
+    call MAPL_TimerOff(MAPL,"--STATE_TO_FV")
 
 ! Check Dry Mass (Apply fixer is option is enabled)
    if ( check_mass .OR. fix_mass ) then
@@ -2059,6 +2066,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     end if
 #endif
 
+    call MAPL_TimerOn(MAPL,"----WIND_EXPORTS")
     allocate ( udt(isc:iec,jsc:jec,npz) )
     allocate ( vdt(isc:iec,jsc:jec,npz) )
     ! go from native D-Grid tendencies to A-grid rotated exports
@@ -2101,10 +2109,12 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     deallocate ( w_dt )
 
     call nullify_domain()
+    call MAPL_TimerOff(MAPL,"----WIND_EXPORTS")
 
     endif
     call MAPL_TimerOff(MAPL,"--FV_DYNAMICS")
 
+  call MAPL_TimerOn(MAPL,"--PUSH_TRACERS")
   SPHU_FILLED = .FALSE.
   QLIQ_FILLED = .FALSE.
   QICE_FILLED = .FALSE.
@@ -2408,12 +2418,15 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
       _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
 
   endif
+  call MAPL_TimerOff(MAPL,"--PUSH_TRACERS")
+  call MAPL_TimerOn(MAPL,"--FV_TO_STATE")
 
 ! Copy FV to internal State
    call FV_To_State ( STATE )
 
     if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
 
+  call MAPL_TimerOff(MAPL,"--FV_TO_STATE")
     RETURN_(ESMF_SUCCESS)
 
 end subroutine FV_Run
