@@ -155,6 +155,7 @@ class GeosDycoreWrapper:
             tile_partitioner=partitioner.tile,
             tile_rank=self.communicator.tile.rank,
             backend=backend,
+            pad_non_interface_dimensions=True,
         )
         quantity_factory = QuantityFactory(sizer=sizer, backend=backend)
 
