@@ -99,11 +99,13 @@ class MemorySpace(enum.Enum):
     CPU = 0
     GPU = 1
 
+
 class InterfaceTransferType(enum.Enum):
     CPU_COPY = enum.auto()  # Copies because of layout mismatch
     CPU_ZERO_COPY = enum.auto()  # No copy - reuse the memory given (case of same layout)
     GPU_TRANSFER = enum.auto()  # Upload from central RAM to device, then download
     GPU_MAPPING = enum.auto()  # Paged memory mapped onto GPU memory space (HMM, ATS, ...)
+
 
 class GeosDycoreWrapper:
     """
@@ -123,6 +125,7 @@ class GeosDycoreWrapper:
         tracer_count: int,
         fortran_mem_space: MemorySpace = MemorySpace.CPU,
     ):
+        ndsl_log_on_rank_0.info("Setup pyfv3 (including grid)")
         # pyfv3 support only 0 and 7 tracers run
         if fv_flags.nwat not in [6, 0]:
             raise NotImplementedError(
@@ -230,10 +233,14 @@ class GeosDycoreWrapper:
             and backend.is_gpu_backend()
             and os.path.exists(f"{MPS_pipe_directory}/log")
         )
-        build_status = f"Build : {os.environ["FV3_DACEMODE"]}\n" if backend.is_orchestrated() and "FV3_DACEMODE" in os.environ else ""
+        build_status = (
+            f"Build : {os.environ['FV3_DACEMODE']}\n"
+            if backend.is_orchestrated() and "FV3_DACEMODE" in os.environ
+            else ""
+        )
         ndsl_log_on_rank_0.info(
             "pyFV3 <> GEOS wrapper initialized (Rank 0):\n"
-            f"     Memory space : {fortran_mem_space} <> {self._ndsl_mem_space}\n"
+            f"           Bridge : {fortran_mem_space} <> {self._ndsl_mem_space}\n"
             f"          Backend : {backend}\n"
             f"            {build_status}"
             f"        Precision : {get_precision()} bit\n"
@@ -241,6 +248,7 @@ class GeosDycoreWrapper:
             f"     Local domain : {sizer.nx}x{sizer.ny}x{sizer.nz}"
             f"(halo: {sizer.n_halo})\n"
             f"           Layout : {partitioner.layout}\n"
+            f"   Strides for 3D : {self.dycore_state.pt._data.strides}\n"
             f"       Device ord : {device_ordinal_info}\n"
             f"       Nvidia MPS : {MPS_is_on}\n"
         )
@@ -254,7 +262,7 @@ class GeosDycoreWrapper:
 
     def __call__(
         self,
-        timings: dict[str, list[float|int]],
+        timings: dict[str, list[float | int]],
         u: np.ndarray,
         v: np.ndarray,
         w: np.ndarray,
@@ -498,28 +506,16 @@ class GeosDycoreWrapper:
         output_dict["pt"] = np.empty((shape_centered))
         output_dict["delp"] = np.empty((shape_centered))
 
-        output_dict["mfxd"] = np.empty(
-            (self._grid_indexing.domain_full(add=(1 - 2 * nhalo, -2 * nhalo, 0)))
-        )
-        output_dict["mfyd"] = np.empty(
-            (self._grid_indexing.domain_full(add=(-2 * nhalo, 1 - 2 * nhalo, 0)))
-        )
+        output_dict["mfxd"] = np.empty((self._grid_indexing.domain_full(add=(1 - 2 * nhalo, -2 * nhalo, 0))))
+        output_dict["mfyd"] = np.empty((self._grid_indexing.domain_full(add=(-2 * nhalo, 1 - 2 * nhalo, 0))))
         output_dict["cxd"] = np.empty((self._grid_indexing.domain_full(add=(1 - 2 * nhalo, 0, 0))))
         output_dict["cyd"] = np.empty((self._grid_indexing.domain_full(add=(0, 1 - 2 * nhalo, 0))))
 
         output_dict["ps"] = np.empty((shape_2d))
-        output_dict["pe"] = np.empty(
-            (self._grid_indexing.domain_full(add=(2 - 2 * nhalo, 2 - 2 * nhalo, 1)))
-        )
-        output_dict["pk"] = np.empty(
-            (self._grid_indexing.domain_full(add=(-2 * nhalo, -2 * nhalo, 1)))
-        )
-        output_dict["peln"] = np.empty(
-            (self._grid_indexing.domain_full(add=(-2 * nhalo, -2 * nhalo, 1)))
-        )
-        output_dict["pkz"] = np.empty(
-            (self._grid_indexing.domain_full(add=(-2 * nhalo, -2 * nhalo, 0)))
-        )
+        output_dict["pe"] = np.empty((self._grid_indexing.domain_full(add=(2 - 2 * nhalo, 2 - 2 * nhalo, 1))))
+        output_dict["pk"] = np.empty((self._grid_indexing.domain_full(add=(-2 * nhalo, -2 * nhalo, 1))))
+        output_dict["peln"] = np.empty((self._grid_indexing.domain_full(add=(-2 * nhalo, -2 * nhalo, 1))))
+        output_dict["pkz"] = np.empty((self._grid_indexing.domain_full(add=(-2 * nhalo, -2 * nhalo, 0))))
         output_dict["phis"] = np.empty((shape_2d))
         output_dict["q_con"] = np.empty((shape_centered))
         output_dict["omga"] = np.empty((shape_centered))
@@ -534,4 +530,3 @@ class GeosDycoreWrapper:
             )
         )
         return output_dict
-        
