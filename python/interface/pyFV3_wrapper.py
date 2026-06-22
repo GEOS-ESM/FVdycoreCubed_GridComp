@@ -21,7 +21,6 @@ from ndsl import (
     StencilFactory,
     SubtileGridSizer,
     TilePartitioner,
-    orchestrate,
     Backend,
 )
 import ndsl.constants
@@ -187,6 +186,7 @@ class GeosDycoreWrapper:
             backend=stencil_config.backend,
             tile_nx=self.dycore_config.npx,
             tile_nz=self.dycore_config.npz,
+            time=True,
         )
 
         self._grid_indexing = GridIndexing.from_sizer_and_communicator(sizer=sizer, comm=self.communicator)
@@ -249,7 +249,7 @@ class GeosDycoreWrapper:
             f"(halo: {sizer.n_halo})\n"
             f"           Layout : {partitioner.layout}\n"
             f"   Strides for 3D : {self.dycore_state.pt._data.strides}\n"
-            f"       Device ord : {device_ordinal_info}\n"
+            f"       Device ord : {device_ordinal_info}"
             f"       Nvidia MPS : {MPS_is_on}\n"
         )
 
