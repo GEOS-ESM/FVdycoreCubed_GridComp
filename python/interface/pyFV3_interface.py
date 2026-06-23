@@ -87,8 +87,9 @@ class PYFV3_WRAPPER:
     def finalize(self):
         import json
 
-        with open("pyfv3_timings.json", "w") as f:
-            json.dump(self._timings, f, indent=4)
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            with open("pyfv3_timings_rank0.json", "w") as f:
+                json.dump(self._timings, f, indent=4)
 
     def __call__(
         self,
