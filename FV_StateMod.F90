@@ -2110,7 +2110,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
                            FV_Atm(1)%peln, FV_Atm(1)%pkz, FV_Atm(1)%pt, FV_Atm(1)%q,       &
                            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%flagstruct%hydrostatic,&
                            FV_Atm(1)%w, FV_Atm(1)%delz, u_dt, v_dt, t_dt, w_dt,          &
-                           FV_Atm(1)%flagstruct%n_zfilter)
+                           FV_Atm(1)%flagstruct%n_zfilter,                               &
+                           GEOS_MLT=FV_Atm(1)%flagstruct%GEOS_MLT)
         call MAPL_GetPointer ( export, PTR3D, 'DUDTSUBZ', rc=status ); VERIFY_(STATUS)
         if( associated(PTR3D) ) PTR3D = u_dt
         call MAPL_GetPointer ( export, PTR3D, 'DVDTSUBZ', rc=status ); VERIFY_(STATUS)
@@ -5274,5 +5275,6 @@ subroutine WRITE_PARALLEL_L ( field, format )
 end subroutine WRITE_PARALLEL_L
 
 end module FV_StateMod
+
 
 
