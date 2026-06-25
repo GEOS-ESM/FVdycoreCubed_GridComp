@@ -1181,7 +1181,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   character(len=ESMF_MAXSTR)       :: IAm='FV:FV_Run'
 
   type (ESMF_Time) :: fv_time
-  integer  :: days, seconds
+  integer  :: year, days, seconds
   real(FVPRC) :: time_total, massD
 
   integer :: i,j,k,n,nn
@@ -1194,6 +1194,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   real(FVPRC), allocatable :: u_dt(:,:,:), udt(:,:,:)
   real(FVPRC), allocatable :: v_dt(:,:,:), vdt(:,:,:)
   real(FVPRC), allocatable :: t_dt(:,:,:)
+  real(FVPRC), allocatable :: tc_dt(:,:,:)
+  real(FVPRC), allocatable :: molke_dt(:,:,:)
+  real(FVPRC), allocatable :: dcon_dt(:,:,:)
+  real(FVPRC), allocatable :: consvte_dt(:,:,:)
+  real(FVPRC), allocatable :: molu_dt(:,:,:), molv_dt(:,:,:)
   real(FVPRC), allocatable :: w_dt(:,:,:)
   real(FVPRC), allocatable :: q_dt(:,:,:,:)
   real(FVPRC), allocatable :: u_srf(:,:)
@@ -1280,7 +1285,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   call ESMF_ClockGet( CLOCK, currTime=fv_time, rc=STATUS )
   VERIFY_(STATUS)
-  call ESMF_TimeGet( fv_time, dayOfYear=days, s=seconds, rc=STATUS )
+  call ESMF_TimeGet( fv_time, yy=year, dayOfYear=days, s=seconds, rc=STATUS )
   VERIFY_(STATUS)
 
   time_total = days*86400. + seconds
@@ -1998,10 +2003,22 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     allocate ( v_dt(isc:iec,jsc:jec,npz) )
     allocate ( t_dt(isc:iec,jsc:jec,npz) )
     allocate ( w_dt(isc:iec,jsc:jec,npz) )
+    allocate ( tc_dt(isc:iec,jsc:jec,npz) )
+    allocate ( molke_dt(isc:iec,jsc:jec,npz) )
+    allocate ( dcon_dt(isc:iec,jsc:jec,npz) )
+    allocate ( consvte_dt(isc:iec,jsc:jec,npz) )
+    allocate ( molu_dt(isc:iec,jsc:jec,npz) )
+    allocate ( molv_dt(isc:iec,jsc:jec,npz) )
     u_dt(:,:,:) = 0.0
     v_dt(:,:,:) = 0.0
     t_dt(:,:,:) = 0.0
     w_dt(:,:,:) = 0.0
+    tc_dt(:,:,:) = 0.0
+    molke_dt(:,:,:) = 0.0
+    dcon_dt(:,:,:) = 0.0
+    consvte_dt(:,:,:) = 0.0
+    molu_dt(:,:,:) = 0.0
+    molv_dt(:,:,:) = 0.0
 
 #ifdef RUN_GTFV3
     if (run_gtfv3 == 0) then
@@ -2025,7 +2042,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
             FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
             FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
-            time_total)
+            time_total, dtdt_tc = tc_dt, dtdt_molke = molke_dt, dtdt_dcon = dcon_dt, &
+            dtdt_consvte = consvte_dt, dudt_moldiff = molu_dt, dvdt_moldiff = molv_dt, &
+            GEOS_MLT = FV_Atm(1)%flagstruct%GEOS_MLT, year=year, doy=days, ut_seconds=seconds)
 #ifdef RUN_GTFV3
        call cpu_time(finish)
        if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
@@ -2067,6 +2086,18 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     if( associated(PTR3D) ) PTR3D = t_dt
     call MAPL_GetPointer ( export, PTR3D, 'DWDT_RAY', rc=status ); VERIFY_(STATUS)
     if( associated(PTR3D) ) PTR3D = w_dt
+    call MAPL_GetPointer ( export, PTR3D, 'DTDTTC', rc=status ); VERIFY_(STATUS)
+    if( associated(PTR3D) ) PTR3D = tc_dt
+    call MAPL_GetPointer ( export, PTR3D, 'DTDT_MOLKE', rc=status ); VERIFY_(STATUS)
+    if( associated(PTR3D) ) PTR3D = molke_dt
+    call MAPL_GetPointer ( export, PTR3D, 'DTDT_DCON', rc=status ); VERIFY_(STATUS)
+    if( associated(PTR3D) ) PTR3D = dcon_dt
+    call MAPL_GetPointer ( export, PTR3D, 'DTDT_CONSVTE', rc=status ); VERIFY_(STATUS)
+    if( associated(PTR3D) ) PTR3D = consvte_dt
+    call MAPL_GetPointer ( export, PTR3D, 'DUDT_MOLDIFF', rc=status ); VERIFY_(STATUS)
+    if( associated(PTR3D) ) PTR3D = molu_dt
+    call MAPL_GetPointer ( export, PTR3D, 'DVDT_MOLDIFF', rc=status ); VERIFY_(STATUS)
+    if( associated(PTR3D) ) PTR3D = molv_dt
 
     if ( FV_Atm(1)%flagstruct%fv_sg_adj > 0 ) then
          u_dt(:,:,:) = 0.0
@@ -2093,6 +2124,12 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
     deallocate ( v_dt )
     deallocate ( t_dt )
     deallocate ( w_dt )
+    deallocate ( tc_dt )
+    deallocate ( molke_dt )
+    deallocate ( dcon_dt )
+    deallocate ( consvte_dt )
+    deallocate ( molu_dt )
+    deallocate ( molv_dt )
 
     call nullify_domain()
 
@@ -4937,6 +4974,17 @@ subroutine echo_fv3_setup()
 !   real(FVPRC)    :: tau_h2o = 0.            ! Time scale (days) for ch4_chem
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d_con ,format='("FV3 d_con: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%consv_te ,format='("FV3 consv_te: ",(F7.5))' )
+   call WRITE_PARALLEL ( 'FV3 GEOS-MLT molecular momentum diffusion options:' )
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%geos_mlt_momdiff_enable ,format='("FV3 geos_mlt_momdiff_enable: ",(A))' )
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%geos_mlt_momdiff_diag ,format='("FV3 geos_mlt_momdiff_diag: ",(A))' )
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%geos_mlt_momdiff_heat ,format='("FV3 geos_mlt_momdiff_heat: ",(A))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%geos_mlt_momdiff_kmax ,format='("FV3 geos_mlt_momdiff_kmax: ",(I7))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%geos_mlt_momdiff_print_stride ,format='("FV3 geos_mlt_momdiff_print_stride: ",(I7))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%geos_mlt_momdiff_pr ,format='("FV3 geos_mlt_momdiff_pr: ",(F10.4))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%geos_mlt_momdiff_nu_scale ,format='("FV3 geos_mlt_momdiff_nu_scale: ",(F10.4))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%geos_mlt_momdiff_pmax_pa ,format='("FV3 geos_mlt_momdiff_pmax_pa: ",(F10.4))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%geos_mlt_momdiff_rmax ,format='("FV3 geos_mlt_momdiff_rmax: ",(F10.4))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%geos_mlt_momdiff_nu_max ,format='("FV3 geos_mlt_momdiff_nu_max: ",(ES12.4))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%delt_max ,format='("FV3 delt_max: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%ke_bg ,format='("FV3 ke_bg: ",(F7.5))' )
    call WRITE_PARALLEL ( 'FV3 Rayleigh Damping Options:' )
@@ -5073,19 +5121,19 @@ end subroutine echo_fv3_setup
      do m=1,FV_Atm(1)%flagstruct%na_init
        call WRITE_PARALLEL ( (/m,FV_Atm(1)%flagstruct%na_init/) ,format='("FV3 adiabatic_init: step ",(I7)," of ",(I7))' )
 ! Forward call
-       call fv_dynamics( &
-            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+       call fv_dynamics( & 
+            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
+            FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
             kappa, cp, zvir, &
-            FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
-            FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+            FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, & 
+            FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, & 
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
             FV_Atm(1)%flagstruct%hydrostatic, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
             FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
-            FV_Atm(1)%ak, FV_Atm(1)%bk, &
+            FV_Atm(1)%ak, FV_Atm(1)%bk, & 
             FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
             FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
             FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
@@ -5093,11 +5141,11 @@ end subroutine echo_fv3_setup
             time_total)
 ! Backward
        call fv_dynamics( &
-            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, -myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
+            FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
-            FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+            FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, & 
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
             FV_Atm(1)%flagstruct%hydrostatic, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
@@ -5134,19 +5182,19 @@ end subroutine echo_fv3_setup
        enddo
 
 ! Backward
-       call fv_dynamics( &
-            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, -myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+       call fv_dynamics( & 
+            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
+            FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
             kappa, cp, zvir, &
-            FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
-            FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+            FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, & 
+            FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, & 
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
             FV_Atm(1)%flagstruct%hydrostatic, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
             FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
-            FV_Atm(1)%ak, FV_Atm(1)%bk, &
+            FV_Atm(1)%ak, FV_Atm(1)%bk, & 
             FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
             FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
             FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
@@ -5154,11 +5202,11 @@ end subroutine echo_fv3_setup
             time_total)
 ! Forward call
        call fv_dynamics( &
-            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
+            FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
-            FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
+            FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, & 
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
             FV_Atm(1)%flagstruct%hydrostatic, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
@@ -5226,4 +5274,5 @@ subroutine WRITE_PARALLEL_L ( field, format )
 end subroutine WRITE_PARALLEL_L
 
 end module FV_StateMod
+
 

@@ -1213,6 +1213,56 @@ contains
          VLOCATION  = MAPL_VLocationCenter,             RC=STATUS    )
      VERIFY_(STATUS)
 
+     call MAPL_AddExportSpec ( gc,                                      &
+         SHORT_NAME = 'DTDTTC',                                        &
+         LONG_NAME  = 'tendency_of_air_temperature_due_to_thermal_conduction', &
+         UNITS      = 'K s-1',                                         &
+         DIMS       = MAPL_DimsHorzVert,                               &
+         VLOCATION  = MAPL_VLocationCenter,                RC=STATUS   )
+      VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec ( gc,                                      &
+         SHORT_NAME = 'DTDT_MOLKE',                                    &
+         LONG_NAME  = 'potential_temperature_tendency_from_molecular_momentum_diffusion_ke_loss', &
+         UNITS      = 'K s-1',                                         &
+         DIMS       = MAPL_DimsHorzVert,                               &
+         VLOCATION  = MAPL_VLocationCenter,                RC=STATUS   )
+      VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec ( gc,                                      &
+         SHORT_NAME = 'DTDT_DCON',                                     &
+         LONG_NAME  = 'air_temperature_tendency_from_native_fv3_d_con_dissipative_heating', &
+         UNITS      = 'K s-1',                                         &
+         DIMS       = MAPL_DimsHorzVert,                               &
+         VLOCATION  = MAPL_VLocationCenter,                RC=STATUS   )
+      VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec ( gc,                                      &
+         SHORT_NAME = 'DTDT_CONSVTE',                                  &
+         LONG_NAME  = 'air_temperature_tendency_from_global_consv_te_energy_fixer', &
+         UNITS      = 'K s-1',                                         &
+         DIMS       = MAPL_DimsHorzVert,                               &
+         VLOCATION  = MAPL_VLocationCenter,                RC=STATUS   )
+      VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec ( gc,                                      &
+         SHORT_NAME = 'DUDT_MOLDIFF',                                  &
+         LONG_NAME  = 'tendency_of_eastward_wind_due_to_molecular_momentum_diffusion', &
+         UNITS      = 'm s-2',                                         &
+         DIMS       = MAPL_DimsHorzVert,                               &
+         FIELD_TYPE = MAPL_VectorField,                                &
+         VLOCATION  = MAPL_VLocationCenter,                RC=STATUS   )
+      VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec ( gc,                                      &
+         SHORT_NAME = 'DVDT_MOLDIFF',                                  &
+         LONG_NAME  = 'tendency_of_northward_wind_due_to_molecular_momentum_diffusion', &
+         UNITS      = 'm s-2',                                         &
+         DIMS       = MAPL_DimsHorzVert,                               &
+         FIELD_TYPE = MAPL_VectorField,                                &
+         VLOCATION  = MAPL_VLocationCenter,                RC=STATUS   )
+      VERIFY_(STATUS)
+
     call MAPL_AddExportSpec ( gc,                                      &
          SHORT_NAME = 'DQVDTDYN',                                      &
          LONG_NAME  = 'tendency_of_specific_humidity_due_to_dynamics', &
@@ -8884,3 +8934,4 @@ end subroutine freeTracers
   end function
 
 end module FVdycoreCubed_GridComp
+
