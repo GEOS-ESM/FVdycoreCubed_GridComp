@@ -4975,6 +4975,13 @@ subroutine echo_fv3_setup()
 !   real(FVPRC)    :: tau_h2o = 0.            ! Time scale (days) for ch4_chem
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d_con ,format='("FV3 d_con: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%consv_te ,format='("FV3 consv_te: ",(F7.5))' )
+   call WRITE_PARALLEL ( 'FV3 GEOS-MLT thermal conduction options:' )
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%geos_mlt_thermcond_enable ,format='("FV3 geos_mlt_thermcond_enable: ",(A))' )
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%geos_mlt_thermcond_limit ,format='("FV3 geos_mlt_thermcond_limit: ",(A))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%geos_mlt_thermcond_dtmax ,format='("FV3 geos_mlt_thermcond_dtmax [K/s]: ",(ES12.4))' )
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%geos_mlt_alt_diag ,format='("FV3 geos_mlt_alt_diag: ",(A))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%geos_mlt_alt_diag_kmax ,format='("FV3 geos_mlt_alt_diag_kmax: ",(I7))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%geos_mlt_alt_diag_print_stride ,format='("FV3 geos_mlt_alt_diag_print_stride: ",(I7))' )
    call WRITE_PARALLEL ( 'FV3 GEOS-MLT molecular momentum diffusion options:' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%geos_mlt_momdiff_enable ,format='("FV3 geos_mlt_momdiff_enable: ",(A))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%geos_mlt_momdiff_diag ,format='("FV3 geos_mlt_momdiff_diag: ",(A))' )
@@ -5275,6 +5282,7 @@ subroutine WRITE_PARALLEL_L ( field, format )
 end subroutine WRITE_PARALLEL_L
 
 end module FV_StateMod
+
 
 
 
