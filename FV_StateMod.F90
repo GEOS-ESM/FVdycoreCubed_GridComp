@@ -2655,7 +2655,11 @@ subroutine State_To_FV ( STATE )
 !------------
 ! Get delz
 !------------
-       if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%delz(isc:iec,jsc:jec,:) = STATE%VARS%DZ
+       ! GEOS-MLT needs a geometric layer-thickness source for the MSIS
+       if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .or. &
+           FV_Atm(1)%flagstruct%GEOS_MLT) then
+          FV_Atm(1)%delz(isc:iec,jsc:jec,:) = STATE%VARS%DZ
+       endif
 
 !------------------------------------------------------------------------------
 ! Get pkz
@@ -2723,7 +2727,11 @@ subroutine FV_To_State ( STATE )
 !------------------------------
 ! Get delz from FV3
 !------------------------------
-       if (.not. FV_Atm(1)%flagstruct%hydrostatic) STATE%VARS%DZ = FV_Atm(1)%delz(isc:iec,jsc:jec,:)
+       ! Preserve the GEOS-MLT geometric-thickness path in hydrostatic runs.
+       if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .or. &
+           FV_Atm(1)%flagstruct%GEOS_MLT) then
+          STATE%VARS%DZ = FV_Atm(1)%delz(isc:iec,jsc:jec,:)
+       endif
 
 !--------------------------------
 ! Get pkz from FV3
@@ -5282,7 +5290,6 @@ subroutine WRITE_PARALLEL_L ( field, format )
 end subroutine WRITE_PARALLEL_L
 
 end module FV_StateMod
-
 
 
 
