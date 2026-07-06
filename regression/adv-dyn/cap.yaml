@@ -10,6 +10,7 @@ cap:
     segment_duration: PT1H  # P1DT
 
   run_extdata: false
+  run_history: true
   history_name: History
   root_name: Root
 
