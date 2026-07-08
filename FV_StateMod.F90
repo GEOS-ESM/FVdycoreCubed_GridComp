@@ -1098,43 +1098,89 @@ contains
         print *
         write(6,*) ' + denotes a layer within the "dz-filter" of the dynamics'
         write(6,*) ' * denotes a layer within the "sponge-layer" of the dynamics'
-        write(6,100)
-100     format(2x,' k ','      A(k)    ',2x,' B(k)   ',2x,'  Pref    ',2x,'  DelP',/, &
-               1x,'----',3x,'----------',2x,'--------',2x,'----------',2x,'---------' )
+
+        if (FV_Atm(1)%flagstruct%GEOS_MLT) then
+           write(6,200)
+        else
+           write(6,100)
+        endif
+
           k=0
           if ( (FV_Atm(1)%flagstruct%fv_sg_adj > 0) .AND. (k<=FV_Atm(1)%flagstruct%n_zfilter) ) then
             if (k<=FV_Atm(1)%flagstruct%n_sponge) then
-              write(6,101) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+              if (FV_Atm(1)%flagstruct%GEOS_MLT) then
+                write(6,201) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+              else
+                write(6,101) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+              endif
             else
-              write(6,102) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+              if (FV_Atm(1)%flagstruct%GEOS_MLT) then
+                write(6,202) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+              else
+                write(6,102) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+              endif
             endif
           else
             if (k<=FV_Atm(1)%flagstruct%n_sponge) then
-              write(6,105) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+              if (FV_Atm(1)%flagstruct%GEOS_MLT) then
+                write(6,205) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+              else
+                write(6,105) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+              endif
             else
-              write(6,106) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+              if (FV_Atm(1)%flagstruct%GEOS_MLT) then
+                write(6,206) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+              else
+                write(6,106) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+              endif
             endif
           endif
+
           do k=1,ubound(ak,1)
             if ( (FV_Atm(1)%flagstruct%fv_sg_adj > 0) .AND. (k<=FV_Atm(1)%flagstruct%n_zfilter) ) then
               if (k<=FV_Atm(1)%flagstruct%n_sponge) then
-                 write(6,103) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
-                              (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
+                 if (FV_Atm(1)%flagstruct%GEOS_MLT) then
+                    write(6,203) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
+                                 (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
+                 else
+                    write(6,103) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
+                                 (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
+                 endif
               else
-                 write(6,104) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
-                              (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
+                 if (FV_Atm(1)%flagstruct%GEOS_MLT) then
+                    write(6,204) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
+                                 (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
+                 else
+                    write(6,104) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
+                                 (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
+                 endif
               endif
             else
               if (k<=FV_Atm(1)%flagstruct%n_sponge) then
-                 write(6,107) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
-                              (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
+                 if (FV_Atm(1)%flagstruct%GEOS_MLT) then
+                    write(6,207) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
+                                 (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
+                 else
+                    write(6,107) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
+                                 (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
+                 endif
               else
-                 write(6,108) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
-                              (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
+                 if (FV_Atm(1)%flagstruct%GEOS_MLT) then
+                    write(6,208) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
+                                 (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
+                 else
+                    write(6,108) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
+                                 (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
+                 endif
               endif
             endif
           enddo
+
         print *
+
+100     format(2x,' k ','      A(k)    ',2x,' B(k)   ',2x,'  Pref    ',2x,'  DelP',/, &
+               1x,'----',3x,'----------',2x,'--------',2x,'----------',2x,'---------' )
+
 101     format('*+',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4)
 102     format(' +',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4)
 103     format('*+',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
@@ -1143,8 +1189,20 @@ contains
 106     format('  ',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4)
 107     format('* ',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
 108     format('  ',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
-  endif
 
+200     format(2x,' k ','        A(k) [hPa]     ',2x,'   B(k)    ',2x,'      Pref [hPa]    ',2x,'      DelP [hPa]',/, &
+               1x,'----',3x,'------------------',2x,'----------',2x,'------------------',2x,'------------------' )
+
+201     format('*+',2x,i3,2x,es18.8,2x,es10.3,2x,es18.8)
+202     format(' +',2x,i3,2x,es18.8,2x,es10.3,2x,es18.8)
+203     format('*+',2x,i3,2x,es18.8,2x,es10.3,2x,es18.8,2x,es18.8)
+204     format(' +',2x,i3,2x,es18.8,2x,es10.3,2x,es18.8,2x,es18.8)
+205     format('* ',2x,i3,2x,es18.8,2x,es10.3,2x,es18.8)
+206     format('  ',2x,i3,2x,es18.8,2x,es10.3,2x,es18.8)
+207     format('* ',2x,i3,2x,es18.8,2x,es10.3,2x,es18.8,2x,es18.8)
+208     format('  ',2x,i3,2x,es18.8,2x,es10.3,2x,es18.8,2x,es18.8)
+
+  endif
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV Initialize', RC=STATUS )
   VERIFY_(STATUS)
 
