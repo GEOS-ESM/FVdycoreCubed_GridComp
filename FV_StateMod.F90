@@ -88,6 +88,7 @@ private
   public T_TRACERS, T_FVDYCORE_VARS, T_FVDYCORE_GRID, T_FVDYCORE_STATE
   public fv_fillMassFluxes
   public fv_computeMassFluxes
+  public fv_getGradT_2D, fv_getGradT_3D
   public fv_getVerticalMassFlux
   public fv_getPK
   public fv_getOmega
@@ -2828,6 +2829,114 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
     call mp_bcst(state%q_split)
 
 end subroutine adjust_fv3_splits
+
+subroutine fv_getGradT_2D(t_in, ps_in, mag_grad_t)
+  ! INPUT: 2D Temp (REAL4) interpolated to pressure level (with halo bounds)
+  real(REAL4), intent(INOUT) :: t_in(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied, &
+                                     FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed)
+  real(REAL4), intent(INOUT) :: ps_in(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied, &
+                                      FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed)
+
+  ! OUTPUT: MAPL Pointer (REAL4) (Assumed shape, 1-based indexing: 1:im, 1:jm)
+  real(REAL4), intent(OUT)   :: mag_grad_t(:,:)
+
+  integer :: isc, iec, jsc, jec
+  integer :: i, j, ii, jj
+  real(REAL4) :: dTdx, dTdy, p_surf_min
+  real(REAL8) :: dx, dy
+
+  isc = FV_Atm(1)%bd%isc ; iec = FV_Atm(1)%bd%iec
+  jsc = FV_Atm(1)%bd%jsc ; jec = FV_Atm(1)%bd%jec
+
+  ! 1. Update halos. FV3 mpp_update_domains natively supports REAL4 arrays.
+  call mpp_update_domains(ps_in, FV_Atm(1)%domain, complete=.false.)
+  call mpp_update_domains( t_in, FV_Atm(1)%domain, complete=.true.)
+
+  ! 2. Calculate gradient, avoid UNDEF, and map to 1-based MAPL array
+  !$OMP PARALLEL DO DEFAULT(NONE) &
+  !$OMP SHARED(FV_Atm, t_in, ps_in, mag_grad_t, isc, iec, jsc, jec) &
+  !$OMP PRIVATE(i, j, ii, jj, dx, dy, dTdx, dTdy, p_surf_min)
+  do j = jsc, jec
+     jj = j - jsc + 1   ! Map to MAPL pointer index
+     
+     do i = isc, iec
+        ii = i - isc + 1  ! Map to MAPL pointer index
+        
+        ! Find the highest terrain in the 5-point stencil
+        p_surf_min = MIN(ps_in(i,j), ps_in(i-1,j), ps_in(i+1,j), ps_in(i,j-1), ps_in(i,j+1))
+
+        ! SHIELD: Only calculate if the whole stencil is safely > 700 hPa
+        ! (Keeps the 600 hPa level well out of the mountain boundary layer)
+        if ( p_surf_min > 70000.0_REAL4 .and. &
+             t_in(i,j)   /= real(MAPL_UNDEF, REAL4) .and. &
+             t_in(i-1,j) /= real(MAPL_UNDEF, REAL4) .and. &
+             t_in(i+1,j) /= real(MAPL_UNDEF, REAL4) .and. &
+             t_in(i,j-1) /= real(MAPL_UNDEF, REAL4) .and. &
+             t_in(i,j+1) /= real(MAPL_UNDEF, REAL4) ) then
+           
+           dx = FV_Atm(1)%gridstruct%dxa(i,j)
+           dy = FV_Atm(1)%gridstruct%dya(i,j)
+
+           ! Centered difference
+           dTdx = (t_in(i+1,j) - t_in(i-1,j)) / real(2.0_REAL8 * dx, REAL4)
+           dTdy = (t_in(i,j+1) - t_in(i,j-1)) / real(2.0_REAL8 * dy, REAL4)
+
+           mag_grad_t(ii,jj) = SQRT(dTdx**2 + dTdy**2)
+           
+        else
+           ! Stencil hits topography or uninitialized data
+           mag_grad_t(ii,jj) = 0.0_REAL4
+        endif
+
+     enddo
+  enddo
+  !$OMP END PARALLEL DO
+
+return
+end subroutine fv_getGradT_2D
+
+subroutine fv_getGradT_3D(mag_grad_t)
+  ! OUTPUT: Magnitude of the horizontal temperature gradient
+  real(REAL8), intent(OUT) :: mag_grad_t(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec, &
+                                         FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec, &
+                                         1:FV_Atm(1)%npz)
+  
+  integer :: isc, iec, jsc, jec
+  integer :: i, j, k
+  real(REAL8) :: dTdx, dTdy
+  real(REAL8) :: dx, dy
+
+  isc = FV_Atm(1)%bd%isc ; iec = FV_Atm(1)%bd%iec
+  jsc = FV_Atm(1)%bd%jsc ; jec = FV_Atm(1)%bd%jec
+
+  call mpp_update_domains(FV_Atm(1)%pt, FV_Atm(1)%domain, complete=.true.)
+
+  !$OMP PARALLEL DO DEFAULT(NONE) &
+  !$OMP SHARED(FV_Atm, mag_grad_t, isc, iec, jsc, jec) &
+  !$OMP PRIVATE(i, j, k, dx, dy, dTdx, dTdy)
+  do k = 1, FV_Atm(1)%npz
+     do j = jsc, jec
+        do i = isc, iec
+           
+           ! Note: Replace dxa/dya with your exact FV3 metric arrays for cell-center distances.
+           ! (Often found in FV_Atm(1)%gridstruct%dxa or similar)
+           dx = FV_Atm(1)%gridstruct%dxa(i,j)
+           dy = FV_Atm(1)%gridstruct%dya(i,j)
+
+           ! Assuming pt is Absolute Temperature (if it's Potential T, multiply by pkz here)
+           dTdx = (FV_Atm(1)%pt(i+1,j,k) - FV_Atm(1)%pt(i-1,j,k)) / (2.0_REAL8 * dx)
+           dTdy = (FV_Atm(1)%pt(i,j+1,k) - FV_Atm(1)%pt(i,j-1,k)) / (2.0_REAL8 * dy)
+           
+           ! Magnitude in K/m
+           mag_grad_t(i,j,k) = SQRT(dTdx**2 + dTdy**2)
+           
+        enddo
+     enddo
+  enddo
+  !$OMP END PARALLEL DO
+
+return
+end subroutine fv_getGradT_3D
 
 subroutine fv_getDELZ(delz,temp,pe)
   real(REAL8), intent(OUT) :: delz(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)

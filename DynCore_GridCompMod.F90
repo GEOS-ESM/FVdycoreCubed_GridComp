@@ -51,7 +51,8 @@
                            DYN_DEBUG       => DEBUG,                 &
                            HYDROSTATIC     => FV_HYDROSTATIC,        &
                            fv_getUpdraftHelicity, DEBUG_DYN,  DEBUG_ADV, &
-                           ADIABATIC, SW_DYNAMICS, AdvCore_Advection
+                           ADIABATIC, SW_DYNAMICS, AdvCore_Advection, &
+                           fv_getGradT_2D
    use m_topo_remap, only: dyn_topo_remap
    use CubeGridPrototype, only: register_grid_and_regridders
 
@@ -1355,6 +1356,14 @@ contains
     call MAPL_AddExportSpec ( gc,                                  &
        SHORT_NAME         = 'WSPD_10M',                               &
        LONG_NAME          = 'wind_speed_at_10m',                  &
+       UNITS              = 'm s-1',                               &
+       DIMS               = MAPL_DimsHorzOnly,                     &
+       VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
+    VERIFY_(STATUS)
+
+    call MAPL_AddExportSpec ( gc,                                  &
+       SHORT_NAME         = 'WSPD_STABLE300M',                     &
+       LONG_NAME          = 'max_wind_speed_in_stable_cold_surface_layer', &
        UNITS              = 'm s-1',                               &
        DIMS               = MAPL_DimsHorzOnly,                     &
        VLOCATION          = MAPL_VLocationNone,          RC=STATUS )
@@ -2992,10 +3001,14 @@ subroutine Run(gc, import, export, clock, rc)
     integer  :: NKE, NPHI
     integer  :: NUMVARS
     integer  :: ifirstxy, ilastxy, jfirstxy, jlastxy
-    integer  :: kend, i, j, K, L, n
+    integer  :: kend, i, j, K, L, n, ii, jj
     integer  :: im_replay,jm_replay
     logical, parameter :: convt = .false. ! Until this is run with full physics
     logical  :: is_shutoff, is_ringing
+    logical  :: is_stable
+
+    integer  :: k_bot, k_top
+    real     :: z_agl, du, dv
 
     real(r8),     pointer :: phisxy(:,:)
     real(kind=4), pointer ::   phis(:,:)
@@ -5120,6 +5133,12 @@ subroutine Run(gc, import, export, clock, rc)
 
 ! Fill Surface and Near-Surface Variables
 ! ----------------------------------------------
+
+    ! Get the height above the surface
+      do k=1,km+1
+         zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
+      enddo
+
                    HGT_SURFACE = 50.0
    if (km .eq. 72) HGT_SURFACE =  0.0
    call MAPL_GetResource ( MAPL, HGT_SURFACE, Label="HGT_SURFACE:", DEFAULT=HGT_SURFACE, RC=STATUS)
@@ -5130,11 +5149,6 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_GetPointer(export,temp2d,'DZ', rc=status)
       VERIFY_(STATUS)
       if(associated(temp2d)) temp2d = HGT_SURFACE
-
-    ! Get the height above the surface
-      do k=1,km+1
-         zle(:,:,k) = zle(:,:,k) - zle(:,:,km+1)
-      enddo
 
       call MAPL_GetPointer(export,temp2d,'PS',  rc=status)
       VERIFY_(STATUS)
@@ -5217,6 +5231,45 @@ subroutine Run(gc, import, export, clock, rc)
        call VertInterp(temp2d,sqrt(ur**2 + vr**2),-zle,-10.0, rc=status)
        VERIFY_(STATUS)
    end if
+
+   call MAPL_GetPointer(export,temp2d,'WSPD_STABLE300M',rc=status)           
+   VERIFY_(STATUS)
+    if(associated(temp2d)) then
+       tempxy = vars%pt * vars%pkz
+       temp2d = 0.0
+       do j = jfirstxy, jlastxy
+          jj = j - jfirstxy + 1
+          do i = ifirstxy, ilastxy
+             ii = i - ifirstxy + 1  
+             ! 1. Check if surface air is freezing
+             if (tempxy(i,j,km) <= MAPL_TICE) then
+                ! Assume no inversion until proven otherwise
+                is_stable = .false.
+                ! Start max wind tracking with the lowest model level
+                temp2d(ii,jj) = SQRT(ur(i,j,km)**2 + vr(i,j,km)**2)
+                ! 2. Scan the lowest 300m
+                do k = km-1, 1, -1
+                   ! Height AGL
+                   if ( (0.5 * (zle(i,j,k) + zle(i,j,k+1)) - zle(i,j,km+1)) <= 300.0 ) then
+                      ! Track maximum wind speed
+                      temp2d(ii,jj) = MAX(temp2d(ii,jj), SQRT(ur(i,j,k)**2 + vr(i,j,k)**2))
+                      ! 3. Check for Inversion ANYWHERE in the 300m layer
+                      if (tempxy(i,j,k) > tempxy(i,j,km)) then
+                         is_stable = .true.
+                      endif
+                   else
+                      exit ! Reached top of 300m layer
+                   endif
+                end do
+                ! 4. If no inversion was found in the whole 300m, it's not a katabatic zone. 
+                ! Zero out the wind speed.
+                if (.not. is_stable) then
+                   temp2d(ii,jj) = 0.0
+                endif
+             endif
+          end do
+       end do
+    end if
 
    if (.not. HYDROSTATIC) then
    call MAPL_GetPointer(export,temp2d,'VVEL_UP_100_1000',rc=status)
@@ -6485,15 +6538,22 @@ end subroutine RUN
     real(r8), allocatable ::  logpe(:,:,:)
     real(r8), allocatable ::  logps(:,:)
 
+    real(r4), allocatable :: t_600(:,:), ps(:,:)
+
     real(FVPRC)              :: dt
 
     real(r4), pointer     :: QOLD(:,:,:)
     real(r4), pointer     :: temp3d(:,:,:)
     real(r4), pointer     :: temp2d(:,:  )
 
+    integer isc,iec, jsc,jec
+    integer isd,ied, jsd,jed
     integer ifirstxy, ilastxy
     integer jfirstxy, jlastxy
     integer im,jm,km, iNXQ
+    integer ii,jj
+    real :: p_layer
+
     real(r4), pointer     :: ztemp1(:,:  )
     real(r4), pointer     :: ztemp2(:,:  )
     real(r4), pointer     :: ztemp3(:,:  )
@@ -6531,6 +6591,16 @@ end subroutine RUN
     vars  => state%vars   ! direct handle to control variables
     grid  => state%grid   ! direct handle to grid
     dt    =  state%dt     ! dynamics time step (large)
+
+    isc = grid%is
+    iec = grid%ie
+    jsc = grid%js
+    jec = grid%je
+    
+    isd = grid%isd
+    ied = grid%ied
+    jsd = grid%jsd
+    jed = grid%jed
 
     ifirstxy = grid%is
     ilastxy  = grid%ie
@@ -6770,7 +6840,6 @@ end subroutine RUN
     call MAPL_GetPointer(export,temp3d,'ZL',  rc=status)
     VERIFY_(STATUS)
     if(associated(temp3d)) temp3d = 0.5*( zle(:,:,2:) + zle(:,:,:km) )
-
 
 ! Fill Single Level Variables
 ! ---------------------------
