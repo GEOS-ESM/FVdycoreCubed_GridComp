@@ -29,6 +29,7 @@ module FV_StateMod
    use fv_grid_tools_mod,  only: get_unit_vector
    use fv_control_mod, only: fv_init1, fv_init2
    use fv_arrays_mod , only: fv_atmos_type, FVPRC, REAL4, REAL8
+   use msis_wrapper, only: msis_wrapper_init
    use init_hydro_mod, only: p_var
    use fv_dynamics_mod, only: fv_dynamics
    use fv_update_phys_mod, only: fv_update_phys
@@ -717,6 +718,13 @@ contains
 !! Start up FV
     call MAPL_TimerOn(MAPL,"--FV_INIT")
     call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
+
+    ! GEOS-MLT: initialize NRLMSIS and load the time-varying
+    ! F10.7/F10.7A/Ap table before any dynamics-side MSIS calls.
+    if (FV_Atm(1)%flagstruct%GEOS_MLT) then
+       call msis_wrapper_init()
+    endif
+
     call MAPL_TimerOff(MAPL,"--FV_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
@@ -1239,7 +1247,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   character(len=ESMF_MAXSTR)       :: IAm='FV:FV_Run'
 
   type (ESMF_Time) :: fv_time
-  integer  :: year, days, seconds
+  integer  :: year, days, hours, minutes, seconds
+  integer  :: seconds_of_day
   real(FVPRC) :: time_total, massD
 
   integer :: i,j,k,n,nn
@@ -1343,10 +1352,16 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   call ESMF_ClockGet( CLOCK, currTime=fv_time, rc=STATUS )
   VERIFY_(STATUS)
-  call ESMF_TimeGet( fv_time, yy=year, dayOfYear=days, s=seconds, rc=STATUS )
+  call ESMF_TimeGet( fv_time, yy=year, dayOfYear=days, &
+                     h=hours, m=minutes, s=seconds, rc=STATUS )
   VERIFY_(STATUS)
 
-  time_total = days*86400. + seconds
+  ! MSIS expects UT in seconds since midnight, not the seconds field
+  ! returned by ESMF_TimeGet.
+  seconds_of_day = hours*3600 + minutes*60 + seconds
+
+  ! Preserve the existing day-count convention while including time of day.
+  time_total = days*86400. + seconds_of_day
 
   isc = FV_Atm(1)%bd%isc
   iec = FV_Atm(1)%bd%iec
@@ -2102,7 +2117,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
             time_total, dtdt_tc = tc_dt, dtdt_molke = molke_dt, dtdt_dcon = dcon_dt, &
             dtdt_consvte = consvte_dt, dudt_moldiff = molu_dt, dvdt_moldiff = molv_dt, &
-            GEOS_MLT = FV_Atm(1)%flagstruct%GEOS_MLT, year=year, doy=days, ut_seconds=seconds)
+            GEOS_MLT = FV_Atm(1)%flagstruct%GEOS_MLT, year=year, doy=days, &
+            ut_seconds=seconds_of_day)
 #ifdef RUN_GTFV3
        call cpu_time(finish)
        if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
@@ -5348,6 +5364,3 @@ subroutine WRITE_PARALLEL_L ( field, format )
 end subroutine WRITE_PARALLEL_L
 
 end module FV_StateMod
-
-
-
