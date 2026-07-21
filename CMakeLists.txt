@@ -13,6 +13,7 @@ set (srcs
   GEOS_FV3_Utilities.F90
   fv_regridding_utils.F90
   fv_regrid_c2c.F90
+  fv_shared.F90
   rs_scaleMod.F90
   )
 if (BUILD_GEOS_GTFV3_INTERFACE)
