@@ -6,9 +6,17 @@ MODULE fv_shared
   USE MAPL, ONLY : MAPL_FieldGet, MAPL_Verify
 
   IMPLICIT NONE
+
+  private
+
+  public :: get_short_name
+  public :: field_is_cloud_water_species
+  public :: is_name_in_list
+
   !
   !  Functions used in both AdvCore_GridCompMod and DynCore_GridCompMod
   !
+
 CONTAINS
 
      function get_short_name(field, rc) result(short_name)
