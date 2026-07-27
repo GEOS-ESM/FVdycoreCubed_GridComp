@@ -1633,7 +1633,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              cnvfrc  = state%vars%tracer(n)%content_r4(:,:,:)
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
            else
-             cnvfrc  = state%vars%tracer(n)%content_r4(:,:,:)
+             cnvfrc  = state%vars%tracer(n)%content(:,:,:)
              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
            endif
          elseif (clcn /= -1) then
@@ -1674,8 +1674,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
       do k=1,npz
         do j=jsc,jec
           do i=isc,iec
-            if (FV_Atm(1)%q(i,j,k,qcld) > 0.0) &
+            if (FV_Atm(1)%q(i,j,k,qcld) > 0.0) then
+               FV_Atm(1)%q(i,j,k,qcld) = min(FV_Atm(1)%q(i,j,k,qcld),1.0)
                cnvfrc(i,j,k) = cnvfrc(i,j,k)/FV_Atm(1)%q(i,j,k,qcld)
+            endif
           enddo
         enddo
       enddo
@@ -1691,8 +1693,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
       do k=1,npz
         do j=jsc,jec
           do i=isc,iec
-            if (FV_Atm(1)%q(i,j,k,qcld) > 0.0) &
+            if (FV_Atm(1)%q(i,j,k,qcld) > 0.0) then
+               FV_Atm(1)%q(i,j,k,qcld) = min(FV_Atm(1)%q(i,j,k,qcld),1.0)
                cnvfrc(i,j,k) = cnvfrc(i,j,k)/FV_Atm(1)%q(i,j,k,qcld)
+            endif
           enddo
         enddo
       enddo
@@ -2189,18 +2193,18 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
          if (TRIM(state%vars%tracer(n)%tname) == 'CLCN') then
             CLCN_FILLED = .TRUE.
             if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * cnvfrc
+               state%vars%tracer(n)%content_r4(:,:,:) = max(0.0,min(1.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * cnvfrc))
             else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * cnvfrc
+                  state%vars%tracer(n)%content(:,:,:) = max(0.0,min(1.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * cnvfrc))
             endif
          endif
          if (TRIM(state%vars%tracer(n)%tname) == 'CLLS') then
             CLLS_FILLED = .TRUE.
             nn = nn+1
             if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * (1.0-cnvfrc)
+               state%vars%tracer(n)%content_r4(:,:,:) = max(0.0,min(1.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * (1.0-cnvfrc)))
             else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * (1.0-cnvfrc)
+                  state%vars%tracer(n)%content(:,:,:) = max(0.0,min(1.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * (1.0-cnvfrc)))
             endif
          endif
        else
