@@ -552,7 +552,7 @@ contains
    FV_Atm(1)%flagstruct%k_split = 1
    FV_Atm(1)%flagstruct%n_split = 0
    ! Rayleigh Damping defaults
-   FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+   FV_Atm(1)%flagstruct%rf_cutoff = 30.0 ! Pa
    FV_Atm(1)%flagstruct%tau = 5.0
    FV_Atm(1)%flagstruct%RF_fast = .false.
   ! Cubed-Sphere Global Resolution Specific adjustments
@@ -561,73 +561,73 @@ contains
      !              based on ideal remapping DT
       if (FV_Atm(1)%flagstruct%npx >= 12) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 30.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 5.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 24) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 30.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 4.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 48) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0  )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 30.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 3.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 90) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 30.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 2.5
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 180) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 30.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 2.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 360) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 60.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 1.5
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 720) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 100.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 1.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1120) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 250.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 200.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.75
-         FV_Atm(1)%flagstruct%RF_fast = .false.
+         FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1440) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 500.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 300.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.5
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 2880) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 400.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.25
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 500.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.125
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 10800) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  4.6875 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
+         FV_Atm(1)%flagstruct%rf_cutoff = 750.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.0625
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
@@ -678,10 +678,17 @@ contains
       endif
       FV_Atm(1)%flagstruct%d2_bg = 0.0  ! 2nd order Divg Damping coef
       FV_Atm(1)%flagstruct%d_ext = 0.0  ! External damping
-     ! Local Richardson-number turbulent mixing
-      FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
-     ! Sponge layer
-      FV_Atm(1)%flagstruct%n_sponge = 9
+      if (FV_Atm(1)%flagstruct%npz == 72) then
+         ! Local Richardson-number turbulent mixing
+          FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
+         ! Sponge layer
+          FV_Atm(1)%flagstruct%n_sponge = 9
+      else
+         ! Local Richardson-number turbulent mixing
+          FV_Atm(1)%flagstruct%fv_sg_adj = -1
+         ! Sponge layer
+          FV_Atm(1)%flagstruct%n_sponge = 6
+      endif
       FV_Atm(1)%flagstruct%d2_bg_k1 = 0.2
       FV_Atm(1)%flagstruct%d2_bg_k2 = 0.1
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1200) then
