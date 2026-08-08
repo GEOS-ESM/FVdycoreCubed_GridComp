@@ -10,11 +10,11 @@ mapl:
     DYNsa:
       dso: libFVdycoreCubed_GridComp
       config_file: dyn-sa.yaml
-      setservice: fvdycorecubed_setservices_
+      setservices: fvdycorecubed_setservices_
     DataMoist:
       dso: libconfigurable_gridcomp
       config_file: data-moist.yaml
-      setservice: setservices_
+      setservices: setservices_
 
   connections:
     - src_name: TRADV
