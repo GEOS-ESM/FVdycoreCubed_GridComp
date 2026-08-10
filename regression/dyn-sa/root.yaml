@@ -11,6 +11,7 @@ mapl:
       dso: libFVdycoreCubed_GridComp
       config_file: dyn-sa.yaml
       setservices: fvdycorecubed_setservices_
+      setservice: fvdycorecubed_setservices_
     DataMoist:
       dso: libconfigurable_gridcomp
       config_file: data-moist.yaml
