@@ -10,13 +10,11 @@ mapl:
     DYN:
       dso: libFVdycoreCubed_GridComp
       config_file: dyn.yaml
-      setservice: fvdycorecubed_setservices_
       setservices: fvdycorecubed_setservices_
 
     ADV:
       dso: libFVdycoreCubed_GridComp
       config_file: adv.yaml
-      setservice: advcore_setservices_
       setservices: advcore_setservices_
 
     DataMoist:
