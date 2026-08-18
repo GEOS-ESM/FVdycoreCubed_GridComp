@@ -15,13 +15,18 @@ cap:
   root_name: Root
 
   mapl:
+
+    setServices:
+      sharedObj: libMAPL.cap
+
     children:
       Root:
-        dso: libconfigurable_gridcomp
         config_file: root.yaml
+        dso: libconfigurable_gridcomp
+
       History:
-        dso: libMAPL.history
         config_file: history.yaml
+        dso: libMAPL.history
 
   checkpointing:
     enabled: true

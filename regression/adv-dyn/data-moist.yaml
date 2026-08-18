@@ -1,4 +1,7 @@
 mapl:
+  setServices:
+    sharedObj: libconfigurable_gridcomp
+
   states:
     internal:
       Q:
