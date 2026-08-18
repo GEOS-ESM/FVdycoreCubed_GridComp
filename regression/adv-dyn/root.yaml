@@ -13,27 +13,21 @@ mapl:
   children:
     DYN:
       config_file: dyn.yaml
-      setservices: fvdycorecubed_setservices_
 
     ADV:
       config_file: adv.yaml
-      setservices: advcore_setservices_
 
     DataMoist:
       config_file: data-moist.yaml
-      setservices: setservices_
 
     DataTracers:
       config_file: data-tracers.yaml
-      setservices: setservices_
 
     DataPhisVarflt:
       config_file: data-phis-varflt.yaml
-      setservices: setservices_
 
     DataAna:
       config_file: data-ana.yaml
-      setservices: setservices_
 
   connections:
     - src_name: TRADV
