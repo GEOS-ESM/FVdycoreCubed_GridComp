@@ -1,5 +1,9 @@
 ---
 mapl:
+
+  setServices:
+    sharedObj: libconfigurable_gridcomp
+
   states: {}
 
   geometry:
