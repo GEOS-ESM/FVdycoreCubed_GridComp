@@ -18,8 +18,11 @@ cap:
     children:
       Root:
         config_file: root.yaml
+        dso: libconfigurable_gridcomp
+
       History:
         config_file: history.yaml
+        dso: libMAPL.history
 
   checkpointing:
     enabled: true
