@@ -12,34 +12,29 @@ mapl:
 
   children:
     DYN:
-      dso: libFVdycoreCubed_GridComp
       config_file: dyn.yaml
       setservices: fvdycorecubed_setservices_
 
     ADV:
-      dso: libFVdycoreCubed_GridComp
       config_file: adv.yaml
       setservices: advcore_setservices_
 
     DataMoist:
-      dso: libconfigurable_gridcomp
       config_file: data-moist.yaml
       setservices: setservices_
 
     DataTracers:
-      dso: libconfigurable_gridcomp
       config_file: data-tracers.yaml
       setservices: setservices_
 
     DataPhisVarflt:
-      dso: libconfigurable_gridcomp
       config_file: data-phis-varflt.yaml
       setservices: setservices_
 
     DataAna:
-      dso: libconfigurable_gridcomp
       config_file: data-ana.yaml
       setservices: setservices_
+
   connections:
     - src_name: TRADV
       dst_name: TRADV
