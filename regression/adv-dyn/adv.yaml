@@ -8,7 +8,7 @@ RUN_DT: 1800
 mapl:
   setServices:
     sharedObj: libFVdycoreCubed_GridComp
-    userProc: advcore_setservices_
+    userRoutine: advcore_setservices_
 
   misc:
     activate_all_exports: true

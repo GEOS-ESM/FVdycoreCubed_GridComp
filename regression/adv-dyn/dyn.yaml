@@ -26,7 +26,7 @@ geometry:
 mapl:
   setServices:
     sharedObj: libFVdycoreCubed_GridComp
-    userProc: fvdycorecubed_setservices_
+    userRoutine: fvdycorecubed_setservices_
 
   misc:
     checkpoint:
