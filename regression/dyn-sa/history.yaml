@@ -20,4 +20,3 @@ mapl:
 
   setServices:
     sharedObj: libMAPL.history
-      
