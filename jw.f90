@@ -1,6 +1,17 @@
 MODULE jw
+
   IMPLICIT NONE
-  !
+
+  PRIVATE
+
+  PUBLIC :: temperature
+  PUBLIC :: surface_geopotential
+  PUBLIC :: u_wind
+  PUBLIC :: v_wind
+  PUBLIC :: tracer_q1_q2
+  PUBLIC :: tracer_q3
+  PUBLIC :: tracer_q
+
   !  Functions for setting up initial conditions for the Jablonowski-Williamson test case.
   !
   !  Given longitude (radians), latitude (radians), eta (pressure) and rotation_angle (degrees)
@@ -35,31 +46,29 @@ MODULE jw
   !  and equator.
   !
   !  Author: Peter Hjort Lauritzen (NCAR, pel@ucar.edu)
-  !
-  INTEGER,PARAMETER :: r8 = SELECTED_REAL_KIND(12) ! 8 byte real
 
-  REAL(r8), PARAMETER ::       &
-       eta_strato = 0.2d0     ,&! tropopause level
-       u0         = 35.d0     ,&! 35 m/s
-       T0         = 288.d0    ,&! global mean T at surface
-       p0         = 100000.d0 ,&! global mean surface pressure
-       eta0       = 0.252d0   ,&! center of jets (hybrid)
+  INTEGER,  PARAMETER :: r8 = SELECTED_REAL_KIND(12) ! 8 byte real
+
+  REAL(r8), PARAMETER ::                       &
+       eta_strato = 0.2d0                     ,& ! tropopause level
+       u0         = 35.d0                     ,& ! 35 m/s
+       T0         = 288.d0                    ,& ! global mean T at surface
+       p0         = 100000.d0                 ,& ! global mean surface pressure
+       eta0       = 0.252d0                   ,& ! center of jets (hybrid)
        !
-       radius                 = 10.d0,             & ! radius of the perturbation
-       perturbation_amplitude =  1.d0,             & ! amplitude of u perturbation 1 m/s
-       perturbation_longitude = 20.d0,             & ! longitudinal position, 20E
-       perturbation_latitude  = 40.d0,             & ! latitudinal position, 40N
-       perturbation_latitude_tracer = 55.d0,       &
+       radius                       = 10.d0   ,& ! radius of the perturbation
+       perturbation_amplitude       =  1.d0   ,& ! amplitude of u perturbation 1 m/s
+       perturbation_longitude       = 20.d0   ,& ! longitudinal position, 20E
+       perturbation_latitude        = 40.d0   ,& ! latitudinal position, 40N
+       perturbation_latitude_tracer = 55.d0   ,&
        !
-       !
-       !
-       Rd         = 287.d0    ,&! gas constant J/(K kg)
-       g          = 9.80616d0 ,&! gravitational acceleration (m/s^2)
-       a          = 6371229.d0,&! Earth's radius in m
-       omega      = 7.29212d-5,&! angular velocity 1/s
-       gamma      = 0.005d0   ,&! lapse rate
-       pi         = 3.14159265358979323846_R8,&  ! pi
-       deg2rad    = pi/180.d0
+       Rd      = 287.d0                       ,& ! gas constant J/(K kg)
+       g       = 9.80616d0                    ,& ! gravitational acceleration (m/s^2)
+       a       = 6371229.d0                   ,& ! Earth's radius in m
+       omega   = 7.29212d-5                   ,& ! angular velocity 1/s
+       gamma   = 0.005d0                      ,& ! lapse rate
+       pi      = 3.14159265358979323846_R8    ,& ! pi
+       deg2rad = pi/180.d0
 
 CONTAINS
   !
