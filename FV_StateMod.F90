@@ -1382,7 +1382,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
    case (3:4)
     sphu = 1; qliq = 2; qice = 3; qcld = 4
    case (1)
-    sphu = 1; qlcn = 2; qlls = 3; qicn = 4; qils = 5
+    sphu = 1; qlcn = 2; qlls = 3; qicn = 4; qils = 5; clcn = 6; clls = 7
    end select
 
  ! ------------------------------------------------------------------
@@ -1401,7 +1401,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     select case (FV_Atm(1)%flagstruct%nwat)
        case (6:7); nn = 7
        case (3:4); nn = 4
-       case (1);   nn = 5
+       case (1);   nn = 7
        case (0);   nn = 0
     end select
 
@@ -1416,6 +1416,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  else
                      FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu) = state%vars%tracer(n)%content(:,:,:)
                  endif
+                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
              endif
 
           ! -- LIQUID --
@@ -1433,6 +1434,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                      nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qlcn = nn 
                  endif
              endif
+             if ((qlcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if ((qliq /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QLIQ") )
 
           case ('QLLS')
              if (state%vars%tracer(n)%is_r4) then
@@ -1442,6 +1445,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
                  if (qlls /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls) = state%vars%tracer(n)%content(:,:,:)
              endif
+             if ((qlcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
 
           ! -- ICE --
           case ('QICN')
@@ -1458,6 +1462,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                      nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qicn = nn 
                  endif
              endif
+             if ((qicn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if ((qice /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QICE") )
 
           case ('QILS')
              if (state%vars%tracer(n)%is_r4) then
@@ -1467,6 +1473,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
                  if (qils /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils) = state%vars%tracer(n)%content(:,:,:)
              endif
+             if ((qicn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
 
           ! -- CLOUD FRACTION --
           case ('CLCN')
@@ -1483,6 +1490,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                      nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_clcn = nn 
                  endif
              endif
+             if ((clcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if ((qcld /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QCLD") )
 
           case ('CLLS')
              if (state%vars%tracer(n)%is_r4) then
@@ -1492,6 +1501,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
                  if (clls /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls) = state%vars%tracer(n)%content(:,:,:)
              endif
+             if ((clcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
 
           ! -- MICROPHYSICS --
           case ('QRAIN')
@@ -1501,6 +1511,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  else
                      FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain) = state%vars%tracer(n)%content(:,:,:)
                  endif
+                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
              endif
           case ('QSNOW')
              if (snow /= -1) then
@@ -1509,6 +1520,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  else
                      FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow) = state%vars%tracer(n)%content(:,:,:)
                  endif
+                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
              endif
           case ('QGRAUPEL')
              if (grpl /= -1) then
@@ -1517,6 +1529,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  else
                      FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl) = state%vars%tracer(n)%content(:,:,:)
                  endif
+                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
              endif
 
           ! -- ALL OTHER PASSIVE TRACERS --
@@ -1527,6 +1540,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              else
                  FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
              endif
+             if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
        end select
     enddo
     
@@ -1799,7 +1813,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     select case (FV_Atm(1)%flagstruct%nwat)
        case (6:7); nn = 7
        case (3:4); nn = 4
-       case (1);   nn = 5
+       case (1);   nn = 7
        case (0);   nn = 0
     end select
 
