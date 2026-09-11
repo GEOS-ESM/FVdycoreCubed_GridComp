@@ -26,7 +26,7 @@ from ndsl import (
 import ndsl.constants
 from ndsl.comm.comm_abc import Comm
 from ndsl.dsl.dace.build import set_distributed_caches
-from ndsl.dsl.typing import get_precision
+from ndsl.dsl.typing import NDSL_GLOBAL_PRECISION
 from ndsl.grid import DampingCoefficients, GridData, MetricTerms
 from ndsl.logging import ndsl_log, ndsl_log_on_rank_0
 from ndsl.optional_imports import cupy as cp
@@ -243,7 +243,7 @@ class GeosDycoreWrapper:
             f"           Bridge : {fortran_mem_space} <> {self._ndsl_mem_space}\n"
             f"          Backend : {backend}\n"
             f"            {build_status}"
-            f"        Precision : {get_precision()} bit\n"
+            f"        Precision : {NDSL_GLOBAL_PRECISION} bit\n"
             f"     Optimization : -O{GT4PY_COMPILE_OPT_LEVEL}\n"
             f"     Local domain : {sizer.nx}x{sizer.ny}x{sizer.nz}"
             f"(halo: {sizer.n_halo})\n"
