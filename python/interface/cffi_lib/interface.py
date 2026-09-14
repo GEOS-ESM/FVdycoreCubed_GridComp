@@ -17,6 +17,26 @@ from datetime import datetime
 from mpi4py import MPI
 from pyFV3_interface import pyfv3_init, pyfv3_run, pyfv3_finalize
 import traceback
+import sys
+
+try:
+    from mpi4py import MPI
+except ModuleNotFoundError as err:
+    MPI = None
+
+
+def _print_stack_and_return() -> int:
+    if MPI:
+        r = MPI.COMM_WORLD.Get_rank()
+    else:
+        r = ""
+    print(
+        f"\\n == == (Rank {{r}}) Error in Python: == == \\n"
+        f"{{traceback.format_exc()}}",
+        file=sys.stderr,
+        flush=True,
+    )
+    return -1
 
 @ffi.def_extern()
 def pyfv3_interface_py_init(
@@ -30,7 +50,7 @@ def pyfv3_interface_py_init(
     # comm_c -> comm_py
     comm_py = MPI.Intracomm() # new comm, internal MPI_Comm handle is MPI_COMM_NULL
     comm_ptr = MPI._addressof(comm_py)  # internal MPI_Comm handle
-    comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
+    # comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
     comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
     
     try:
@@ -42,9 +62,7 @@ def pyfv3_interface_py_init(
             bdt, nq_tot, ak, bk, phis,
             )
     except Exception as err:
-        print("Error in Python:")
-        print(traceback.format_exc())
-        return -1
+        return _print_stack_and_return()
     return 0
 
 @ffi.def_extern()
@@ -63,7 +81,7 @@ def pyfv3_interface_py_run(
     # comm_c -> comm_py
     comm_py = MPI.Intracomm() # new comm, internal MPI_Comm handle is MPI_COMM_NULL
     comm_ptr = MPI._addressof(comm_py)  # internal MPI_Comm handle
-    comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
+    # comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
     comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
 
     try:
@@ -79,9 +97,7 @@ def pyfv3_interface_py_run(
             ua, va, uc, vc,
             mfx, mfy, cx, cy, diss_est)
     except Exception as err:
-        print("Error in Python:")
-        print(traceback.format_exc())
-        return -1
+        return _print_stack_and_return()
     return 0
 
 @ffi.def_extern()
@@ -89,9 +105,7 @@ def pyfv3_interface_py_finalize() -> int:
     try:
         pyfv3_finalize()
     except Exception as err:
-        print("Error in Python:")
-        print(traceback.format_exc())
-        return -1
+        return _print_stack_and_return()
     return 0
 
 """.format(TMPFILEBASE, _mpi_comm_t, _mpi_comm_t)
