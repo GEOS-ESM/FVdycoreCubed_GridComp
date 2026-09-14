@@ -42,40 +42,40 @@ class FVFlags:
     damp_k_k2: float
     n_zs_filter: int
     nord_zs_filter: int
-    full_zs_filter: int # [bool] but under ifx/icc those are int8_t
-    RF_fast: int # [bool] but under ifx/icc those are int8_t
-    Beljaars_TOFD: int # [bool] but under ifx/icc those are int8_t
-    consv_am: int # [bool] but under ifx/icc those are int8_t
-    do_sat_adj: int # [bool] but under ifx/icc those are int8_t
-    do_f3d: int # [bool] but under ifx/icc those are int8_t
-    no_dycore: int # [bool] but under ifx/icc those are int8_t
-    convert_ke: int # [bool] but under ifx/icc those are int8_t
-    do_vort_damp: int # [bool] but under ifx/icc those are int8_t
-    use_old_omega: int # [bool] but under ifx/icc those are int8_t
+    full_zs_filter: bool
+    RF_fast: bool
+    Beljaars_TOFD: bool
+    consv_am: bool
+    do_sat_adj: bool
+    do_f3d: bool
+    no_dycore: bool
+    convert_ke: bool
+    do_vort_damp: bool
+    use_old_omega: bool
     beta: float
     n_zfilter: int
     n_sponge: int
     d_ext: float
     nwat: int
-    warm_start: int # [bool] but under ifx/icc those are int8_t
-    inline_q: int # [bool] but under ifx/icc those are int8_t
-    adiabatic: int # [bool] but under ifx/icc those are int8_t
+    warm_start: bool
+    inline_q: bool
+    adiabatic: bool
     shift_fac: float
-    do_schmidt: int # [bool] but under ifx/icc those are int8_t
+    do_schmidt: bool
     stretch_fac: float
     target_lat: float
     target_lon: float
-    reset_eta: int # [bool] but under ifx/icc those are int8_t
+    reset_eta: bool
     p_fac: float
     a_imp: float
     dz_min: float
     n_split: int
     m_split: int
     k_split: int
-    use_logp: int # [bool] but under ifx/icc those are int8_t
+    use_logp: bool
     q_split: int
     print_freq: int
-    write_3d_diags: int # [bool] but under ifx/icc those are int8_t
+    write_3d_diags: bool
     npx: int
     npy: int
     npz: int
@@ -88,7 +88,7 @@ class FVFlags:
     nf_omega: int
     fv_sg_adj: int
     na_init: int
-    nudge_dz: int # [bool] but under ifx/icc those are int8_t
+    nudge_dz: bool
     p_ref: float
     dry_mass: float
     nt_prog: int
@@ -100,52 +100,52 @@ class FVFlags:
     consv_te: float
     tau: float
     rf_cutoff: float
-    filter_phys: int # [bool] but under ifx/icc those are int8_t
-    dwind_2d: int # [bool] but under ifx/icc those are int8_t
-    breed_vortex_inline: int # [bool] but under ifx/icc those are int8_t
-    range_warn: int # [bool] but under ifx/icc those are int8_t
-    fill: int # [bool] but under ifx/icc those are int8_t
-    fill_dp: int # [bool] but under ifx/icc those are int8_t
-    fill_wz: int # [bool] but under ifx/icc those are int8_t
-    check_negative: int # [bool] but under ifx/icc those are int8_t
-    non_ortho: int # [bool] but under ifx/icc those are int8_t
-    moist_phys: int # [bool] but under ifx/icc those are int8_t
-    do_Held_Suarez: int # [bool] but under ifx/icc those are int8_t
-    do_reed_physics: int # [bool] but under ifx/icc those are int8_t
-    reed_cond_only: int # [bool] but under ifx/icc those are int8_t
-    reproduce_sum: int # [bool] but under ifx/icc those are int8_t
-    adjust_dry_mass: int # [bool] but under ifx/icc those are int8_t
-    fv_debug: int # [bool] but under ifx/icc those are int8_t
-    srf_init: int # [bool] but under ifx/icc those are int8_t
-    mountain: int # [bool] but under ifx/icc those are int8_t
-    old_divg_damp: int # [bool] but under ifx/icc those are int8_t
+    filter_phys: bool
+    dwind_2d: bool
+    breed_vortex_inline: bool
+    range_warn: bool
+    fill: bool
+    fill_dp: bool
+    fill_wz: bool
+    check_negative: bool
+    non_ortho: bool
+    moist_phys: bool
+    do_Held_Suarez: bool
+    do_reed_physics: bool
+    reed_cond_only: bool
+    reproduce_sum: bool
+    adjust_dry_mass: bool
+    fv_debug: bool
+    srf_init: bool
+    mountain: bool
+    old_divg_damp: bool
     remap_option: int
     gmao_remap: int
-    z_tracer: int # [bool] but under ifx/icc those are int8_t
-    fv_land: int # [bool] but under ifx/icc those are int8_t
-    nudge: int # [bool] but under ifx/icc those are int8_t
-    nudge_ic: int # [bool] but under ifx/icc those are int8_t
-    ncep_ic: int # [bool] but under ifx/icc those are int8_t
-    nggps_ic: int # [bool] but under ifx/icc those are int8_t
-    ecmwf_ic: int # [bool] but under ifx/icc those are int8_t
-    gfs_phil: int # [bool] but under ifx/icc those are int8_t
-    agrid_vel_rst: int # [bool] but under ifx/icc those are int8_t
-    use_new_ncep: int # [bool] but under ifx/icc those are int8_t
-    use_ncep_phy: int # [bool] but under ifx/icc those are int8_t
-    fv_diag_ic: int # [bool] but under ifx/icc those are int8_t
-    external_ic: int # [bool] but under ifx/icc those are int8_t
-    external_eta: int # [bool] but under ifx/icc those are int8_t
-    read_increment: int # [bool] but under ifx/icc those are int8_t
-    do_skeb: int # [bool] but under ifx/icc those are int8_t
+    z_tracer: bool
+    fv_land: bool
+    nudge: bool
+    nudge_ic: bool
+    ncep_ic: bool
+    nggps_ic: bool
+    ecmwf_ic: bool
+    gfs_phil: bool
+    agrid_vel_rst: bool
+    use_new_ncep: bool
+    use_ncep_phy: bool
+    fv_diag_ic: bool
+    external_ic: bool
+    external_eta: bool
+    read_increment: bool
+    do_skeb: bool
     skeb_npass: int
-    hydrostatic: int # [bool] but under ifx/icc those are int8_t
-    phys_hydrostatic: int # [bool] but under ifx/icc those are int8_t
-    use_hydro_pressure: int # [bool] but under ifx/icc those are int8_t
-    do_uni_zfull: int # [bool] but under ifx/icc those are int8_t
-    hybrid_z: int # [bool] but under ifx/icc those are int8_t
-    Make_NH: int # [bool] but under ifx/icc those are int8_t
-    make_hybrid_z: int # [bool] but under ifx/icc those are int8_t
-    nudge_qv: int # [bool] but under ifx/icc those are int8_t
+    hydrostatic: bool
+    phys_hydrostatic: bool
+    use_hydro_pressure: bool
+    do_uni_zfull: bool
+    hybrid_z: bool
+    Make_NH: bool
+    make_hybrid_z: bool
+    nudge_qv: bool
     add_noise: float
     a2b_ord: int
     c2l_ord: int
@@ -153,8 +153,8 @@ class FVFlags:
     dy_const: float
     deglat: float
     deglon_start: float
-    adj_mass_vmr: int # [bool] but under ifx/icc those are int8_t
-    compute_coords_locally: int # [bool] but under ifx/icc those are int8_t
+    adj_mass_vmr: bool
+    compute_coords_locally: bool
     # Grid
     layout_x: int
     layout_y: int
@@ -176,12 +176,7 @@ def _generic_config_bridge(
     keys = list(filter(lambda k: not k.startswith("__"), dir(type(py_config))))
     for k in keys:
         if hasattr(fv_config, k):
-            v_fortran = getattr(fv_config, k)
-            v_py = getattr(py_config, k)
-            if isinstance(v_py, bool):
-                setattr(py_config, k, v_fortran != 0)
-            else:
-                setattr(py_config, k, v_fortran)
+            setattr(py_config, k, getattr(fv_config, k))
 
 
 def FVFlags_to_DycoreConfig(
