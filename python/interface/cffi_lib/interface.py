@@ -50,9 +50,12 @@ def pyfv3_interface_py_init(
     # comm_c -> comm_py
     comm_py = MPI.Intracomm() # new comm, internal MPI_Comm handle is MPI_COMM_NULL
     comm_ptr = MPI._addressof(comm_py)  # internal MPI_Comm handle
-    comm_ptr = ffi.cast('{_mpi_comm_t}*', comm_ptr)  # make it a CFFI pointer
-    comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
-    
+    try:
+        comm_ptr = ffi.cast('int*', comm_ptr)  # make it a CFFI pointer
+        comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
+    except TypeError:
+        comm_ptr = ffi.cast('void**', comm_ptr)  # make it a CFFI pointer
+        comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
     try:
         pyfv3_init(
             fv_flags,
