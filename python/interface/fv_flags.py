@@ -1,3 +1,4 @@
+import warnings
 import dataclasses
 from typing import Union
 from pyfv3._config import (
@@ -173,14 +174,16 @@ def _generic_config_bridge(
     ],
     fv_config: FVFlags,
 ):
-    keys = list(filter(lambda k: not k.startswith("__"), dir(type(py_config))))
+    keys = list(filter(lambda k: not k.startswith("__"), dir(type(fv_config))))
     for k in keys:
-        if hasattr(fv_config, k):
+        if hasattr(py_config, k):
             v = getattr(fv_config, k)
             if isinstance(v, bool):
                 setattr(py_config, k, bool(v))
             else:
                 setattr(py_config, k, v)
+        else:
+            warnings.warn(f"FV Config {k} does not exist in pyFV configuration")
 
 
 def FVFlags_to_DycoreConfig(
@@ -193,7 +196,4 @@ def FVFlags_to_DycoreConfig(
         )
 
     _generic_config_bridge(py_config, fv_config)
-    py_config.layout = (
-        getattr(fv_config, "layout_x"),
-        getattr(fv_config, "layout_y"),
-    )
+    py_config.layout = (fv_config.layout_x, fv_config.layout_y)
