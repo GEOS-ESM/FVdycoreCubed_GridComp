@@ -11,8 +11,8 @@ if MPI._sizeof(MPI.Comm) == ffi.sizeof("int"):
 else:
     _mpi_comm_t = "void*"
 
-source = """
-from {} import ffi
+source = f"""
+from {TMPFILEBASE} import ffi
 from datetime import datetime
 from mpi4py import MPI
 from pyFV3_interface import pyfv3_init, pyfv3_run, pyfv3_finalize
@@ -50,7 +50,7 @@ def pyfv3_interface_py_init(
     # comm_c -> comm_py
     comm_py = MPI.Intracomm() # new comm, internal MPI_Comm handle is MPI_COMM_NULL
     comm_ptr = MPI._addressof(comm_py)  # internal MPI_Comm handle
-    # comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
+    comm_ptr = ffi.cast('{_mpi_comm_t}*', comm_ptr)  # make it a CFFI pointer
     comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
     
     try:
@@ -81,7 +81,7 @@ def pyfv3_interface_py_run(
     # comm_c -> comm_py
     comm_py = MPI.Intracomm() # new comm, internal MPI_Comm handle is MPI_COMM_NULL
     comm_ptr = MPI._addressof(comm_py)  # internal MPI_Comm handle
-    # comm_ptr = ffi.cast('{}*', comm_ptr)  # make it a CFFI pointer
+    comm_ptr = ffi.cast('{_mpi_comm_t}*', comm_ptr)  # make it a CFFI pointer
     comm_ptr[0] = comm_c  # assign comm_c to comm_py's MPI_Comm handle
 
     try:
@@ -108,7 +108,7 @@ def pyfv3_interface_py_finalize() -> int:
         return _print_stack_and_return()
     return 0
 
-""".format(TMPFILEBASE, _mpi_comm_t, _mpi_comm_t)
+"""
 
 with open("fv_flags.h") as f:
     data = "".join([line for line in f if not line.startswith("#")])
