@@ -176,7 +176,12 @@ def _generic_config_bridge(
     keys = list(filter(lambda k: not k.startswith("__"), dir(type(py_config))))
     for k in keys:
         if hasattr(fv_config, k):
-            setattr(py_config, k, getattr(fv_config, k))
+            py_v = getattr(py_config, k)
+            ftn_v = getattr(fv_config, k)
+            if isinstance(py_v, bool):
+                setattr(py_config, k, ftn_v != 0)
+            else:
+                setattr(py_config, k, ftn_v)
 
 
 def FVFlags_to_DycoreConfig(
