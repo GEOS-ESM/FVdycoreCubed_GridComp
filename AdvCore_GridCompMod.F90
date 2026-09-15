@@ -157,7 +157,6 @@ contains
          FV3_DynCoreIsRunning = .false.
          AdvCore_Advection = 1
       end select
-      if (.not. FV3_DynCoreIsRunning) call fv_setup(gc, _RC)
       call MAPL_GridCompGetResource(gc, "AdvCore_Advection", AdvCore_Advection, default=AdvCore_Advection, _RC)
 
       _RETURN(_SUCCESS)
@@ -184,8 +183,8 @@ contains
       real, pointer :: area(:, :)
       integer :: is, ie, js, je, status
 
-      ! pchakrab - maybe use the FV_DynCoreIsRunning flag instead
       if (.not. FV3_DynCoreIsRunning) then
+         call fv_setup(gc, _RC)
          call MAPL_GridCompSetGeometry(gc, _RC)
       end if
       ! pchakrab - below was the original logic for grid creation
