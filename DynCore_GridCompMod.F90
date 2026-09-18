@@ -3190,6 +3190,8 @@ subroutine Run(gc, import, export, clock, rc)
     logical                             :: doEnergetics
     logical                             :: doTropvars
 
+    real :: t_max_300
+
     integer :: FV3_STANDALONE
 
   Iam = "Run"
@@ -5232,37 +5234,42 @@ subroutine Run(gc, import, export, clock, rc)
        VERIFY_(STATUS)
    end if
 
-   call MAPL_GetPointer(export,temp2d,'WSPD_STABLE300M',rc=status)           
-   VERIFY_(STATUS)
+   call MAPL_GetPointer(export,temp2d,'WSPD_STABLE300M',rc=status)  
+   VERIFY_(STATUS)        
     if(associated(temp2d)) then
        tempxy = vars%pt * vars%pkz
-       temp2d = 0.0
+       temp2d = 0.0       
        do j = jfirstxy, jlastxy
           jj = j - jfirstxy + 1
-          do i = ifirstxy, ilastxy
+          do i = ifirstxy, ilastxy                                 
              ii = i - ifirstxy + 1  
              ! 1. Check if surface air is freezing
-             if (tempxy(i,j,km) <= MAPL_TICE) then
-                ! Assume no inversion until proven otherwise
+             if (tempxy(i,j,km) <= MAPL_TICE) then                 
                 is_stable = .false.
-                ! Start max wind tracking with the lowest model level
+                ! Start tracking max wind AND max temperature
                 temp2d(ii,jj) = SQRT(ur(i,j,km)**2 + vr(i,j,km)**2)
-                ! 2. Scan the lowest 300m
+                t_max_300 = tempxy(i,j,km) 
+                ! 2. Scan the lowest 300m                          
                 do k = km-1, 1, -1
                    ! Height AGL
                    if ( (0.5 * (zle(i,j,k) + zle(i,j,k+1)) - zle(i,j,km+1)) <= 300.0 ) then
-                      ! Track maximum wind speed
+                      ! Track maximum wind speed                   
                       temp2d(ii,jj) = MAX(temp2d(ii,jj), SQRT(ur(i,j,k)**2 + vr(i,j,k)**2))
-                      ! 3. Check for Inversion ANYWHERE in the 300m layer
-                      if (tempxy(i,j,k) > tempxy(i,j,km)) then
-                         is_stable = .true.
-                      endif
-                   else
-                      exit ! Reached top of 300m layer
-                   endif
-                end do
-                ! 4. If no inversion was found in the whole 300m, it's not a katabatic zone. 
-                ! Zero out the wind speed.
+                      ! Track maximum temperature in the layer to measure inversion strength
+                      t_max_300 = MAX(t_max_300, tempxy(i,j,k))
+                   else   
+                      exit ! Reached top of 300m layer             
+                   endif  
+                end do    
+                ! 3. Check for Inversion and apply Thermodynamic Boost
+                if (t_max_300 > tempxy(i,j,km)) then
+                   is_stable = .true.
+                   ! Calculate the inversion strength (Delta T)
+                   ! Add 50% of it to the physical wind speed. 
+                   ! (e.g., A 10 K inversion acts like +5 m/s of effective wave-generating speed)
+                   temp2d(ii,jj) = temp2d(ii,jj) + 0.5 * (t_max_300 - tempxy(i,j,km))
+                endif
+                ! 4. If no inversion was found, zero it out.
                 if (.not. is_stable) then
                    temp2d(ii,jj) = 0.0
                 endif
