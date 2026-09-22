@@ -1406,7 +1406,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     end select
 
     do n=1, STATE%GRID%NQ
-       if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
        
        select case (TRIM(state%vars%tracer(n)%tname))
           case ('Q')
