@@ -19,8 +19,8 @@ This directory contains CTest-based regression cases for
 
 Coupled advection + dynamics test.
 
-Key files:
-- `cap.yaml`, `cap_restart.yaml`
+ Key files:
+- `mapl.yaml`, `cap_driver.yaml`, `cap_gridcomp.yaml`, `cap_restart.yaml`
 - `root.yaml`
 - `dyn.yaml`, `adv.yaml`
 - `data-moist.yaml` — `DataMoist` component; owns `Q`, that is advected by DYN
@@ -32,8 +32,8 @@ Key files:
 
 Held-Suarez style standalone dynamics test.
 
-Key files:
-- `cap.yaml`, `cap_restart.yaml`
+ Key files:
+- `mapl.yaml`, `cap_driver.yaml`, `cap_gridcomp.yaml`, `cap_restart.yaml`
 - `root.yaml`
 - `dyn-sa.yaml`
 - `data-moist.yaml`

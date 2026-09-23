@@ -25,6 +25,11 @@ geometry:
     field_center: PE
 
 mapl:
+
+  setServices:
+    sharedObj: libFVdycoreCubed_GridComp
+    userRoutine: fvdycorecubed_setservices_
+
   misc:
     activate_all_imports: true
     activate_all_exports: true

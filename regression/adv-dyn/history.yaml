@@ -17,3 +17,8 @@ collections:
       "[UKE,VKE]": {source: DYN.UV_KE}
       "[UPHI,VPHI]": {source: DYN.UV_PHI}
       "[UQV,VQV]": {source: DYN.UV_QV}
+
+mapl:
+
+  setServices:
+    sharedObj: libMAPL.history
