@@ -1351,7 +1351,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
          if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
            if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3 
          endif
-         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 
+         if (nwat_tracers >= 8) FV_Atm(1)%flagstruct%nwat = 6
+         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 7
        endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
@@ -1365,8 +1366,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
      NWAT_TEST = ( (FV_Atm(1)%flagstruct%nwat == 0) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 1) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 3) .OR. &
+                   (FV_Atm(1)%flagstruct%nwat == 4) .OR. &
                    (FV_Atm(1)%flagstruct%nwat >= 6) )
-     _ASSERT( NWAT_TEST , 'NWAT must be either 0, 1, 3 or 6')
+     _ASSERT( NWAT_TEST , 'NWAT must be either 0, 1, 3, 4 or >=6')
      
      ! OPTION A: We keep ALL tracers, no subtracting CN species.
      FV_Atm(1)%ncnst = STATE%GRID%NQ
@@ -1377,12 +1379,16 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
    endif
 
    select case ( FV_Atm(1)%flagstruct%nwat )
-   case (6:7)
-    sphu = 1; qliq = 2; qice = 3; rain = 4; snow = 5; grpl = 6; qcld = 7
-   case (3:4)
-    sphu = 1; qliq = 2; qice = 3; qcld = 4
    case (1)
     sphu = 1; qlcn = 2; qlls = 3; qicn = 4; qils = 5; clcn = 6; clls = 7
+   case (3)
+    sphu = 1; qliq = 2; qice = 3
+   case (4)
+    sphu = 1; qliq = 2; qice = 3; qcld = 4
+   case (6)
+    sphu = 1; qliq = 2; qice = 3; rain = 4; snow = 5; grpl = 6
+   case (7)
+    sphu = 1; qliq = 2; qice = 3; rain = 4; snow = 5; grpl = 6; qcld = 7
    end select
 
  ! ------------------------------------------------------------------
@@ -1394,15 +1400,19 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (fv_first_run .and. FV_Atm(1)%ncnst > 0) then
        write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", FV_Atm(1)%ncnst, " tracers:"
        call WRITE_PARALLEL( trim(STRING) )
+       write(STRING,'(A,I5,A)') "       Water species, nwat=", FV_Atm(1)%flagstruct%nwat, " :"
+       call WRITE_PARALLEL( trim(STRING) )
     endif
     FV_Atm(1)%q(:,:,:,:) = 0.0
 
     ! Initialize index offset for extra tracers beyond standard nwat
     select case (FV_Atm(1)%flagstruct%nwat)
-       case (6:7); nn = 7
-       case (3:4); nn = 4
-       case (1);   nn = 7
-       case (0);   nn = 0
+       case (7); nn = 7
+       case (6); nn = 6
+       case (4); nn = 4
+       case (3); nn = 3
+       case (1); nn = 7
+       case (0); nn = 0
     end select
 
     do n=1, STATE%GRID%NQ
@@ -1810,10 +1820,12 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
     ! Reset dynamic offset
     select case (FV_Atm(1)%flagstruct%nwat)
-       case (6:7); nn = 7
-       case (3:4); nn = 4
-       case (1);   nn = 7
-       case (0);   nn = 0
+       case (7); nn = 7
+       case (6); nn = 6
+       case (4); nn = 4
+       case (3); nn = 3
+       case (1); nn = 7
+       case (0); nn = 0
     end select
 
     do n=1, STATE%GRID%NQ
