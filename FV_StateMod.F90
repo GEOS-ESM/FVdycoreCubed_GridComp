@@ -1434,7 +1434,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  endif
              endif
              if ((qlcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-             if ((qliq /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QLIQ") )
+             if ((qliq /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME)//"_QLIQ" )
 
           case ('QLLS')
              if (state%vars%tracer(n)%is_r4) then
@@ -1462,7 +1462,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  endif
              endif
              if ((qicn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-             if ((qice /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QICE") )
+             if ((qice /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME)//"_QICE" )
 
           case ('QILS')
              if (state%vars%tracer(n)%is_r4) then
@@ -1490,7 +1490,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  endif
              endif
              if ((clcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-             if ((qcld /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QCLD") )
+             if ((qcld /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME)//"_QCLD" )
 
           case ('CLLS')
              if (state%vars%tracer(n)%is_r4) then
@@ -1539,7 +1539,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              else
                  FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
              endif
-             if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
        end select
     enddo
     
