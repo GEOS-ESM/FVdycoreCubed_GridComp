@@ -28,6 +28,7 @@ module FVdycoreCubed_GridComp
    use MAPL, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED, MAPL_ArrayGather
    use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
+   use MAPL_Constants, only: MAPL_TICE
    use MAPL_Constants, only: MAPL_VectorField ! pchakrab: TODO - need MAPL3 equivalent
    use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
@@ -67,7 +68,8 @@ module FVdycoreCubed_GridComp
         DYN_DEBUG => DEBUG, &
         HYDROSTATIC => FV_HYDROSTATIC, &
         fv_getUpdraftHelicity, DEBUG_DYN, DEBUG_ADV, &
-        ADIABATIC, SW_DYNAMICS, AdvCore_Advection
+        ADIABATIC, SW_DYNAMICS, AdvCore_Advection, &
+        fv_getGradT_2D
    use m_topo_remap, only: dyn_topo_remap
 
    !PUBLIC MEMBER FUNCTIONS:
@@ -531,12 +533,14 @@ contains
       type(DynGrid), pointer :: grid
       type(DynVars), pointer :: vars
 
-      integer :: nq, im, jm, km, kend, i, j, k, n
+      integer :: nq, im, jm, km, kend, i, j, k, n, ii, jj
       integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
       ! TODO: pchakrab - convt is not used anywhere
       logical, parameter :: convt = .false. ! Until this is run with full physics
       logical :: is_shutoff, is_ringing
       logical :: is_connected
+      logical :: is_stable
+      real :: t_max_300
 
       real(kind=r8), pointer :: phisxy(:, :)
       real(kind=4), pointer :: phis(:, :)
@@ -2232,6 +2236,49 @@ contains
          call MAPL_StateGetPointer(export, temp2d, 'WSPD_10M', _RC)
          if (associated(temp2d)) then
             call VertInterp(temp2d, sqrt(ur**2 + vr**2), -zle, -10.0, _RC)
+         end if
+
+         call MAPL_StateGetPointer(export, temp2d, 'WSPD_STABLE300M', _RC)
+         if (associated(temp2d)) then
+            tempxy = vars%pt * vars%pkz
+            temp2d = 0.0
+            do j = jfirstxy, jlastxy
+               jj = j - jfirstxy + 1
+               do i = ifirstxy, ilastxy
+                  ii = i - ifirstxy + 1
+                  ! 1. Check if surface air is freezing
+                  if (tempxy(i, j, km) <= MAPL_TICE) then
+                     is_stable = .false.
+                     ! Start tracking max wind AND max temperature
+                     temp2d(ii, jj) = sqrt(ur(i, j, km)**2 + vr(i, j, km)**2)
+                     t_max_300 = tempxy(i, j, km)
+                     ! 2. Scan the lowest 300m
+                     do k = km - 1, 1, -1
+                        ! Height AGL
+                        if ((0.5 * (zle(i, j, k) + zle(i, j, k + 1)) - zle(i, j, km + 1)) <= 300.0) then
+                           ! Track maximum wind speed
+                           temp2d(ii, jj) = max(temp2d(ii, jj), sqrt(ur(i, j, k)**2 + vr(i, j, k)**2))
+                           ! Track maximum temperature in the layer to measure inversion strength
+                           t_max_300 = max(t_max_300, tempxy(i, j, k))
+                        else
+                           exit ! Reached top of 300m layer
+                        end if
+                     end do
+                     ! 3. Check for Inversion and apply Thermodynamic Boost
+                     if (t_max_300 > tempxy(i, j, km)) then
+                        is_stable = .true.
+                        ! Calculate the inversion strength (Delta T)
+                        ! Add 50% of it to the physical wind speed.
+                        ! (e.g., A 10 K inversion acts like +5 m/s of effective wave-generating speed)
+                        temp2d(ii, jj) = temp2d(ii, jj) + 0.5 * (t_max_300 - tempxy(i, j, km))
+                     end if
+                     ! 4. If no inversion was found, zero it out.
+                     if (.not. is_stable) then
+                        temp2d(ii, jj) = 0.0
+                     end if
+                  end if
+               end do
+            end do
          end if
 
          if (.not. HYDROSTATIC) then
