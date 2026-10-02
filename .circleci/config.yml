@@ -10,6 +10,7 @@ orbs:
 workflows:
   build-test:
     jobs:
+      # Build GEOSgcm
       - ci/build:
           name: build-GEOSgcm-on-<< matrix.compiler >>
           context:

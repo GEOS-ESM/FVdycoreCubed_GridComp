@@ -111,35 +111,25 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
     SRCS ${srcs}
     SUBCOMPONENTS fvdycore
     DEPENDENCIES ${dependencies}
+    DEPENDENCIES FMS::fms
     DEPENDENCIES geos_gtfv3_interface_py) # Make the main library depend on the Python library
 else ()
   esma_add_library (${this}
     SRCS ${srcs}
     SUBCOMPONENTS fvdycore
-    DEPENDENCIES ${dependencies})
+    DEPENDENCIES ${dependencies}
+    DEPENDENCIES FMS::fms)
 endif ()
 
-if (FV_PRECISION STREQUAL R4)
-  target_link_libraries (${this} PUBLIC FMS::fms_r4)
-  target_compile_definitions (${this} PRIVATE SINGLE_FV OVERLOAD_R4)
-elseif (FV_PRECISION STREQUAL R4R8) # FV is R4 but FMS is R8
-  # fvdycore needs r4 .mod interfaces
-  get_target_property(inc_r4 FMS::fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
-  target_include_directories(${this} PRIVATE $<BUILD_INTERFACE:${inc_r4}>)
-
-  # But fvdycore should not *compile* with fms_r8 includes
-  target_link_libraries(${this} PUBLIC $<LINK_ONLY:FMS::fms_r8>)
-
-  target_compile_definitions (${this} PRIVATE SINGLE_FV OVERLOAD_R4)
-
-  # This tells CMake that we need these targets built before we can build
-  add_dependencies(${this} FMS::fms_r4 FMS::fms_r8)
-elseif (FV_PRECISION STREQUAL R8)
-  target_link_libraries (${this} PUBLIC FMS::fms_r8)
+if (FV_PRECISION STREQUAL R8)
   string(REPLACE " " ";" tmp ${FREAL8})
   foreach(flag ${tmp})
     target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${flag}>)
   endforeach()
+endif ()
+
+if (FV_PRECISION MATCHES R4)
+  target_compile_definitions (${this} PRIVATE -DSINGLE_FV -DOVERLOAD_R4)
 endif ()
 
 message(STATUS "Building FV as ${FV_PRECISION}")
@@ -193,31 +183,17 @@ ecbuild_add_executable (
    SOURCES interp_restarts_bin.F90
    LIBS ${this} OpenMP::OpenMP_Fortran)
 
-# If we are doing R4R8 we also need add_dependencies for both fms_r4 and fms_r8
-# for all our executables that link to ${this} because of the way we set up the
-# main library above.
-if (FV_PRECISION STREQUAL R4R8)
-  foreach(executable
-    StandAlone_FV3_Dycore.x
-    rs_scale.x
-    StandAlone_AdvCore.x
-    StandAlone_DynAdvCore.x
-    c2c.x
-    interp_restarts.x
-    interp_restarts_bin.x)
-
-    # fvdycore needs r4 .mod interfaces
-    get_target_property(inc_r4 FMS::fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
-    target_include_directories(${executable} PRIVATE $<BUILD_INTERFACE:${inc_r4}>)
-
-    # But fvdycore should not *compile* with FMS::fms_r8 includes
-    target_link_libraries(${executable} $<LINK_ONLY:FMS::fms_r8>)
-
-    # This tells CMake that we need these targets built before we can build
-    add_dependencies(${executable} FMS::fms_r4 FMS::fms_r8)
-  endforeach()
-endif ()
-
+# Note this macro requires ESMA_cmake v4.19.0 or later
+include(check_fms1_io_support)
+check_fms1_io_support(FMS1_IO_SUPPORTED)
+if(FMS1_IO_SUPPORTED)
+  message(STATUS "Using deprecated FMS1 I/O for ${this}")
+  target_compile_definitions (${this} PRIVATE FMS1_IO)
+  target_compile_definitions (interp_restarts.x PRIVATE FMS1_IO)
+  target_compile_definitions (interp_restarts_bin.x PRIVATE FMS1_IO)
+else()
+  message(STATUS "Using FMS2 I/O for ${this}")
+endif()
 
 if (BUILD_GEOS_GTFV3_INTERFACE)
   ecbuild_add_executable (

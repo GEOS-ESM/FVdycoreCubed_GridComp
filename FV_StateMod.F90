@@ -18,7 +18,10 @@ module FV_StateMod
    use fv_mp_mod,         only: group_halo_update_type
    use fv_mp_mod,         only: mp_bcst, mp_reduce_max
 
-   use fms_mod, only: fms_init, set_domain, nullify_domain
+   use fms_mod, only: fms_init
+#if defined(FMS1_IO)
+   use fms_mod, only: set_domain, nullify_domain
+#endif
    use mpp_domains_mod, only: mpp_update_domains, CGRID_NE, DGRID_NE, mpp_get_boundary
    use mpp_parameter_mod, only: AGRID_PARAM=>AGRID, CORNER
    use fv_timing_mod,    only: timing_on, timing_off, timing_init, timing_prt
@@ -1347,11 +1350,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
          if (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL') nwat_tracers = nwat_tracers + 1
        enddo
        if (FV_Atm(1)%flagstruct%nwat == 0) then
-         if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 1 
+         if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 1
          if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
-           if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3 
+           if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3
          endif
-         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 
+         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6
        endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
@@ -1361,16 +1364,16 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
      FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=FVPRC)
      FV_Atm(1)%varflt(isc:iec,jsc:jec) = real(varflt,kind=FVPRC)
      call mpp_update_domains(FV_Atm(1)%phis, FV_Atm(1)%domain, complete=.true.)
-     
+
      NWAT_TEST = ( (FV_Atm(1)%flagstruct%nwat == 0) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 1) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 3) .OR. &
                    (FV_Atm(1)%flagstruct%nwat >= 6) )
      _ASSERT( NWAT_TEST , 'NWAT must be either 0, 1, 3 or 6')
-     
+
      ! OPTION A: We keep ALL tracers, no subtracting CN species.
      FV_Atm(1)%ncnst = STATE%GRID%NQ
-     
+
      deallocate( FV_Atm(1)%q )
      allocate  ( FV_Atm(1)%q(isd:ied  ,jsd:jed  ,npz, FV_Atm(1)%ncnst) )
      call echo_fv3_setup()
@@ -1389,7 +1392,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
  ! Pull Tracers (Dynamic Mapping for Mass Conservation Option A)
  ! ------------------------------------------------------------------
   call MAPL_TimerOn(MAPL,"--PULL_TRACERS")
-  
+
   if (.not. ADIABATIC) then
     if (fv_first_run .and. FV_Atm(1)%ncnst > 0) then
        write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", FV_Atm(1)%ncnst, " tracers:"
@@ -1406,7 +1409,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     end select
 
     do n=1, STATE%GRID%NQ
-       
+
        select case (TRIM(state%vars%tracer(n)%tname))
           case ('Q')
              if (sphu /= -1) then
@@ -1423,14 +1426,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              if (state%vars%tracer(n)%is_r4) then
                  if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
                  if (qlcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content_r4(:,:,:)
-                 if (qliq /= -1 .and. qlcn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qlcn = nn 
+                 if (qliq /= -1 .and. qlcn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qlcn = nn
                  endif
              else
                  if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
                  if (qlcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content(:,:,:)
-                 if (qliq /= -1 .and. qlcn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qlcn = nn 
+                 if (qliq /= -1 .and. qlcn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qlcn = nn
                  endif
              endif
              if ((qlcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
@@ -1451,14 +1454,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              if (state%vars%tracer(n)%is_r4) then
                  if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content_r4(:,:,:)
                  if (qicn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content_r4(:,:,:)
-                 if (qice /= -1 .and. qicn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qicn = nn 
+                 if (qice /= -1 .and. qicn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qicn = nn
                  endif
              else
                  if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
                  if (qicn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content(:,:,:)
-                 if (qice /= -1 .and. qicn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qicn = nn 
+                 if (qice /= -1 .and. qicn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qicn = nn
                  endif
              endif
              if ((qicn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
@@ -1479,14 +1482,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              if (state%vars%tracer(n)%is_r4) then
                  if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
                  if (clcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content_r4(:,:,:)
-                 if (qcld /= -1 .and. clcn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_clcn = nn 
+                 if (qcld /= -1 .and. clcn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_clcn = nn
                  endif
              else
                  if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
                  if (clcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content(:,:,:)
-                 if (qcld /= -1 .and. clcn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_clcn = nn 
+                 if (qcld /= -1 .and. clcn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_clcn = nn
                  endif
              endif
              if ((clcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
@@ -1542,7 +1545,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
        end select
     enddo
-    
+
     write (STRING, "(I3.3,' /= ',I3.3)") nn, FV_Atm(1)%ncnst
     _ASSERT(nn == FV_Atm(1)%ncnst, 'nn /= ncnst: '//trim(STRING))
 
@@ -1580,7 +1583,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   if (fv_first_run) then
     if ( .not. FV_Atm(1)%flagstruct%hydrostatic ) then
       if ( FV_Atm(1)%flagstruct%Make_NH ) then
-        if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT)) 
+        if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT))
         if (mpp_pe()==0) print*, 'fv_first_run: FV3 is making Non-Hydrostatic W and DZ'
         FV_Atm(1)%w = 0.0
         call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
@@ -1691,7 +1694,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
      if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
         if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
         allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
+#if defined(FMS1_IO)
         call nullify_domain ( )
+#endif
         DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
         call prt_maxmin('Before adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
         call adiabatic_init(myDT,DEBUG_ARRAY,fac1)
@@ -1704,7 +1709,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
   call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
   if (.not. FV_OFF) then
-  call set_domain(FV_Atm(1)%domain) 
+#if defined(FMS1_IO)
+  call set_domain(FV_Atm(1)%domain)
+#endif
   allocate ( u_dt(isc:iec,jsc:jec,npz) )
   allocate ( v_dt(isc:iec,jsc:jec,npz) )
   allocate ( t_dt(isc:iec,jsc:jec,npz) )
@@ -1761,7 +1768,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   call MAPL_GetPointer ( export, PTR3D, 'DVDT_RAY', rc=status ); VERIFY_(STATUS)
   if( associated(PTR3D) ) PTR3D = vdt
   deallocate ( udt ); deallocate ( vdt )
-  
+
   call MAPL_GetPointer ( export, PTR3D, 'DTDT_RAY', rc=status ); VERIFY_(STATUS)
   if( associated(PTR3D) ) PTR3D = t_dt
   call MAPL_GetPointer ( export, PTR3D, 'DWDT_RAY', rc=status ); VERIFY_(STATUS)
@@ -1786,7 +1793,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
       if( associated(PTR3D) ) PTR3D = w_dt
   endif
   deallocate ( u_dt ); deallocate ( v_dt ); deallocate ( t_dt ); deallocate ( w_dt )
+#if defined(FMS1_IO)
   call nullify_domain()
+#endif
   endif
   call MAPL_TimerOff(MAPL,"--FV_DYNAMICS")
 
@@ -1794,7 +1803,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
  ! Push Tracers (Dynamic Mass Separation for Option A)
  ! ------------------------------------------------------------------
   call MAPL_TimerOn(MAPL,"--PUSH_TRACERS")
-  
+
   if (.not. ADIABATIC) then
     ! --- Eulerian Monotonicity Safegaurds ---
     ! Ensure advected CN does not exceed Total, preventing negative LS
@@ -2331,12 +2340,12 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
     integer :: i, j, k
     real    :: u_c, v_c
     real    :: max_cfl_h, max_cfl_z
-    
+
     ! Updated constraints
     real, parameter    :: TARGET_CFL   = 1.05
     real, parameter    :: H_MULTIPLIER = 4.0  ! For acoustic speed scaling
     real, parameter    :: Z_MULTIPLIER = 0.25 ! Tune this to dictate max_cfl_z's impact
-    
+
     integer :: new_k_split, new_n_split, new_q_split
     integer :: target_k_split, base_tot
 
@@ -2349,7 +2358,7 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
           do i = isc, iec
              u_c = 0.5 * (u(i,j,k) + u(i,j+1,k))
              v_c = 0.5 * (v(i,j,k) + v(i+1,j,k))
-             
+
              max_cfl_h = max(max_cfl_h, abs((u_c/dx(i,j)) + (v_c/dy(i,j))) * state%DT)
              max_cfl_z = max(max_cfl_z, abs(w(i,j,k) / delz(i,j,k)) * state%DT)
           enddo
@@ -2362,15 +2371,15 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
 
     ! --- 3. DYNAMIC ADJUSTMENT ON ROOT PE ---
     if (mpp_pe() == 0) then
-       
+
        ! Calculate total baseline acoustic steps (e.g., 1 * 6 = 6)
        ! We want to keep (k_split * n_split) as close to this as possible
        base_tot = state%base_k_split * state%base_n_split
-       
+
        ! Calculate the strictly required k_split
        target_k_split = max(state%base_k_split, ceiling(max_cfl_z * Z_MULTIPLIER))
-       
-       ! b. RATE LIMITING VIA FACTORS: 
+
+       ! b. RATE LIMITING VIA FACTORS:
        ! Step to the next integer that cleanly divides base_tot
        if (target_k_split > state%k_split) then
            new_k_split = state%k_split + 1
@@ -2389,13 +2398,13 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
        else
            new_k_split = state%k_split
        endif
-       
+
        ! c. Calculate n_split
        ! Because new_k_split is guaranteed to be a factor, this division is exact!
        ! (Unless max_cfl_h independently forces it higher)
        new_n_split = ceiling(base_tot / real(new_k_split))
        new_n_split = max(new_n_split, ceiling(max_cfl_h * H_MULTIPLIER / real(new_k_split)))
-       
+
        ! d. Calculate q_split
        if (state%base_q_split == 0) then
            new_q_split = 0
@@ -2407,14 +2416,14 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
        if (state%k_split /= new_k_split .or. &
            state%n_split /= new_n_split .or. &
            state%q_split /= new_q_split) then
-           
+
            print *, "=== FV3 DYNAMIC SPLIT ADJUSTMENT ==="
            print *, "Max Horz CFL: ", max_cfl_h, " | Max Vert CFL: ", max_cfl_z
            print *, "FV3 k_split: ", new_k_split, " (was ", state%k_split, ", target was ", target_k_split, ")"
            print *, "FV3 n_split: ", new_n_split, " (was ", state%n_split, ")"
            print *, "FV3 q_split: ", new_q_split, " (was ", state%q_split, ")"
            print *, "===================================="
-           
+
            state%k_split = new_k_split
            state%n_split = new_n_split
            state%q_split = new_q_split
@@ -2456,10 +2465,10 @@ subroutine fv_getGradT_2D(t_in, ps_in, mag_grad_t)
   !$OMP PRIVATE(i, j, ii, jj, dx, dy, dTdx, dTdy, p_surf_min)
   do j = jsc, jec
      jj = j - jsc + 1   ! Map to MAPL pointer index
-     
+
      do i = isc, iec
         ii = i - isc + 1  ! Map to MAPL pointer index
-        
+
         ! Find the highest terrain in the 5-point stencil
         p_surf_min = MIN(ps_in(i,j), ps_in(i-1,j), ps_in(i+1,j), ps_in(i,j-1), ps_in(i,j+1))
 
@@ -2471,7 +2480,7 @@ subroutine fv_getGradT_2D(t_in, ps_in, mag_grad_t)
              t_in(i+1,j) /= real(MAPL_UNDEF, REAL4) .and. &
              t_in(i,j-1) /= real(MAPL_UNDEF, REAL4) .and. &
              t_in(i,j+1) /= real(MAPL_UNDEF, REAL4) ) then
-           
+
            dx = FV_Atm(1)%gridstruct%dxa(i,j)
            dy = FV_Atm(1)%gridstruct%dya(i,j)
 
@@ -2480,7 +2489,7 @@ subroutine fv_getGradT_2D(t_in, ps_in, mag_grad_t)
            dTdy = (t_in(i,j+1) - t_in(i,j-1)) / real(2.0_REAL8 * dy, REAL4)
 
            mag_grad_t(ii,jj) = SQRT(dTdx**2 + dTdy**2)
-           
+
         else
            ! Stencil hits topography or uninitialized data
            mag_grad_t(ii,jj) = 0.0_REAL4
@@ -2498,7 +2507,7 @@ subroutine fv_getGradT_3D(mag_grad_t)
   real(REAL8), intent(OUT) :: mag_grad_t(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec, &
                                          FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec, &
                                          1:FV_Atm(1)%npz)
-  
+
   integer :: isc, iec, jsc, jec
   integer :: i, j, k
   real(REAL8) :: dTdx, dTdy
@@ -2515,7 +2524,7 @@ subroutine fv_getGradT_3D(mag_grad_t)
   do k = 1, FV_Atm(1)%npz
      do j = jsc, jec
         do i = isc, iec
-           
+
            ! Note: Replace dxa/dya with your exact FV3 metric arrays for cell-center distances.
            ! (Often found in FV_Atm(1)%gridstruct%dxa or similar)
            dx = FV_Atm(1)%gridstruct%dxa(i,j)
@@ -2524,10 +2533,10 @@ subroutine fv_getGradT_3D(mag_grad_t)
            ! Assuming pt is Absolute Temperature (if it's Potential T, multiply by pkz here)
            dTdx = (FV_Atm(1)%pt(i+1,j,k) - FV_Atm(1)%pt(i-1,j,k)) / (2.0_REAL8 * dx)
            dTdy = (FV_Atm(1)%pt(i,j+1,k) - FV_Atm(1)%pt(i,j-1,k)) / (2.0_REAL8 * dy)
-           
+
            ! Magnitude in K/m
            mag_grad_t(i,j,k) = SQRT(dTdx**2 + dTdy**2)
-           
+
         enddo
      enddo
   enddo
@@ -3907,7 +3916,11 @@ subroutine fv_getDivergence(uc, vc, divg)
 end subroutine fv_getDivergence
 
 subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25, shr06)
+#if defined (SINGLE_FV)
+   use constantsr4_mod, only: fms_grav=>grav
+#else
    use constants_mod, only: fms_grav=>grav
+#endif
 ! made this REAL4
    real(REAL4), intent(OUT) ::  uh25(:,:)
    real(REAL4), intent(OUT) ::  uh03(:,:)

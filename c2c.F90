@@ -1,7 +1,7 @@
 
 #define I_AM_MAIN
 #include "MAPL_Generic.h"
- 
+
 #if defined(__INTEL_COMPILER)
 # define _FTELL ftelli8
 #elif defined(__PGI)
@@ -29,7 +29,9 @@ program gmao_regrid
 #ifndef __GFORTRAN__
   integer*4              :: iargc
   external               :: iargc
+#endif
 
+#if !defined(__GFORTRAN__) && !defined(__flang__)
   integer(kind=8)         :: _FTELL
   external      :: _FTELL
 #endif
@@ -41,7 +43,7 @@ program gmao_regrid
   character(len=ESMF_MAXSTR)   :: Iam="GMAO_Regrid"
 
   integer :: comm
-  
+
   type Regrid_GridInfo
      character(len=ESMF_MAXSTR) :: filename
      integer                    :: IM
@@ -82,7 +84,7 @@ program gmao_regrid
          576, 361,   & ! D - 1/2 degree
         1152, 721,   & ! E - 1/4 degree
         1440, 721,   & ! F - 1/4 degree rectangular
-        2880, 1441], & ! G - 1/8 degree rectangular  
+        2880, 1441], & ! G - 1/8 degree rectangular
        SHAPE = [2,8] )
 
   !type(MAPL_NCIO) :: inNCIO,outNCIO
@@ -92,7 +94,7 @@ program gmao_regrid
   integer :: rc
 
 ! Begin
-   
+
   nargs = iargc() ! get command line argument info
 
   if (nargs /= 3) then
@@ -132,7 +134,7 @@ program gmao_regrid
      !InNCIO = MAPL_NCIOOpen(f_in,rc=status)
      !VERIFY_(STATUS)
      !call GetGridInfo(gi, filetype, ncinfo=InNCIO, rc=status)
-     !VERIFY_(STATUS)   
+     !VERIFY_(STATUS)
   else
      call GetGridInfo(gi, filetype, rc=status)
      VERIFY_(STATUS)
@@ -149,13 +151,13 @@ program gmao_regrid
      if(ic >= iA .and. ic <= iZ) ic=ic+(mA-iA)
      str(i:i)=char(ic)
   end do
-  
+
   if (str(1:1) == 'B') then
      gout%gridtype = GridType_LatLon
      gout%IM = 144
      gout%JM = 91
   else if (str(1:1) == 'C') then
-     if (str(2:2) /= ' ') then 
+     if (str(2:2) /= ' ') then
         ic = ichar(str(2:2))
         _ASSERT(ic >= i0 .and. ic <= i9,'needs informative message') ! Must be a number
         read(str(2:),*) im
@@ -176,7 +178,7 @@ program gmao_regrid
      gout%IM = 1152
      gout%JM = 721
   else if (str(1:1) == 'F') then
-     if (str(2:2) /= ' ') then 
+     if (str(2:2) /= ' ') then
         ic = ichar(str(2:2))
         _ASSERT(ic >= i0 .and. ic <= i9,'needs informative message') ! Must be a number
         read(str(2:),*) im
@@ -189,7 +191,7 @@ program gmao_regrid
         gout%JM = 721
      end if
   else if (str(1:1) == 'G') then
-     if (str(2:2) /= ' ') then 
+     if (str(2:2) /= ' ') then
         ic = ichar(str(2:2))
         _ASSERT(ic >= i0 .and. ic <= i9,'needs informative message') ! Must be a number
         read(str(2:),*) im
@@ -231,14 +233,14 @@ program gmao_regrid
         !call MAPL_NCIOCreateFile(OutNCIO)
         !do n=1,InNCIO%nVars
            !call MAPL_NCIOVarGetDims(InNCIO,InNCIO%vars(n)%name,nDims,dimSizes,nSpatialDims=nSpatialDims)
- 
+
            !if (nSpatialDims == 2) then
               !call MAPL_VarRead(InNCIO,InNCIO%vars(n)%name,var_in)
               !call regridder%regrid(var_in, var_out, rc=status)
               !VERIFY_(STATUS)
               !call MAPL_VarWrite(OutNCIO,InNCIO%vars(n)%name,var_out)
            !else if (nSpatialDims ==3) then
-              !do i=1,dimSizes(3) 
+              !do i=1,dimSizes(3)
                  !call MAPL_VarRead(InNCIO,InNCIO%vars(n)%name,var_in,lev=i)
                  !call regridder%regrid(var_in, var_out, rc=status)
                  !VERIFY_(STATUS)
@@ -316,7 +318,7 @@ program gmao_regrid
 
       ! ErrLog variables
       !-----------------
-      
+
       integer                      :: STATUS
       character(len=ESMF_MAXSTR)   :: Iam="GMAO_Regrid"
 
@@ -332,11 +334,11 @@ program gmao_regrid
 
       UNIT = GETFILE(FILENAME, DO_OPEN=0, ALL_PES=.false., RC=STATUS)
       VERIFY_(STATUS)
-      
+
       INQUIRE(IOLENGTH=IREC) WORD
       open (UNIT=UNIT, FILE=FILENAME, FORM='unformatted', ACCESS='DIRECT', RECL=IREC, IOSTAT=status)
       VERIFY_(STATUS)
-      
+
 ! Read first 8 characters and compare with HDF5 signature
       read (UNIT, REC=1, ERR=100) TwoWords(1:4)
       read (UNIT, REC=2, ERR=100) TwoWords(5:8)
@@ -360,7 +362,7 @@ program gmao_regrid
 
       ! Attempt to identify as fortran binary
       cwrd = transfer(TwoWords(1:4), irec)
-      ! check if divisible by 4 
+      ! check if divisible by 4
       irec = cwrd/4
       filetype = irec
       if (cwrd /= 4*irec) then

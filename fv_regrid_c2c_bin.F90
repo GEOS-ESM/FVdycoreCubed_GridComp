@@ -5,8 +5,11 @@ module fv_regrid_c2c_bin
 #endif
 
    use fv_arrays_mod,  only: REAL4, REAL8, FVPRC
-   use fms_mod,            only: file_exist, read_data, field_exist
-   use fms_io_mod,         only: get_tile_string, field_size
+#if defined (FMS1_IO)
+   use fms_mod,            only: file_exists => file_exist
+#else
+   use fms2_io_mod,        only: file_exists
+#endif
    use mpp_mod,            only: mpp_error, FATAL, NOTE, mpp_broadcast,mpp_npes
    use mpp_parameter_mod,  only: AGRID_PARAM=>AGRID
    use mpp_domains_mod,    only: mpp_get_tile_id, domain2d, mpp_update_domains, mpp_get_boundary, DGRID_NE
@@ -103,9 +106,9 @@ contains
                end if
             enddo
          else
-            do j=1,size(extra_rst(i)%vars) 
+            do j=1,size(extra_rst(i)%vars)
                allocate(extra_rst(i)%vars(j)%ptr3d(isd:ied,jsd:jed,extra_rst(i)%vars(j)%nLev),source=0.0_FVPRC )
-            enddo 
+            enddo
          end if
       enddo
 
@@ -196,7 +199,7 @@ contains
 ! Read input FV core restart file
       fname = "fvcore_internal_restart_in"
 
-      if( file_exist(fname) ) then
+      if( file_exists(fname) ) then
 
          open(IUNIT,file=fname ,access='sequential',form='unformatted',status='old')
          read (IUNIT, IOSTAT=status) header
@@ -210,7 +213,7 @@ contains
 
          if(is_master()) write(*,*) 'Using GEOS restart:', fname
 
-         if ( file_exist(fname) ) then
+         if ( file_exists(fname) ) then
             if(is_master())  write(*,*) 'External IC dimensions:', im   , jm       , km
             if(is_master())  write(*,*) 'Interpolating to      :', npx-1, (npy-1)*6, npz
          else
@@ -261,7 +264,7 @@ contains
 
 ! Read U
          allocate (  u0(isd_i:ied_i,jsd_i:jed_i+1,km) )
-         u0(:,:,:) = 0.0 
+         u0(:,:,:) = 0.0
 !offset = sequential access: 4 + INT(6) + 8 + INT(5) + 8 + DBL(NPZ+1) + 8 + DBL(NPZ+1) + 8
          offset =                    4 + 24     + 8 + 20     + 8 + (km+1)*8   + 8 + (km+1)*8   + 8
          if (is_master()) print*, offset
@@ -282,7 +285,7 @@ contains
                sbufferx=sbuffer, nbufferx=nbuffer, &
                gridtype=DGRID_NE )
          do k=1,km
-            do i=is_i,ie_i    
+            do i=is_i,ie_i
                u0(i,je_i+1,k) = nbuffer(i,k)
             enddo
             do j=js_i,je_i
@@ -342,7 +345,7 @@ contains
          jmc = adjustl(jmc)
 
          write(fname1, "('topo_DYN_ave_',a,'x',a,'.data')") trim(imc), trim(jmc)
-         if (.not. file_exist(fname1)) then
+         if (.not. file_exists(fname1)) then
             call mpp_error(FATAL,'get_geos_cubed_ic: cannot find topo_DYN_ave file')
          endif
          call print_memuse_stats('get_geos_cubed_ic: '//TRIM(fname1)//' being read')
@@ -358,7 +361,7 @@ contains
          Atm(1)%phis = Atm(1)%phis*grav
          call print_memuse_stats('get_geos_cubed_ic: phis')
 
-! Horiz Interp for surface pressure 
+! Horiz Interp for surface pressure
          call prt_maxmin('PS_geos', ps0, is_i, ie_i, js_i, je_i, ng_i, 1, 1.0_FVPRC)
          call regridder%regrid(ps0(is_i:ie_i,js_i:je_i),psc(is:ie,js:je),rc=status)
          deallocate ( ps0 )
@@ -376,7 +379,7 @@ contains
 ! Horiz Interp for moist tracers
 ! is there a moist restart file to interpolate?
 ! Read in tracers: only sphum at this point
-         if( file_exist("moist_internal_restart_in") ) then
+         if( file_exists("moist_internal_restart_in") ) then
             if (is_master()) print*, 'Trying to interpolate moist_internal_restart_in'
 
             offset=4
@@ -401,13 +404,13 @@ contains
            do j=1,size(extra_rst(i)%vars)
               if (extra_rst(i)%have_descriptor) then
                  if (extra_rst(i)%vars(j)%nLev/=1) then
-                    if (extra_rst(i)%vars(j)%nLev == npz) then 
+                    if (extra_rst(i)%vars(j)%nLev == npz) then
                        tracer_bundles(i)%vars(j)%nLev=km
                        allocate(tracer_bundles(i)%vars(j)%ptr3d(is:ie,js:je,km) )
                     else if (extra_rst(i)%vars(j)%nLev == npz+1) then
                        tracer_bundles(i)%vars(j)%nLev=km+1
                        allocate(tracer_bundles(i)%vars(j)%ptr3d(is:ie,js:je,km+1) )
-                    end if    
+                    end if
                  else
                     allocate(tracer_bundles(i)%vars(j)%ptr2d(is:ie,js:je) )
                  end if
@@ -443,7 +446,7 @@ contains
             deallocate(qlev)
 
          enddo
-                   
+
 ! Horiz Interp for T
          deallocate ( q0 )
          call mpp_update_domains(t0, domain_i)
@@ -486,12 +489,12 @@ contains
       call prt_maxmin('PT_model', Atm(1)%pt, is, ie, js, je, ng, npz, 1.0_FVPRC)
 ! Range check the MOIST tracers
 ! Iterate over tracer names
-  
+
       iter = moist_tracers%begin()
       do while (iter /= moist_tracers%end())
          iptr => iter%value()
          cptr => iter%key()
-         if (.not.match(cptr)) then 
+         if (.not.match(cptr)) then
             do k=1,npz
                do j=js,je
                   do i=is,ie
@@ -552,7 +555,7 @@ contains
       real(FVPRC):: s2c(is:ie,js:je,4)
       integer, dimension(is:ie,js:je):: id1, id2, jdc
       real(FVPRC) psc(is:ie,js:je)
-      real(FVPRC) gzc(is:ie,js:je)          
+      real(FVPRC) gzc(is:ie,js:je)
       real(FVPRC), allocatable:: tp(:,:,:), qp(:,:,:,:)
       real(FVPRC), allocatable:: ua(:,:,:), va(:,:,:)
 
@@ -582,7 +585,7 @@ contains
 ! Read in lat-lon FV core restart file
       fname = "fvcore_internal_restart_in"
 
-      if( file_exist(fname) ) then
+      if( file_exists(fname) ) then
 
 
          call MAPL_NCIOGetFileType(fname,filetype)
@@ -624,7 +627,7 @@ contains
          enddo
          allocate (  lat(jm) )
          do j=1,jm
-            lat(j) = -0.5*pi + real(j-1)*pi/real(jm-1)   ! SP to NP 
+            lat(j) = -0.5*pi + real(j-1)*pi/real(jm-1)   ! SP to NP
          enddo
 
          call remap_coef( im, jm, lon, lat, id1, id2, jdc, s2c , Atm(1)%gridstruct%agrid, Atm(1)%bd)
@@ -724,7 +727,7 @@ contains
          enddo
          call print_memuse_stats('get_geos_latlon_ic: read t')
 ! Read PE
-         do k=1,km+1 
+         do k=1,km+1
             if (isNC4) then
                call MAPL_VarRead(formatter,"PE",r8latlon,lev=k)
             else
@@ -764,8 +767,8 @@ contains
          jmc = adjustl(jmc)
 
          write(fname1, "('topo_DYN_ave_',a,'x',a,'_DC.data')") trim(imc), trim(jmc)
-         if (.not. file_exist(fname1)) then
-            CALL mpp_error(FATAL,'get_geos_latlon_ic: cannot find topo_DYN_ave file') 
+         if (.not. file_exists(fname1)) then
+            CALL mpp_error(FATAL,'get_geos_latlon_ic: cannot find topo_DYN_ave file')
          endif
          call print_memuse_stats('get_geos_latlon_ic: '//TRIM(fname1)//' being read')
          allocate ( r4latlon(im,jm) )
@@ -786,7 +789,7 @@ contains
          jmc = adjustl(jmc)
 
          write(fname1, "('topo_DYN_ave_',a,'x',a,'.data')") trim(imc), trim(jmc)
-         if (.not. file_exist(fname1)) then
+         if (.not. file_exists(fname1)) then
             call mpp_error(FATAL,'get_geos_latlon_ic: cannot find topo_DYN_ave file')
          endif
          allocate( phis_r4(Atm(1)%npx-1,6*(Atm(1)%npy-1)) )
@@ -798,7 +801,7 @@ contains
          deallocate( phis_r4 )
          call print_memuse_stats('get_geos_latlon_ic: phis')
 
-! Horiz Interp for surface pressure 
+! Horiz Interp for surface pressure
          if(is_master()) call pmaxmin( 'PS_geos', ps0, im,    jm, 0.01_FVPRC)
          do j=js,je
             do i=is,ie
@@ -832,7 +835,7 @@ contains
 ! Horiz Interp for moist tracers
 ! is there a moist restart file to interpolate?
 ! Read in tracers: only sphum at this point
-         if( file_exist("moist_internal_restart_in")) then
+         if( file_exists("moist_internal_restart_in")) then
             if (is_master()) print*, 'Trying to interpolate moist_internal_restart_in'
             allocate ( r4latlon(im,jm) )
 
@@ -890,13 +893,13 @@ contains
            do j=1,size(extra_rst(i)%vars)
               if (extra_rst(i)%have_descriptor) then
                  if (extra_rst(i)%vars(j)%nLev/=1) then
-                    if (extra_rst(i)%vars(j)%nLev == npz) then 
+                    if (extra_rst(i)%vars(j)%nLev == npz) then
                        tracer_bundles(i)%vars(j)%nLev=km
                        allocate(tracer_bundles(i)%vars(j)%ptr3d(is:ie,js:je,km) )
                     else if (extra_rst(i)%vars(j)%nLev == npz+1) then
                        tracer_bundles(i)%vars(j)%nLev=km+1
                        allocate(tracer_bundles(i)%vars(j)%ptr3d(is:ie,js:je,km+1) )
-                    end if    
+                    end if
                  else
                     allocate(tracer_bundles(i)%vars(j)%ptr2d(is:ie,js:je) )
                  end if
@@ -971,7 +974,7 @@ contains
          deallocate ( q0 )
 
 ! Horiz Interp for T
-         if(is_master()) call pmaxmin( 'T_geos',   t0, im*jm, km, 1.0_FVPRC) 
+         if(is_master()) call pmaxmin( 'T_geos',   t0, im*jm, km, 1.0_FVPRC)
          allocate (  tp(is:ie,js:je,km) )
          do k=1,km
             do j=js,je
@@ -989,12 +992,12 @@ contains
 
 ! Horz/Vert remap for MOIST, GOCART, and PCHEM scalars (Assuming Total Number is divisible by KM)
 ! -----------------------------------------------------------------------------------------------
-         nqmap = nmoist + ngocart + npchem 
+         nqmap = nmoist + ngocart + npchem
 
      !!  call remap_scalar(im, jm, km, npz, nqmap, nqmap, ak0, bk0, psc, gzc, tp, qp, Atm(1), tracer_bundles, extra_rst)
 
          deallocate ( tp )
-         deallocate ( qp ) 
+         deallocate ( qp )
          call print_memuse_stats('get_geos_latlon_ic: remap_scalar')
 
 ! Horz/Vert remap for U/V
@@ -1103,7 +1106,7 @@ contains
             endif
             enddo
        endif
-111    continue       
+111    continue
        if ( agrid(i,j,2)<lat(1) ) then
             jc = 1
             b1 = 0.
@@ -1260,7 +1263,7 @@ contains
   real(FVPRC), pointer, dimension(:,:,:) :: agrid
 
 ! local:
-  real(FVPRC), dimension(Atm%bd%isd:Atm%bd%ied,Atm%bd%jsd:Atm%bd%jed,npz):: ut, vt   ! winds 
+  real(FVPRC), dimension(Atm%bd%isd:Atm%bd%ied,Atm%bd%jsd:Atm%bd%jed,npz):: ut, vt   ! winds
   real(FVPRC), dimension(Atm%bd%is:Atm%bd%ie,km):: up, vp, tp
   real(FVPRC), dimension(Atm%bd%is:Atm%bd%ie,km+1):: pe0, pn0
   real(FVPRC) pt0(km), gz(km+1), pk0(km+1)
@@ -1507,7 +1510,7 @@ contains
 
 
 
-                     subroutine init_cubsph_grid(npts, is,ie, js,je, ntiles, sph_corner)  
+                     subroutine init_cubsph_grid(npts, is,ie, js,je, ntiles, sph_corner)
 !------------------------------------------------------------------!
 ! read/generate cubed sphere grid                                  !
 ! calculate cell center from cell corners                          !
@@ -1518,7 +1521,7 @@ contains
 ! output:                                                          !
 ! sph_corner             cell corners in spherical coor            !
 !------------------------------------------------------------------!
-                        use GHOST_CUBSPH_mod, only: B_grid, ghost_cubsph_update             
+                        use GHOST_CUBSPH_mod, only: B_grid, ghost_cubsph_update
                         use fv_grid_utils_mod, only : gnomonic_grids
                         use fv_grid_tools_mod, only : mirror_grid
 
@@ -1537,7 +1540,7 @@ contains
 #ifdef SMEM_MAPL_MODE
 ! allocate global arrays (preferable in shared memory)
                         if(MAPL_ShmInitialized) then
-                           if (is_master()) write(*,*) 'Using MAPL_Shmem in external_ic: init_cubsph_grid' 
+                           if (is_master()) write(*,*) 'Using MAPL_Shmem in external_ic: init_cubsph_grid'
                            call MAPL_AllocNodeArray(grid_in,Shp=(/npts,npts,2,ntiles/),rc=STATUS)
                         else
                            if (is_master()) write(*,*) 'WARNING... in external_ic: Global grid allocate'
@@ -2068,7 +2071,7 @@ contains
 
                      subroutine pmaxmin4d( qname, a, im, jm, km, lm, fac )
 
-                        character*(*)  qname 
+                        character*(*)  qname
                         integer, intent(in):: im, jm, km, lm
                         integer i, j, k, l
                         real(FVPRC) a(im,jm,km,lm)
@@ -2407,7 +2410,7 @@ contains
                            var(:,:,k) = var_r8
                            offset = offset + slice_2d*8 + 8
                         enddo
-                        call MPI_FILE_CLOSE(MUNIT, STATUS) 
+                        call MPI_FILE_CLOSE(MUNIT, STATUS)
 
                      end subroutine parallel_read_file_r8
 

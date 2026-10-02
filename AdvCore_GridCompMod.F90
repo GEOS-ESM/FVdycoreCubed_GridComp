@@ -6,7 +6,7 @@
 !
 ! !MODULE: AdvCore_GridCompMod
 !
-! !DESCRIPTION: 
+! !DESCRIPTION:
 !    This a MAPL component that can be used in
 !    either with offline or online applications to advect an arbitrary set
 !    of constituents.
@@ -21,7 +21,7 @@
 !   which this component is taken may be found in:
 !
 !   \begin{quote}
-!   Lin, S.-J. 2004, A vertically Lagrangian Finite-Volume Dynamical 
+!   Lin, S.-J. 2004, A vertically Lagrangian Finite-Volume Dynamical
 !   Core for Global Models. {\em Mon. Wea. Rev.}, {\bf 132}, 2293-2307.
 !   \end{quote}
 !
@@ -46,7 +46,7 @@
 !    state. Each Field in the Bundle is tested for ``Friendliness'' to
 !    advection; if friendly it is advected and its values updated.
 !
-!    Currently no Export capability is implemented. 
+!    Currently no Export capability is implemented.
 !
 ! !INTERFACE:
 
@@ -60,7 +60,7 @@ module AdvCore_GridCompMod
       use m_set_eta,       only: set_eta
       use mpp_mod,         only: mpp_pe, mpp_root_pe
       use fv_arrays_mod,   only: fv_atmos_type, FVPRC, REAL4, REAL8
-      use fms_mod,         only: fms_init, set_domain, nullify_domain
+      use fms_mod,         only: fms_init
       use fv_control_mod,  only: fv_init1, fv_init2, fv_end
       use fv_tracer2d_mod, only: offline_tracer_advection
       use fv_mp_mod,       only: is,ie, js,je, is_master, tile
@@ -139,7 +139,7 @@ contains
 
       ! Get my name and set-up traceback handle
       ! ---------------------------------------
-    
+
       call ESMF_GridCompGet( GC, NAME=COMP_NAME, vm=vm, RC=STATUS )
       VERIFY_(STATUS)
       Iam = trim(COMP_NAME) // 'SetServices'
@@ -195,7 +195,7 @@ contains
 
     call MAPL_AddImportSpec ( gc,                                  &
          SHORT_NAME = 'PLE1',                                      &
-         LONG_NAME  = 'pressure_at_layer_edges_after_advection',   &                
+         LONG_NAME  = 'pressure_at_layer_edges_after_advection',   &
          UNITS      = 'Pa',                                        &
          PRECISION  = ESMF_KIND_R8,                                &
          DIMS       = MAPL_DimsHorzVert,                           &
@@ -218,7 +218,7 @@ contains
           DIMS       = MAPL_DimsHorzOnly,                           &
           VLOCATION  = MAPL_VLocationNone,               RC=STATUS  )
      VERIFY_(STATUS)
- 
+
 
 ! 3D Tracers
      do ntracer=1,ntracers
@@ -256,7 +256,7 @@ contains
       call MAPL_GridCompSetEntryPoint ( gc, ESMF_METHOD_FINALIZE,     Finalize,  RC=status)
       VERIFY_(STATUS)
 
-      ! Check if AdvCore is running without FV3_DynCoreIsRunning, if yes then setup the MAPL Grid 
+      ! Check if AdvCore is running without FV3_DynCoreIsRunning, if yes then setup the MAPL Grid
       ! ----------------------------------------------------------------------------
       call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
       VERIFY_(STATUS)
@@ -341,7 +341,7 @@ contains
          call fv_init2(FV_Atm, dt, grids_on_my_pe, p_split)
       end if
 
-      ! Ending with a Generic SetServices call is a MAPL requirement 
+      ! Ending with a Generic SetServices call is a MAPL requirement
       !-------------------------------------------------------------
       call MAPL_GenericSetServices    ( GC, rc=STATUS)
       VERIFY_(STATUS)
@@ -360,7 +360,7 @@ contains
   subroutine Initialize(GC, IMPORT, EXPORT, CLOCK, RC)
 !
 ! !INPUT/OUTPUT PARAMETERS:
-      type(ESMF_GridComp), intent(inout) :: GC     ! Gridded component 
+      type(ESMF_GridComp), intent(inout) :: GC     ! Gridded component
       type(ESMF_State),    intent(inout) :: IMPORT ! Import state
       type(ESMF_State),    intent(inout) :: EXPORT ! Export state
       type(ESMF_Clock),    intent(inout) :: CLOCK  ! The clock
@@ -371,8 +371,8 @@ contains
 ! !DESCRIPTION:
 !     This initialization routine creates the import and export states,
 !     as well as the internal state, which is attached to the component.
-!     It also determines the distribution (and therefore the grid) 
-!     and performs allocations of persistent data, 
+!     It also determines the distribution (and therefore the grid)
+!     and performs allocations of persistent data,
 !
 !EOP
 !=============================================================================
@@ -389,7 +389,7 @@ contains
       logical                            :: gridCreated
       type(ESMF_Grid)                    :: grid
 
-! Begin... 
+! Begin...
 
 ! Get the target components name and set-up traceback handle.
 ! -----------------------------------------------------------
@@ -452,7 +452,7 @@ contains
       subroutine Run(GC, IMPORT, EXPORT, CLOCK, RC)
 !
 ! !INPUT/OUTPUT PARAMETERS:
-      type(ESMF_GridComp), intent(inout) :: GC     ! Gridded component 
+      type(ESMF_GridComp), intent(inout) :: GC     ! Gridded component
       type(ESMF_State),    intent(inout) :: IMPORT ! Import state
       type(ESMF_State),    intent(inout) :: EXPORT ! Export state
       type(ESMF_Clock),    intent(inout) :: CLOCK  ! The clock
@@ -461,7 +461,7 @@ contains
       integer, optional,   intent(  out) :: RC     ! Error code
 !
 ! !DESCRIPTION:
-! 
+!
 ! The Run method advanced the advection one long time step, as
 ! specified in the configuration.  This may be broken down int a
 ! number of internal, small steps, also configurable.
@@ -696,7 +696,7 @@ contains
             end if
 
             if (allocated(biggerlist)) then
-               deallocate(biggerlist)      
+               deallocate(biggerlist)
             end if
 
             firstRun=.false.
@@ -772,7 +772,7 @@ contains
          call global_integral(TMASS1, TRACERS, PLE1, IM,JM,LM, NQ)
          endif
 
-         ! Conserve Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air 
+         ! Conserve Specific Mass of Constituents Keeping Mixing_Ratio Constant WRT_Dry_Air
          ! --------------------------------------------------------------------------------
          if (rpt_mass) then
          do N=1,NQ
@@ -878,7 +878,7 @@ contains
   subroutine Finalize(GC, IMPORT, EXPORT, CLOCK, RC)
 !
 ! !INPUT/OUTPUT PARAMETERS:
-      type(ESMF_GridComp), intent(inout) :: GC     ! Gridded component 
+      type(ESMF_GridComp), intent(inout) :: GC     ! Gridded component
       type(ESMF_State),    intent(inout) :: IMPORT ! Import state
       type(ESMF_State),    intent(inout) :: EXPORT ! Export state
       type(ESMF_Clock),    intent(inout) :: CLOCK  ! The clock
