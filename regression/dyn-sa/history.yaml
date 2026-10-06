@@ -23,7 +23,7 @@ vertical_grids:
     levels: [40., 30., 20., 10.]
     units: km
     physical_dimension: height
-  
+
 time_specs:
   three_hour: &one_hour
     frequency: PT1H
