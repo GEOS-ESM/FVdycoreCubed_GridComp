@@ -103,6 +103,7 @@ category: EXPORT
   UV_S           | m s-1            | xy   |  N   | V         |          | surface_(eastward,northward)_wind
   SPEED          | m s-1            | xy   |  N   |           |          | surface_wind_speed
   WSPD_10M       | m s-1            | xy   |  N   |           |          | wind_speed_at_10m
+WSPD_STABLE300M  | m s-1            | xy   |  N   |           |          | max_wind_speed_in_stable_cold_surface_layer
 VVEL_UP_100_1000 | m s-1            | xy   |  N   |           |          | max_vertical_velocity_up_between_100_1000_hPa
 VVEL_DN_100_1000 | m s-1            | xy   |  N   |           |          | max_vertical_velocity_down_between_100_1000_hPa
   DZ             | m                | xy   |  N   |           |          | surface_layer_height

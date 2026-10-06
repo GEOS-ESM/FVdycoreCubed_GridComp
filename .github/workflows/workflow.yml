@@ -6,24 +6,23 @@ on:
     # Do not run if the only files changed cannot affect the build
     paths-ignore:
       - "**.md"
-      - "**.json"
-      - "ChangeLog-PreJason.txt"
-      - "parallel_build.csh"
+      - "**.pro"
+      - "**.sh"
+      - "**.perl"
       - ".github/CODEOWNERS"
-      - ".codebuild/**"
-      - ".circleci/**"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
 
 jobs:
   build_gcm:
     strategy:
-      matrix:
-        compiler: [ifort, gfortran-14, gfortran-15, ifx]
-        build-type: [Debug]
       fail-fast: false
+      matrix:
+        compiler: [ifort, gfortran-15, gfortran-16, ifx]
+        build-type: [Debug]
     uses: GEOS-ESM/CI-workflows/.github/workflows/geosgcm_build_tests.yml@project/geosgcm
     with:
       compiler: ${{ matrix.compiler }}
