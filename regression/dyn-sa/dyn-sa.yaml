@@ -17,12 +17,9 @@ geometry:
     nx_face: 1
     ny_face: 1
   vertical_grid:
-    class: model
-    standard_name: air_pressure
-    units: hPa
+    grid_type: model
+    fields: {pressure: PLE, height: ZLE}
     num_levels: 91
-    field_edge: PLE
-    field_center: PE
 
 mapl:
 
