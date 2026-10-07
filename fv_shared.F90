@@ -1,25 +1,25 @@
 #include "MAPL.h"
 
-MODULE fv_shared
+module fv_shared
 
-  USE ESMF
-  USE MAPL, ONLY : MAPL_FieldGet, MAPL_Verify
+   use ESMF
+   use MAPL, only : MAPL_FieldGet, MAPL_Verify, MAPL_Return
 
-  IMPLICIT NONE
+   implicit none
 
-  private
+   private
 
-  public :: get_short_name
-  public :: field_is_cloud_water_species
-  public :: is_name_in_list
+   public :: get_short_name
+   public :: field_is_cloud_water_species
+   public :: is_name_in_list
 
-  !
-  !  Functions used in both AdvCore_GridCompMod and DynCore_GridCompMod
-  !
+   !
+   !  Functions used in both AdvCore_GridCompMod and DynCore_GridCompMod
+   !
 
-CONTAINS
+contains
 
-     function get_short_name(field, rc) result(short_name)
+   function get_short_name(field, rc) result(short_name)
       type(ESMF_Field) :: field
       integer, intent(out) :: rc
       character(len=:), allocatable :: short_name
@@ -95,4 +95,4 @@ CONTAINS
       end do
    end function is_name_in_list
 
-END MODULE fv_shared
+end module fv_shared
