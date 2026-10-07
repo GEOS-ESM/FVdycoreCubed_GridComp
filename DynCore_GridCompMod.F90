@@ -15,17 +15,18 @@ module FVdycoreCubed_GridComp
 
    !USES:
    use ESMF
-   use MAPL, only: MAPL_Verify, MAPL_Assert, MAPL_Return
-   use MAPL, only: WRITE_PARALLEL, MAPL_Am_I_Root, MAPL_MaxMin, MAPL_AreaMean
-   use MAPL, only: MAPL_GridCompSetGeometry, MAPL_GridCompGet, MAPL_GridCompGetResource
-   use MAPL, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
-   use MAPL, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, MAPL_STATEITEM_VECTOR
-   use MAPL, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
-   use MAPL, only: MAPL_VERTICAL_STAGGER_NONE, MAPL_VERTICAL_STAGGER_CENTER, MAPL_VERTICAL_STAGGER_EDGE
-   use MAPL, only: MAPL_GridGetCoordinates, MAPL_StateGetPointer, MAPL_FieldCreate, MAPL_FieldGet
-   use MAPL, only: MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, MAPL_FieldBundleGetPointer
-   use MAPL, only: MAPL_FieldBundleGet
-   use MAPL, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED, MAPL_ArrayGather
+    use MAPL, only: MAPL_Verify, MAPL_Assert, MAPL_Return
+    use MAPL, only: WRITE_PARALLEL, MAPL_Am_I_Root, MAPL_MaxMin, MAPL_AreaMean
+    use MAPL, only: MAPL_GridCompSetGeometry, MAPL_GridCompGet, MAPL_GridCompGetResource
+    use MAPL, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
+    use MAPL, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, MAPL_STATEITEM_VECTOR
+    use MAPL, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
+    use MAPL, only: MAPL_VERTICAL_STAGGER_NONE, MAPL_VERTICAL_STAGGER_CENTER, MAPL_VERTICAL_STAGGER_EDGE
+    use MAPL, only: MAPL_GridGetCoordinates, MAPL_StateGetPointer, MAPL_FieldCreate, MAPL_FieldGet
+    use MAPL, only: MAPL_FieldBundleAdd, MAPL_FieldBundleSameData, MAPL_FieldBundleGetPointer
+    use MAPL, only: MAPL_FieldBundleGet
+    use MAPL, only: MAPL_RESTART_SKIP, MAPL_RESTART_REQUIRED, MAPL_ArrayGather
+    use mapl_OwningGridComp_mod, only: mapl_get_owning_gridcomp
    use MAPL_Constants, only: MAPL_RADIUS, MAPL_CP, MAPL_PI, MAPL_PI_R8, MAPL_OMEGA, MAPL_KAPPA
    use MAPL_Constants, only: MAPL_P00, MAPL_GRAV, MAPL_RGAS, MAPL_RVAP, MAPL_CPVAP, MAPL_O3MW, MAPL_AIRMW
    use MAPL_Constants, only: MAPL_TICE
