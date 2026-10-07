@@ -1,20 +1,67 @@
 active_collections:
-  - test
+  - test_native
+  - test_pressure
+  - test_height
+
+geoms:
+  ll_geom: &ll_geom
+    class: latlon
+    im_world: 40
+    jm_world: 21
+    pole: PC
+    dateline: DC
+
+vertical_grids:
+  pressure_levs: &pressure_levs
+    grid_type: fixed_levels
+    levels: [600., 500., 400., 300., 200., 100., 50., 25., 10., 5., 1.1]
+    units: hPa
+    physical_dimension: pressure
+
+  height_levs: &height_levs
+    grid_type: fixed_levels
+    levels: [40., 30., 20., 10.]
+    units: km
+    physical_dimension: height
 
 time_specs:
   three_hour: &one_hour
     frequency: PT1H
 
 collections:
-  test:
+  test_native:
     template: "%c.nc4"
     time_spec: *one_hour
     var_list:
       "[U,V]": {source: DYNsa.UV}
-      "[DUDTANA,DVDTANA]": {source: DYNsa.D_UV_DTANA}
       "[UKE,VKE]": {source: DYNsa.UV_KE}
       "[UPHI,VPHI]": {source: DYNsa.UV_PHI}
       "[UQV,VQV]": {source: DYNsa.UV_QV}
+      T: {source: DYNsa.T}
+
+  test_pressure:
+    template: "%c.nc4"
+    time_spec: *one_hour
+    geom: *ll_geom
+    vertical_grid: *pressure_levs
+    var_list:
+      "[U,V]": {source: DYNsa.UV}
+      "[UKE,VKE]": {source: DYNsa.UV_KE}
+      "[UPHI,VPHI]": {source: DYNsa.UV_PHI}
+      "[UQV,VQV]": {source: DYNsa.UV_QV}
+      T: {source: DYNsa.T}
+
+  test_height:
+    template: "%c.nc4"
+    time_spec: *one_hour
+    geom: *ll_geom
+    vertical_grid: *height_levs
+    var_list:
+      "[U,V]": {source: DYNsa.UV}
+      "[UKE,VKE]": {source: DYNsa.UV_KE}
+      "[UPHI,VPHI]": {source: DYNsa.UV_PHI}
+      "[UQV,VQV]": {source: DYNsa.UV_QV}
+      T: {source: DYNsa.T}
 
 mapl:
 
