@@ -552,6 +552,7 @@ contains
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%k_split = 1
    FV_Atm(1)%flagstruct%n_split = 0
+   FV_Atm(1)%flagstruct%q_split = 1
    ! Rayleigh Damping defaults
    imsize = FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac)*4.0
    sigma = 1.0-0.9839*exp(-0.09835*4.e7*0.9/imsize/1000.) ! Based on Arakawa 2011 sigma used in GF2020
