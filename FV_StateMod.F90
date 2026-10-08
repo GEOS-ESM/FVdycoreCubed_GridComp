@@ -588,37 +588,37 @@ contains
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 360) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
          FV_Atm(1)%flagstruct%tau = 1.5
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 720) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
          FV_Atm(1)%flagstruct%tau = 1.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1120) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
          FV_Atm(1)%flagstruct%tau = 0.75
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1440) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
          FV_Atm(1)%flagstruct%tau = 0.5
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 2880) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
          FV_Atm(1)%flagstruct%tau = 0.25
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
          FV_Atm(1)%flagstruct%tau = 0.125
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 10800) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  4.6875 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375 )
          FV_Atm(1)%flagstruct%tau = 0.0625
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
