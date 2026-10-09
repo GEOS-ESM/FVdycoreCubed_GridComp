@@ -137,6 +137,7 @@ class GeosDycoreWrapper:
         # Make a custom performance collector for the GEOS wrapper
         self.do_time_core = "PYFV3_TIME_CORE" in os .environ and os.environ["PYFV3_TIME_CORE"].lower() == "True"
         if self.do_time_core:
+            ndsl_log.info("Timing pyFV3 + interface")
             self.perf_collector = PerformanceCollector("GEOS wrapper", comm)
         else:
             self.perf_collector = NullPerformanceCollector()
