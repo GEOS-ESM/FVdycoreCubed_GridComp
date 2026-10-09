@@ -260,13 +260,6 @@ class GeosDycoreWrapper:
             f"       Nvidia MPS : {MPS_is_on}\n"
         )
 
-    def _run(self):
-        with self.perf_collector.timestep_timer.clock("step_dynamics"):
-            self.dynamical_core.step_dynamics(
-                state=self.dycore_state,
-                timer=self.perf_collector.timestep_timer,
-            )
-
     def __call__(
         self,
         timings: dict[str, list[float | int]],
@@ -322,8 +315,13 @@ class GeosDycoreWrapper:
                 cyd,
                 diss_estd,
             )
+
         # Enter orchestrated code - if applicable
-        self._run()
+        with self.perf_collector.timestep_timer.clock("FVDynamics"):
+            self.dynamical_core.step_dynamics(
+                state=self.dycore_state,
+                timer=self.perf_collector.timestep_timer,
+            )
 
         with self.perf_collector.timestep_timer.clock("dycore-to-numpy"):
             self.output_dict = self._prep_outputs_for_geos()
