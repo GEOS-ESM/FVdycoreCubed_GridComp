@@ -16,6 +16,7 @@ from ndsl import (
     DaceConfig,
     GridIndexing,
     PerformanceCollector,
+    NullPerformanceCollector,
     QuantityFactory,
     StencilConfig,
     StencilFactory,
@@ -77,7 +78,7 @@ class StencilBackendCompilerOverride:
     def __enter__(self):
         if self.no_op:
             return
-        if self.config.do_compile:
+        if self.config.is_compiling():
             ndsl_log.info(f"Stencil backend compiles on {self.comm.Get_rank()}")
         else:
             ndsl_log.info(f"Stencil backend waits on {self.comm.Get_rank()}")
@@ -86,7 +87,7 @@ class StencilBackendCompilerOverride:
     def __exit__(self, type, value, traceback):
         if self.no_op:
             return
-        if not self.config.do_compile:
+        if not self.config.is_compiling():
             ndsl_log.info(f"Stencil backend read cache on {self.comm.Get_rank()}")
         else:
             ndsl_log.info(f"Stencil backend compiled on {self.comm.Get_rank()}")
@@ -119,7 +120,7 @@ class GeosDycoreWrapper:
         bk: np.ndarray,
         phis: np.ndarray,
         bdt: float,
-        comm: Comm,
+        fortran_comm: Comm,
         backend: Backend,
         tracer_count: int,
         fortran_mem_space: MemorySpace = MemorySpace.CPU,
@@ -131,9 +132,14 @@ class GeosDycoreWrapper:
                 f"pyFV3 requires 6 or 0 water tracers to be advected, {fv_flags.nwat} given. Abort."
             )
         comm = MPIComm()
+        comm.comm_ = fortran_comm
 
         # Make a custom performance collector for the GEOS wrapper
-        self.perf_collector = PerformanceCollector("GEOS wrapper", comm)
+        self.do_time_core = "PYFV3_TIME_CORE" in os .environ and os.environ["PYFV3_TIME_CORE"].lower() == "True"
+        if self.do_time_core:
+            self.perf_collector = PerformanceCollector("GEOS wrapper", comm)
+        else:
+            self.perf_collector = NullPerformanceCollector()
 
         self.dycore_config = pyfv3._config.DynamicalCoreConfig()
         FVFlags_to_DycoreConfig(fv_flags, self.dycore_config)
@@ -188,6 +194,7 @@ class GeosDycoreWrapper:
             tile_nz=self.dycore_config.npz,
             time=True,
         )
+        stencil_config.dace_config.performance_collector = self.perf_collector
 
         self._grid_indexing = GridIndexing.from_sizer_and_communicator(sizer=sizer, comm=self.communicator)
         stencil_factory = StencilFactory(config=stencil_config, grid_indexing=self._grid_indexing)
@@ -322,13 +329,14 @@ class GeosDycoreWrapper:
             self.output_dict = self._prep_outputs_for_geos()
 
         # Collect performance of the timestep and write a json file for rank 0
-        self.perf_collector.collect_performance()
-        for k, v in self.perf_collector.times_per_step[0].items():
-            if k not in timings.keys():
-                timings[k] = [v]
-            else:
-                timings[k].append(v)
-        self.perf_collector.clear()
+        if self.do_time_core:
+            self.perf_collector.collect_performance()
+            for k, v in self.perf_collector.times_per_step[0].items():
+                if k not in timings.keys():
+                    timings[k] = [v]
+                else:
+                    timings[k].append(v)
+            self.perf_collector.clear()
 
         return self.output_dict, timings
 

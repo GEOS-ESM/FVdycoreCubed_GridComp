@@ -73,7 +73,7 @@ class PYFV3_WRAPPER:
         self.dycore = GeosDycoreWrapper(
             fv_flags=fv_flags,
             bdt=bdt,
-            comm=comm,
+            fortran_comm=comm,
             ak=ak,
             bk=bk,
             phis=phis,
