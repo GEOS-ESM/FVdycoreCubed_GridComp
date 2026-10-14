@@ -552,6 +552,7 @@ contains
   ! Some default time-splitting options
    FV_Atm(1)%flagstruct%k_split = 1
    FV_Atm(1)%flagstruct%n_split = 0
+   FV_Atm(1)%flagstruct%q_split = 0 ! set to 1 to enable dynamic subcycling
    ! Rayleigh Damping defaults
    imsize = FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac)*4.0
    sigma = 1.0-0.9839*exp(-0.09835*4.e7*0.9/imsize/1000.) ! Based on Arakawa 2011 sigma used in GF2020
@@ -588,37 +589,37 @@ contains
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 360) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 225.0   )
          FV_Atm(1)%flagstruct%tau = 1.5
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 720) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
          FV_Atm(1)%flagstruct%tau = 1.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1120) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
          FV_Atm(1)%flagstruct%tau = 0.75
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1440) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
          FV_Atm(1)%flagstruct%tau = 0.5
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 2880) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
          FV_Atm(1)%flagstruct%tau = 0.25
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
          FV_Atm(1)%flagstruct%tau = 0.125
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 10800) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  4.6875 )
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375 )
          FV_Atm(1)%flagstruct%tau = 0.0625
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
@@ -1394,6 +1395,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (fv_first_run .and. FV_Atm(1)%ncnst > 0) then
        write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", FV_Atm(1)%ncnst, " tracers:"
        call WRITE_PARALLEL( trim(STRING) )
+       write(STRING,'(A,I5,A)') "       Water species, nwat=", FV_Atm(1)%flagstruct%nwat, " :"
+       call WRITE_PARALLEL( trim(STRING) )
     endif
     FV_Atm(1)%q(:,:,:,:) = 0.0
 
@@ -1434,7 +1437,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  endif
              endif
              if ((qlcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-             if ((qliq /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QLIQ") )
+             if ((qliq /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME)//"_QLIQ" )
 
           case ('QLLS')
              if (state%vars%tracer(n)%is_r4) then
@@ -1462,7 +1465,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  endif
              endif
              if ((qicn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-             if ((qice /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QICE") )
+             if ((qice /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME)//"_QICE" )
 
           case ('QILS')
              if (state%vars%tracer(n)%is_r4) then
@@ -1490,7 +1493,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  endif
              endif
              if ((clcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-             if ((qcld /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QCLD") )
+             if ((qcld /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME)//"_QCLD" )
 
           case ('CLLS')
              if (state%vars%tracer(n)%is_r4) then
@@ -1539,7 +1542,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              else
                  FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
              endif
-             if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
        end select
     enddo
     
