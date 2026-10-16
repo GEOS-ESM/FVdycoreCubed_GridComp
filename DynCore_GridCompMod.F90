@@ -19,6 +19,7 @@ module FVdycoreCubed_GridComp
    use MAPL, only: WRITE_PARALLEL, MAPL_Am_I_Root, MAPL_MaxMin, MAPL_AreaMean
    use MAPL, only: MAPL_GridCompSetGeometry, MAPL_GridCompGet, MAPL_GridCompGetResource
    use MAPL, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompGetInternalState
+   use MAPL, only: MAPL_InternalStateGet
    use MAPL, only: MAPL_GridCompAddSpec, MAPL_STATEITEM_SERVICE, MAPL_STATEITEM_VECTOR
    use MAPL, only: MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
    use MAPL, only: MAPL_VERTICAL_STAGGER_NONE, MAPL_VERTICAL_STAGGER_CENTER, MAPL_VERTICAL_STAGGER_EDGE
