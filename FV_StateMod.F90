@@ -103,6 +103,7 @@ private
   public fv_getAllWinds
   public INTERP_AGRID_TO_DGRID
   public setup_fv_dimensions_and_topology
+  public get_geometry_subsection
 
   interface fv_computeMassFluxes
      module procedure fv_computeMassFluxes_r4
@@ -795,27 +796,67 @@ contains
       integer, intent(out) :: topology(2)
       integer, optional, intent(out) :: rc
 
-      type(ESMF_HConfig) :: geometry_cfg, geom_cfg
-      logical :: has_section
+      type(ESMF_HConfig) :: geom_cfg
       integer :: nx_face, ny_face, status
 
-      has_section = ESMF_HConfigIsDefined(hconfig, keyString="geometry", _RC)
-      _ASSERT(has_section, "hconfig is missing geometry section")
-      geometry_cfg = ESMF_HConfigCreateAt(hconfig, keyString="geometry", _RC)
-      has_section = ESMF_HConfigIsDefined(geometry_cfg, keyString="esmf_geom", _RC)
-      _ASSERT(has_section, "geometry is missing esmf_geom section")
-      geom_cfg = ESMF_HConfigCreateAt(geometry_cfg, keyString="esmf_geom", _RC)
-
+      geom_cfg = get_geometry_subsection(hconfig, "esmf_geom", _RC)
       im_world = ESMF_HConfigAsI4(geom_cfg, keyString="im_world", _RC)
       nx_face = ESMF_HConfigAsI4(geom_cfg, keyString="nx_face", _RC)
       ny_face = ESMF_HConfigAsI4(geom_cfg, keyString="ny_face", _RC)
       topology = [nx_face, ny_face]
 
-      call ESMF_HConfigDestroy(geometry_cfg, _RC)
       call ESMF_HConfigDestroy(geom_cfg, _RC)
 
       _RETURN(_SUCCESS)
    end subroutine get_im_world_and_topology
+
+   function get_geometry_subsection(hconfig, name, rc) result(subsection_cfg)
+      type(ESMF_HConfig) :: subsection_cfg
+      type(ESMF_HConfig), intent(in) :: hconfig
+      character(*), intent(in) :: name
+      integer, optional, intent(out) :: rc
+
+      type(ESMF_HConfig) :: mapl_cfg
+      logical :: has_mapl, found
+      integer :: status
+
+      found = .false.
+      has_mapl = ESMF_HConfigIsDefined(hconfig, keyString="mapl", _RC)
+      if (has_mapl) then
+         mapl_cfg = ESMF_HConfigCreateAt(hconfig, keyString="mapl", _RC)
+         call find_geometry_subsection_(mapl_cfg, name, subsection_cfg, found, _RC)
+         call ESMF_HConfigDestroy(mapl_cfg, _RC)
+      end if
+      if (.not. found) then
+         call find_geometry_subsection_(hconfig, name, subsection_cfg, found, _RC)
+      end if
+      _ASSERT(found, "geometry:"//name//" not found under mapl: or at top level of component hconfig")
+
+      _RETURN(_SUCCESS)
+   end function get_geometry_subsection
+
+   subroutine find_geometry_subsection_(parent_cfg, name, subsection_cfg, found, rc)
+      type(ESMF_HConfig), intent(in) :: parent_cfg
+      character(*), intent(in) :: name
+      type(ESMF_HConfig), intent(out) :: subsection_cfg
+      logical, intent(out) :: found
+      integer, optional, intent(out) :: rc
+
+      type(ESMF_HConfig) :: geometry_cfg
+      integer :: status
+
+      found = ESMF_HConfigIsDefined(parent_cfg, keyString="geometry", _RC)
+      if (found) then
+         geometry_cfg = ESMF_HConfigCreateAt(parent_cfg, keyString="geometry", _RC)
+         found = ESMF_HConfigIsDefined(geometry_cfg, keyString=name, _RC)
+         if (found) then
+            subsection_cfg = ESMF_HConfigCreateAt(geometry_cfg, keyString=name, _RC)
+         end if
+         call ESMF_HConfigDestroy(geometry_cfg, _RC)
+      end if
+
+      _RETURN(_SUCCESS)
+   end subroutine find_geometry_subsection_
 
  subroutine FV_InitState (STATE, CLOCK, INTERNAL, IMPORT, GC, RC)
 
