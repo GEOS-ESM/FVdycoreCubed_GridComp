@@ -6,7 +6,7 @@
   !--------------------------------------------------------------------!
   use ESMF
   use CUB2CUB_mod,       only : get_c2c_weight, do_c2c_interpolation
-  use MAPL_ConstantsMod, only : pi=> MAPL_PI
+  use MAPL_Constants,    only : pi=> MAPL_PI
   use fv_grid_utils_mod, only : gnomonic_grids
   use fv_grid_tools_mod, only : mirror_grid
   use GHOST_CUBSPH_mod,  only : B_grid, A_grid, ghost_cubsph_update
@@ -48,7 +48,7 @@
      print*, 'ABORT: need 3 arguments input_res and output_res and levels (No vertical interp supported yet)'
      stop
   endif
- 
+
   CALL GETARG(1, str_arg)
   read (str_arg,'(I10)') npx_in
   read (str_arg,'(I10)') npy_in
@@ -94,7 +94,7 @@
                               1, ntiles, 1, 1, l, B_grid)
   enddo
   deallocate (grid_in)
- 
+
   !--------------------------------------------------------------------!
   ! initialize Output cubed sphere grid                                !
   !--------------------------------------------------------------------!
@@ -155,7 +155,7 @@
   deallocate(corner_in, corner_out, index_c2c, weight_c2c)
 
  contains
- 
+
  subroutine read_interp_write(IUNIT, OUNIT, npx_in, npy_in, npx_out, npy_out, npz, ntiles, &
                               index_c2c, weight_c2c)
   integer, intent(IN) :: IUNIT, OUNIT, npx_in, npy_in, npx_out, npy_out, npz, ntiles
@@ -173,7 +173,7 @@
   allocate( varo(npx_out,npy_out*ntiles) )
   allocate( var_in(0:npx_in+1,0:npy_in+1,npz,ntiles) )
   allocate( var_out(npx_out,npy_out,npz,ntiles) )
-! 
+!
   do k=1,npz
     read (IUNIT, IOSTAT=status) vari
     do l=1,ntiles

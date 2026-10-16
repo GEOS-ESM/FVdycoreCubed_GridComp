@@ -1,0 +1,28 @@
+---
+mapl:
+
+  setServices:
+    sharedObj: libconfigurable_gridcomp
+
+  states: {}
+
+  geometry:
+    kind: from_child
+    provider: DYNsa
+
+  children:
+    DYNsa:
+      dso: libFVdycoreCubed_GridComp
+      config_file: dyn-sa.yaml
+      setservices: fvdycorecubed_setservices_
+
+    DataMoist:
+      dso: libconfigurable_gridcomp
+      config_file: data-moist.yaml
+      setservices: setservices_
+
+  connections:
+    - src_name: TRADV
+      dst_name: TRADV
+      src_comp: DYNsa
+      dst_comp: DataMoist

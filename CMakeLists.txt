@@ -7,19 +7,13 @@ set (srcs
   GetWeightsC2C.F90
   GetWeights.F90
   CubeHalo.F90
-  Cube2LatLon.F90 LatLon2Cube.F90 AppGridCreate.F90 FV_StateMod.F90
+  AppGridCreate.F90 FV_StateMod.F90
   AdvCore_GridCompMod.F90
-  DynCore_GridCompMod.F90 CreateInterpWeights_GridCompMod.F90
-  StandAlone_DynAdvCore_GridCompMod.F90
-  CubeToLatLonRegridder.F90
-  LatLonToCubeRegridder.F90
-  CubeToCubeRegridder.F90
-  CubeToLatLon.F90
-  CubeGridPrototype.F90
+  DynCore_GridCompMod.F90
   GEOS_FV3_Utilities.F90
-  fv_regrid_c2c.F90
-  fv_regrid_c2c_bin.F90
   fv_regridding_utils.F90
+  fv_regrid_c2c.F90
+  fv_shared.F90
   rs_scaleMod.F90
   )
 if (BUILD_GEOS_GTFV3_INTERFACE)
@@ -104,7 +98,10 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
 
 endif ()
 
-set(dependencies MAPL GFTL_SHARED::gftl-shared GMAO_hermes GEOS_Shared esmf OpenMP::OpenMP_Fortran)
+set(dependencies
+  esmf MAPL
+  GFTL_SHARED::gftl-shared-v2 GMAO_hermes GEOS_Shared
+  OpenMP::OpenMP_Fortran)
 
 if (BUILD_GEOS_GTFV3_INTERFACE)
   esma_add_library (${this}
@@ -116,8 +113,13 @@ else ()
   esma_add_library (${this}
     SRCS ${srcs}
     SUBCOMPONENTS fvdycore
-    DEPENDENCIES ${dependencies})
+    DEPENDENCIES ${dependencies}
+    TYPE SHARED
+  )
 endif ()
+
+mapl_acg (${this} DynCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS INTERNAL_SPECS)
+mapl_acg (${this} AdvCore_StateSpecs.rc IMPORT_SPECS EXPORT_SPECS GET_POINTERS DECLARE_POINTERS)
 
 if (FV_PRECISION STREQUAL R4)
   target_link_libraries (${this} PUBLIC FMS::fms_r4)
@@ -153,58 +155,22 @@ endif()
 target_compile_definitions (${this} PRIVATE MAPL_MODE FVREGRID_MAPL_MODE)
 
 ecbuild_add_executable (
-  TARGET StandAlone_FV3_Dycore.x
-  SOURCES StandAlone_FV3_Dycore.F90
-  LIBS ${this} OpenMP::OpenMP_Fortran)
-
-find_package (JeMalloc)
-if(JeMalloc_FOUND)
-  message(STATUS "JeMalloc found, using for StandAlone_FV3_Dycore.x")
-  target_link_libraries (StandAlone_FV3_Dycore.x JeMalloc::JeMalloc)
-endif()
-
-ecbuild_add_executable (
   TARGET rs_scale.x
   SOURCES rs_scale.F90
   LIBS ${this} OpenMP::OpenMP_Fortran)
 
 ecbuild_add_executable (
-   TARGET StandAlone_AdvCore.x
-   SOURCES StandAlone_AdvCore.F90
-   LIBS ${this} OpenMP::OpenMP_Fortran)
-
-ecbuild_add_executable (
-   TARGET StandAlone_DynAdvCore.x
-   SOURCES StandAlone_DynAdvCore.F90
-   LIBS ${this} OpenMP::OpenMP_Fortran)
-
-ecbuild_add_executable (
-   TARGET c2c.x
-   SOURCES c2c.F90
-   LIBS ${this} OpenMP::OpenMP_Fortran)
-
-ecbuild_add_executable (
-   TARGET interp_restarts.x
-   SOURCES interp_restarts.F90
-   LIBS ${this} OpenMP::OpenMP_Fortran)
-
-ecbuild_add_executable (
-   TARGET interp_restarts_bin.x
-   SOURCES interp_restarts_bin.F90
-   LIBS ${this} OpenMP::OpenMP_Fortran)
+  TARGET interp_restarts.x
+  SOURCES interp_restarts.F90
+  LIBS ${this} OpenMP::OpenMP_Fortran)
 
 # If we are doing R4R8 we also need add_dependencies for both fms_r4 and fms_r8
 # for all our executables that link to ${this} because of the way we set up the
 # main library above.
 if (FV_PRECISION STREQUAL R4R8)
   foreach(executable
-    StandAlone_FV3_Dycore.x
     rs_scale.x
-    StandAlone_AdvCore.x
-    StandAlone_DynAdvCore.x
-    c2c.x
-    interp_restarts.x
-    interp_restarts_bin.x)
+    interp_restarts.x)
 
     # fvdycore needs r4 .mod interfaces
     get_target_property(inc_r4 FMS::fms_r4 INTERFACE_INCLUDE_DIRECTORIES)
@@ -217,7 +183,6 @@ if (FV_PRECISION STREQUAL R4R8)
     add_dependencies(${executable} FMS::fms_r4 FMS::fms_r8)
   endforeach()
 endif ()
-
 
 if (BUILD_GEOS_GTFV3_INTERFACE)
   ecbuild_add_executable (
@@ -243,3 +208,4 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
 endif ()
 
 add_subdirectory(scripts)
+add_subdirectory(regression)

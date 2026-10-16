@@ -8,7 +8,7 @@
 
 ! Cube to Cube Utilities
   use CUB2CUB_mod,       only : get_c2c_weight, do_c2c_interpolation
-  use MAPL_ConstantsMod, only : pi=> MAPL_PI
+  use MAPL_Constants,    only : pi=> MAPL_PI
   use fv_grid_utils_mod, only : gnomonic_grids
   use fv_grid_tools_mod, only : mirror_grid
   use GHOST_CUBSPH_mod,  only : B_grid, A_grid, ghost_cubsph_update
@@ -72,7 +72,7 @@
      print*, 'ABORT: need 5 arguments input_res_x,input_res_y and output_res_x,output_res_y and levels (No vertical interp supported yet)'
      stop
   endif
- 
+
   CALL GETARG(1, str_arg)
   read (str_arg,'(I10)') npx_in
   CALL GETARG(2, str_arg)
@@ -123,7 +123,7 @@
                               1, ntiles, 1, 1, l, B_grid)
   enddo
   deallocate (grid_in)
- 
+
   !--------------------------------------------------------------------!
   ! initialize Output cubed sphere grid                                !
   !--------------------------------------------------------------------!
@@ -184,7 +184,7 @@
   print*, '-----------------------------'
   print*, ' '
   read (IUNIT, IOSTAT=status) header(1:5)
-  print*, header(1:5)  
+  print*, header(1:5)
   header(1) = npx_out
   header(2) = npy_out*6
   write(OUNIT) header(1:5)
@@ -233,7 +233,7 @@
   close(OUNIT)
 
   deallocate(corner_in, corner_out, index_c2c, weight_c2c)
- 
+
  else ! LAT-LON to Cube
 
 !#define GRADS_READABLE
@@ -343,7 +343,7 @@
   allocate ( r8latlon(npx_in,npy_in) )
   allocate ( r4latlon(npx_in,npy_in) )
   allocate ( r8tmp(Atm(1)%isd:Atm(1)%ied,Atm(1)%jsd:Atm(1)%jed) )
-  allocate ( r8_global(npx_out,npy_out,ntiles) ) 
+  allocate ( r8_global(npx_out,npy_out,ntiles) )
   allocate ( varo(npx_out,npy_out*ntiles) )
 
 ! State Vars
@@ -443,7 +443,7 @@
 
 
  contains
- 
+
  subroutine read_interp_write(IUNIT, OUNIT, npx_in, npy_in, npx_out, npy_out, npz, ntiles, &
                               index_c2c, weight_c2c)
   integer, intent(IN) :: IUNIT, OUNIT, npx_in, npy_in, npx_out, npy_out, npz, ntiles
@@ -461,7 +461,7 @@
   allocate( varo(npx_out,npy_out*ntiles) )
   allocate( var_in(0:npx_in+1,0:npy_in+1,npz,ntiles) )
   allocate( var_out(npx_out,npy_out,npz,ntiles) )
-! 
+!
   do k=1,npz
     read (IUNIT, IOSTAT=status) vari
     do l=1,ntiles
@@ -618,7 +618,7 @@
                !-------------------------------------------------------!
                ! fill shared edges on D-Grid                           !
                !-------------------------------------------------------!
-               if (itile==1) u(1:nx_in-1,ny_in,1:) = -REVERSE( v_in(1        ,1:ny_in-1,k:k,3) ) 
+               if (itile==1) u(1:nx_in-1,ny_in,1:) = -REVERSE( v_in(1        ,1:ny_in-1,k:k,3) )
                if (itile==2) u(1:nx_in-1,ny_in,1:) =         ( u_in(1:nx_in-1,1        ,k:k,3) )
                if (itile==3) u(1:nx_in-1,ny_in,1:) = -REVERSE( v_in(1        ,1:ny_in-1,k:k,5) )
                if (itile==4) u(1:nx_in-1,ny_in,1:) =         ( u_in(1:nx_in-1,1        ,k:k,5) )
@@ -654,7 +654,7 @@
                              0, nx_in  , 0, ny_in  , 1, nz,            &
                              1, nx_in-1, 1, ny_in-1, 1, nz,            &
                              vxyz_in(:,:,:,:,itile))
-            enddo 
+            enddo
             deallocate(u, v, dx, dy, dxa, dya, rdxa, rdya, ec1, ec2, cosa_s, sina_s)
             allocate(vxyz_out(3,0:nx_out,0:ny_out,nz,ntiles))
             !----------------------------------------------------------!
