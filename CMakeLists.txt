@@ -144,6 +144,11 @@ endif ()
 
 message(STATUS "Building FV as ${FV_PRECISION}")
 
+ecbuild_add_test (
+  TARGET test_fv3_splits
+  SOURCES tests/test_fv3_splits.F90
+  LIBS ${this})
+
 #set (CMAKE_Fortran_FLAGS_RELEASE "${GEOS_Fortran_FLAGS_VECT}")
 
 if (CRAY_POINTER)

@@ -96,6 +96,7 @@ private
   public fv_getDELZ
   public fv_getPKZ
   public fv_getQ
+  public select_fv3_splits
 
   public debug_fv_state
 
@@ -1715,6 +1716,13 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   if (run_gtfv3 == 0) then
      call cpu_time(start)
 #endif
+     ! Recompute from the current fields, never from the previous split values.
+     ! Do this only before dynamics, not during restart initialization.
+     if ( ADJUST_SPLITS ) then
+        call adjust_fv3_splits(STATE, isc, iec, jsc, jec, isd, ied, jsd, jed, npz, &
+                               FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
+                               FV_Atm(1)%gridstruct%dxa, FV_Atm(1)%gridstruct%dya)
+     endif
      call fv_dynamics( &
           FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
           FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, &
@@ -2216,19 +2224,6 @@ subroutine State_To_FV ( MAPL, STATE )
 
     endif
 
-    if ( ADJUST_SPLITS ) then
-      call adjust_fv3_splits(STATE, &
-                             isc, iec, jsc, jec, &       ! Compute domain bounds
-                             isd, ied, jsd, jed, &       ! Data/Memory domain bounds
-                             km, &                       ! Number of vertical levels
-                             FV_Atm(1)%u, &              ! D-grid U-wind
-                             FV_Atm(1)%v, &              ! D-grid V-wind
-                             FV_Atm(1)%w, &              ! W-wind
-                             FV_Atm(1)%delz, &           ! Layer thickness
-                             FV_Atm(1)%gridstruct%dxa, & ! Cell center dx (dxa)
-                             FV_Atm(1)%gridstruct%dya)   ! Cell center dy (dya)
-    endif
-
     call MAPL_TimerOff(MAPL,"--State_To_FV")
 
    return
@@ -2323,22 +2318,17 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
     integer, intent(in) :: isd, ied, jsd, jed
     integer, intent(in) :: npz
 
-    real, intent(in), dimension(isd:ied,   jsd:jed+1, npz) :: u
-    real, intent(in), dimension(isd:ied+1, jsd:jed,   npz) :: v
-    real, intent(in), dimension(isd:ied,   jsd:jed,   npz) :: w, delz
-    real, intent(in), dimension(isd:ied, jsd:jed) :: dx, dy
+    real(FVPRC), intent(in), dimension(isd:ied,   jsd:jed+1, npz) :: u
+    real(FVPRC), intent(in), dimension(isd:ied+1, jsd:jed,   npz) :: v
+    real(FVPRC), intent(in), dimension(isd:ied,   jsd:jed,   npz) :: w, delz
+    real(FVPRC), intent(in), dimension(isd:ied, jsd:jed) :: dx, dy
 
     integer :: i, j, k
-    real    :: u_c, v_c
-    real    :: max_cfl_h, max_cfl_z
-    
-    ! Updated constraints
-    real, parameter    :: TARGET_CFL   = 1.05
-    real, parameter    :: H_MULTIPLIER = 4.0  ! For acoustic speed scaling
-    real, parameter    :: Z_MULTIPLIER = 0.25 ! Tune this to dictate max_cfl_z's impact
+    real(FVPRC) :: u_c, v_c
+    real(FVPRC) :: max_cfl_h, max_cfl_z
     
     integer :: new_k_split, new_n_split, new_q_split
-    integer :: target_k_split, base_tot
+    integer :: target_k_split
 
     max_cfl_h = 0.0
     max_cfl_z = 0.0
@@ -2350,8 +2340,12 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
              u_c = 0.5 * (u(i,j,k) + u(i,j+1,k))
              v_c = 0.5 * (v(i,j,k) + v(i+1,j,k))
              
-             max_cfl_h = max(max_cfl_h, abs((u_c/dx(i,j)) + (v_c/dy(i,j))) * state%DT)
-             max_cfl_z = max(max_cfl_z, abs(w(i,j,k) / delz(i,j,k)) * state%DT)
+             ! Oppositely directed contributions must not cancel.
+             max_cfl_h = max(max_cfl_h, real((abs(u_c/dx(i,j)) + abs(v_c/dy(i,j))) * state%DT, FVPRC))
+             ! Hydrostatic and shallow-water modes do not supply w and delz.
+             if (.not. FV_HYDROSTATIC .and. .not. SW_DYNAMICS) then
+                max_cfl_z = max(max_cfl_z, real(abs(w(i,j,k) / delz(i,j,k)) * state%DT, FVPRC))
+             endif
           enddo
        enddo
     enddo
@@ -2362,46 +2356,8 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
 
     ! --- 3. DYNAMIC ADJUSTMENT ON ROOT PE ---
     if (mpp_pe() == 0) then
-       
-       ! Calculate total baseline acoustic steps (e.g., 1 * 6 = 6)
-       ! We want to keep (k_split * n_split) as close to this as possible
-       base_tot = state%base_k_split * state%base_n_split
-       
-       ! Calculate the strictly required k_split
-       target_k_split = max(state%base_k_split, ceiling(max_cfl_z * Z_MULTIPLIER))
-       
-       ! b. RATE LIMITING VIA FACTORS: 
-       ! Step to the next integer that cleanly divides base_tot
-       if (target_k_split > state%k_split) then
-           new_k_split = state%k_split + 1
-           ! Increment until we find a clean factor (or exceed base_tot)
-           do while (new_k_split < base_tot .and. mod(base_tot, new_k_split) /= 0)
-               new_k_split = new_k_split + 1
-           end do
-       elseif (target_k_split < state%k_split) then
-           new_k_split = state%k_split - 1
-           ! Decrement until we find a clean factor
-           do while (new_k_split > state%base_k_split .and. mod(base_tot, new_k_split) /= 0)
-               new_k_split = new_k_split - 1
-           end do
-           ! Safety catch
-           new_k_split = max(state%base_k_split, new_k_split)
-       else
-           new_k_split = state%k_split
-       endif
-       
-       ! c. Calculate n_split
-       ! Because new_k_split is guaranteed to be a factor, this division is exact!
-       ! (Unless max_cfl_h independently forces it higher)
-       new_n_split = ceiling(base_tot / real(new_k_split))
-       new_n_split = max(new_n_split, ceiling(max_cfl_h * H_MULTIPLIER / real(new_k_split)))
-       
-       ! d. Calculate q_split
-       if (state%base_q_split == 0) then
-           new_q_split = 0
-       else
-           new_q_split = max(state%base_q_split, ceiling((max_cfl_h / real(new_k_split)) / TARGET_CFL))
-       endif
+       call select_fv3_splits(state%base_k_split, state%base_n_split, state%base_q_split, &
+                              max_cfl_h, max_cfl_z, new_k_split, new_n_split, new_q_split, target_k_split)
 
        ! Apply and report if adjusted
        if (state%k_split /= new_k_split .or. &
@@ -2427,6 +2383,44 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
     call mp_bcst(state%q_split)
 
 end subroutine adjust_fv3_splits
+
+ pure subroutine select_fv3_splits(base_k_split, base_n_split, base_q_split, max_cfl_h, max_cfl_z, &
+                                  new_k_split, new_n_split, new_q_split, target_k_split)
+    integer, intent(in) :: base_k_split, base_n_split, base_q_split
+    real(FVPRC), intent(in) :: max_cfl_h, max_cfl_z
+    integer, intent(out) :: new_k_split, new_n_split, new_q_split
+    integer, intent(out) :: target_k_split
+    integer :: base_tot
+
+    ! Retain the existing empirical safety factors; these are not exact
+    ! acoustic CFL estimates and must be validated with model regressions.
+    real(FVPRC), parameter :: TARGET_CFL = 1.05_FVPRC
+    real(FVPRC), parameter :: H_MULTIPLIER = 4.0_FVPRC
+    real(FVPRC), parameter :: Z_MULTIPLIER = 0.25_FVPRC
+
+    target_k_split = max(1, base_k_split, ceiling(max_cfl_z * Z_MULTIPLIER))
+    new_k_split = target_k_split
+    if (base_n_split == 0) then
+       ! Leave automatic acoustic substepping to the dynamical core.
+       new_n_split = 0
+    else
+       base_tot = base_k_split * base_n_split
+       ! Round the requirement upward, independent of the previous splits.
+       ! Above base_tot, use the requirement directly and at least one substep.
+       do while (new_k_split < base_tot)
+          if (mod(base_tot, new_k_split) == 0) exit
+          new_k_split = new_k_split + 1
+       enddo
+       new_n_split = max(1, 1 + (base_tot - 1) / new_k_split, &
+                         ceiling(max_cfl_h * H_MULTIPLIER / real(new_k_split, FVPRC)))
+    endif
+
+    if (base_q_split == 0) then
+       new_q_split = 0
+    else
+       new_q_split = max(base_q_split, ceiling((max_cfl_h / real(new_k_split, FVPRC)) / TARGET_CFL))
+    endif
+ end subroutine select_fv3_splits
 
 subroutine fv_getGradT_2D(t_in, ps_in, mag_grad_t)
   ! INPUT: 2D Temp (REAL4) interpolated to pressure level (with halo bounds)
@@ -5095,4 +5089,3 @@ subroutine WRITE_PARALLEL_L ( field, format )
 end subroutine WRITE_PARALLEL_L
 
 end module FV_StateMod
-
