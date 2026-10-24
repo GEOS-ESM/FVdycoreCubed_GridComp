@@ -96,6 +96,7 @@ private
   public fv_getDELZ
   public fv_getPKZ
   public fv_getQ
+  public select_fv3_splits
 
   public debug_fv_state
 
@@ -1418,7 +1419,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  else
                      FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu) = state%vars%tracer(n)%content(:,:,:)
                  endif
-                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+                 call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, sphu )
              endif
 
           ! -- LIQUID --
@@ -1427,17 +1428,19 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
                  if (qlcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content_r4(:,:,:)
                  if (qliq /= -1 .and. qlcn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qlcn = nn 
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qlcn = nn
+                     call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, idx_qlcn )
                  endif
              else
                  if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
                  if (qlcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content(:,:,:)
                  if (qliq /= -1 .and. qlcn == -1) then 
                      nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qlcn = nn 
+                     call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, idx_qlcn )
                  endif
              endif
-             if ((qlcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-             if ((qliq /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME)//"_QLIQ" )
+             if (qlcn /= -1) call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, qlcn )
+             if (qliq /= -1) call REPORT_TRACER_INDEX( "QLIQ", qliq )
 
           case ('QLLS')
              if (state%vars%tracer(n)%is_r4) then
@@ -1447,7 +1450,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
                  if (qlls /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls) = state%vars%tracer(n)%content(:,:,:)
              endif
-             if ((qlcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if (qlls /= -1) call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, qlls )
 
           ! -- ICE --
           case ('QICN')
@@ -1456,16 +1459,18 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  if (qicn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content_r4(:,:,:)
                  if (qice /= -1 .and. qicn == -1) then 
                      nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qicn = nn 
+                     call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, idx_qicn )
                  endif
              else
                  if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
                  if (qicn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content(:,:,:)
                  if (qice /= -1 .and. qicn == -1) then 
                      nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qicn = nn 
+                     call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, idx_qicn )
                  endif
              endif
-             if ((qicn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-             if ((qice /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME)//"_QICE" )
+             if (qicn /= -1) call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, qicn )
+             if (qice /= -1) call REPORT_TRACER_INDEX( "QICE", qice )
 
           case ('QILS')
              if (state%vars%tracer(n)%is_r4) then
@@ -1475,7 +1480,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
                  if (qils /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils) = state%vars%tracer(n)%content(:,:,:)
              endif
-             if ((qicn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if (qils /= -1) call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, qils )
 
           ! -- CLOUD FRACTION --
           case ('CLCN')
@@ -1484,16 +1489,18 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  if (clcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content_r4(:,:,:)
                  if (qcld /= -1 .and. clcn == -1) then 
                      nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_clcn = nn 
+                     call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, idx_clcn )
                  endif
              else
                  if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
                  if (clcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content(:,:,:)
                  if (qcld /= -1 .and. clcn == -1) then 
                      nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_clcn = nn 
+                     call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, idx_clcn )
                  endif
              endif
-             if ((clcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-             if ((qcld /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME)//"_QCLD" )
+             if (clcn /= -1) call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, clcn )
+             if (qcld /= -1) call REPORT_TRACER_INDEX( "QCLD", qcld )
 
           case ('CLLS')
              if (state%vars%tracer(n)%is_r4) then
@@ -1503,7 +1510,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
                  if (clls /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls) = state%vars%tracer(n)%content(:,:,:)
              endif
-             if ((clcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if (clls /= -1) call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, clls )
 
           ! -- MICROPHYSICS --
           case ('QRAIN')
@@ -1513,7 +1520,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  else
                      FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain) = state%vars%tracer(n)%content(:,:,:)
                  endif
-                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+                 call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, rain )
              endif
           case ('QSNOW')
              if (snow /= -1) then
@@ -1522,7 +1529,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  else
                      FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow) = state%vars%tracer(n)%content(:,:,:)
                  endif
-                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+                 call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, snow )
              endif
           case ('QGRAUPEL')
              if (grpl /= -1) then
@@ -1531,7 +1538,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
                  else
                      FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl) = state%vars%tracer(n)%content(:,:,:)
                  endif
-                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+                 call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, grpl )
              endif
 
           ! -- ALL OTHER PASSIVE TRACERS --
@@ -1542,7 +1549,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              else
                  FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
              endif
-             if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
+             call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, nn )
        end select
     enddo
     
@@ -1558,8 +1565,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     endif
     nn = 0
     do n=1,STATE%GRID%NQ
-       if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
        nn = nn+1
+       call REPORT_TRACER_INDEX( STATE%VARS%TRACER(n)%TNAME, nn )
        if (state%vars%tracer(n)%is_r4) then
           FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
        else
@@ -1718,6 +1725,13 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   if (run_gtfv3 == 0) then
      call cpu_time(start)
 #endif
+     ! Recompute from the current fields, never from the previous split values.
+     ! Do this only before dynamics, not during restart initialization.
+     if ( ADJUST_SPLITS ) then
+        call adjust_fv3_splits(STATE, isc, iec, jsc, jec, isd, ied, jsd, jed, npz, &
+                               FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
+                               FV_Atm(1)%gridstruct%dxa, FV_Atm(1)%gridstruct%dya)
+     endif
      call fv_dynamics( &
           FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
           FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, &
@@ -2012,6 +2026,21 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
 end subroutine FV_Run
 
+subroutine REPORT_TRACER_INDEX(tracer_name, index_num)
+    implicit none
+    character(len=*), intent(in) :: tracer_name
+    integer,          intent(in) :: index_num
+    character(len=12)            :: index_str
+
+    if (fv_first_run) then
+      ! Convert the integer to a string with zero padding/spacing
+      write(index_str, '(I0)') index_num
+      ! Safely concatenate using // and pass to your parallel writer
+      call WRITE_PARALLEL( trim(tracer_name) // " | Index: " // trim(index_str) )
+    endif
+
+end subroutine REPORT_TRACER_INDEX
+
  subroutine FV_DA_Incs (LONS,LATS,IM,JM,KM,&
                         u_amb, v_amb, t_amb, dp_amb, q_amb, o3_amb, &
                         u_inc, v_inc, t_inc, dp_inc, q_inc, o3_inc)
@@ -2219,19 +2248,6 @@ subroutine State_To_FV ( MAPL, STATE )
 
     endif
 
-    if ( ADJUST_SPLITS ) then
-      call adjust_fv3_splits(STATE, &
-                             isc, iec, jsc, jec, &       ! Compute domain bounds
-                             isd, ied, jsd, jed, &       ! Data/Memory domain bounds
-                             km, &                       ! Number of vertical levels
-                             FV_Atm(1)%u, &              ! D-grid U-wind
-                             FV_Atm(1)%v, &              ! D-grid V-wind
-                             FV_Atm(1)%w, &              ! W-wind
-                             FV_Atm(1)%delz, &           ! Layer thickness
-                             FV_Atm(1)%gridstruct%dxa, & ! Cell center dx (dxa)
-                             FV_Atm(1)%gridstruct%dya)   ! Cell center dy (dya)
-    endif
-
     call MAPL_TimerOff(MAPL,"--State_To_FV")
 
    return
@@ -2335,13 +2351,8 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
     real    :: u_c, v_c
     real    :: max_cfl_h, max_cfl_z
     
-    ! Updated constraints
-    real, parameter    :: TARGET_CFL   = 1.05
-    real, parameter    :: H_MULTIPLIER = 4.0  ! For acoustic speed scaling
-    real, parameter    :: Z_MULTIPLIER = 0.25 ! Tune this to dictate max_cfl_z's impact
-    
     integer :: new_k_split, new_n_split, new_q_split
-    integer :: target_k_split, base_tot
+    integer :: target_k_split
 
     max_cfl_h = 0.0
     max_cfl_z = 0.0
@@ -2353,8 +2364,12 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
              u_c = 0.5 * (u(i,j,k) + u(i,j+1,k))
              v_c = 0.5 * (v(i,j,k) + v(i+1,j,k))
              
-             max_cfl_h = max(max_cfl_h, abs((u_c/dx(i,j)) + (v_c/dy(i,j))) * state%DT)
-             max_cfl_z = max(max_cfl_z, abs(w(i,j,k) / delz(i,j,k)) * state%DT)
+             ! Oppositely directed contributions must not cancel.
+             max_cfl_h = max(max_cfl_h, real((abs(u_c/dx(i,j)) + abs(v_c/dy(i,j))) * state%DT, FVPRC))
+             ! Hydrostatic and shallow-water modes do not supply w and delz.
+             if (.not. FV_HYDROSTATIC .and. .not. SW_DYNAMICS) then
+                max_cfl_z = max(max_cfl_z, real(abs(w(i,j,k) / delz(i,j,k)) * state%DT, FVPRC))
+             endif
           enddo
        enddo
     enddo
@@ -2365,46 +2380,8 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
 
     ! --- 3. DYNAMIC ADJUSTMENT ON ROOT PE ---
     if (mpp_pe() == 0) then
-       
-       ! Calculate total baseline acoustic steps (e.g., 1 * 6 = 6)
-       ! We want to keep (k_split * n_split) as close to this as possible
-       base_tot = state%base_k_split * state%base_n_split
-       
-       ! Calculate the strictly required k_split
-       target_k_split = max(state%base_k_split, ceiling(max_cfl_z * Z_MULTIPLIER))
-       
-       ! b. RATE LIMITING VIA FACTORS: 
-       ! Step to the next integer that cleanly divides base_tot
-       if (target_k_split > state%k_split) then
-           new_k_split = state%k_split + 1
-           ! Increment until we find a clean factor (or exceed base_tot)
-           do while (new_k_split < base_tot .and. mod(base_tot, new_k_split) /= 0)
-               new_k_split = new_k_split + 1
-           end do
-       elseif (target_k_split < state%k_split) then
-           new_k_split = state%k_split - 1
-           ! Decrement until we find a clean factor
-           do while (new_k_split > state%base_k_split .and. mod(base_tot, new_k_split) /= 0)
-               new_k_split = new_k_split - 1
-           end do
-           ! Safety catch
-           new_k_split = max(state%base_k_split, new_k_split)
-       else
-           new_k_split = state%k_split
-       endif
-       
-       ! c. Calculate n_split
-       ! Because new_k_split is guaranteed to be a factor, this division is exact!
-       ! (Unless max_cfl_h independently forces it higher)
-       new_n_split = ceiling(base_tot / real(new_k_split))
-       new_n_split = max(new_n_split, ceiling(max_cfl_h * H_MULTIPLIER / real(new_k_split)))
-       
-       ! d. Calculate q_split
-       if (state%base_q_split == 0) then
-           new_q_split = 0
-       else
-           new_q_split = max(state%base_q_split, ceiling((max_cfl_h / real(new_k_split)) / TARGET_CFL))
-       endif
+       call select_fv3_splits(state%base_k_split, state%base_n_split, state%base_q_split, &
+                              max_cfl_h, max_cfl_z, new_k_split, new_n_split, new_q_split, target_k_split)
 
        ! Apply and report if adjusted
        if (state%k_split /= new_k_split .or. &
@@ -2430,6 +2407,44 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
     call mp_bcst(state%q_split)
 
 end subroutine adjust_fv3_splits
+
+ pure subroutine select_fv3_splits(base_k_split, base_n_split, base_q_split, max_cfl_h, max_cfl_z, &
+                                  new_k_split, new_n_split, new_q_split, target_k_split)
+    integer, intent(in) :: base_k_split, base_n_split, base_q_split
+    real(FVPRC), intent(in) :: max_cfl_h, max_cfl_z
+    integer, intent(out) :: new_k_split, new_n_split, new_q_split
+    integer, intent(out) :: target_k_split
+    integer :: base_tot
+
+    ! Retain the existing empirical safety factors; these are not exact
+    ! acoustic CFL estimates and must be validated with model regressions.
+    real(FVPRC), parameter :: TARGET_CFL = 1.50_FVPRC
+    real(FVPRC), parameter :: H_MULTIPLIER = 2.0_FVPRC
+    real(FVPRC), parameter :: Z_MULTIPLIER = 0.25_FVPRC
+
+    target_k_split = max(1, base_k_split, ceiling(max_cfl_z * Z_MULTIPLIER))
+    new_k_split = target_k_split
+    if (base_n_split == 0) then
+       ! Leave automatic acoustic substepping to the dynamical core.
+       new_n_split = 0
+    else
+       base_tot = base_k_split * base_n_split
+       ! Round the requirement upward, independent of the previous splits.
+       ! Above base_tot, use the requirement directly and at least one substep.
+       do while (new_k_split < base_tot)
+          if (mod(base_tot, new_k_split) == 0) exit
+          new_k_split = new_k_split + 1
+       enddo
+       new_n_split = max(1, 1 + (base_tot - 1) / new_k_split, &
+                         ceiling(max_cfl_h * H_MULTIPLIER / real(new_k_split, FVPRC)))
+    endif
+
+    if (base_q_split == 0) then
+       new_q_split = 0
+    else
+       new_q_split = max(base_q_split, ceiling((max_cfl_h / real(new_k_split, FVPRC)) / TARGET_CFL))
+    endif
+ end subroutine select_fv3_splits
 
 subroutine fv_getGradT_2D(t_in, ps_in, mag_grad_t)
   ! INPUT: 2D Temp (REAL4) interpolated to pressure level (with halo bounds)
@@ -4745,7 +4760,7 @@ subroutine echo_fv3_setup()
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d_ext ,format='("FV3 d_ext: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%nwat ,format='("FV3 nwat: ",(I3))' )
 !  logical :: warm_start = .false.
-!  logical :: inline_q = .true.
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%inline_q ,format='("FV3 inline_q: ",(A))' )
 !  logical :: adiabatic = .true.     ! Run without physics (full or idealized).
 ! Grid options:
 !  real(FVPRC) :: shift_fac   =  18.   ! shift west by 180/shift_fac = 10 degrees
@@ -5098,4 +5113,3 @@ subroutine WRITE_PARALLEL_L ( field, format )
 end subroutine WRITE_PARALLEL_L
 
 end module FV_StateMod
-
