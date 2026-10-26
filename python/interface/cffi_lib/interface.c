@@ -49,7 +49,8 @@ void pyfv3_interface_c_run(
     float *phis, float *q_con, float *omga, float *ua, float *va, float *uc, float *vc,
 
     // input/output
-    float *mfx, float *mfy, float *cx, float *cy, float *diss_est)
+    double *mfx, double *mfy, double *cx, double *cy,
+    float *diss_est)
 {
 
     MPI_Comm comm_c = MPI_Comm_f2c(comm_f);

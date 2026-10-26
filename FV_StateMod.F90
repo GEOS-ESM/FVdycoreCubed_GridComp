@@ -1368,20 +1368,20 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
      ! We can do this because this is trigger _only once_.
 #ifdef BUILD_PYFV3
      if (USE_PYFV3) then
-      ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
-      ! disable trapping of FPEs temporarily, call the Python interface and resume trapping
-      call ieee_get_halting_mode(ieee_all, halting_mode)
-      call ieee_set_halting_mode(ieee_all, .false.)
-      call make_fv_flags_C_interop(FV_Atm(1)%flagstruct, FV_Atm(1)%layout, c_fv_flags)
-      call pyfv3_interface_f_init( &
-            c_fv_flags, &
-            comm, &
-            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
-            FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, &
-            FV_Atm(1)%bd%isd, FV_Atm(1)%bd%ied, FV_Atm(1)%bd%jsd, FV_Atm(1)%bd%jed, &
-            real(STATE%DT), FV_Atm(1)%ncnst, &
-            FV_Atm(1)%ak, FV_Atm(1)%bk, FV_Atm(1)%phis)
-      call ieee_set_halting_mode(ieee_all, halting_mode)
+         ! A workaround to the issue of SIGFPE abort during importing of numpy, is to
+         ! disable trapping of FPEs temporarily, call the Python interface and resume trapping
+         call ieee_get_halting_mode(ieee_all, halting_mode)
+         call ieee_set_halting_mode(ieee_all, .false.)
+         call make_fv_flags_C_interop(FV_Atm(1)%flagstruct, FV_Atm(1)%layout, c_fv_flags)
+         call pyfv3_interface_f_init( &
+               c_fv_flags, &
+               comm, &
+               FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
+               FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec, &
+               FV_Atm(1)%bd%isd, FV_Atm(1)%bd%ied, FV_Atm(1)%bd%jsd, FV_Atm(1)%bd%jed, &
+               real(STATE%DT), FV_Atm(1)%ncnst, &
+               FV_Atm(1)%ak, FV_Atm(1)%bk, FV_Atm(1)%phis)
+         call ieee_set_halting_mode(ieee_all, halting_mode)
       end if
 #endif
 
@@ -1724,13 +1724,12 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   u_dt(:,:,:) = 0.0; v_dt(:,:,:) = 0.0; t_dt(:,:,:) = 0.0; w_dt(:,:,:) = 0.0
 
 #ifdef BUILD_PYFV3
-  if (.not. USE_PYFV3) then
-     call cpu_time(start)
+   if (.not. USE_PYFV3) then
+      call cpu_time(start)
 #endif
-
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
-            FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             STATE%k_split, STATE%n_split, STATE%q_split, &
@@ -1744,14 +1743,13 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
             FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
             FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
             FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
-            FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
-            time_total)
-#ifdef RUN_GTFV3
-       call cpu_time(finish)
-       if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
-    else
-       call cpu_time(start)
-       call geos_gtfv3_interface_f( &
+            FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, time_total)
+#ifdef BUILD_PYFV3
+      call cpu_time(finish)
+      if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
+   else
+      call cpu_time(start)
+      call pyfv3_interface_f_run( &
             comm, &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
             FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
@@ -1760,17 +1758,15 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
             FV_Atm(1)%layout(1), FV_Atm(1)%layout(2), adiabatic, &
             ! input/output
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-            FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,1:7), &
+            FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,:), &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
             FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
-            ! input
-            FV_Atm(1)%ak, FV_Atm(1)%bk, &
             ! input/output
             FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
-       call cpu_time(finish)
-       print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
-    end if
+      call cpu_time(finish)
+      if (rank == 0) print *, rank, ', pyfv3_interface_f_run: time taken = ', finish - start, 's'
+   end if
 #endif
 
   allocate ( udt(isc:iec,jsc:jec,npz) )
