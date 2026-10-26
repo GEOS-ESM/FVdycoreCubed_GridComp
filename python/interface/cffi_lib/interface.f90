@@ -277,7 +277,7 @@ contains
       c_fv_flags%dddmp = fv_flags%dddmp
       c_fv_flags%d2_bg = fv_flags%d2_bg
       ! TODO: this is now d4_bg_top and d4_bg_bottom. This requires code change.
-      c_fv_flags%d4_bg = fv_flags%d4_bg_bot
+      c_fv_flags%d4_bg = fv_flags%d4_bg_top
       c_fv_flags%vtdm4 = fv_flags%vtdm4
       c_fv_flags%trdm2 = fv_flags%trdm2
       c_fv_flags%d2_bg_k1 = fv_flags%d2_bg_k1
