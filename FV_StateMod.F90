@@ -1281,6 +1281,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   real :: start, finish
   logical :: halting_mode(5)
   type(fv_flags_interface_type) :: c_fv_flags
+  ! workaround to handle single precision requirements for pyFV3
+  real(4), allocatable :: mfx_r4(:,:,:), mfy_r4(:,:,:), cx_r4(:,:,:), cy_r4(:,:,:)
 #endif
 
 ! Begin
@@ -1749,6 +1751,23 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
       if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
    else
       call cpu_time(start)
+      ! workaround to handle single precision requirements for pyFV3 
+      allocate(mfx_r4(lbound(FV_Atm(1)%mfx,1):ubound(FV_Atm(1)%mfx,1), &
+                     lbound(FV_Atm(1)%mfx,2):ubound(FV_Atm(1)%mfx,2), &
+                     lbound(FV_Atm(1)%mfx,3):ubound(FV_Atm(1)%mfx,3)))
+      allocate(mfy_r4(lbound(FV_Atm(1)%mfy,1):ubound(FV_Atm(1)%mfy,1), &
+                     lbound(FV_Atm(1)%mfy,2):ubound(FV_Atm(1)%mfy,2), &
+                     lbound(FV_Atm(1)%mfy,3):ubound(FV_Atm(1)%mfy,3)))
+      allocate(cx_r4(lbound(FV_Atm(1)%cx,1):ubound(FV_Atm(1)%cx,1), &
+                     lbound(FV_Atm(1)%cx,2):ubound(FV_Atm(1)%cx,2), &
+                     lbound(FV_Atm(1)%cx,3):ubound(FV_Atm(1)%cx,3)))
+      allocate(cy_r4(lbound(FV_Atm(1)%cy,1):ubound(FV_Atm(1)%cy,1), &
+                     lbound(FV_Atm(1)%cy,2):ubound(FV_Atm(1)%cy,2), &
+                     lbound(FV_Atm(1)%cy,3):ubound(FV_Atm(1)%cy,3)))
+      mfx_r4 = real(FV_Atm(1)%mfx, 4)
+      mfy_r4 = real(FV_Atm(1)%mfy, 4)
+      cx_r4  = real(FV_Atm(1)%cx,  4)
+      cy_r4  = real(FV_Atm(1)%cy,  4)
       call pyfv3_interface_f_run( &
             comm, &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
@@ -1763,7 +1782,16 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
             FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
             FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
             ! input/output
-            FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
+            mfx_r4, mfy_r4, cx_r4, cy_r4, FV_Atm(1)%diss_est)
+      ! workaround to handle single precision requirements for pyFV3 
+      FV_Atm(1)%mfx = real(mfx_r4, 8)
+      FV_Atm(1)%mfy = real(mfy_r4, 8)
+      FV_Atm(1)%cx  = real(cx_r4,  8)
+      FV_Atm(1)%cy  = real(cy_r4,  8)
+      deallocate(mfx_r4)
+      deallocate(mfy_r4)
+      deallocate(cx_r4)
+      deallocate(cy_r4)
       call cpu_time(finish)
       if (rank == 0) print *, rank, ', pyfv3_interface_f_run: time taken = ', finish - start, 's'
    end if

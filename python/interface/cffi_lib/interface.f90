@@ -241,7 +241,7 @@ module pyfv3_interface_mod
          real(kind=c_float), dimension(*), intent(inout) :: phis, q_con, omga, ua, va, uc, vc
 
          ! Input/Output
-         real(kind=c_double), dimension(*), intent(inout) :: mfx, mfy, cx, cy
+         real(kind=c_float), dimension(*), intent(inout) :: mfx, mfy, cx, cy
          real(kind=c_float), dimension(*), intent(inout)  :: diss_est
 
       end subroutine pyfv3_interface_f_run

@@ -49,7 +49,7 @@ void pyfv3_interface_c_run(
     float *phis, float *q_con, float *omga, float *ua, float *va, float *uc, float *vc,
 
     // input/output
-    double *mfx, double *mfy, double *cx, double *cy,
+    float *mfx, float *mfy, float *cx, float *cy,
     float *diss_est)
 {
 
