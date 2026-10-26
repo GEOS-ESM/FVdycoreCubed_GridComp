@@ -16,6 +16,7 @@ module FV_StateMod
 
    use fv_mp_mod,         only: start_group_halo_update, complete_group_halo_update
    use fv_mp_mod,         only: group_halo_update_type
+   use fv_mp_mod,         only: mp_bcst, mp_reduce_max
 
    use fms_mod, only: fms_init, set_domain, nullify_domain
    use mpp_domains_mod, only: mpp_update_domains, CGRID_NE, DGRID_NE, mpp_get_boundary
@@ -34,10 +35,9 @@ module FV_StateMod
    use fv_update_phys_mod, only: fv_update_phys
    use sw_core_mod, only: d2a2c_vect
    use fv_sg_mod, only: fv_subgrid_z
-   use gfdl_lin_cloud_microphys_mod, only: gfdl_cloud_microphys_init
 
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax, range_check, &
-                                 get_vorticity, updraft_helicity, bunkers_vector, helicity_relative_CAPS
+                                 get_vorticity, updraft_helicity, calculate_shear_06, bunkers_vector, helicity_relative_CAPS
 #ifdef BUILD_PYFV3
    use ieee_exceptions, only: ieee_get_halting_mode, ieee_set_halting_mode, ieee_all
    use pyfv3_interface_mod, only: pyfv3_interface_f_run
@@ -61,8 +61,10 @@ private
 
   logical :: FV_OFF = .false.
   integer :: INT_FV_OFF = 0
-  logical :: ADJUST_DT = .false.
+  logical :: ADJUST_SPLITS = .false.
   logical :: DEBUG = .false.
+  logical :: DEBUG_DYN = .false.
+  logical :: DEBUG_ADV = .false.
   logical :: COLDSTART = .false.
   logical :: SW_DYNAMICS = .false.
   integer :: INT_ADIABATIC = 0
@@ -78,12 +80,13 @@ private
 
   public FV_Atm
   public FV_Setup, FV_InitState, FV_Run, FV_Finalize, FV_DA_Incs
-  public FV_HYDROSTATIC, ADIABATIC, DEBUG, COLDSTART, CASE_ID, SW_DYNAMICS, AdvCore_Advection
+  public FV_HYDROSTATIC, ADIABATIC, DEBUG, DEBUG_DYN, DEBUG_ADV, COLDSTART, CASE_ID, SW_DYNAMICS, AdvCore_Advection
   public FV_RESET_CONSTANTS
   public FV_To_State, State_To_FV
   public T_TRACERS, T_FVDYCORE_VARS, T_FVDYCORE_GRID, T_FVDYCORE_STATE
   public fv_fillMassFluxes
   public fv_computeMassFluxes
+  public fv_getGradT_2D, fv_getGradT_3D
   public fv_getVerticalMassFlux
   public fv_getPK
   public fv_getOmega
@@ -209,12 +212,15 @@ private
     type (ESMF_Alarm)                    :: ALARMS(NUM_FVDYCORE_ALARMS)
 
 #endif
-    integer(kind=8)                      :: RUN_TIMES(4,NUM_TIMES)
-    logical                              :: DOTIME, DODYN
     real(REAL8)                          :: DT          ! Large time step
-    integer                              :: KSPLIT
-    integer                              :: NSPLIT
-    integer                              :: NUM_CALLS
+    ! Dynamically adjusted FV3 splits (active for this timestep)
+    integer                              :: k_split
+    integer                              :: n_split
+    integer                              :: q_split
+    ! Original namelist baselines (never change)
+    integer                              :: base_k_split
+    integer                              :: base_n_split
+    integer                              :: base_q_split
   end type T_FVDYCORE_STATE
 
 ! Constants used by fvcore
@@ -331,6 +337,7 @@ contains
 ! Local
    character(len=ESMF_MAXSTR)       :: IAm='FV_StateMod:FV_Setup'
 ! Local variables
+   character(len=ESMF_MAXSTR)       :: DYCORE
 
   type (ESMF_Config)           :: cf
   type (ESMF_VM)               :: VM
@@ -345,6 +352,7 @@ contains
   integer :: p_split=1
 
   real :: temp_real
+  real :: imsize, sigma
 
 ! BEGIN
 
@@ -373,8 +381,6 @@ contains
     call MAPL_TimerOff(MAPL,"--FV_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
-
-
 
 ! FV grid dimensions setup from MAPL
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'AGCM_IM:', default= 32, RC=STATUS )
@@ -423,12 +429,22 @@ contains
   VERIFY_(STATUS)
   DT = ndt
 
+  call MAPL_GetResource(MAPL, DYCORE, 'DYCORE:', default="", RC=STATUS )
+  VERIFY_(STATUS)
+
+  if(adjustl(DYCORE)=="FV3") then
+       AdvCore_Advection = 0
+  endif
+  if(adjustl(DYCORE)=="FV3+ADV") then
+       AdvCore_Advection = 1
+  endif
+
 ! Advect tracers within DynCore(AdvCore_Advection=.false.)
 !             or within AdvCore(AdvCore_Advection=.true.)
   call MAPL_GetResource( MAPL, AdvCore_Advection, label='AdvCore_Advection:', default=AdvCore_Advection, rc=status )
   VERIFY_(STATUS)
 
-  call MAPL_GetResource( MAPL, ADJUST_DT,       label='ADJUST_DT:'   , default=ADJUST_DT, rc=status )
+  call MAPL_GetResource( MAPL, ADJUST_SPLITS,   label='ADJUST_SPLITS:', default=ADJUST_SPLITS, rc=status )
   VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, INT_fix_mass,    label='fix_mass:'    , default=INT_fix_mass, rc=status )
   VERIFY_(STATUS)
@@ -437,10 +453,6 @@ contains
   call MAPL_GetResource( MAPL, INT_ADIABATIC,   label='ADIABATIC:'   , default=INT_adiabatic, rc=status )
   VERIFY_(STATUS)
   call MAPL_GetResource( MAPL, INT_FV_OFF,      label='FV_OFF:'      , default=INT_FV_OFF, rc=status )
-  VERIFY_(STATUS)
-
-  ! option to enable MERRA-2 configurations for FV3
-  call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='STOCK', rc=status )
   VERIFY_(STATUS)
 
   ! MAT The Fortran Standard, and thus gfortran, *does not allow* the use
@@ -483,6 +495,10 @@ contains
     hlv    = MAPL_ALHL     ! latent heat of evaporation
     zvir   = MAPL_RVAP/MAPL_RGAS - 1.   ! RWV/RAIR-1
 
+   ! option to enable different configurations for FV3
+    call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='STOCK', rc=status )
+    VERIFY_(STATUS)
+
 !
 ! Create some resolution dependent defaults for FV3 in GEOS...
 !    These can be overrided in fv_core_nml in fvcore_layout.rc linked to input.nml
@@ -491,200 +507,244 @@ contains
   ! when reading the tracer bundle in fv_first_run
    FV_Atm(1)%flagstruct%nwat = 0
   ! Trigger to enable autoconversion/cloud processes on the fv_mapz step
-   FV_Atm(1)%flagstruct%do_sat_adj = .false.
+   FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
   ! Veritical resolution dependencies
    FV_Atm(1)%flagstruct%external_eta = .true.
    if (FV_Atm(1)%flagstruct%npz >= 70) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 18 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 17 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 72) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 25 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 21 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 90) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 25 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 17 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 126) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 19 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 132) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 136) then
-     FV_Atm(1)%flagstruct%n_sponge = 9   ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 30 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 23 ! ~5mb
    endif
    if (FV_Atm(1)%flagstruct%npz >= 180) then
-     FV_Atm(1)%flagstruct%n_sponge = 18  ! ~0.2mb
-     FV_Atm(1)%flagstruct%n_zfilter = 50 ! ~10mb
+     FV_Atm(1)%flagstruct%n_zfilter = 32 ! ~5mb
    endif
+  ! Cubed-Sphere Global Resolution Specific adjustments
+   FV_Atm(1)%flagstruct%compute_coords_locally = .TRUE.
+  ! Vertical remap options
    FV_Atm(1)%flagstruct%remap_option = 0 ! Remap T in LogP
-   if (FV_Atm(1)%flagstruct%npz == 72) then
-     FV_Atm(1)%flagstruct%gmao_remap = 0   ! GFDL Schemes
-   else
-     FV_Atm(1)%flagstruct%gmao_remap = 0   ! (0 for GFDL Schemes) (3 for GMAO Cubic)
-   endif
+   FV_Atm(1)%flagstruct%gmao_remap = 0   ! (0 for GFDL Schemes) (3 for GMAO Cubic)
+   FV_Atm(1)%flagstruct%gmao_top_bc = .true.
+   FV_Atm(1)%flagstruct%gmao_bot_bc = .true.
    FV_Atm(1)%flagstruct%kord_tm =  9
    FV_Atm(1)%flagstruct%kord_mt =  9
    FV_Atm(1)%flagstruct%kord_wz =  9
    FV_Atm(1)%flagstruct%kord_tr =  9
-   FV_Atm(1)%flagstruct%z_tracer = .true.
   ! Some default horizontal flags
+   FV_Atm(1)%flagstruct%z_tracer = .true.
    FV_Atm(1)%flagstruct%adjust_dry_mass = fix_mass
    FV_Atm(1)%flagstruct%consv_am = .false.
    FV_Atm(1)%flagstruct%fill = .true.
    FV_Atm(1)%flagstruct%dwind_2d = .false.
    FV_Atm(1)%flagstruct%delt_max = 0.002
    FV_Atm(1)%flagstruct%ke_bg = 0.0
-  ! Rayleigh & Divergence Damping
-   if (index(FV3_CONFIG,"HWT") > 0) then
-     FV_Atm(1)%flagstruct%fv_sg_adj = -1
-     FV_Atm(1)%flagstruct%n_zfilter = -1
-     FV_Atm(1)%flagstruct%do_sat_adj = .false. ! only valid when nwat >= 6
-     FV_Atm(1)%flagstruct%dz_min = 6.0
-     FV_Atm(1)%flagstruct%RF_fast = .true.
-     FV_Atm(1)%flagstruct%tau = 2.0
-     FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
-     if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-       ! 6th order default damping options
-        FV_Atm(1)%flagstruct%nord = 3
-        FV_Atm(1)%flagstruct%dddmp = 0.2
-        FV_Atm(1)%flagstruct%d4_bg = 0.12
-        FV_Atm(1)%flagstruct%d2_bg = 0.0
-        FV_Atm(1)%flagstruct%d_ext = 0.0
-     else
-       ! 4th order default damping options
-        FV_Atm(1)%flagstruct%nord = 2
-        FV_Atm(1)%flagstruct%dddmp = 0.2
-        FV_Atm(1)%flagstruct%d4_bg = 0.12
-        FV_Atm(1)%flagstruct%d2_bg = 0.0
-        FV_Atm(1)%flagstruct%d_ext = 0.0
-     endif
-    ! Sponge damping and TE conservation
-     FV_Atm(1)%flagstruct%n_sponge = 0
-     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
-     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.15
-     FV_Atm(1)%flagstruct%consv_te = 1.0
-   else
-     FV_Atm(1)%flagstruct%fv_sg_adj = DT
-     FV_Atm(1)%flagstruct%RF_fast = .false.
-     FV_Atm(1)%flagstruct%tau = 0.0
-     FV_Atm(1)%flagstruct%rf_cutoff = 0.35e2
-    ! 4th order default damping options
-     FV_Atm(1)%flagstruct%nord = 2
-     FV_Atm(1)%flagstruct%dddmp = 0.2
-     FV_Atm(1)%flagstruct%d4_bg = 0.12
-     FV_Atm(1)%flagstruct%d2_bg = 0.0
-     FV_Atm(1)%flagstruct%d_ext = 0.0
-     FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
-     FV_Atm(1)%flagstruct%d2_bg_k2 = 0.06
-     FV_Atm(1)%flagstruct%consv_te = 1.0
-   endif
   ! Some default time-splitting options
-   FV_Atm(1)%flagstruct%n_split = 0
    FV_Atm(1)%flagstruct%k_split = 1
-  ! default NonHydrostatic settings (irrelavent to Hydrostatic)
-   FV_Atm(1)%flagstruct%beta = 0.0
-   FV_Atm(1)%flagstruct%a_imp = 1.0
-   FV_Atm(1)%flagstruct%p_fac = 0.05
+   FV_Atm(1)%flagstruct%n_split = 0
+   ! Rayleigh Damping defaults
+   imsize = FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac)*4.0
+   sigma = 1.0-0.9839*exp(-0.09835*4.e7*0.9/imsize/1000.) ! Based on Arakawa 2011 sigma used in GF2020
+   FV_Atm(1)%flagstruct%rf_cutoff = 25.0 + (1.0 - sigma) * (250.0 - 25.0) ! Pa
+   FV_Atm(1)%flagstruct%tau = 5.0
+   FV_Atm(1)%flagstruct%RF_fast = .false.
   ! Cubed-Sphere Global Resolution Specific adjustments
    if (FV_Atm(1)%flagstruct%ntiles == 6) then
-     ! Cubed-sphere grid resolution and DT dependence
+     ! Cubed-sphere uniform global grid resolution and DT dependence
      !              based on ideal remapping DT
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 12) then
+      if (FV_Atm(1)%flagstruct%npx >= 12) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
+         FV_Atm(1)%flagstruct%tau = 5.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 24) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
+         FV_Atm(1)%flagstruct%tau = 4.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 24) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
+      if (FV_Atm(1)%flagstruct%npx >= 48) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0  )
+         FV_Atm(1)%flagstruct%tau = 3.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 48) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 90) then
-         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 900.0   )
-      endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
+      if (FV_Atm(1)%flagstruct%npx >= 90) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
+         FV_Atm(1)%flagstruct%tau = 2.5
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
+      if (FV_Atm(1)%flagstruct%npx >= 180) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
+         FV_Atm(1)%flagstruct%tau = 2.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
+      if (FV_Atm(1)%flagstruct%npx >= 360) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
+         FV_Atm(1)%flagstruct%tau = 1.5
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+      if (FV_Atm(1)%flagstruct%npx >= 720) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+         FV_Atm(1)%flagstruct%tau = 1.0
+         FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
+      if (FV_Atm(1)%flagstruct%npx >= 1120) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+         FV_Atm(1)%flagstruct%tau = 0.75
+         FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  28.125)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
+      if (FV_Atm(1)%flagstruct%npx >= 1440) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
+         FV_Atm(1)%flagstruct%tau = 0.5
+         FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
-      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-                                                    FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
-          if (FV_Atm(1)%flagstruct%stretch_fac > 1) FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75)
+      if (FV_Atm(1)%flagstruct%npx >= 2880) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
+         FV_Atm(1)%flagstruct%tau = 0.25
+         FV_Atm(1)%flagstruct%RF_fast = .true.
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 5760) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
+         FV_Atm(1)%flagstruct%tau = 0.125
+         FV_Atm(1)%flagstruct%RF_fast = .true.
+      endif
+      if (FV_Atm(1)%flagstruct%npx >= 10800) then
+         FV_Atm(1)%flagstruct%k_split = CEILING(DT/  4.6875 )
+         FV_Atm(1)%flagstruct%tau = 0.0625
+         FV_Atm(1)%flagstruct%RF_fast = .true.
+      endif
+      if (FV_Atm(1)%flagstruct%stretch_fac > 1.0) then
+     ! Cubed-sphere stretched global grid resolution and DT dependence
+     !              based on ideal remapping DT
+          if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 540) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
+              FV_Atm(1)%flagstruct%tau = 2.0
+              FV_Atm(1)%flagstruct%RF_fast = .true.
+          endif
+          if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1080) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
+              FV_Atm(1)%flagstruct%tau = 1.0
+              FV_Atm(1)%flagstruct%RF_fast = .true.
+          endif
+          if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2160) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
+              FV_Atm(1)%flagstruct%tau = 0.5
+              FV_Atm(1)%flagstruct%RF_fast = .true.
+          endif
+          if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
+              FV_Atm(1)%flagstruct%tau = 0.25
+              FV_Atm(1)%flagstruct%RF_fast = .true.
+          endif
+          if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 8640) then
+              FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375 )
+              FV_Atm(1)%flagstruct%tau = 0.125
+              FV_Atm(1)%flagstruct%RF_fast = .true.
+          endif
       endif
       FV_Atm(1)%flagstruct%k_split = MAX(FV_Atm(1)%flagstruct%k_split,1)
-      ! Monotonic Hydrostatic defaults
-      FV_Atm(1)%flagstruct%hydrostatic = .false.
+     ! Divergence Damping
+     ! 6th order divergence default damping options
+      FV_Atm(1)%flagstruct%nord = 2
+      FV_Atm(1)%flagstruct%dddmp = 0.2  ! Smagorinsky damping coef
+      FV_Atm(1)%flagstruct%d4_bg_top = 0.12 ! High-order Divg Damping coef
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1200) then
+         FV_Atm(1)%flagstruct%d4_bg_bot = 0.06 ! High-order Divg Damping coef
+      else
+         FV_Atm(1)%flagstruct%d4_bg_bot = 0.12 ! High-order Divg Damping coef
+      endif
+      FV_Atm(1)%flagstruct%d2_bg = 0.0  ! 2nd order Divg Damping coef
+      FV_Atm(1)%flagstruct%d_ext = 0.0  ! External damping
+      if (FV_Atm(1)%flagstruct%npz == 72) then
+         ! Local Richardson-number turbulent mixing
+          FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
+         ! Sponge layer
+          FV_Atm(1)%flagstruct%n_sponge = 9
+      else
+         ! Local Richardson-number turbulent mixing
+          FV_Atm(1)%flagstruct%fv_sg_adj = -1
+         ! Sponge layer
+          FV_Atm(1)%flagstruct%n_sponge = 6
+      endif
+      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.2
+      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.1
+      if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1200) then
+         FV_Atm(1)%flagstruct%consv_te = 0.0
+      else
+         FV_Atm(1)%flagstruct%consv_te = 1.0
+      endif
+     ! default NonHydrostatic settings (irrelavent to Hydrostatic)
+     ! a_imp > 0.5 for semi-implicit scheme [1 fully backward]
+     ! if (a_imp > 0.5) beta + a_imp must = 1.0
+      FV_Atm(1)%flagstruct%beta = 0.0
+      FV_Atm(1)%flagstruct%a_imp = 1.0
+     ! dz_min is a NH delta-z limiter increasing may improve stability
+      FV_Atm(1)%flagstruct%dz_min = 3.0
+     ! p_fac is a NH pressure fraction limiter near model top (0:0.25)
+      FV_Atm(1)%flagstruct%p_fac = 0.05
+     ! General defaults
       FV_Atm(1)%flagstruct%make_nh = .false.
      ! This is the best/fastest option for tracers
       FV_Atm(1)%flagstruct%hord_tr =  8
       if (index(FV3_CONFIG,"MONOTONIC") > 0) then
-         ! Monotonic advection schemes
+         FV_Atm(1)%flagstruct%hydrostatic = .true.
+        ! Monotonic advection schemes
          FV_Atm(1)%flagstruct%hord_mt =  10
          FV_Atm(1)%flagstruct%hord_vt =  10
          FV_Atm(1)%flagstruct%hord_tm =  10
          FV_Atm(1)%flagstruct%hord_dp =  10
-         ! disable vorticity damping
+        ! disable hyperdiffusion (vorticity damping)
          FV_Atm(1)%flagstruct%vtdm4 = 0.0
          FV_Atm(1)%flagstruct%do_vort_damp = .false.
          FV_Atm(1)%flagstruct%d_con = 0.
       else
-      ! Non-Monotonic advection
-         if (index(FV3_CONFIG,"HWT") > 0) then
-           FV_Atm(1)%flagstruct%hord_mt =  6
-           FV_Atm(1)%flagstruct%hord_vt =  6
-           FV_Atm(1)%flagstruct%hord_tm =  6
-           FV_Atm(1)%flagstruct%hord_dp = -6
+       ! Non-Monotonic advection schemes
+         if (FV_Atm(1)%flagstruct%npz == 72) then
+            FV_Atm(1)%flagstruct%hydrostatic = .true.
+            FV_Atm(1)%flagstruct%hord_mt =  5
+            FV_Atm(1)%flagstruct%hord_vt =  6
+            FV_Atm(1)%flagstruct%hord_tm =  6
+            FV_Atm(1)%flagstruct%hord_dp = -6
          else
-           FV_Atm(1)%flagstruct%hord_mt =  5
-           FV_Atm(1)%flagstruct%hord_vt =  6
-           FV_Atm(1)%flagstruct%hord_tm =  6
-           FV_Atm(1)%flagstruct%hord_dp = -6
+            FV_Atm(1)%flagstruct%hydrostatic = .false.
+            FV_Atm(1)%flagstruct%hord_mt =  6
+            FV_Atm(1)%flagstruct%hord_vt =  6
+            FV_Atm(1)%flagstruct%hord_tm =  6
+            FV_Atm(1)%flagstruct%hord_dp = -6
          endif
-       ! Must now include explicit vorticity damping
+       ! Must now include hyperdiffusion (vorticity damping)
          FV_Atm(1)%flagstruct%d_con = 1.
          FV_Atm(1)%flagstruct%do_vort_damp = .true.
          FV_Atm(1)%flagstruct%vtdm4 = 0.01
-     ! continue to adjust vorticity damping with
-     ! increasing resolution
+       ! continue to adjust vorticity damping with
+       ! increasing resolution
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 180) then
            FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 360) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.02
+           FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 720) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.03
+           FV_Atm(1)%flagstruct%vtdm4 = 0.01
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 1440) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.04
+           FV_Atm(1)%flagstruct%vtdm4 = 0.02
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 2880) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.05
+           FV_Atm(1)%flagstruct%vtdm4 = 0.03
          endif
          if (FV_Atm(1)%flagstruct%npx*(FV_Atm(1)%flagstruct%stretch_fac) >= 5760) then
-           FV_Atm(1)%flagstruct%vtdm4 = 0.06
+           FV_Atm(1)%flagstruct%vtdm4 = 0.04
          endif
       endif
       if (index(FV3_CONFIG,"MERRA-2") > 0) then
@@ -700,7 +760,8 @@ contains
        ! 2nd order damping
         FV_Atm(1)%flagstruct%nord = 0
         FV_Atm(1)%flagstruct%dddmp = 0.2
-        FV_Atm(1)%flagstruct%d4_bg = 0.0
+        FV_Atm(1)%flagstruct%d4_bg_top = 0.0
+        FV_Atm(1)%flagstruct%d4_bg_bot = 0.0
         FV_Atm(1)%flagstruct%d2_bg = 0.0075
         FV_Atm(1)%flagstruct%d_ext = 0.02
        ! disable vorticity damping
@@ -735,12 +796,7 @@ contains
         FV_Atm(1)%flagstruct%n_zfilter = 0
     endif
 
-!! Setup GFDL microphysics module
-    if (FV_Atm(1)%flagstruct%do_sat_adj) then
-       call gfdl_cloud_microphys_init()
-    endif
-
- _ASSERT(DT > 0.0, 'DT must be greater than zero')
+  _ASSERT(DT > 0.0, 'DT must be greater than zero')
 
   call WRITE_PARALLEL("Dynamics PE Layout ")
   call WRITE_PARALLEL(FV_Atm(1)%layout(1)    ,format='("NPES_X  : ",(   I3))')
@@ -753,7 +809,7 @@ contains
 
   FV_HYDROSTATIC = FV_Atm(1)%flagstruct%hydrostatic
   DEBUG          = FV_Atm(1)%flagstruct%fv_debug
-  prt_minmax     = FV_Atm(1)%flagstruct%fv_debug
+  call MAPL_GetResource(MAPL, DEBUG, 'DEBUG_STATE:', default=DEBUG, RC=STATUS)
 
   call MAPL_MemUtilsWrite(VM, trim(Iam), RC=STATUS )
   VERIFY_(STATUS)
@@ -792,6 +848,8 @@ contains
   type (T_FVDYCORE_GRID) , pointer :: GRID
   integer              :: status
   real(REAL8) :: DT
+  real        :: rPRS
+  character(len=1) :: sCODE, rCODE, zCODE
 
   integer   :: is ,ie , js ,je    !  Local dims
   integer   :: isc,iec, jsc,jec   !  Local dims
@@ -841,10 +899,17 @@ contains
 
   STATE%GRID%FVgenstate => MAPL
   GRID => STATE%GRID     ! For convenience
-  STATE%DOTIME= .TRUE.
-  STATE%DT        = DT
-  STATE%KSPLIT    = FV_Atm(1)%flagstruct%K_SPLIT
-  STATE%NSPLIT    = FV_Atm(1)%flagstruct%N_SPLIT
+
+  STATE%DT      = DT
+
+  STATE%q_split = FV_Atm(1)%flagstruct%q_split
+  STATE%k_split = FV_Atm(1)%flagstruct%k_split
+  STATE%n_split = FV_Atm(1)%flagstruct%n_split
+
+  STATE%base_q_split = FV_Atm(1)%flagstruct%q_split
+  STATE%base_k_split = FV_Atm(1)%flagstruct%k_split
+  STATE%base_n_split = FV_Atm(1)%flagstruct%n_split
+
   GRID%NG     = 3 ; ng = 3
   GRID%NPX    = FV_Atm(1)%flagstruct%NPX-1
   GRID%NPY    = FV_Atm(1)%flagstruct%NPY-1
@@ -981,9 +1046,6 @@ contains
 
 !  Clear wall clock time clocks and global budgets
 
-  STATE%RUN_TIMES = 0
-  STATE%NUM_CALLS = 0
-
   call ESMF_ClockGet( CLOCK, currTime=fv_time, rc=STATUS )
   VERIFY_(STATUS)
   call ESMF_TimeGet( fv_time, dayOfYear=days, s=seconds, rc=STATUS )
@@ -1042,7 +1104,7 @@ contains
                                  FV_Atm(1)%flagstruct%moist_phys, FV_Atm(1)%flagstruct%hydrostatic, hybrid, FV_Atm(1)%delz, FV_Atm(1)%ze0, &
                                  FV_Atm(1)%ks, FV_Atm(1)%ptop, FV_Atm(1)%domain, tile_in, FV_Atm(1)%bd)
      ! Copy FV to internal State
-       call FV_To_State ( STATE )
+       call FV_To_State ( MAPL, STATE )
        if( gid==masterproc ) write(*,*) 'Doubly Periodic IC generated LAT:', FV_Atm(1)%flagstruct%deglat
    else
      ALLOCATE( UA(isc:iec  ,jsc:jec  ,1:FV_Atm(1)%npz) )
@@ -1065,7 +1127,7 @@ contains
         call fv_getDELZ(DZ,PT,PE)
         PT = PT/PKZ
      endif
-     call State_To_FV( STATE )
+     call State_To_FV( MAPL, STATE )
    endif ! doubly-periodic
 
   else ! COLDSTART
@@ -1077,7 +1139,7 @@ contains
     !   call fv_getDELZ(DZ,PT,PE)
     !   PT = PT/PKZ
     !endif
-     call State_To_FV( STATE )
+     call State_To_FV( MAPL, STATE )
 
   endif
 
@@ -1099,53 +1161,33 @@ contains
 !
   if( gid.eq.0 .and. .not. SW_DYNAMICS) then
         print *
-        write(6,*) ' + denotes a layer within the "dz-filter" of the dynamics'
-        write(6,*) ' * denotes a layer within the "sponge-layer" of the dynamics'
+        write(6,*) ' x denotes a layer within the "Sponge layer"                of the dynamics'
+        write(6,*) ' + denotes a layer within the "Rayleigh Damping"            of the dynamics'
+        write(6,*) ' o denotes a layer within the "Richardson Number dz-filter" of the dynamics'
         write(6,100)
-100     format(2x,' k ','      A(k)    ',2x,' B(k)   ',2x,'  Pref    ',2x,'  DelP',/, &
-               1x,'----',3x,'----------',2x,'--------',2x,'----------',2x,'---------' )
-          k=0
-          if ( (FV_Atm(1)%flagstruct%fv_sg_adj > 0) .AND. (k<=FV_Atm(1)%flagstruct%n_zfilter) ) then
-            if (k<=FV_Atm(1)%flagstruct%n_sponge) then
-              write(6,101) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
+100     format(5x,'  k  ',2x,'   A(k)   ',2x,'   B(k)   ',2x,'   Pref   ',2x,'   DelP   ',/, &
+               5x,'-----',2x,'----------',2x,'----------',2x,'----------',2x,'----------' )
+          do k=0,ubound(ak,1)
+            rPRS=ak(k)*0.01 + 1000.0*bk(k)
+            zCODE = ' '
+            if ((FV_Atm(1)%flagstruct%fv_sg_adj > 0.0) .AND. (k   <=FV_Atm(1)%flagstruct%n_zfilter))  &
+               zCODE = 'o'
+            rCODE = ' '
+            if ((FV_Atm(1)%flagstruct%tau       > 0.0) .AND. (rPRS<=0.01*FV_Atm(1)%flagstruct%rf_cutoff))  &
+               rCODE = '+'
+            sCODE = ' '
+            if (k<=FV_Atm(1)%flagstruct%n_sponge) &
+               sCODE = 'x'
+            if (k == 0) then
+              write(6,200) sCODE,rCODE,zCODE,k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
             else
-              write(6,102) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
-            endif
-          else
-            if (k<=FV_Atm(1)%flagstruct%n_sponge) then
-              write(6,105) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
-            else
-              write(6,106) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k)
-            endif
-          endif
-          do k=1,ubound(ak,1)
-            if ( (FV_Atm(1)%flagstruct%fv_sg_adj > 0) .AND. (k<=FV_Atm(1)%flagstruct%n_zfilter) ) then
-              if (k<=FV_Atm(1)%flagstruct%n_sponge) then
-                 write(6,103) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
+              write(6,300) sCODE,rCODE,zCODE,k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
                               (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
-              else
-                 write(6,104) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
-                              (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
-              endif
-            else
-              if (k<=FV_Atm(1)%flagstruct%n_sponge) then
-                 write(6,107) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
-                              (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
-              else
-                 write(6,108) k+1,ak(k)*0.01, bk(k), ak(k)*0.01 + 1000.0*bk(k), &
-                              (ak(k)-ak(k-1))*0.01 + 1000.0*(bk(k)-bk(k-1))
-              endif
             endif
           enddo
         print *
-101     format('*+',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4)
-102     format(' +',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4)
-103     format('*+',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
-104     format(' +',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
-105     format('* ',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4)
-106     format('  ',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4)
-107     format('* ',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
-108     format('  ',2x,i3,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
+200     format(A1,A1,A1,2x,i5,2x,f10.6,2x,f8.4,2x,f10.4)
+300     format(A1,A1,A1,2x,i5,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
   endif
 
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV Initialize', RC=STATUS )
@@ -1155,12 +1197,13 @@ contains
 
 end subroutine FV_InitState
 
-subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
+subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
   type (T_FVDYCORE_STATE),pointer              :: STATE
   type (ESMF_State),             intent(INOUT) :: EXPORT
   type (ESMF_Clock), target,     intent(IN   ) :: CLOCK
   type (ESMF_GridComp)         , intent(INOUT) :: GC
+  real(REAL8), optional        , intent(INOUT) :: PLE0(:,:,:)
   integer, optional            , intent(OUT  ) :: RC
 
 ! Local variables
@@ -1194,7 +1237,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 
   real(REAL4), pointer     :: PTR3D(:,:,:)
 
-  real(FVPRC), allocatable           :: DEBUG_ARRAY(:,:,:)
+  real(FVPRC), allocatable :: DEBUG_ARRAY(:,:,:)
   real(FVPRC) :: fac1    = 1.0
 
   real(REAL4), pointer     :: LONS(:,:), LATS(:,:)
@@ -1205,6 +1248,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 ! Splitting for Pure Advection
   real(FVPRC) :: myDT, lnp, rdg, pek, ak1
 
+! Dynamic Index Tracking for Option A (Mass-Conserving Advection)
+  integer :: idx_qlcn = -1
+  integer :: idx_qicn = -1
+  integer :: idx_clcn = -1
+
 ! Convience variables
   integer :: nwat_tracers
   integer :: sphu = -1
@@ -1212,37 +1260,18 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   integer :: qice = -1
   integer :: qlls = -1
   integer :: qlcn = -1
-  integer :: qlcnf= -1
   integer :: qils = -1
   integer :: qicn = -1
-  integer :: qicnf= -1
   integer :: clls = -1
   integer :: clcn = -1
-  integer :: clcnf= -1
   integer :: qcld = -1
   integer :: rain = -1
   integer :: snow = -1
   integer :: grpl = -1
 
   type(domain2D) :: domain
-
   type (MAPL_MetaComp),          pointer :: mapl  => NULL()
-
   character(len=ESMF_MAXSTR) :: STRING
-
-  logical :: SPHU_FILLED = .FALSE.
-  logical :: QLIQ_FILLED = .FALSE.
-  logical :: QICE_FILLED = .FALSE.
-  logical :: RAIN_FILLED = .FALSE.
-  logical :: SNOW_FILLED = .FALSE.
-  logical :: GRPL_FILLED = .FALSE.
-  logical :: QCLD_FILLED = .FALSE.
-  logical :: QLLS_FILLED = .FALSE.
-  logical :: QLCN_FILLED = .FALSE.
-  logical :: QILS_FILLED = .FALSE.
-  logical :: QICN_FILLED = .FALSE.
-  logical :: CLLS_FILLED = .FALSE.
-  logical :: CLCN_FILLED = .FALSE.
 
   logical :: NWAT_TEST
 
@@ -1257,13 +1286,12 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
 ! Begin
 
 #ifdef BUILD_PYFV3
-  call ESMF_VMGetCurrent(vm, rc=status) ! pchakrab: replace with ESMF_GridCompGet(gc, VM=VM, _RC)
+  call ESMF_VMGetCurrent(vm, rc=status)
   call ESMF_VMGet(vm, mpiCommunicator=comm)
   call MPI_Comm_rank(comm, rank, mpierr)
 #endif
-! Retrieve the pointer to the state
-! ---------------------------------
 
+! Retrieve the pointer to the state
   call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
   VERIFY_(STATUS)
 
@@ -1291,7 +1319,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
   call MAPL_TimerOn(MAPL,"--FV_FIRST_RUN")
   ! Be sure we have the correct PHIS and number of tracers for this run
    if (fv_first_run) then
-    ! Determine how many water species we have
      nwat_tracers = 0
      if (.not. ADIABATIC) then
        do n=1,STATE%GRID%NQ
@@ -1301,9 +1328,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
          if (TRIM(state%vars%tracer(n)%tname) == 'QICN'    ) nwat_tracers = nwat_tracers + 1
          if (TRIM(state%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
        enddo
-      ! We must have these first 5 at a minimum
        _ASSERT(nwat_tracers == 5, 'expecting 5 water species: Q QLCN QLLS QICN QILS')
-      ! Check for CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'CLLS'    ) nwat_tracers = nwat_tracers + 1
          if (TRIM(state%vars%tracer(n)%tname) == 'CLCN'    ) nwat_tracers = nwat_tracers + 1
@@ -1312,77 +1337,32 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
          if (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL') nwat_tracers = nwat_tracers + 1
        enddo
        if (FV_Atm(1)%flagstruct%nwat == 0) then
-         if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 1 ! Tell FV3 about QV only
+         if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 1 
          if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
-           if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3 ! Tell FV3 about QV, QLIQ, QICE
+           if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3 
          endif
-         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL plus QCLD
+         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 
        endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
-#ifdef VERIFY_GRID
-    ! Verify Grid Coordinates
-    ! ------- ESMF ------
-     allocate ( griddiffs(isc:iec,jsc:jec) )
-     call ESMF_GridCompGet( GC, grid=ESMFGRID, RC=STATUS )
-     call ESMF_GridGetCoord(ESMFGRID,localDE=0,coordDim=1,&
-                        staggerloc=ESMF_STAGGERLOC_CENTER,&
-                            farrayPtr=lonptr,rc=status)
-     griddiffs = REAL(lonptr)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,1))
-     do j=jsc,jec
-        do i=isc,iec
-           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LONS discprepency FV3 : ESMF ', &
-                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,1)*180.0/MAPL_PI), &
-                                REAL(           lonptr(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
-        enddo
-     enddo
-     call ESMF_GridGetCoord(ESMFGRID,localDE=0,coordDim=2,&
-                        staggerloc=ESMF_STAGGERLOC_CENTER,&
-                                    farrayPtr=latptr,rc=status)
-     griddiffs = REAL(latptr)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,2))
-     do j=jsc,jec
-        do i=isc,iec
-           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LATS discprepency FV3 : ESMF ', &
-                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,2)*180.0/MAPL_PI), &
-                                REAL(           latptr(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
-        enddo
-     enddo
-    ! ------- MAPL ------
-     call MAPL_Get(MAPL, LATS=LATS, LONS=LONS, RC=STATUS)  ! These are in radians
-     griddiffs = REAL(LONS)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,1))
-     do j=jsc,jec
-        do i=isc,iec
-           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LONS discprepency FV3 : MAPL ', &
-                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,1)*180.0/MAPL_PI), &
-                                REAL(             LONS(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
-        enddo
-     enddo
-     griddiffs = REAL(LATS)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,2))
-     do j=jsc,jec
-        do i=isc,iec
-           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LATS discprepency FV3 : MAPL ', &
-                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,2)*180.0/MAPL_PI), &
-                                REAL(             LATS(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
-        enddo
-     enddo
-     deallocate ( griddiffs )
-#endif
+
     ! Set FV3 surface geopotential
+     FV_Atm(1)%phis = 0.0
      FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=FVPRC)
      FV_Atm(1)%varflt(isc:iec,jsc:jec) = real(varflt,kind=FVPRC)
      call mpp_update_domains(FV_Atm(1)%phis, FV_Atm(1)%domain, complete=.true.)
-    ! How many tracers do we really have?
-     ! MAT GCC cannot handle multi-line asserts. For ease of reading,
-     !     create a new variable to test
+     
      NWAT_TEST = ( (FV_Atm(1)%flagstruct%nwat == 0) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 1) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 3) .OR. &
                    (FV_Atm(1)%flagstruct%nwat >= 6) )
      _ASSERT( NWAT_TEST , 'NWAT must be either 0, 1, 3 or 6')
+     
+     ! OPTION A: We keep ALL tracers, no subtracting CN species.
      FV_Atm(1)%ncnst = STATE%GRID%NQ
+     
      deallocate( FV_Atm(1)%q )
-     allocate  ( FV_Atm(1)%q(isd:ied  ,jsd:jed  ,npz, FV_Atm(1)%ncnst) )  
-     ! Echo FV3 setup
+     allocate  ( FV_Atm(1)%q(isd:ied  ,jsd:jed  ,npz, FV_Atm(1)%ncnst) )
      call echo_fv3_setup()
      ! Setup pyFV3 here since we need to know the exact nwat
      ! We can do this because this is trigger _only once_.
@@ -1409,626 +1389,351 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
    call MAPL_TimerOff(MAPL,"--FV_FIRST_RUN")
 
    select case ( FV_Atm(1)%flagstruct%nwat )
-  ! Assign Tracer Indices for FV3
    case (6:7)
-    sphu = 1
-    qliq = 2
-    qice = 3
-    rain = 4
-    snow = 5
-    grpl = 6
-    qcld = 7
-  ! Advect around CN fractions of species for redistribution...
-    qlcnf = 8
-    qicnf = 9
-    clcnf = 10
-   case (3)
-    sphu = 1
-    qliq = 2
-    qice = 3
-  ! Advect around CN fractions of species for redistribution...
-    qlcnf = 4
-    qicnf = 5
+    sphu = 1; qliq = 2; qice = 3; rain = 4; snow = 5; grpl = 6; qcld = 7
+   case (3:4)
+    sphu = 1; qliq = 2; qice = 3; qcld = 4
    case (1)
-    sphu = 1
-  ! Advect as split CN/LS species
-    qlcn = 2
-    qlls = 3
-    qicn = 4
-    qils = 5
+    sphu = 1; qlcn = 2; qlls = 3; qicn = 4; qils = 5; clcn = 6; clls = 7
    end select
 
+ ! ------------------------------------------------------------------
+ ! Pull Tracers (Dynamic Mapping for Mass Conservation Option A)
+ ! ------------------------------------------------------------------
   call MAPL_TimerOn(MAPL,"--PULL_TRACERS")
- ! Pull Tracers
-  nn = 0
+  
   if (.not. ADIABATIC) then
-    select case ( FV_Atm(1)%flagstruct%nwat )
-    case (0)
-       _ASSERT(FV_Atm(1)%ncnst == STATE%GRID%NQ, 'needs informative message')
-    case (1)
-       _ASSERT(FV_Atm(1)%ncnst >= 5, 'needs informative message')
-       _ASSERT(FV_Atm(1)%ncnst == STATE%GRID%NQ, 'needs informative message')
-    case (3)
-       _ASSERT(FV_Atm(1)%ncnst >= 5, 'needs informative message')
-       _ASSERT(FV_Atm(1)%ncnst == STATE%GRID%NQ, 'needs informative message')
-    case (6:7)
-       _ASSERT(FV_Atm(1)%ncnst >= 10, 'needs informative message')
-       _ASSERT(FV_Atm(1)%ncnst == STATE%GRID%NQ, 'needs informative message')
-    end select
-   ! Report total number and names of advected tracers
-    if (fv_first_run .and. STATE%GRID%NQ > 0) then
-       write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", STATE%GRID%NQ, " tracers:"
-       call WRITE_PARALLEL( trim(STRING)   )
+    if (fv_first_run .and. FV_Atm(1)%ncnst > 0) then
+       write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", FV_Atm(1)%ncnst, " tracers:"
+       call WRITE_PARALLEL( trim(STRING) )
     endif
     FV_Atm(1)%q(:,:,:,:) = 0.0
-    if (FV_Atm(1)%flagstruct%nwat > 0) then
-    do n=1,STATE%GRID%NQ
-       if (TRIM(state%vars%tracer(n)%tname) == 'Q') then
-         if (sphu /= -1) then ! SPHU
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           SPHU_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
-       if (TRIM(state%vars%tracer(n)%tname) == 'QLCN') then
-         if (qliq /= -1) then ! QLIQ
-           if (fv_first_run) call WRITE_PARALLEL( trim('QLIQ') )
-           QLIQ_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-         if (qlcn /= -1) then ! QLCN
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           QLCN_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-         if (qlcnf /= -1) then ! QLCN
-           if (fv_first_run) call WRITE_PARALLEL( trim('QLCNF') )
-           QLCN_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
-       if (TRIM(state%vars%tracer(n)%tname) == 'QLLS') then
-         if (qliq /= -1) then ! QLIQ
-           QLIQ_FILLED = .TRUE.
-          ! nn increment already handled in QLLS
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-         if (qlls /= -1) then ! QLLS
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           QLLS_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
-       if (TRIM(state%vars%tracer(n)%tname) == 'QICN') then
-         if (qice /= -1) then ! QICE
-           if (fv_first_run) call WRITE_PARALLEL( trim('QICE') )
-           QICE_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-         if (qicn /= -1) then ! QICN
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           QICN_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-         if (qicnf /= -1) then ! QICN
-           if (fv_first_run) call WRITE_PARALLEL( trim('QICNF') )
-           QICN_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
-       if (TRIM(state%vars%tracer(n)%tname) == 'QILS') then
-         if (qice /= -1) then ! QICE
-           QICE_FILLED = .TRUE.
-          ! nn increment already handled in QICN
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-         if (qils /= -1) then ! QILS
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           QILS_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
-     ! Extra species for 6-phase microphysics
-       if ((rain /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QRAIN')) then
-         if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-         RAIN_FILLED = .TRUE.
-         nn = nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain) = state%vars%tracer(n)%content_r4(:,:,:)
-         else
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain) = state%vars%tracer(n)%content(:,:,:)
-         endif
-       endif
-       if ((snow /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QSNOW')) then
-         if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-         SNOW_FILLED = .TRUE.
-         nn = nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow) = state%vars%tracer(n)%content_r4(:,:,:)
-         else
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow) = state%vars%tracer(n)%content(:,:,:)
-         endif
-       endif
-       if ((grpl /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL')) then
-         if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-         GRPL_FILLED = .TRUE.
-         nn = nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl) = state%vars%tracer(n)%content_r4(:,:,:)
-         else
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl) = state%vars%tracer(n)%content(:,:,:)
-         endif
-       endif
-       if (TRIM(state%vars%tracer(n)%tname) == 'CLCN') then
-         if (qcld /= -1) then ! QCLD
-           if (fv_first_run) call WRITE_PARALLEL( trim('QCLD') )
-           QCLD_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-         if (clcn /= -1) then ! CLCN
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           CLCN_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-         if (clcnf /= -1) then ! CLCN
-           if (fv_first_run) call WRITE_PARALLEL( trim('CLCNF') )
-           CLCN_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
-       if (TRIM(state%vars%tracer(n)%tname) == 'CLLS') then
-         if (qcld /= -1) then ! QCLD
-           QCLD_FILLED = .TRUE.
-          ! nn increment already handled in CLCN
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-         if (clls /= -1) then ! CLLS
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           CLLS_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
+
+    ! Initialize index offset for extra tracers beyond standard nwat
+    select case (FV_Atm(1)%flagstruct%nwat)
+       case (6:7); nn = 7
+       case (3:4); nn = 4
+       case (1);   nn = 7
+       case (0);   nn = 0
+    end select
+
+    do n=1, STATE%GRID%NQ
+       
+       select case (TRIM(state%vars%tracer(n)%tname))
+          case ('Q')
+             if (sphu /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu) = state%vars%tracer(n)%content_r4(:,:,:)
+                 else
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu) = state%vars%tracer(n)%content(:,:,:)
+                 endif
+                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             endif
+
+          ! -- LIQUID --
+          case ('QLCN')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qlcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qliq /= -1 .and. qlcn == -1) then 
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qlcn = nn 
+                 endif
+             else
+                 if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
+                 if (qlcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content(:,:,:)
+                 if (qliq /= -1 .and. qlcn == -1) then 
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qlcn = nn 
+                 endif
+             endif
+             if ((qlcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if ((qliq /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QLIQ") )
+
+          case ('QLLS')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qlls /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls) = state%vars%tracer(n)%content_r4(:,:,:)
+             else
+                 if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
+                 if (qlls /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls) = state%vars%tracer(n)%content(:,:,:)
+             endif
+             if ((qlcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+
+          ! -- ICE --
+          case ('QICN')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qicn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qice /= -1 .and. qicn == -1) then 
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qicn = nn 
+                 endif
+             else
+                 if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
+                 if (qicn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content(:,:,:)
+                 if (qice /= -1 .and. qicn == -1) then 
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qicn = nn 
+                 endif
+             endif
+             if ((qicn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if ((qice /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QICE") )
+
+          case ('QILS')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qils /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils) = state%vars%tracer(n)%content_r4(:,:,:)
+             else
+                 if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
+                 if (qils /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils) = state%vars%tracer(n)%content(:,:,:)
+             endif
+             if ((qicn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+
+          ! -- CLOUD FRACTION --
+          case ('CLCN')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
+                 if (clcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qcld /= -1 .and. clcn == -1) then 
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_clcn = nn 
+                 endif
+             else
+                 if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
+                 if (clcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content(:,:,:)
+                 if (qcld /= -1 .and. clcn == -1) then 
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_clcn = nn 
+                 endif
+             endif
+             if ((clcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if ((qcld /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QCLD") )
+
+          case ('CLLS')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
+                 if (clls /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls) = state%vars%tracer(n)%content_r4(:,:,:)
+             else
+                 if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
+                 if (clls /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls) = state%vars%tracer(n)%content(:,:,:)
+             endif
+             if ((clcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+
+          ! -- MICROPHYSICS --
+          case ('QRAIN')
+             if (rain /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain) = state%vars%tracer(n)%content_r4(:,:,:)
+                 else
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain) = state%vars%tracer(n)%content(:,:,:)
+                 endif
+                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             endif
+          case ('QSNOW')
+             if (snow /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow) = state%vars%tracer(n)%content_r4(:,:,:)
+                 else
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow) = state%vars%tracer(n)%content(:,:,:)
+                 endif
+                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             endif
+          case ('QGRAUPEL')
+             if (grpl /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl) = state%vars%tracer(n)%content_r4(:,:,:)
+                 else
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl) = state%vars%tracer(n)%content(:,:,:)
+                 endif
+                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             endif
+
+          ! -- ALL OTHER PASSIVE TRACERS --
+          case default
+             nn = nn + 1
+             if (state%vars%tracer(n)%is_r4) then
+                 FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
+             else
+                 FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
+             endif
+             if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+       end select
     enddo
-   ! make convective fractions for advection
-    if ( (qliq /= -1) .and. (qlcnf /= -1) ) then
-       do k=1,npz
-         do j=jsc,jec
-           do i=isc,iec
-             if (FV_Atm(1)%q(i,j,k,qliq) > 0.0) then
-                 FV_Atm(1)%q(i,j,k,qlcnf) = FV_Atm(1)%q(i,j,k,qlcnf) / &
-                                            FV_Atm(1)%q(i,j,k,qliq)
-             else
-                 FV_Atm(1)%q(i,j,k,qlcnf) = 0.0
-             endif
-           enddo
-         enddo
-       enddo
-    endif
-    if ( (qice /= -1) .and. (qicnf /= -1) ) then
-       do k=1,npz
-         do j=jsc,jec
-           do i=isc,iec
-             if (FV_Atm(1)%q(i,j,k,qice) > 0.0) then
-                 FV_Atm(1)%q(i,j,k,qicnf) = FV_Atm(1)%q(i,j,k,qicnf) / &
-                                            FV_Atm(1)%q(i,j,k,qice)
-             else
-                 FV_Atm(1)%q(i,j,k,qicnf) = 0.0
-             endif
-           enddo
-         enddo
-       enddo
-    endif
-    if ( (qcld /= -1) .and. (clcnf /= -1) ) then
-       do k=1,npz
-         do j=jsc,jec
-           do i=isc,iec
-             if (FV_Atm(1)%q(i,j,k,qcld) > 0.0) then
-                 FV_Atm(1)%q(i,j,k,clcnf) = FV_Atm(1)%q(i,j,k,clcnf) / &
-                                            FV_Atm(1)%q(i,j,k,qcld)
-             else
-                 FV_Atm(1)%q(i,j,k,clcnf) = 0.0
-             endif
-           enddo
-         enddo
-       enddo
-    endif
-   ! Verify
-    select case (FV_Atm(1)%flagstruct%nwat)
-    case (6:7)
-      _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
-      _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled')
-      _ASSERT(QICE_FILLED, 'QICE Not Filled')
-      _ASSERT(RAIN_FILLED, 'RAIN Not Filled')
-      _ASSERT(SNOW_FILLED, 'SNOW Not Filled')
-      _ASSERT(GRPL_FILLED, 'GRPL Not Filled')
-      _ASSERT(QCLD_FILLED, 'QCLD Not Filled')
-      _ASSERT(QLCN_FILLED, 'QLCNF Not Filled')
-      _ASSERT(QICN_FILLED, 'QICNF Not Filled')
-      _ASSERT(CLCN_FILLED, 'CLCNF Not Filled')
-      _ASSERT(nn == 10, 'Expecting 10 water species') ! Q, QLCN, QICN, CLCN, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
-    case (3)
-      _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
-      _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled')
-      _ASSERT(QICE_FILLED, 'QICE Not Filled')
-      _ASSERT(QLCN_FILLED, 'QLCNF Not Filled')
-      _ASSERT(QICN_FILLED, 'QICNF Not Filled')
-      _ASSERT(nn == 5, 'Expecting 5 water species') ! Q, QLCN, QICN, QLIQ, QICE
-    case (1)
-      _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
-      _ASSERT(QLCN_FILLED, 'QLCN Not Filled')
-      _ASSERT(QLLS_FILLED, 'QLLS Not Filled')
-      _ASSERT(QICN_FILLED, 'QICN Not Filled')
-      _ASSERT(QILS_FILLED, 'QILS Not Filled')
-      _ASSERT(nn == 5, 'Expecting 5 water species') ! Q, QLCN, QLLS, QICN, QILS
-    end select
-    endif !nwat > 0
-
- ! Include any additional tracers
-
-    select case (FV_Atm(1)%flagstruct%nwat)
-    case (0)
-       do n=1,STATE%GRID%NQ
-         if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
-         nn = nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
-         else
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
-         endif
-       enddo
-    case (1)
-       do n=1,STATE%GRID%NQ
-         if ( (TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
-           if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
-           nn=nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       enddo
-    case (3)
-       do n=1,STATE%GRID%NQ
-         if ( (TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
-           if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
-           nn=nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       enddo
-    case (6:7)
-       do n=1,STATE%GRID%NQ
-         if ( (TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'CLCN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'CLLS'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QRAIN'   ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QSNOW'   ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QGRAUPEL') ) then
-           if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
-           nn=nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       enddo
-    end select
-    _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
+    
+    write (STRING, "(I3.3,' /= ',I3.3)") nn, FV_Atm(1)%ncnst
+    _ASSERT(nn == FV_Atm(1)%ncnst, 'nn /= ncnst: '//trim(STRING))
 
   else
-
+    ! Adiabatic Fallback
     if (fv_first_run .and. (mpp_pe()==0)) print*, 'Running In Adiabatic Mode'
-
-   ! Report total number and names of advected tracers
-      if (fv_first_run .and. STATE%GRID%NQ > 0) then
-         write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", STATE%GRID%NQ, " tracers:"
-         call WRITE_PARALLEL( trim(STRING)   )
-      endif
-   ! Advect all tracers
-      do n=1,STATE%GRID%NQ
-         if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-         nn = nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
-         else
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
-         endif
-      enddo
-      _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
-
-  endif
-   call MAPL_TimerOff(MAPL,"--PULL_TRACERS")
-   call MAPL_TimerOn(MAPL,"--STATE_TO_FV")
-
-    myDT = state%dt
-
-    elapsed_time = elapsed_time + myDT
-
-    if (DEBUG) call debug_fv_state('Before Dynamics Execution',STATE)
-
-! Update FV with Internal State
-    call State_To_FV( STATE )
-
-    ! Query for PSDRY from AGCM.rc and set to MAPL_PSDRY if not found
-    call MAPL_GetResource( MAPL, massD0, 'PSDRY:', default=MAPL_PSDRY, RC=STATUS )
-    VERIFY_(STATUS)
-    FV_Atm(1)%flagstruct%dry_mass = massD0
-
-    if (fv_first_run) then
-     ! Make_NH
-      if ( .not. FV_Atm(1)%flagstruct%hydrostatic ) then
-        if (all(FV_Atm(1)%w(isc:iec,jsc:jec,:) == 0.0)) FV_Atm(1)%flagstruct%Make_NH = .true.
-        if ( FV_Atm(1)%flagstruct%Make_NH ) then
-          if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT))
-          if (mpp_pe()==0) print*, 'fv_first_run: FV3 is making Non-Hydrostatic W and DZ'
-          if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
-          FV_Atm(1)%w = 0.0
-          call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
-                     FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
-                     FV_Atm(1)%pk,   FV_Atm(1)%pkz, kappa, FV_Atm(1)%q, FV_Atm(1)%ng, &
-                     FV_Atm(1)%ncnst, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%flagstruct%dry_mass,  &
-                     FV_Atm(1)%flagstruct%adjust_dry_mass,  FV_Atm(1)%flagstruct%mountain, &
-                     FV_Atm(1)%flagstruct%moist_phys,  FV_Atm(1)%flagstruct%hydrostatic, &
-                     FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%domain, FV_Atm(1)%flagstruct%make_nh)
-          FV_Atm(1)%flagstruct%Make_NH=.false.
-        endif
-      endif
-     ! Mark FV setup complete
-      fv_first_run = .false.
+    if (fv_first_run .and. STATE%GRID%NQ > 0) then
+       write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", STATE%GRID%NQ, " tracers:"
+       call WRITE_PARALLEL( trim(STRING) )
     endif
-    call MAPL_TimerOff(MAPL,"--STATE_TO_FV")
-
-! Check Dry Mass (Apply fixer is option is enabled)
-   if ( check_mass .OR. fix_mass ) then
-      call MAPL_TimerOn(MAPL,"--MASS_FIX")
-
-      if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. &
-            ((.not. FV_Atm(1)%flagstruct%hydrostatic) .OR. FV_Atm(1)%flagstruct%nwat>=6)  ) then
-
-         call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
-                    FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
-                    FV_Atm(1)%pk,   FV_Atm(1)%pkz, kappa, FV_Atm(1)%q, FV_Atm(1)%ng, &
-                    FV_Atm(1)%ncnst, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%flagstruct%dry_mass,  &
-                    FV_Atm(1)%flagstruct%adjust_dry_mass,  FV_Atm(1)%flagstruct%mountain, &
-                    FV_Atm(1)%flagstruct%moist_phys,  FV_Atm(1)%flagstruct%hydrostatic, &
-                    FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%domain, FV_Atm(1)%flagstruct%make_nh)
-
-      else
-
-      allocate ( mass(isc:iec,jsc:jec))
-      allocate (tqtot(isc:iec,jsc:jec))
-      do j=jsc,jec
-         do i=isc,iec
-            mass(i,j) = FV_Atm(1)%pe(i,npz+1,j)
-         enddo
-      enddo
-      tqtot = 0.0
-      if ( (.not. ADIABATIC) .AND. (FV_Atm(1)%flagstruct%nwat /= 0) ) then
-       if (FV_Atm(1)%flagstruct%nwat >= 6) then
-         do k=1,npz
-            tqtot(:,:) = tqtot(:,:) + ( &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qice) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,rain) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,snow) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,grpl) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
-         enddo
-       elseif (FV_Atm(1)%flagstruct%nwat == 3) then
-         do k=1,npz
-            tqtot(:,:) = tqtot(:,:) + ( &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qice) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
-         enddo
+    nn = 0
+    do n=1,STATE%GRID%NQ
+       if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+       nn = nn+1
+       if (state%vars%tracer(n)%is_r4) then
+          FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
        else
-         do k=1,npz
-            tqtot(:,:) = tqtot(:,:) + ( &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qlcn) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qlls) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qicn) + &
-            FV_Atm(1)%q(isc:iec,jsc:jec,k,qils) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
-         enddo
+          FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
        endif
+    enddo
+    _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
+  endif
+  call MAPL_TimerOff(MAPL,"--PULL_TRACERS")
+
+  myDT = state%dt
+  elapsed_time = elapsed_time + myDT
+
+  if (DEBUG) call debug_fv_state('Before Dynamics Execution',STATE)
+  call State_To_FV( MAPL, STATE )
+
+  call MAPL_GetResource( MAPL, massD0, 'PSDRY:', default=MAPL_PSDRY, RC=STATUS )
+  VERIFY_(STATUS)
+  FV_Atm(1)%flagstruct%dry_mass = massD0
+
+  if (fv_first_run) then
+    if ( .not. FV_Atm(1)%flagstruct%hydrostatic ) then
+      if ( FV_Atm(1)%flagstruct%Make_NH ) then
+        if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT)) 
+        if (mpp_pe()==0) print*, 'fv_first_run: FV3 is making Non-Hydrostatic W and DZ'
+        FV_Atm(1)%w = 0.0
+        call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
+                   FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
+                   FV_Atm(1)%pk,   FV_Atm(1)%pkz, kappa, FV_Atm(1)%q, FV_Atm(1)%ng, &
+                   FV_Atm(1)%ncnst, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%flagstruct%dry_mass,  &
+                   FV_Atm(1)%flagstruct%adjust_dry_mass,  FV_Atm(1)%flagstruct%mountain, &
+                   FV_Atm(1)%flagstruct%moist_phys,  FV_Atm(1)%flagstruct%hydrostatic, &
+                   FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%domain, FV_Atm(1)%flagstruct%make_nh)
+        FV_Atm(1)%flagstruct%Make_NH=.false.
       endif
+    endif
+    fv_first_run = .false.
+  endif
 
-      massD = g_sum(FV_Atm(1)%domain, mass-tqtot, isc, iec, jsc, jec, state%grid%ng, &
-                    fv_atm(1)%gridstruct%area_64, 1, reproduce=.true.)
+! Check Dry Mass
+  if ( check_mass .OR. fix_mass ) then
+     call MAPL_TimerOn(MAPL,"--MASS_FIX")
+     if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. FV_Atm(1)%flagstruct%nwat > 1 ) then
+        call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
+                   FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
+                   FV_Atm(1)%pk,   FV_Atm(1)%pkz, kappa, FV_Atm(1)%q, FV_Atm(1)%ng, &
+                   FV_Atm(1)%ncnst, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%flagstruct%dry_mass,  &
+                   FV_Atm(1)%flagstruct%adjust_dry_mass,  FV_Atm(1)%flagstruct%mountain, &
+                   FV_Atm(1)%flagstruct%moist_phys,  FV_Atm(1)%flagstruct%hydrostatic, &
+                   FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%domain, FV_Atm(1)%flagstruct%make_nh)
+     else
+        allocate ( mass(isc:iec,jsc:jec))
+        allocate (tqtot(isc:iec,jsc:jec))
+        do j=jsc,jec
+           do i=isc,iec
+              mass(i,j) = FV_Atm(1)%pe(i,npz+1,j)
+           enddo
+        enddo
+        tqtot = 0.0
+        if ( (.not. ADIABATIC) .AND. (FV_Atm(1)%flagstruct%nwat /= 0) ) then
+         if (FV_Atm(1)%flagstruct%nwat >= 6) then
+           do k=1,npz
+              tqtot(:,:) = tqtot(:,:) + ( &
+              FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
+              FV_Atm(1)%q(isc:iec,jsc:jec,k,qice) + FV_Atm(1)%q(isc:iec,jsc:jec,k,rain) + &
+              FV_Atm(1)%q(isc:iec,jsc:jec,k,snow) + FV_Atm(1)%q(isc:iec,jsc:jec,k,grpl) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
+           enddo
+         elseif (FV_Atm(1)%flagstruct%nwat == 3) then
+           do k=1,npz
+              tqtot(:,:) = tqtot(:,:) + ( &
+              FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
+              FV_Atm(1)%q(isc:iec,jsc:jec,k,qice) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
+           enddo
+         else
+           do k=1,npz
+              tqtot(:,:) = tqtot(:,:) + ( &
+              FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + FV_Atm(1)%q(isc:iec,jsc:jec,k,qlcn) + &
+              FV_Atm(1)%q(isc:iec,jsc:jec,k,qlls) + FV_Atm(1)%q(isc:iec,jsc:jec,k,qicn) + &
+              FV_Atm(1)%q(isc:iec,jsc:jec,k,qils) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
+           enddo
+         endif
+        endif
+        massD = g_sum(FV_Atm(1)%domain, mass-tqtot, isc, iec, jsc, jec, state%grid%ng, &
+                      fv_atm(1)%gridstruct%area_64, 1, reproduce=FV_Atm(1)%flagstruct%exact_sum)
+        if (massD0 < 0.0d0) massD0 = massD
+        if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
+           if (ABS((massD-massD0)/massD0) >= epsilon(1.0_REAL4)) then
+              if (mpp_pe()==mpp_root_pe()) then
+                 write(6,126)
+                 write(6,127) massD0
+                 write(6,128) massD
+                 write(6,129) massD0/massD, (massD-massD0)/massD0
+                 126 format('Dry Mass Difference of > epsilon relative found!')
+                 127 format('Dry Mass Expected:'2x,g21.14)
+                 128 format('Dry Mass Calculated in FV3:'2x,g21.14)
+                 129 format('Dry Mass Scaling Factor and Relative Difference'2x,g21.14,2x,g21.14)
+              end if
+           end if
+        end if
 
-      ! If PSDRY is negative, set to use the incoming drymass.
-      ! NOTE: THIS WILL NOT TIME REGRESS
-      if (massD0 < 0.0d0) then
-         massD0 = massD
-      end if
+        if (fix_mass) then
+           if (ABS((massD-massD0)/massD0) >= epsilon(1.0_REAL4)) then
+              if (mpp_pe()==mpp_root_pe()) then
+                 write(6,119) massD0, massD, massD0/massD, (massD-massD0)/massD0
+                 119 format('Dry Mass Violation (epsilon relative)!'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
+              end if
+           end if
+           massADDED = massADDED + (massD-massD0)/massD0
+           FV_Atm(1)%pe = FV_Atm(1)%pe*massD0/massD
+           if (present(PLE0)) then
+              do k=1,npz
+                 PLE0(:,:,k) = FV_Atm(1)%pe(isc:iec,k,jsc:jec)
+              enddo
+           endif
+           if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
+              if (mpp_pe()==mpp_root_pe()) then
+                 write(6,109) massD0, massD, massD0/massD, (massD-massD0)/massD0, massADDED
+                 109    format('Dry Mass Fixer'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
+              end if
+           end if
+        else
+           if(ESMF_AlarmIsRinging(MASSALARM) .AND. mpp_pe()==mpp_root_pe()) write(6,110) massD0, massD, massD0/massD, (massD-massD0)/massD0
+           110    format('Dry Mass Check'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
+        endif
+        deallocate (mass)
+        deallocate (tqtot)
+     endif
+     call MAPL_TimerOff(MAPL,"--MASS_FIX")
+  endif
 
-      if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
-         if (ABS((massD-massD0)/massD0) >= epsilon(1.0_REAL4)) then
-            if (mpp_pe()==mpp_root_pe()) then
-               write(6,126)
-               write(6,127) massD0
-               write(6,128) massD
-               write(6,129) massD0/massD, (massD-massD0)/massD0
-               126 format('Dry Mass Difference of > epsilon relative found!')
-               127 format('Dry Mass Expected:'2x,g21.14)
-               128 format('Dry Mass Calculated in FV3:'2x,g21.14)
-               129 format('Dry Mass Scaling Factor and Relative Difference'2x,g21.14,2x,g21.14)
-            end if
-         end if
-      end if
+  call MAPL_TimerOn(MAPL,"--NH_ADIABATIC_INIT")
+     if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
+        if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
+        allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
+        call nullify_domain ( )
+        DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
+        call prt_maxmin('Before adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
+        call adiabatic_init(myDT,DEBUG_ARRAY,fac1)
+        DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
+        call prt_maxmin('After adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
+        deallocate( DEBUG_ARRAY )
+        FV_Atm(1)%flagstruct%na_init=0
+     endif
+  call MAPL_TimerOff(MAPL,"--NH_ADIABATIC_INIT")
 
-      ! Apply the fixer if asked for
-      if (fix_mass) then
-
-         if (ABS((massD-massD0)/massD0) >= epsilon(1.0_REAL4)) then
-            if (mpp_pe()==mpp_root_pe()) then
-               write(6,119) massD0, massD, massD0/massD, (massD-massD0)/massD0
-               119 format('Dry Mass Violation (epsilon relative)!'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
-            end if
-         end if
-
-         ! Accumulate added dry mass from the fixer
-         massADDED = massADDED + (massD-massD0)/massD0
-
-         ! -----------------------------------------------
-         ! Fix Dry Mass after increments have been applied
-         ! -----------------------------------------------
-         FV_Atm(1)%pe = FV_Atm(1)%pe*massD0/massD
-
-         if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
-            if (mpp_pe()==mpp_root_pe()) then
-               write(6,109) massD0, massD, massD0/massD, (massD-massD0)/massD0, massADDED
-               109    format('Dry Mass Fixer'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
-            end if
-         end if
-      else
-         ! Check Dry Mass Conservation and write to log
-         if(ESMF_AlarmIsRinging(MASSALARM) .AND. mpp_pe()==mpp_root_pe()) write(6,110) massD0, massD, massD0/massD, (massD-massD0)/massD0
-         110    format('Dry Mass Check'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
-      endif
-
-      deallocate (mass)
-      deallocate (tqtot)
-
-      endif
-
-      call MAPL_TimerOff(MAPL,"--MASS_FIX")
-   endif
-
-          ! if (mpp_pe()==mpp_root_pe()) then
-          !    write(6,*) 'Advecting tracers: ', FV_Atm(1)%ncnst, STATE%GRID%NQ
-          ! endif
-
-    call MAPL_TimerOn(MAPL,"--NH_ADIABATIC_INIT")
-       if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
-          allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
-          call nullify_domain ( )
-          DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
-          call prt_maxmin('Before adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
-          call adiabatic_init(myDT,DEBUG_ARRAY,fac1)
-          DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
-          call prt_maxmin('After adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
-          deallocate( DEBUG_ARRAY )
-          FV_Atm(1)%flagstruct%na_init=0
-       endif
-    call MAPL_TimerOff(MAPL,"--NH_ADIABATIC_INIT")
-
-    call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
-    if (.not. FV_OFF) then
-    call set_domain(FV_Atm(1)%domain)  ! needed for diagnostic output done in fv_dynamics
-    allocate ( u_dt(isc:iec,jsc:jec,npz) )
-    allocate ( v_dt(isc:iec,jsc:jec,npz) )
-    allocate ( t_dt(isc:iec,jsc:jec,npz) )
-    allocate ( w_dt(isc:iec,jsc:jec,npz) )
-    u_dt(:,:,:) = 0.0
-    v_dt(:,:,:) = 0.0
-    t_dt(:,:,:) = 0.0
-    w_dt(:,:,:) = 0.0
+  call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
+  if (.not. FV_OFF) then
+  call set_domain(FV_Atm(1)%domain) 
+  allocate ( u_dt(isc:iec,jsc:jec,npz) )
+  allocate ( v_dt(isc:iec,jsc:jec,npz) )
+  allocate ( t_dt(isc:iec,jsc:jec,npz) )
+  allocate ( w_dt(isc:iec,jsc:jec,npz) )
+  u_dt(:,:,:) = 0.0; v_dt(:,:,:) = 0.0; t_dt(:,:,:) = 0.0; w_dt(:,:,:) = 0.0
 
 #ifdef BUILD_PYFV3
-    if (.not. USE_PYFV3) then
-       call cpu_time(start)
+  if (.not. USE_PYFV3) then
+     call cpu_time(start)
 #endif
+
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
             FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
-            state%ksplit, state%nsplit, FV_Atm(1)%flagstruct%q_split, &
+            STATE%k_split, STATE%n_split, STATE%q_split, &
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
             FV_Atm(1)%flagstruct%hydrostatic, &
             FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
@@ -2041,12 +1746,12 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
             FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
             time_total)
-#ifdef BUILD_PYFV3
+#ifdef RUN_GTFV3
        call cpu_time(finish)
        if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
     else
-      call cpu_time(start)
-      call pyfv3_interface_f_run( &
+       call cpu_time(start)
+       call geos_gtfv3_interface_f( &
             comm, &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
             FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
@@ -2055,379 +1760,272 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, RC)
             FV_Atm(1)%layout(1), FV_Atm(1)%layout(2), adiabatic, &
             ! input/output
             FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-            FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,:), &
+            FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,1:7), &
             FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
             FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
             FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
+            ! input
+            FV_Atm(1)%ak, FV_Atm(1)%bk, &
             ! input/output
             FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
        call cpu_time(finish)
-       if (rank == 0) print *, rank, ', pyfv3_interface_f_run: time taken = ', finish - start, 's'
+       print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
     end if
 #endif
 
-    call MAPL_TimerOn(MAPL,"----WIND_EXPORTS")
-    allocate ( udt(isc:iec,jsc:jec,npz) )
-    allocate ( vdt(isc:iec,jsc:jec,npz) )
-    ! go from native D-Grid tendencies to A-grid rotated exports
-    call fv_getAllWinds(u_dt, v_dt, ur=udt, vr=vdt)
-    call MAPL_GetPointer ( export, PTR3D, 'DUDT_RAY', rc=status ); VERIFY_(STATUS)
-    if( associated(PTR3D) ) PTR3D = udt
-    call MAPL_GetPointer ( export, PTR3D, 'DVDT_RAY', rc=status ); VERIFY_(STATUS)
-    if( associated(PTR3D) ) PTR3D = vdt
-    deallocate ( udt )
-    deallocate ( vdt )
-    call MAPL_GetPointer ( export, PTR3D, 'DTDT_RAY', rc=status ); VERIFY_(STATUS)
-    if( associated(PTR3D) ) PTR3D = t_dt
-    call MAPL_GetPointer ( export, PTR3D, 'DWDT_RAY', rc=status ); VERIFY_(STATUS)
-    if( associated(PTR3D) ) PTR3D = w_dt
+  allocate ( udt(isc:iec,jsc:jec,npz) )
+  allocate ( vdt(isc:iec,jsc:jec,npz) )
+  call fv_getAllWinds(u_dt, v_dt, ur=udt, vr=vdt)
+  call MAPL_GetPointer ( export, PTR3D, 'DUDT_RAY', rc=status ); VERIFY_(STATUS)
+  if( associated(PTR3D) ) PTR3D = udt
+  call MAPL_GetPointer ( export, PTR3D, 'DVDT_RAY', rc=status ); VERIFY_(STATUS)
+  if( associated(PTR3D) ) PTR3D = vdt
+  deallocate ( udt ); deallocate ( vdt )
+  
+  call MAPL_GetPointer ( export, PTR3D, 'DTDT_RAY', rc=status ); VERIFY_(STATUS)
+  if( associated(PTR3D) ) PTR3D = t_dt
+  call MAPL_GetPointer ( export, PTR3D, 'DWDT_RAY', rc=status ); VERIFY_(STATUS)
+  if( associated(PTR3D) ) PTR3D = w_dt
 
-    if ( FV_Atm(1)%flagstruct%fv_sg_adj > 0 ) then
-         u_dt(:,:,:) = 0.0
-         v_dt(:,:,:) = 0.0
-         t_dt(:,:,:) = 0.0
-         w_dt(:,:,:) = 0.0
-         call fv_subgrid_z(isd, ied, jsd, jed, isc, iec, jsc, jec, FV_Atm(1)%npz, &
-                           FV_Atm(1)%ncnst, myDT, FV_Atm(1)%flagstruct%fv_sg_adj,      &
-                           FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%delp, FV_Atm(1)%pe,     &
-                           FV_Atm(1)%peln, FV_Atm(1)%pkz, FV_Atm(1)%pt, FV_Atm(1)%q,       &
-                           FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%flagstruct%hydrostatic,&
-                           FV_Atm(1)%w, FV_Atm(1)%delz, u_dt, v_dt, t_dt, w_dt,          &
-                           FV_Atm(1)%flagstruct%n_zfilter)
-        call MAPL_GetPointer ( export, PTR3D, 'DUDTSUBZ', rc=status ); VERIFY_(STATUS)
-        if( associated(PTR3D) ) PTR3D = u_dt
-        call MAPL_GetPointer ( export, PTR3D, 'DVDTSUBZ', rc=status ); VERIFY_(STATUS)
-        if( associated(PTR3D) ) PTR3D = v_dt
-        call MAPL_GetPointer ( export, PTR3D, 'DTDTSUBZ', rc=status ); VERIFY_(STATUS)
-        if( associated(PTR3D) ) PTR3D = t_dt
-        call MAPL_GetPointer ( export, PTR3D, 'DWDTSUBZ', rc=status ); VERIFY_(STATUS)
-        if( associated(PTR3D) ) PTR3D = w_dt
-    endif
-    deallocate ( u_dt )
-    deallocate ( v_dt )
-    deallocate ( t_dt )
-    deallocate ( w_dt )
+  if ( FV_Atm(1)%flagstruct%fv_sg_adj > 0 ) then
+       u_dt(:,:,:) = 0.0; v_dt(:,:,:) = 0.0; t_dt(:,:,:) = 0.0; w_dt(:,:,:) = 0.0
+       call fv_subgrid_z(isd, ied, jsd, jed, isc, iec, jsc, jec, FV_Atm(1)%npz, &
+                         FV_Atm(1)%ncnst, myDT, FV_Atm(1)%flagstruct%fv_sg_adj,      &
+                         FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%delp, FV_Atm(1)%pe,     &
+                         FV_Atm(1)%peln, FV_Atm(1)%pkz, FV_Atm(1)%pt, FV_Atm(1)%q,       &
+                         FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%flagstruct%hydrostatic,&
+                         FV_Atm(1)%w, FV_Atm(1)%delz, u_dt, v_dt, t_dt, w_dt,          &
+                         FV_Atm(1)%flagstruct%n_zfilter)
+      call MAPL_GetPointer ( export, PTR3D, 'DUDTSUBZ', rc=status ); VERIFY_(STATUS)
+      if( associated(PTR3D) ) PTR3D = u_dt
+      call MAPL_GetPointer ( export, PTR3D, 'DVDTSUBZ', rc=status ); VERIFY_(STATUS)
+      if( associated(PTR3D) ) PTR3D = v_dt
+      call MAPL_GetPointer ( export, PTR3D, 'DTDTSUBZ', rc=status ); VERIFY_(STATUS)
+      if( associated(PTR3D) ) PTR3D = t_dt
+      call MAPL_GetPointer ( export, PTR3D, 'DWDTSUBZ', rc=status ); VERIFY_(STATUS)
+      if( associated(PTR3D) ) PTR3D = w_dt
+  endif
+  deallocate ( u_dt ); deallocate ( v_dt ); deallocate ( t_dt ); deallocate ( w_dt )
+  call nullify_domain()
+  endif
+  call MAPL_TimerOff(MAPL,"--FV_DYNAMICS")
 
-    call nullify_domain()
-    call MAPL_TimerOff(MAPL,"----WIND_EXPORTS")
-
-    endif
-    call MAPL_TimerOff(MAPL,"--FV_DYNAMICS")
-
+ ! ------------------------------------------------------------------
+ ! Push Tracers (Dynamic Mass Separation for Option A)
+ ! ------------------------------------------------------------------
   call MAPL_TimerOn(MAPL,"--PUSH_TRACERS")
-  SPHU_FILLED = .FALSE.
-  QLIQ_FILLED = .FALSE.
-  QICE_FILLED = .FALSE.
-  RAIN_FILLED = .FALSE.
-  SNOW_FILLED = .FALSE.
-  GRPL_FILLED = .FALSE.
-  QCLD_FILLED = .FALSE.
-  QLLS_FILLED = .FALSE.
-  QLCN_FILLED = .FALSE.
-  QILS_FILLED = .FALSE.
-  QICN_FILLED = .FALSE.
-  CLLS_FILLED = .FALSE.
-  CLCN_FILLED = .FALSE.
-
- ! Push Tracers
-  nn = 0
+  
   if (.not. ADIABATIC) then
+    ! --- Eulerian Monotonicity Safegaurds ---
+    ! Ensure advected CN does not exceed Total, preventing negative LS
+    if (qliq /= -1 .and. idx_qlcn /= -1) then
+       FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qlcn) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qlcn), FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq))
+    endif
+    if (qice /= -1 .and. idx_qicn /= -1) then
+       FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qicn) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qicn), FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice))
+    endif
+    if (qcld /= -1 .and. idx_clcn /= -1) then
+       FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_clcn) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_clcn), FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld))
+    endif
 
-     do n=1,STATE%GRID%NQ
-
-       if ((sphu /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'Q')) then
-          SPHU_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
-          endif
-       endif
-    ! QLIQ
-       if (qliq /= -1) then
-         if ((qlcnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLCN')) then
-            QLCN_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * &
-                                        MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf)))
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * &
-                                        MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf)))
-            endif
-         endif
-         if ((qlcnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLLS')) then
-            QLLS_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * &
-                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf))))
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * &
-                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcnf))))
-            endif
-         endif
-       else
-         if ((qlcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLCN')) then
-            QLCN_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
-            endif
-         endif
-         if ((qlls /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLLS')) then
-            QLLS_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
-            endif
-          endif
-       endif
-    ! QICE
-       if (qice /= -1) then
-         if ((qicnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QICN')) then
-            QICN_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * &
-                                        MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf)))
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * &
-                                        MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf)))
-            endif
-         endif
-         if ((qicnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QILS')) then
-            QILS_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * &
-                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf))))
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * &
-                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicnf))))
-            endif
-         endif
-       else
-         if ((qicn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QICN')) then
-            QICN_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
-            endif
-         endif
-         if ((qils /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QILS')) then
-            QILS_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
-            endif
-         endif
-       endif
-    ! QCLD
-       if (qcld /= -1) then
-         if ((clcnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLCN')) then
-            CLCN_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
-                                        MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf)))
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
-                                        MIN(1.0,MAX(0.0,FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf)))
-            endif
-         endif
-         if ((clcnf /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLLS')) then
-            CLLS_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
-                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf))))
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * &
-                                   MIN(1.0,MAX(0.0,(1.0-FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcnf))))
-            endif
-         endif
-       else
-         if ((clcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLCN')) then
-            CLCN_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
-            endif
-         endif
-         if ((clls /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLLS')) then
-            CLLS_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
-            endif
-         endif
-       endif
-    ! RAIN
-       if ((rain /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QRAIN')) then
-          RAIN_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain)
-          endif
-       endif
-    ! SNOW
-       if ((snow /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QSNOW')) then
-          SNOW_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow)
-          endif
-       endif
-     ! GRPL
-       if ((grpl /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL')) then
-          GRPL_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl)
-          endif
-       endif
-
-     enddo
-
-   ! Verify
+    ! Reset dynamic offset
     select case (FV_Atm(1)%flagstruct%nwat)
-    case (6:7)
-       _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
-       _ASSERT(RAIN_FILLED, 'RAIN Not Filled Out')
-       _ASSERT(SNOW_FILLED, 'SNOW Not Filled Out')
-       _ASSERT(GRPL_FILLED, 'GRPL Not Filled Out')
-       _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
-       _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
-       _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
-       _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
-       _ASSERT(CLCN_FILLED, 'CLCN Not Filled Out')
-       _ASSERT(CLLS_FILLED, 'CLLS Not Filled Out')
-       _ASSERT(nn == 10, 'Expecting 10 water species Out') ! Q, QLCN, QLLS, QICN, QILS, CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL
-     case (3)
-       _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
-       _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
-       _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
-       _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
-       _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
-       _ASSERT(nn == 5, 'Expecting 5 water species Out') ! Q, QLCN, QLLS, QICN, QILS
-    case (1)
-      _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
-      _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
-      _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
-      _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
-      _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
-      _ASSERT(nn == 5, 'Expecting 5 water species Out') ! Q, QLCN, QLLS, QICN, QILS
+       case (6:7); nn = 7
+       case (3:4); nn = 4
+       case (1);   nn = 7
+       case (0);   nn = 0
     end select
 
-! Include additional tracers
+    do n=1, STATE%GRID%NQ
+       select case (TRIM(state%vars%tracer(n)%tname))
+          case ('Q')
+             if (sphu /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
+                 else
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
+                 endif
+             endif
 
-    select case(FV_Atm(1)%flagstruct%nwat)
-      case (0)
-       do n=1,STATE%GRID%NQ
-         nn=nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         else
-            state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         endif
-       enddo
-      case (1)
-       do n=1,STATE%GRID%NQ
-        if ((TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
-         nn=nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         else
-            state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         endif
-        endif
-       enddo
-      case (3)
-       do n=1,STATE%GRID%NQ
-        if ((TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
-         nn=nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         else
-            state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         endif
-        endif
-       enddo
-      case (6:7)
-       do n=1,STATE%GRID%NQ
-        if ((TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'CLCN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'CLLS'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QRAIN'   ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QSNOW'   ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QGRAUPEL') ) then
-         nn=nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         else
-            state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         endif
-        endif
-       enddo
-      end select
-      _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
+          ! -- LIQUID --
+          case ('QLCN')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qliq /= -1 .and. qlcn == -1) then
+                     nn = nn + 1; state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qlcn)
+                 elseif (qlcn /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
+                 endif
+                 state%vars%tracer(n)%content_r4(:,:,:) = MAX(state%vars%tracer(n)%content_r4(:,:,:), 0.0_REAL4)
+             else
+                 if (qliq /= -1 .and. qlcn == -1) then
+                     nn = nn + 1; state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qlcn)
+                 elseif (qlcn /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
+                 endif
+                 state%vars%tracer(n)%content(:,:,:) = MAX(state%vars%tracer(n)%content(:,:,:), 0.0_FVPRC)
+             endif
 
+          case ('QLLS')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qliq /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) - FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qlcn)
+                 elseif (qlls /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
+                 endif
+                 state%vars%tracer(n)%content_r4(:,:,:) = MAX(state%vars%tracer(n)%content_r4(:,:,:), 0.0_REAL4)
+             else
+                 if (qliq /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) - FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qlcn)
+                 elseif (qlls /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
+                 endif
+                 state%vars%tracer(n)%content(:,:,:) = MAX(state%vars%tracer(n)%content(:,:,:), 0.0_FVPRC)
+             endif
+
+          ! -- ICE --
+          case ('QICN')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qice /= -1 .and. qicn == -1) then
+                     nn = nn + 1; state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qicn)
+                 elseif (qicn /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
+                 endif
+                 state%vars%tracer(n)%content_r4(:,:,:) = MAX(state%vars%tracer(n)%content_r4(:,:,:), 0.0_REAL4)
+             else
+                 if (qice /= -1 .and. qicn == -1) then
+                     nn = nn + 1; state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qicn)
+                 elseif (qicn /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
+                 endif
+                 state%vars%tracer(n)%content(:,:,:) = MAX(state%vars%tracer(n)%content(:,:,:), 0.0_FVPRC)
+             endif
+
+          case ('QILS')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qice /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) - FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qicn)
+                 elseif (qils /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
+                 endif
+                 state%vars%tracer(n)%content_r4(:,:,:) = MAX(state%vars%tracer(n)%content_r4(:,:,:), 0.0_REAL4)
+             else
+                 if (qice /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) - FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qicn)
+                 elseif (qils /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
+                 endif
+                 state%vars%tracer(n)%content(:,:,:) = MAX(state%vars%tracer(n)%content(:,:,:), 0.0_FVPRC)
+             endif
+
+          ! -- CLOUD FRACTION --
+          case ('CLCN')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qcld /= -1 .and. clcn == -1) then
+                     nn = nn + 1; state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_clcn)
+                 elseif (clcn /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
+                 endif
+                 state%vars%tracer(n)%content_r4(:,:,:) = MAX(state%vars%tracer(n)%content_r4(:,:,:), 0.0_REAL4)
+             else
+                 if (qcld /= -1 .and. clcn == -1) then
+                     nn = nn + 1; state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_clcn)
+                 elseif (clcn /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
+                 endif
+                 state%vars%tracer(n)%content(:,:,:) = MAX(state%vars%tracer(n)%content(:,:,:), 0.0_FVPRC)
+             endif
+
+          case ('CLLS')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qcld /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) - FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_clcn)
+                 elseif (clls /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
+                 endif
+                 state%vars%tracer(n)%content_r4(:,:,:) = MAX(state%vars%tracer(n)%content_r4(:,:,:), 0.0_REAL4)
+             else
+                 if (qcld /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) - FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_clcn)
+                 elseif (clls /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
+                 endif
+                 state%vars%tracer(n)%content(:,:,:) = MAX(state%vars%tracer(n)%content(:,:,:), 0.0_FVPRC)
+             endif
+
+          ! -- MICROPHYSICS --
+          case ('QRAIN')
+             if (rain /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = MAX(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain), 0.0_REAL4)
+                 else
+                     state%vars%tracer(n)%content(:,:,:) = MAX(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain), 0.0_FVPRC)
+                 endif
+             endif
+          case ('QSNOW')
+             if (snow /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = MAX(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow), 0.0_REAL4)
+                 else
+                     state%vars%tracer(n)%content(:,:,:) = MAX(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow), 0.0_FVPRC)
+                 endif
+             endif
+          case ('QGRAUPEL')
+             if (grpl /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = MAX(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl), 0.0_REAL4)
+                 else
+                     state%vars%tracer(n)%content(:,:,:) = MAX(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl), 0.0_FVPRC)
+                 endif
+             endif
+
+          ! -- PASSIVE TRACERS --
+          case default
+             nn = nn + 1
+             if (state%vars%tracer(n)%is_r4) then
+                 state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+             else
+                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+             endif
+       end select
+    enddo
   else
+    nn = 0
+    do n=1,STATE%GRID%NQ
+       nn=nn+1
+       if (state%vars%tracer(n)%is_r4) then
+          state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+       else
+          state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+       endif
+    enddo
+  endif
 
-    ! Include all tracers
-      do n=1,STATE%GRID%NQ
-         nn=nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         else
-            state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         endif
-      enddo
-      _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
-
+ ! Clean negative tracers and check
+  if (DEBUG_ADV) then
+    prt_minmax = DEBUG_ADV
+    if (mpp_pe()==0) print*,''
+    if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
+    allocate( DEBUG_ARRAY(isc:iec,jsc:jec,npz) )
+    do n=1,STATE%GRID%NQ
+       if (state%vars%tracer(n)%is_r4) then
+          DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content_r4
+       else
+          DEBUG_ARRAY(:,:,1:npz) = state%vars%tracer(n)%content
+       endif
+       call prt_maxmin(TRIM(state%vars%tracer(n)%tname), DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1)
+    enddo
+    deallocate ( DEBUG_ARRAY )
+    if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
+    if (mpp_pe()==0) print*,''
+    prt_minmax = .false.
   endif
   call MAPL_TimerOff(MAPL,"--PUSH_TRACERS")
-  call MAPL_TimerOn(MAPL,"--FV_TO_STATE")
 
 ! Copy FV to internal State
-   call FV_To_State ( STATE )
+   call FV_To_State ( MAPL, STATE )
+   if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
 
-    if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
-
-  call MAPL_TimerOff(MAPL,"--FV_TO_STATE")
-    RETURN_(ESMF_SUCCESS)
+   RETURN_(ESMF_SUCCESS)
 
 end subroutine FV_Run
 
@@ -2472,10 +2070,11 @@ end subroutine FV_Run
 
  end subroutine FV_Finalize
 
-subroutine State_To_FV ( STATE )
+subroutine State_To_FV ( MAPL, STATE )
 
 ! !INPUT PARAMETERS:
 
+   type(MAPL_MetaComp),         pointer   :: MAPL
    type(T_FVDYCORE_STATE),      pointer   :: STATE
 
     integer               :: ISC,IEC, JSC,JEC
@@ -2498,8 +2097,14 @@ subroutine State_To_FV ( STATE )
     logical :: bad_range_V
     logical :: bad_range_T
 
-    integer :: rc
-    character(len=ESMF_MAXSTR)          :: ERRSTR
+    integer :: rc, status
+    character(len=ESMF_MAXSTR)  :: IAm='FV_StateMod:State_To_FV'
+    character(len=ESMF_MAXSTR)  :: ERRSTR
+
+    real(REAL4), pointer     :: LONS(:,:), LATS(:,:)
+
+    call MAPL_Get(MAPL, LATS=LATS, LONS=LONS, RC=STATUS)  ! These are in radians
+    VERIFY_(STATUS)
 
     ISC = state%grid%is
     IEC = state%grid%ie
@@ -2514,6 +2119,8 @@ subroutine State_To_FV ( STATE )
 
     akap  = kappa
     if (SW_DYNAMICS) akap  = 1.
+
+    call MAPL_TimerOn(MAPL,"--State_To_FV")
 
 !------------
 ! Update Winds
@@ -2549,22 +2156,6 @@ subroutine State_To_FV ( STATE )
           FV_Atm(1)%v(iec+1,j,k) = ebuffer(j,k)
        enddo
     enddo
-  endif
-
-  if ( FV_Atm(1)%flagstruct%range_warn ) then
-    call range_check('U_S2F', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                      -280., 280., bad_range=bad_range_U)
-    call range_check('V_S2F', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                      -280., 280., bad_range=bad_range_V)
-    if ((bad_range_U .or. bad_range_V) .and. (ADJUST_DT)) then
-       STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
-       STATE%NSPLIT = MIN(2*FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT*1.25))
-    else
-       STATE%KSPLIT = FV_Atm(1)%flagstruct%k_split
-       STATE%NSPLIT = MAX(  FV_Atm(1)%flagstruct%n_split,NINT(STATE%NSPLIT/1.25))
-    endif
-    if (STATE%NSPLIT /= FV_Atm(1)%flagstruct%n_split) &
-    call WRITE_PARALLEL( STATE%DT/real(STATE%KSPLIT*STATE%NSPLIT)   ,format='("Adjusted Dynamics time step : ",(F10.4))')
   endif
 
   if (.not. FV_Atm(1)%flagstruct%hydrostatic) FV_Atm(1)%w(isc:iec,jsc:jec,:) = STATE%VARS%W
@@ -2628,10 +2219,10 @@ subroutine State_To_FV ( STATE )
        FV_Atm(1)%pt(:,:,:) = tiny_number
        FV_Atm(1)%pt(isc:iec,jsc:jec,:) = STATE%VARS%PT*STATE%VARS%PKZ
 
-       if ( FV_Atm(1)%flagstruct%range_warn ) then
-          call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-                            100., 335., bad_range=bad_range_T)
-       endif
+     ! if ( DEBUG_DYN ) then
+     !    call range_check('T_S2F', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+     !                      150., 333., bad_range=bad_range_T)
+     ! endif
 
 !------------
 ! Get delz
@@ -2645,23 +2236,38 @@ subroutine State_To_FV ( STATE )
 
     endif
 
+    if ( ADJUST_SPLITS ) then
+      call adjust_fv3_splits(STATE, &
+                             isc, iec, jsc, jec, &       ! Compute domain bounds
+                             isd, ied, jsd, jed, &       ! Data/Memory domain bounds
+                             km, &                       ! Number of vertical levels
+                             FV_Atm(1)%u, &              ! D-grid U-wind
+                             FV_Atm(1)%v, &              ! D-grid V-wind
+                             FV_Atm(1)%w, &              ! W-wind
+                             FV_Atm(1)%delz, &           ! Layer thickness
+                             FV_Atm(1)%gridstruct%dxa, & ! Cell center dx (dxa)
+                             FV_Atm(1)%gridstruct%dya)   ! Cell center dy (dya)
+    endif
+
+    call MAPL_TimerOff(MAPL,"--State_To_FV")
 
    return
 
 end subroutine State_To_FV
 
-subroutine FV_To_State ( STATE )
+subroutine FV_To_State ( MAPL, STATE )
 
 !
 ! !INPUT PARAMETERS:
 
+   type(MAPL_MetaComp),         pointer   :: MAPL
    type(T_FVDYCORE_STATE),      pointer   :: STATE
 
     logical :: bad_range = .false.
     integer               :: ISC,IEC, JSC,JEC, KM, NG
     integer               :: I,J,K
     character(len=ESMF_MAXSTR)          :: ERRSTR
-    integer :: rc
+    integer :: status
 
     ISC = state%grid%is
     IEC = state%grid%ie
@@ -2670,17 +2276,16 @@ subroutine FV_To_State ( STATE )
     KM  = state%grid%npz
     NG  = state%grid%ng
 
-   !if ( FV_Atm(1)%flagstruct%range_warn ) then
-   !  call range_check('U_F2S', FV_Atm(1)%u, isc, iec, jsc, jec+1, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-   !                    -280., 280., bad_range)
-   !  call range_check('V_F2S', FV_Atm(1)%v, isc, iec+1, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-   !                    -280., 280., bad_range)
-   !endif
+    call MAPL_TimerOn(MAPL,"--FV_To_State")
 
 ! Copy updated FV data to internal state
     STATE%VARS%U(:,:,:) = FV_Atm(1)%u(isc:iec,jsc:jec,:)
     STATE%VARS%V(:,:,:) = FV_Atm(1)%v(isc:iec,jsc:jec,:)
-    if (.not. FV_Atm(1)%flagstruct%hydrostatic) STATE%VARS%W = FV_Atm(1)%w(isc:iec,jsc:jec,:)
+    if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
+       STATE%VARS%W = FV_Atm(1)%w(isc:iec,jsc:jec,:)
+    else
+       STATE%VARS%W = 0.0
+    endif
 
     if (SW_DYNAMICS) then
        STATE%VARS%PE(:,:,1) = FV_Atm(1)%phis(isc:iec,jsc:jec)
@@ -2695,16 +2300,20 @@ subroutine FV_To_State ( STATE )
 !-----------------------------------
 ! Fill Dry Temperature to PT
 !-----------------------------------
-      !if ( FV_Atm(1)%flagstruct%range_warn ) then
-      !   call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
-      !                     100., 335., bad_range)
-      !endif
+     ! if ( DEBUG ) then
+        ! call range_check('T_F2S', FV_Atm(1)%pt, isc, iec, jsc, jec, ng, km, FV_Atm(1)%gridstruct%agrid,   &
+        !                   150., 333., bad_range)
+     ! endif
        STATE%VARS%PT  = FV_Atm(1)%pt(isc:iec,jsc:jec,:)
 
 !------------------------------
 ! Get delz from FV3
 !------------------------------
-       if (.not. FV_Atm(1)%flagstruct%hydrostatic) STATE%VARS%DZ = FV_Atm(1)%delz(isc:iec,jsc:jec,:)
+       if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
+          STATE%VARS%DZ = FV_Atm(1)%delz(isc:iec,jsc:jec,:)
+       else
+          STATE%VARS%DZ = 0.0
+       endif
 
 !--------------------------------
 ! Get pkz from FV3
@@ -2718,9 +2327,234 @@ subroutine FV_To_State ( STATE )
        STATE%VARS%PT  = STATE%VARS%PT/STATE%VARS%PKZ
     endif
 
+    call MAPL_TimerOff(MAPL,"--FV_To_State")
+
    return
 
 end subroutine FV_To_State
+
+subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz, &
+                             u, v, w, delz, dx, dy)
+    implicit none
+
+    type(T_FVDYCORE_STATE), intent(inout) :: state
+
+    integer, intent(in) :: isc, iec, jsc, jec
+    integer, intent(in) :: isd, ied, jsd, jed
+    integer, intent(in) :: npz
+
+    real, intent(in), dimension(isd:ied,   jsd:jed+1, npz) :: u
+    real, intent(in), dimension(isd:ied+1, jsd:jed,   npz) :: v
+    real, intent(in), dimension(isd:ied,   jsd:jed,   npz) :: w, delz
+    real, intent(in), dimension(isd:ied, jsd:jed) :: dx, dy
+
+    integer :: i, j, k
+    real    :: u_c, v_c
+    real    :: max_cfl_h, max_cfl_z
+    
+    ! Updated constraints
+    real, parameter    :: TARGET_CFL   = 1.05
+    real, parameter    :: H_MULTIPLIER = 4.0  ! For acoustic speed scaling
+    real, parameter    :: Z_MULTIPLIER = 0.25 ! Tune this to dictate max_cfl_z's impact
+    
+    integer :: new_k_split, new_n_split, new_q_split
+    integer :: target_k_split, base_tot
+
+    max_cfl_h = 0.0
+    max_cfl_z = 0.0
+
+    ! --- 1. FIND LOCAL MAXIMUMS ---
+    do k = 1, npz
+       do j = jsc, jec
+          do i = isc, iec
+             u_c = 0.5 * (u(i,j,k) + u(i,j+1,k))
+             v_c = 0.5 * (v(i,j,k) + v(i+1,j,k))
+             
+             max_cfl_h = max(max_cfl_h, abs((u_c/dx(i,j)) + (v_c/dy(i,j))) * state%DT)
+             max_cfl_z = max(max_cfl_z, abs(w(i,j,k) / delz(i,j,k)) * state%DT)
+          enddo
+       enddo
+    enddo
+
+    ! --- 2. GLOBAL REDUCTION ---
+    call mp_reduce_max(max_cfl_h)
+    call mp_reduce_max(max_cfl_z)
+
+    ! --- 3. DYNAMIC ADJUSTMENT ON ROOT PE ---
+    if (mpp_pe() == 0) then
+       
+       ! Calculate total baseline acoustic steps (e.g., 1 * 6 = 6)
+       ! We want to keep (k_split * n_split) as close to this as possible
+       base_tot = state%base_k_split * state%base_n_split
+       
+       ! Calculate the strictly required k_split
+       target_k_split = max(state%base_k_split, ceiling(max_cfl_z * Z_MULTIPLIER))
+       
+       ! b. RATE LIMITING VIA FACTORS: 
+       ! Step to the next integer that cleanly divides base_tot
+       if (target_k_split > state%k_split) then
+           new_k_split = state%k_split + 1
+           ! Increment until we find a clean factor (or exceed base_tot)
+           do while (new_k_split < base_tot .and. mod(base_tot, new_k_split) /= 0)
+               new_k_split = new_k_split + 1
+           end do
+       elseif (target_k_split < state%k_split) then
+           new_k_split = state%k_split - 1
+           ! Decrement until we find a clean factor
+           do while (new_k_split > state%base_k_split .and. mod(base_tot, new_k_split) /= 0)
+               new_k_split = new_k_split - 1
+           end do
+           ! Safety catch
+           new_k_split = max(state%base_k_split, new_k_split)
+       else
+           new_k_split = state%k_split
+       endif
+       
+       ! c. Calculate n_split
+       ! Because new_k_split is guaranteed to be a factor, this division is exact!
+       ! (Unless max_cfl_h independently forces it higher)
+       new_n_split = ceiling(base_tot / real(new_k_split))
+       new_n_split = max(new_n_split, ceiling(max_cfl_h * H_MULTIPLIER / real(new_k_split)))
+       
+       ! d. Calculate q_split
+       if (state%base_q_split == 0) then
+           new_q_split = 0
+       else
+           new_q_split = max(state%base_q_split, ceiling((max_cfl_h / real(new_k_split)) / TARGET_CFL))
+       endif
+
+       ! Apply and report if adjusted
+       if (state%k_split /= new_k_split .or. &
+           state%n_split /= new_n_split .or. &
+           state%q_split /= new_q_split) then
+           
+           print *, "=== FV3 DYNAMIC SPLIT ADJUSTMENT ==="
+           print *, "Max Horz CFL: ", max_cfl_h, " | Max Vert CFL: ", max_cfl_z
+           print *, "FV3 k_split: ", new_k_split, " (was ", state%k_split, ", target was ", target_k_split, ")"
+           print *, "FV3 n_split: ", new_n_split, " (was ", state%n_split, ")"
+           print *, "FV3 q_split: ", new_q_split, " (was ", state%q_split, ")"
+           print *, "===================================="
+           
+           state%k_split = new_k_split
+           state%n_split = new_n_split
+           state%q_split = new_q_split
+       endif
+    endif
+
+    ! --- 4. BROADCAST ---
+    call mp_bcst(state%k_split)
+    call mp_bcst(state%n_split)
+    call mp_bcst(state%q_split)
+
+end subroutine adjust_fv3_splits
+
+subroutine fv_getGradT_2D(t_in, ps_in, mag_grad_t)
+  ! INPUT: 2D Temp (REAL4) interpolated to pressure level (with halo bounds)
+  real(REAL4), intent(INOUT) :: t_in(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied, &
+                                     FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed)
+  real(REAL4), intent(INOUT) :: ps_in(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied, &
+                                      FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed)
+
+  ! OUTPUT: MAPL Pointer (REAL4) (Assumed shape, 1-based indexing: 1:im, 1:jm)
+  real(REAL4), intent(OUT)   :: mag_grad_t(:,:)
+
+  integer :: isc, iec, jsc, jec
+  integer :: i, j, ii, jj
+  real(REAL4) :: dTdx, dTdy, p_surf_min
+  real(REAL8) :: dx, dy
+
+  isc = FV_Atm(1)%bd%isc ; iec = FV_Atm(1)%bd%iec
+  jsc = FV_Atm(1)%bd%jsc ; jec = FV_Atm(1)%bd%jec
+
+  ! 1. Update halos. FV3 mpp_update_domains natively supports REAL4 arrays.
+  call mpp_update_domains(ps_in, FV_Atm(1)%domain, complete=.false.)
+  call mpp_update_domains( t_in, FV_Atm(1)%domain, complete=.true.)
+
+  ! 2. Calculate gradient, avoid UNDEF, and map to 1-based MAPL array
+  !$OMP PARALLEL DO DEFAULT(NONE) &
+  !$OMP SHARED(FV_Atm, t_in, ps_in, mag_grad_t, isc, iec, jsc, jec) &
+  !$OMP PRIVATE(i, j, ii, jj, dx, dy, dTdx, dTdy, p_surf_min)
+  do j = jsc, jec
+     jj = j - jsc + 1   ! Map to MAPL pointer index
+     
+     do i = isc, iec
+        ii = i - isc + 1  ! Map to MAPL pointer index
+        
+        ! Find the highest terrain in the 5-point stencil
+        p_surf_min = MIN(ps_in(i,j), ps_in(i-1,j), ps_in(i+1,j), ps_in(i,j-1), ps_in(i,j+1))
+
+        ! SHIELD: Only calculate if the whole stencil is safely > 700 hPa
+        ! (Keeps the 600 hPa level well out of the mountain boundary layer)
+        if ( p_surf_min > 70000.0_REAL4 .and. &
+             t_in(i,j)   /= real(MAPL_UNDEF, REAL4) .and. &
+             t_in(i-1,j) /= real(MAPL_UNDEF, REAL4) .and. &
+             t_in(i+1,j) /= real(MAPL_UNDEF, REAL4) .and. &
+             t_in(i,j-1) /= real(MAPL_UNDEF, REAL4) .and. &
+             t_in(i,j+1) /= real(MAPL_UNDEF, REAL4) ) then
+           
+           dx = FV_Atm(1)%gridstruct%dxa(i,j)
+           dy = FV_Atm(1)%gridstruct%dya(i,j)
+
+           ! Centered difference
+           dTdx = (t_in(i+1,j) - t_in(i-1,j)) / real(2.0_REAL8 * dx, REAL4)
+           dTdy = (t_in(i,j+1) - t_in(i,j-1)) / real(2.0_REAL8 * dy, REAL4)
+
+           mag_grad_t(ii,jj) = SQRT(dTdx**2 + dTdy**2)
+           
+        else
+           ! Stencil hits topography or uninitialized data
+           mag_grad_t(ii,jj) = 0.0_REAL4
+        endif
+
+     enddo
+  enddo
+  !$OMP END PARALLEL DO
+
+return
+end subroutine fv_getGradT_2D
+
+subroutine fv_getGradT_3D(mag_grad_t)
+  ! OUTPUT: Magnitude of the horizontal temperature gradient
+  real(REAL8), intent(OUT) :: mag_grad_t(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec, &
+                                         FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec, &
+                                         1:FV_Atm(1)%npz)
+  
+  integer :: isc, iec, jsc, jec
+  integer :: i, j, k
+  real(REAL8) :: dTdx, dTdy
+  real(REAL8) :: dx, dy
+
+  isc = FV_Atm(1)%bd%isc ; iec = FV_Atm(1)%bd%iec
+  jsc = FV_Atm(1)%bd%jsc ; jec = FV_Atm(1)%bd%jec
+
+  call mpp_update_domains(FV_Atm(1)%pt, FV_Atm(1)%domain, complete=.true.)
+
+  !$OMP PARALLEL DO DEFAULT(NONE) &
+  !$OMP SHARED(FV_Atm, mag_grad_t, isc, iec, jsc, jec) &
+  !$OMP PRIVATE(i, j, k, dx, dy, dTdx, dTdy)
+  do k = 1, FV_Atm(1)%npz
+     do j = jsc, jec
+        do i = isc, iec
+           
+           ! Note: Replace dxa/dya with your exact FV3 metric arrays for cell-center distances.
+           ! (Often found in FV_Atm(1)%gridstruct%dxa or similar)
+           dx = FV_Atm(1)%gridstruct%dxa(i,j)
+           dy = FV_Atm(1)%gridstruct%dya(i,j)
+
+           ! Assuming pt is Absolute Temperature (if it's Potential T, multiply by pkz here)
+           dTdx = (FV_Atm(1)%pt(i+1,j,k) - FV_Atm(1)%pt(i-1,j,k)) / (2.0_REAL8 * dx)
+           dTdy = (FV_Atm(1)%pt(i,j+1,k) - FV_Atm(1)%pt(i,j-1,k)) / (2.0_REAL8 * dy)
+           
+           ! Magnitude in K/m
+           mag_grad_t(i,j,k) = SQRT(dTdx**2 + dTdy**2)
+           
+        enddo
+     enddo
+  enddo
+  !$OMP END PARALLEL DO
+
+return
+end subroutine fv_getGradT_3D
 
 subroutine fv_getDELZ(delz,temp,pe)
   real(REAL8), intent(OUT) :: delz(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
@@ -2779,12 +2613,13 @@ subroutine fv_getPKZ_NH(pkz,temp,qv,pe,delz)
 !-------------------------------------------------------------------------
 ! Re-compute the full (nonhydrostatic) pressure due to temperature changes
 !-------------------------------------------------------------------------
-!$omp parallel do default(shared)
+!$omp parallel do default (none) &
+!$omp shared (npz, jsc, jec, isc, iec, pkz, kappa, rdg, delp, temp, zvir, qv, delz) &
+!$omp private (k, j, i)
       do k=1,npz
          do j=jsc,jec
             do i=isc,iec
 ! perfect gas law: p = density * rdgas * virtual_temperature
-!              pkz(i,j,k) = ( rdg*delp(i,j,k)*pt(i,j,k)/delz(i,j,k) )**kappa
                pkz(i,j,k) = exp( kappa*log(rdg*delp(i,j,k)*temp(i,j,k)*    &
                                       (1.d0+zvir*qv(i,j,k))/delz(i,j,k)) )
             enddo
@@ -2813,7 +2648,9 @@ subroutine fv_getPKZ(pkz,pe)
   peln = log(pe)
   pk   = exp( kappa*peln )
 
-!$omp parallel do default(shared)
+!$omp parallel do default (none) &
+!$omp shared (npz, jsc, jec, isc, iec, pkz, pk, kappa, peln) &
+!$omp private (k, j, i)
       do k=1,npz
          do j=jsc,jec
             do i=isc,iec
@@ -2883,7 +2720,7 @@ subroutine a2d3d(ua, va, ud, vd, wind_increment_limiter)
        call mpp_update_domains(vatemp, FV_Atm(1)%domain, complete=.true.)
     endif
 
-  ! if ( FV_Atm(1)%flagstruct%range_warn ) then
+  ! if ( DEBUG ) then
   !    call range_check('DUDT_A2D', 86400.0*uatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
   !                      -1000., 1000., bad_range)
   !    call range_check('DVDT_A2D', 86400.0*vatemp, is, ie, js, je, ng, npz, FV_Atm(1)%gridstruct%agrid,   &
@@ -3225,7 +3062,7 @@ end subroutine a2d2d
 
 subroutine fv_computeMassFluxes_r4(ucI, vcI, ple, mfx, mfy, cx, cy, dt)
   use tp_core_mod,       only: fv_tp_2d
-  use fv_mp_mod,         only: is,js,ie,je, isd,jsd,ied,jed, mp_reduce_max
+  use fv_mp_mod,         only: is,js,ie,je, isd,jsd,ied,jed
   real(REAL4), intent(IN   ) ::  ucI(is:ie,js:je,1:FV_Atm(1)%flagstruct%npz)
   real(REAL4), intent(IN   ) ::  vcI(is:ie,js:je,1:FV_Atm(1)%flagstruct%npz)
   real(REAL4), intent(IN   ) ::  ple(is:ie,js:je,1:FV_Atm(1)%flagstruct%npz+1)
@@ -3408,7 +3245,7 @@ end subroutine fv_computeMassFluxes_r4
 
 subroutine fv_computeMassFluxes_r8(ucI, vcI, ple, mfx, mfy, cx, cy, dt)
   use tp_core_mod,       only: fv_tp_2d
-  use fv_mp_mod,         only: is,js,ie,je, isd,jsd,ied,jed, mp_reduce_max
+  use fv_mp_mod,         only: is,js,ie,je, isd,jsd,ied,jed
   real(REAL8), intent(IN   ) ::  ucI(is:ie,js:je,1:FV_Atm(1)%flagstruct%npz)
   real(REAL8), intent(IN   ) ::  vcI(is:ie,js:je,1:FV_Atm(1)%flagstruct%npz)
   real(REAL8), intent(IN   ) ::  ple(is:ie,js:je,1:FV_Atm(1)%flagstruct%npz+1)
@@ -4089,7 +3926,7 @@ subroutine fv_getDivergence(uc, vc, divg)
     enddo
 end subroutine fv_getDivergence
 
-subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
+subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25, shr06)
    use constants_mod, only: fms_grav=>grav
 ! made this REAL4
    real(REAL4), intent(OUT) ::  uh25(:,:)
@@ -4097,9 +3934,11 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
    real(REAL4), intent(OUT) :: srh01(:,:)
    real(REAL4), intent(OUT) :: srh03(:,:)
    real(REAL4), intent(OUT) :: srh25(:,:)
+   real(REAL4), intent(OUT) :: shr06(:,:)
 
 ! made an intermediate output of FVPRC
    real(FVPRC) :: uh_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
+   real(FVPRC) :: shr_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)
    integer :: sphum=1
    real(FVPRC) :: vort(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,FV_Atm(1)%npz)
    real(FVPRC) :: z_bot, z_top
@@ -4140,6 +3979,13 @@ subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25)
                          FV_Atm(1)%w, vort, FV_Atm(1)%delz, FV_Atm(1)%q,   &
                          FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, FV_Atm(1)%phis, fms_grav, z_bot, z_top)
    uh03 = uh_tmp
+
+   ! Shear 0-6km
+
+   call calculate_shear_06(isc, iec, jsc, jec, ng, npz, zvir, sphum, shr_tmp, &
+                  FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%delz, FV_Atm(1)%q,   &
+                  FV_Atm(1)%flagstruct%hydrostatic, FV_Atm(1)%pt, FV_Atm(1)%peln, fms_grav)
+   shr06 = shr_tmp ! This is an FVPRC temporary to allow r4/r8
 
    ! Storm relative helicities
 
@@ -4669,7 +4515,7 @@ end subroutine fv_getAllWinds_2D
   JSC    = FV_Atm(1)%bd%jsc
   JEC    = FV_Atm(1)%bd%jec
   NPZ    = FV_Atm(1)%npz
-  prt_minmax     = FV_Atm(1)%flagstruct%fv_debug
+  prt_minmax     = DEBUG
   allocate( DEBUG_ARRAY(ISC:IEC,JSC:JEC,NPZ+1) )
   if (mpp_pe()==0) print*,''
   if (mpp_pe()==0) print*,'--------------', TRIM(debug_txt), '--------------'
@@ -4890,7 +4736,8 @@ subroutine echo_fv3_setup()
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%nord ,format='("FV3 nord: ",(I3))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%dddmp ,format='("FV3 dddmp: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d2_bg ,format='("FV3 d2_bg: ",(F7.5))' )
-   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d4_bg ,format='("FV3 d4_bg: ",(F7.5))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d4_bg_top ,format='("FV3 d4_bg_top: ",(F7.5))' )
+   call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d4_bg_bot ,format='("FV3 d4_bg_bot: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%vtdm4 ,format='("FV3 vtdm4: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d2_bg_k1 ,format='("FV3 d2_bg_k1: ",(F7.5))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%d2_bg_k2 ,format='("FV3 d2_bg_k2: ",(F7.5))' )
@@ -4977,13 +4824,15 @@ subroutine echo_fv3_setup()
 !   logical :: do_Held_Suarez = .false.
 !   logical :: do_reed_physics = .false.
 !   logical :: reed_cond_only = .false.
-   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%reproduce_sum ,format='("FV3 reproduce_sum: ",(A))' )
+   call WRITE_PARALLEL   ( FV_Atm(1)%flagstruct%exact_sum ,format='("FV3 exact_sum: ",(I1))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%adjust_dry_mass ,format='("FV3 adjust_dry_mass: ",(A))' )
 !   logical :: fv_debug  = .false.
 !   logical :: srf_init  = .false.
 !   logical :: mountain  = .true.
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%remap_option ,format='("FV3 remap_option: ",(I4))' )
    call WRITE_PARALLEL ( FV_Atm(1)%flagstruct%gmao_remap ,format='("FV3 gmao_remap: ",(I4))' )
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%gmao_top_bc ,format='("FV3 gmao_top_bc: ",(A))' )
+   call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%gmao_bot_bc ,format='("FV3 gmao_bot_bc: ",(A))' )
    call WRITE_PARALLEL_L ( FV_Atm(1)%flagstruct%z_tracer ,format='("FV3 z_tracer: ",(A))' )
 !   logical :: old_divg_damp = .false. ! parameter to revert damping parameters back to values
 !   logical :: fv_land = .false.       ! To cold starting the model with USGS terrain
@@ -5024,13 +4873,7 @@ end subroutine echo_fv3_setup
 !***********
 ! Haloe Data
 !***********
-   real(FVPRC), parameter::    q1_h2o = 2.2E-6
-   real(FVPRC), parameter::    q7_h2o = 3.8E-6
-   real(FVPRC), parameter::  q100_h2o = 3.8E-6
-   real(FVPRC), parameter:: q1000_h2o = 3.1E-6
-   real(FVPRC), parameter:: q2000_h2o = 2.8E-6
-   real(FVPRC), parameter:: q3000_h2o = 3.0E-6
-   real(FVPRC):: xt, p00, q00
+   real(FVPRC):: xt
    integer:: isc, iec, jsc, jec, npz
    integer:: m, n, i,j,k
    integer :: sphum=1
@@ -5041,6 +4884,25 @@ end subroutine echo_fv3_setup
    real(FVPRC), allocatable :: v_dt(:,:,:)
    real(FVPRC), allocatable :: t_dt(:,:,:)
    real(FVPRC), allocatable :: w_dt(:,:,:)
+
+   integer :: nord
+   real(FVPRC):: dddmp, d4_bg_top, d4_bg_bot, d2_bg, d_ext
+
+! Save input damping state
+   nord  = FV_Atm(1)%flagstruct%nord
+   dddmp = FV_Atm(1)%flagstruct%dddmp
+   d4_bg_top = FV_Atm(1)%flagstruct%d4_bg_top
+   d4_bg_bot = FV_Atm(1)%flagstruct%d4_bg_bot
+   d2_bg = FV_Atm(1)%flagstruct%d2_bg
+   d_ext = FV_Atm(1)%flagstruct%d_ext
+
+! Use 2nd order damping for spinup
+   FV_Atm(1)%flagstruct%nord = 0
+   FV_Atm(1)%flagstruct%dddmp = 0.2
+   FV_Atm(1)%flagstruct%d4_bg_top = 0.0
+   FV_Atm(1)%flagstruct%d4_bg_bot = 0.0
+   FV_Atm(1)%flagstruct%d2_bg = 0.0075
+   FV_Atm(1)%flagstruct%d_ext = 0.02
 
     xt = 1./(1.+wt)
 
@@ -5068,8 +4930,8 @@ end subroutine echo_fv3_setup
      allocate (dp0(isc:iec,jsc:jec, npz) )
 
 !$omp parallel do default (none) &
-!$omp              shared (npz, jsc, jec, isc, iec, n, sphum, u0, v0, t0, dp0, FV_Atm, zvir) &
-!$omp             private (k, j, i)
+!$omp shared (npz, jsc, jec, isc, iec, n, sphum, u0, v0, t0, dp0, FV_Atm, zvir) &
+!$omp private (k, j, i)
        do k=1,npz
           do j=jsc,jec+1
              do i=isc,iec
@@ -5094,7 +4956,7 @@ end subroutine echo_fv3_setup
 ! Forward call
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
@@ -5113,7 +4975,7 @@ end subroutine echo_fv3_setup
 ! Backward
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, -myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
@@ -5132,7 +4994,7 @@ end subroutine echo_fv3_setup
 !Nudging back to IC
 !$omp parallel do default (none) &
 !$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) &
-!$omp private (i, j, k, p00, q00)
+!$omp private (i, j, k)
        do k=1,npz
           do j=jsc,jec+1
              do i=isc,iec
@@ -5155,7 +5017,7 @@ end subroutine echo_fv3_setup
 ! Backward
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, -myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
@@ -5174,7 +5036,7 @@ end subroutine echo_fv3_setup
 ! Forward call
        call fv_dynamics( &
             FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, 0.0, &
-            FV_Atm(1)%flagstruct%fill, FV_Atm(1)%flagstruct%reproduce_sum, &
+            FV_Atm(1)%flagstruct%fill, &
             kappa, cp, zvir, &
             FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
             FV_Atm(1)%flagstruct%k_split, FV_Atm(1)%flagstruct%n_split, FV_Atm(1)%flagstruct%q_split, &
@@ -5192,8 +5054,8 @@ end subroutine echo_fv3_setup
             time_total)
 ! Nudging back to IC
 !$omp parallel do default (none) &
-!$omp             shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) &
-!$omp            private (i, j, k)
+!$omp shared (npz, jsc, jec, isc, iec, n, sphum, FV_Atm, u0, v0, t0, dp0, xt, zvir) &
+!$omp private (i, j, k)
        do k=1,npz
           do j=jsc,jec+1
              do i=isc,iec
@@ -5229,6 +5091,14 @@ end subroutine echo_fv3_setup
      deallocate ( w_dt )
 
      do_adiabatic_init = .false.
+
+! Reset input damping parameters
+     FV_Atm(1)%flagstruct%nord  = nord
+     FV_Atm(1)%flagstruct%dddmp = dddmp
+     FV_Atm(1)%flagstruct%d4_bg_top = d4_bg_top
+     FV_Atm(1)%flagstruct%d4_bg_bot = d4_bg_bot
+     FV_Atm(1)%flagstruct%d2_bg = d2_bg
+     FV_Atm(1)%flagstruct%d_ext = d_ext
 
  end subroutine adiabatic_init
 
