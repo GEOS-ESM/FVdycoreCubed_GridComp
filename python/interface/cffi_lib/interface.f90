@@ -241,7 +241,8 @@ module pyfv3_interface_mod
          real(kind=c_float), dimension(*), intent(inout) :: phis, q_con, omga, ua, va, uc, vc
 
          ! Input/Output
-         real(kind=c_float), dimension(*), intent(inout) :: mfx, mfy, cx, cy, diss_est
+         real(kind=c_float), dimension(*), intent(inout) :: mfx, mfy, cx, cy
+         real(kind=c_float), dimension(*), intent(inout)  :: diss_est
 
       end subroutine pyfv3_interface_f_run
 
@@ -275,7 +276,8 @@ contains
       c_fv_flags%nord_tr = fv_flags%nord_tr
       c_fv_flags%dddmp = fv_flags%dddmp
       c_fv_flags%d2_bg = fv_flags%d2_bg
-      c_fv_flags%d4_bg = fv_flags%d4_bg
+      ! TODO: this is now d4_bg_top and d4_bg_bottom. This requires code change.
+      c_fv_flags%d4_bg = fv_flags%d4_bg_top
       c_fv_flags%vtdm4 = fv_flags%vtdm4
       c_fv_flags%trdm2 = fv_flags%trdm2
       c_fv_flags%d2_bg_k1 = fv_flags%d2_bg_k1
@@ -357,7 +359,8 @@ contains
       c_fv_flags%do_Held_Suarez = merge(.true._c_bool, .false._c_bool, fv_flags%do_Held_Suarez)
       c_fv_flags%do_reed_physics = merge(.true._c_bool, .false._c_bool, fv_flags%do_reed_physics)
       c_fv_flags%reed_cond_only = merge(.true._c_bool, .false._c_bool, fv_flags%reed_cond_only)
-      c_fv_flags%reproduce_sum = merge(.true._c_bool, .false._c_bool, fv_flags%reproduce_sum)
+      ! TODO: this option disspeared in 11.11.x
+      c_fv_flags%reproduce_sum = .FALSE.
       c_fv_flags%adjust_dry_mass = merge(.true._c_bool, .false._c_bool, fv_flags%adjust_dry_mass)
       c_fv_flags%fv_debug = merge(.true._c_bool, .false._c_bool, fv_flags%fv_debug)
       c_fv_flags%srf_init = merge(.true._c_bool, .false._c_bool, fv_flags%srf_init)
