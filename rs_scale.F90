@@ -108,7 +108,7 @@
 
         open(unit=10, file=trim(dynrst), form='unformatted')
         open(unit=20, file=trim(mstrst), form='unformatted')
- 
+
 ! **********************************************************************
 ! ****                  Read dycore internal Restart                ****
 ! **********************************************************************
@@ -295,7 +295,7 @@
       do while ( dabs( pdrydif_ave ).gt.eps .and. iter.le.20 )
 
 ! --------------------------------------
-      
+
       do n=1,5
          qsum = 0.0_8
          do L=1,lm
@@ -506,7 +506,7 @@
          ! check if we have ncpl and ncpi
          if (nVarsMoist == 9) then
             allocate( dum4(im,jm) )
-               
+
             do L=1,lm
                call MAPL_VarRead(InMoist,"NCPL",dum4,lev=l)
                call MAPL_VarWrite(OutMoist,"NCPL",dum4,lev=l)
@@ -576,7 +576,12 @@
 
       subroutine Get_Areas ( area,im,jm )
       use ESMF
-      use constants_mod, only: cnst_radius=>radius
+#if defined (SINGLE_FV)
+      use constantsr4_mod,    &
+#else
+      use constants_mod,      &
+#endif
+                         only: cnst_radius=>radius
       use fv_grid_utils_mod, only: get_area
       use fv_arrays_mod,     only: R_GRID
       implicit   none
@@ -638,7 +643,7 @@ end interface
       else
       ! Cube Area
       ! ---------
-        allocate(grid_lons(im+1,im+1,6)) 
+        allocate(grid_lons(im+1,im+1,6))
         allocate(grid_lats(im+1,im+1,6))
         call AppCSEdgeCreateF(im,grid_lons,grid_lats)
         do k=1,6
