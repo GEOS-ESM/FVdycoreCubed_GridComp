@@ -345,6 +345,7 @@ contains
   integer :: p_split=1
 
   real :: temp_real
+  logical :: geos_mlt_enabled
 
 ! BEGIN
 
@@ -442,6 +443,11 @@ contains
   ! option to enable MERRA-2 configurations for FV3
   call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='STOCK', rc=status )
   VERIFY_(STATUS)
+
+   ! Read the GEOS-MLT setting before initializing FV3 defaults.
+   call MAPL_GetResource( MAPL, geos_mlt_enabled, &
+        label='GEOS_MLT:', default=.false., rc=status )
+   VERIFY_(STATUS)
 
   ! MAT The Fortran Standard, and thus gfortran, *does not allow* the use
   !     of if (integer). So, we must convert integer resources to logicals
@@ -713,6 +719,42 @@ contains
        ! do TE conservation just in the GMAO cubic remap
         FV_Atm(1)%flagstruct%consv_te = 0.0
       endif
+   endif
+
+   ! ==================
+   ! GEOS-MLT Defaults
+   ! ==================
+   if (geos_mlt_enabled) then
+      FV_Atm(1)%flagstruct%n_sponge = 3
+      FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
+      FV_Atm(1)%flagstruct%d2_bg_k2 = 0.13
+      FV_Atm(1)%flagstruct%n_zfilter = 0
+      FV_Atm(1)%flagstruct%fv_sg_adj = 0
+      FV_Atm(1)%flagstruct%convert_ke = .true.
+      FV_Atm(1)%flagstruct%d_con = 1.0
+      FV_Atm(1)%flagstruct%consv_te = 0.0
+      FV_Atm(1)%flagstruct%delt_max = 0.02
+      select case (FV_Atm(1)%flagstruct%npx - 1)
+      case (360)
+         FV_Atm(1)%flagstruct%n_split = 8
+      case default
+         FV_Atm(1)%flagstruct%n_split = 4
+      end select
+      FV_Atm(1)%flagstruct%k_split = 4
+      FV_Atm(1)%flagstruct%remap_option = 0
+      FV_Atm(1)%flagstruct%gmao_remap = 0
+      FV_Atm(1)%flagstruct%geos_mlt_thermcond_enable = .true.
+      FV_Atm(1)%flagstruct%geos_mlt_thermcond_limit = .false.
+      FV_Atm(1)%flagstruct%geos_mlt_thermcond_zero_top_flux = .false.
+      FV_Atm(1)%flagstruct%geos_mlt_thermcond_ghost_dz_factor = 1.0
+      FV_Atm(1)%flagstruct%geos_mlt_thermcond_top_flux_scale = 0.15
+      FV_Atm(1)%flagstruct%geos_mlt_momdiff_enable = .true.
+      FV_Atm(1)%flagstruct%geos_mlt_momdiff_heat = .true.
+      FV_Atm(1)%flagstruct%geos_mlt_momdiff_pr = 1.0
+      FV_Atm(1)%flagstruct%geos_mlt_momdiff_pmax_pa = 1.0
+      FV_Atm(1)%flagstruct%RF_fast = .true.
+      FV_Atm(1)%flagstruct%tau = 0.28
+      FV_Atm(1)%flagstruct%rf_cutoff = 35.0
    endif
 
 !! Start up FV
