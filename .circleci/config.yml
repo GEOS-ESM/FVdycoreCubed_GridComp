@@ -20,7 +20,7 @@ workflows:
       #       - docker-hub-creds                                                              #
       #     matrix:                                                                           #
       #       parameters:                                                                     #
-      #         compiler: [gfortran, ifort]                                                   #
+      #         compiler: [gfortran, ifx]                                                   #
       #     #baselibs_version: *baselibs_version                                              #
       #     repo: GEOSgcm                                                                     #
       #     checkout_fixture: true                                                            #
@@ -33,7 +33,7 @@ workflows:
       #       - docker-hub-creds                                                              #
       #     matrix:                                                                           #
       #       parameters:                                                                     #
-      #         compiler: [gfortran, ifort]                                                   #
+      #         compiler: [gfortran, ifx]                                                   #
       #     #baselibs_version: *baselibs_version                                              #
       #     requires:                                                                         #
       #       - build-GEOSgcm-on-<< matrix.compiler >>                                        #
@@ -45,7 +45,7 @@ workflows:
       #       - docker-hub-creds                                                              #
       #     matrix:                                                                           #
       #       parameters:                                                                     #
-      #         compiler: [gfortran, ifort]                                                   #
+      #         compiler: [gfortran, ifx]                                                   #
       #     requires:                                                                         #
       #       - build-GEOSgcm-on-<< matrix.compiler >>                                        #
       #     repo: GEOSgcm                                                                     #
@@ -62,7 +62,7 @@ workflows:
             - docker-hub-creds
           matrix:
             parameters:
-              compiler: [ifort, gfortran]
+              compiler: [ifx, gfortran]
           fv_precision: "R4"
           #baselibs_version: *baselibs_version
           repo: GEOSfvdycore
@@ -76,10 +76,10 @@ workflows:
           # The regression tests need a larger machine to run in a reasonable time, so we set the resource class to xlarge for this job
           resource_class: xlarge
       - ci/build:
-          name: build-GEOSfvdycore-as-R8-on-ifort
+          name: build-GEOSfvdycore-as-R8-on-ifx
           context:
             - docker-hub-creds
-          compiler: ifort
+          compiler: ifx
           fv_precision: "R8"
           #baselibs_version: *baselibs_version
           repo: GEOSfvdycore
@@ -96,7 +96,7 @@ workflows:
       #       - docker-hub-creds                                                                  #
       #     matrix:                                                                               #
       #       parameters:                                                                         #
-      #         compiler: [gfortran, ifort]                                                       #
+      #         compiler: [gfortran, ifx]                                                       #
       #         fv_precision: ["R4", "R8"]                                                        #
       #     #baselibs_version: *baselibs_version                                                  #
       #     requires:                                                                             #
