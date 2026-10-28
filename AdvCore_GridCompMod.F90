@@ -69,8 +69,8 @@ module AdvCore_GridCompMod
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
    use FV_StateMod, only: FV_Atm, setup_fv_dimensions_and_topology
    use FV_StateMod, only: AdvCoreTracers => T_TRACERS
-   use FVdycoreCubed_GridComp, only: field_is_cloud_water_species
-   use FVdycoreCubed_GridComp, only: get_short_name, is_name_in_list
+   use fv_shared, only: field_is_cloud_water_species
+   use fv_shared, only: get_short_name, is_name_in_list
 
    use pflogger, only: logger_t => logger
 

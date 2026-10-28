@@ -86,6 +86,7 @@ private
   public T_TRACERS, T_FVDYCORE_VARS, T_FVDYCORE_GRID, T_FVDYCORE_STATE
   public fv_fillMassFluxes
   public fv_computeMassFluxes
+  public fv_getGradT_2D, fv_getGradT_3D
   public fv_getVerticalMassFlux
   public fv_getPK
   public fv_getOmega
@@ -346,6 +347,7 @@ contains
   integer :: p_split=1
   real :: temp_real
   class(logger_t), pointer :: logger
+  real :: imsize, sigma
 
 ! BEGIN
 
@@ -490,7 +492,9 @@ contains
    FV_Atm(1)%flagstruct%k_split = 1
    FV_Atm(1)%flagstruct%n_split = 0
    ! Rayleigh Damping defaults
-   FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
+   imsize = FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac)*4.0
+   sigma = 1.0-0.9839*exp(-0.09835*4.e7*0.9/imsize/1000.) ! Based on Arakawa 2011 sigma used in GF2020
+   FV_Atm(1)%flagstruct%rf_cutoff = 25.0 + (1.0 - sigma) * (250.0 - 25.0) ! Pa
    FV_Atm(1)%flagstruct%tau = 5.0
    FV_Atm(1)%flagstruct%RF_fast = .false.
   ! Cubed-Sphere Global Resolution Specific adjustments
@@ -499,73 +503,61 @@ contains
      !              based on ideal remapping DT
       if (FV_Atm(1)%flagstruct%npx >= 12) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/3600.0  )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 5.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 24) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1800.0  )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 4.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 48) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/1200.0  )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 3.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 90) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 600.0   )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 2.5
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 180) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 300.0   )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 2.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 360) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0   )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 1.5
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 720) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 25.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 1.0
          FV_Atm(1)%flagstruct%RF_fast = .false.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1120) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 250.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.75
-         FV_Atm(1)%flagstruct%RF_fast = .false.
+         FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 1440) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 500.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.5
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 2880) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.25
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 5760) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/   9.375 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.125
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
       if (FV_Atm(1)%flagstruct%npx >= 10800) then
          FV_Atm(1)%flagstruct%k_split = CEILING(DT/  4.6875 )
-         FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
          FV_Atm(1)%flagstruct%tau = 0.0625
          FV_Atm(1)%flagstruct%RF_fast = .true.
       endif
@@ -574,31 +566,26 @@ contains
      !              based on ideal remapping DT
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 540) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/ 150.0 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 100.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 2.0
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1080) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/  75.0 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 500.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 1.0
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 2160) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/  37.5 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 0.5
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 4320) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/  18.75 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 0.25
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
           if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 8640) then
               FV_Atm(1)%flagstruct%k_split = CEILING(DT/  9.375 )
-              FV_Atm(1)%flagstruct%rf_cutoff = 1000.0 ! Pa
               FV_Atm(1)%flagstruct%tau = 0.125
               FV_Atm(1)%flagstruct%RF_fast = .true.
           endif
@@ -616,10 +603,17 @@ contains
       endif
       FV_Atm(1)%flagstruct%d2_bg = 0.0  ! 2nd order Divg Damping coef
       FV_Atm(1)%flagstruct%d_ext = 0.0  ! External damping
-     ! Local Richardson-number turbulent mixing
-      FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
-     ! Sponge layer
-      FV_Atm(1)%flagstruct%n_sponge = 9
+      if (FV_Atm(1)%flagstruct%npz == 72) then
+         ! Local Richardson-number turbulent mixing
+          FV_Atm(1)%flagstruct%fv_sg_adj = DT*4
+         ! Sponge layer
+          FV_Atm(1)%flagstruct%n_sponge = 9
+      else
+         ! Local Richardson-number turbulent mixing
+          FV_Atm(1)%flagstruct%fv_sg_adj = -1
+         ! Sponge layer
+          FV_Atm(1)%flagstruct%n_sponge = 6
+      endif
       FV_Atm(1)%flagstruct%d2_bg_k1 = 0.2
       FV_Atm(1)%flagstruct%d2_bg_k2 = 0.1
       if (FV_Atm(1)%flagstruct%npx*CEILING(FV_Atm(1)%flagstruct%stretch_fac) >= 1200) then
@@ -1270,8 +1264,12 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 ! Splitting for Pure Advection
   real(FVPRC) :: myDT, lnp, rdg, pek, ak1
 
+! Dynamic Index Tracking for Option A (Mass-Conserving Advection)
+  integer :: idx_qlcn = -1
+  integer :: idx_qicn = -1
+  integer :: idx_clcn = -1
+
 ! Convience variables
-  real(FVPRC), allocatable :: cnvfrc(:,:,:)
   integer :: nwat_tracers
   integer :: sphu = -1
   integer :: qliq = -1
@@ -1291,20 +1289,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
   character(len=ESMF_MAXSTR) :: STRING
 
-  logical :: SPHU_FILLED = .FALSE.
-  logical :: QLIQ_FILLED = .FALSE.
-  logical :: QICE_FILLED = .FALSE.
-  logical :: RAIN_FILLED = .FALSE.
-  logical :: SNOW_FILLED = .FALSE.
-  logical :: GRPL_FILLED = .FALSE.
-  logical :: QCLD_FILLED = .FALSE.
-  logical :: QLLS_FILLED = .FALSE.
-  logical :: QLCN_FILLED = .FALSE.
-  logical :: QILS_FILLED = .FALSE.
-  logical :: QICN_FILLED = .FALSE.
-  logical :: CLLS_FILLED = .FALSE.
-  logical :: CLCN_FILLED = .FALSE.
-
   logical :: NWAT_TEST
 
 #ifdef RUN_GTFV3
@@ -1318,7 +1302,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 ! Begin
 
 #ifdef RUN_GTFV3
-  call ESMF_VMGetCurrent(vm, rc=status) ! pchakrab: replace with ESMF_GridCompGet(gc, VM=VM, _RC)
+  call ESMF_VMGetCurrent(vm, rc=status)
   call ESMF_VMGet(vm, mpiCommunicator=comm)
   call MPI_Comm_rank(comm, rank, mpierr)
 #endif
@@ -1346,7 +1330,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
   ! Be sure we have the correct PHIS and number of tracers for this run
    if (fv_first_run) then
-    ! Determine how many water species we have
      nwat_tracers = 0
      if (.not. ADIABATIC) then
        do n=1,STATE%GRID%NQ
@@ -1356,9 +1339,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
          if (TRIM(state%vars%tracer(n)%tname) == 'QICN'    ) nwat_tracers = nwat_tracers + 1
          if (TRIM(state%vars%tracer(n)%tname) == 'QILS'    ) nwat_tracers = nwat_tracers + 1
        enddo
-      ! We must have these first 5 at a minimum
        _ASSERT(nwat_tracers == 5, 'expecting 5 water species: Q QLCN QLLS QICN QILS')
-      ! Check for CLLS, CLCN, QRAIN, QSNOW, QGRAUPEL
        do n=1,STATE%GRID%NQ
          if (TRIM(state%vars%tracer(n)%tname) == 'CLLS'    ) nwat_tracers = nwat_tracers + 1
          if (TRIM(state%vars%tracer(n)%tname) == 'CLCN'    ) nwat_tracers = nwat_tracers + 1
@@ -1367,11 +1348,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
          if (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL') nwat_tracers = nwat_tracers + 1
        enddo
        if (FV_Atm(1)%flagstruct%nwat == 0) then
-         if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 1 ! Tell FV3 about QV only
+         if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 1
          if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
-           if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3 ! Tell FV3 about QV, QLIQ, QICE
+           if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3
          endif
-         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 ! Tell FV3 about QV, QLIQ, QICE, QRAIN, QSNOW, QGRAUPEL plus QCLD
+         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6
        endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
@@ -1427,20 +1408,16 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
      FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=FVPRC)
      FV_Atm(1)%varflt(isc:iec,jsc:jec) = real(varflt,kind=FVPRC)
      call mpp_update_domains(FV_Atm(1)%phis, FV_Atm(1)%domain, complete=.true.)
-    ! How many tracers do we really have?
-     ! MAT GCC cannot handle multi-line asserts. For ease of reading,
-     !     create a new variable to test
+
      NWAT_TEST = ( (FV_Atm(1)%flagstruct%nwat == 0) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 1) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 3) .OR. &
                    (FV_Atm(1)%flagstruct%nwat >= 6) )
      _ASSERT( NWAT_TEST , 'NWAT must be either 0, 1, 3 or 6')
-     FV_Atm(1)%ncnst = STATE%GRID%NQ - 3 ! Remove CN species
-     if (FV_Atm(1)%flagstruct%nwat >= 3) then
-        FV_Atm(1)%ncnst = STATE%GRID%NQ - 3 ! Remove CN species
-     else
-        FV_Atm(1)%ncnst = STATE%GRID%NQ
-     endif
+
+     ! OPTION A: We keep ALL tracers, no subtracting CN species.
+     FV_Atm(1)%ncnst = STATE%GRID%NQ
+
      deallocate( FV_Atm(1)%q )
      allocate  ( FV_Atm(1)%q(isd:ied  ,jsd:jed  ,npz, FV_Atm(1)%ncnst) , source=0.0 )
     ! Echo FV3 setup
@@ -1448,359 +1425,193 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
    endif
 
    select case ( FV_Atm(1)%flagstruct%nwat )
-  ! Assign Tracer Indices for FV3
    case (6:7)
-    sphu = 1
-    qliq = 2
-    qice = 3
-    rain = 4
-    snow = 5
-    grpl = 6
-    qcld = 7
+    sphu = 1; qliq = 2; qice = 3; rain = 4; snow = 5; grpl = 6; qcld = 7
    case (3:4)
-    sphu = 1
-    qliq = 2
-    qice = 3
-    qcld = 4
+    sphu = 1; qliq = 2; qice = 3; qcld = 4
    case (1)
-    sphu = 1
-  ! Advect as split CN/LS species
-    qlcn = 2
-    qlls = 3
-    qicn = 4
-    qils = 5
+    sphu = 1; qlcn = 2; qlls = 3; qicn = 4; qils = 5; clcn = 6; clls = 7
    end select
 
-   allocate ( cnvfrc(isc:iec,jsc:jec,npz) )
-   cnvfrc = 0.0
-
- ! Pull Tracers
+ ! ------------------------------------------------------------------
+ ! Pull Tracers (Dynamic Mapping for Mass Conservation Option A)
+ ! ------------------------------------------------------------------
   call MAPL_GridCompTimerStart(gc, "pull_tracers" , _RC)
   nn = 0
   if (.not. ADIABATIC) then
-    select case ( FV_Atm(1)%flagstruct%nwat )
-    case (0)
-       _ASSERT(FV_Atm(1)%ncnst == STATE%GRID%NQ, 'needs informative message')
-    case (1)
-       _ASSERT(FV_Atm(1)%ncnst >= 5, 'needs informative message')
-    case (3:4)
-       _ASSERT(FV_Atm(1)%ncnst >= 4, 'needs informative message')
-    case (6:7)
-       _ASSERT(FV_Atm(1)%ncnst >= 7, 'needs informative message')
-    end select
-   ! Report total number and names of advected tracers
     if (fv_first_run .and. FV_Atm(1)%ncnst > 0) then
        write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", FV_Atm(1)%ncnst, " tracers:"
-       call WRITE_PARALLEL( trim(STRING)   )
+       call WRITE_PARALLEL( trim(STRING) )
     endif
     FV_Atm(1)%q(:,:,:,:) = 0.0
-    if (FV_Atm(1)%flagstruct%nwat > 0) then
-    do n=1,STATE%GRID%NQ
-       if (TRIM(state%vars%tracer(n)%tname) == 'Q') then
-         if (sphu /= -1) then ! SPHU
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           SPHU_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
-       if (TRIM(state%vars%tracer(n)%tname) == 'QLCN') then
-         if (qliq /= -1) then ! QLIQ
-           if (fv_first_run) call WRITE_PARALLEL( trim('QLIQ') )
-           QLIQ_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
-           endif
-         elseif (qlcn /= -1) then
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           QLCN_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
-       if (TRIM(state%vars%tracer(n)%tname) == 'QLLS') then
-         if (qliq /= -1) then ! QLIQ
-           QLIQ_FILLED = .TRUE.
-          ! nn increment already handled in QLLS
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
-           endif
-         elseif (qlls /= -1) then
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           QLLS_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
-       if (TRIM(state%vars%tracer(n)%tname) == 'QICN') then
-         if (qice /= -1) then ! QICE
-           if (fv_first_run) call WRITE_PARALLEL( trim('QICE') )
-           QICE_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
-           endif
-         elseif (qicn /= -1) then
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           QICN_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
-       if (TRIM(state%vars%tracer(n)%tname) == 'QILS') then
-         if (qice /= -1) then ! QICE
-           QICE_FILLED = .TRUE.
-          ! nn increment already handled in QICN
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
-           endif
-         elseif (qils /= -1) then
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           QILS_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
-     ! Extra species for 6-phase microphysics
-       if ((rain /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QRAIN')) then
-         if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-         RAIN_FILLED = .TRUE.
-         nn = nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain) = state%vars%tracer(n)%content_r4(:,:,:)
-         else
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain) = state%vars%tracer(n)%content(:,:,:)
-         endif
-       endif
-       if ((snow /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QSNOW')) then
-         if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-         SNOW_FILLED = .TRUE.
-         nn = nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow) = state%vars%tracer(n)%content_r4(:,:,:)
-         else
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow) = state%vars%tracer(n)%content(:,:,:)
-         endif
-       endif
-       if ((grpl /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL')) then
-         if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-         GRPL_FILLED = .TRUE.
-         nn = nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl) = state%vars%tracer(n)%content_r4(:,:,:)
-         else
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl) = state%vars%tracer(n)%content(:,:,:)
-         endif
-       endif
-       if (TRIM(state%vars%tracer(n)%tname) == 'CLCN') then
-         if (qcld /= -1) then ! QCLD
-           if (fv_first_run) call WRITE_PARALLEL( trim('QCLD') )
-           QCLD_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-             cnvfrc  = state%vars%tracer(n)%content_r4(:,:,:)
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             cnvfrc  = state%vars%tracer(n)%content_r4(:,:,:)
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
-           endif
-         elseif (clcn /= -1) then
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           CLCN_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
-       if (TRIM(state%vars%tracer(n)%tname) == 'CLLS') then
-         if (qcld /= -1) then ! QCLD
-           QCLD_FILLED = .TRUE.
-          ! nn increment already handled in CLCN
-           if (state%vars%tracer(n)%is_r4) then
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
-           else
-             FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
-           endif
-         elseif (clls /= -1) then
-           if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-           CLLS_FILLED = .TRUE.
-           nn = nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       endif
+
+    ! Initialize index offset for extra tracers beyond standard nwat
+    select case (FV_Atm(1)%flagstruct%nwat)
+       case (6:7); nn = 7
+       case (3:4); nn = 4
+       case (1);   nn = 7
+       case (0);   nn = 0
+    end select
+
+    do n=1, STATE%GRID%NQ
+
+       select case (TRIM(state%vars%tracer(n)%tname))
+          case ('Q')
+             if (sphu /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu) = state%vars%tracer(n)%content_r4(:,:,:)
+                 else
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu) = state%vars%tracer(n)%content(:,:,:)
+                 endif
+                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             endif
+
+          ! -- LIQUID --
+          case ('QLCN')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qlcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qliq /= -1 .and. qlcn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qlcn = nn
+                 endif
+             else
+                 if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
+                 if (qlcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content(:,:,:)
+                 if (qliq /= -1 .and. qlcn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qlcn = nn
+                 endif
+             endif
+             if ((qlcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if ((qliq /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QLIQ") )
+
+          case ('QLLS')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qlls /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls) = state%vars%tracer(n)%content_r4(:,:,:)
+             else
+                 if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
+                 if (qlls /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls) = state%vars%tracer(n)%content(:,:,:)
+             endif
+             if ((qlcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+
+          ! -- ICE --
+          case ('QICN')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qicn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qice /= -1 .and. qicn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qicn = nn
+                 endif
+             else
+                 if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
+                 if (qicn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content(:,:,:)
+                 if (qice /= -1 .and. qicn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qicn = nn
+                 endif
+             endif
+             if ((qicn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if ((qice /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QICE") )
+
+          case ('QILS')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qils /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils) = state%vars%tracer(n)%content_r4(:,:,:)
+             else
+                 if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
+                 if (qils /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils) = state%vars%tracer(n)%content(:,:,:)
+             endif
+             if ((qicn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+
+          ! -- CLOUD FRACTION --
+          case ('CLCN')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
+                 if (clcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content_r4(:,:,:)
+                 if (qcld /= -1 .and. clcn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_clcn = nn
+                 endif
+             else
+                 if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
+                 if (clcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content(:,:,:)
+                 if (qcld /= -1 .and. clcn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_clcn = nn
+                 endif
+             endif
+             if ((clcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             if ((qcld /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME//"_QCLD") )
+
+          case ('CLLS')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
+                 if (clls /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls) = state%vars%tracer(n)%content_r4(:,:,:)
+             else
+                 if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
+                 if (clls /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls) = state%vars%tracer(n)%content(:,:,:)
+             endif
+             if ((clcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+
+          ! -- MICROPHYSICS --
+          case ('QRAIN')
+             if (rain /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain) = state%vars%tracer(n)%content_r4(:,:,:)
+                 else
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain) = state%vars%tracer(n)%content(:,:,:)
+                 endif
+                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             endif
+          case ('QSNOW')
+             if (snow /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow) = state%vars%tracer(n)%content_r4(:,:,:)
+                 else
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow) = state%vars%tracer(n)%content(:,:,:)
+                 endif
+                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             endif
+          case ('QGRAUPEL')
+             if (grpl /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl) = state%vars%tracer(n)%content_r4(:,:,:)
+                 else
+                     FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl) = state%vars%tracer(n)%content(:,:,:)
+                 endif
+                 if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+             endif
+
+          ! -- ALL OTHER PASSIVE TRACERS --
+          case default
+             nn = nn + 1
+             if (state%vars%tracer(n)%is_r4) then
+                 FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
+             else
+                 FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
+             endif
+             if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+       end select
     enddo
-   ! Verify
-    select case (FV_Atm(1)%flagstruct%nwat)
-    case (6:7)
-      do k=1,npz
-        do j=jsc,jec
-          do i=isc,iec
-            if (FV_Atm(1)%q(i,j,k,qcld) > 0.0) &
-               cnvfrc(i,j,k) = cnvfrc(i,j,k)/FV_Atm(1)%q(i,j,k,qcld)
-          enddo
-        enddo
-      enddo
-      _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
-      _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled')
-      _ASSERT(QICE_FILLED, 'QICE Not Filled')
-      _ASSERT(RAIN_FILLED, 'RAIN Not Filled')
-      _ASSERT(SNOW_FILLED, 'SNOW Not Filled')
-      _ASSERT(GRPL_FILLED, 'GRPL Not Filled')
-      _ASSERT(QCLD_FILLED, 'QCLD Not Filled')
-      _ASSERT(nn == 7, 'Expecting 7 water species') ! Q, QRAIN, QSNOW, QGRAUPEL, QLIQ, QICE, QCLD
-    case (3:4)
-      do k=1,npz
-        do j=jsc,jec
-          do i=isc,iec
-            if (FV_Atm(1)%q(i,j,k,qcld) > 0.0) &
-               cnvfrc(i,j,k) = cnvfrc(i,j,k)/FV_Atm(1)%q(i,j,k,qcld)
-          enddo
-        enddo
-      enddo
-      _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
-      _ASSERT(QLIQ_FILLED, 'QLIQ Not Filled')
-      _ASSERT(QICE_FILLED, 'QICE Not Filled')
-      _ASSERT(QCLD_FILLED, 'QCLD Not Filled')
-      _ASSERT(nn == 4, 'Expecting 4 water species') ! Q, QLIQ, QICE
-    case (1)
-      _ASSERT(SPHU_FILLED, 'SPHU Not Filled')
-      _ASSERT(QLCN_FILLED, 'QLCN Not Filled')
-      _ASSERT(QLLS_FILLED, 'QLLS Not Filled')
-      _ASSERT(QICN_FILLED, 'QICN Not Filled')
-      _ASSERT(QILS_FILLED, 'QILS Not Filled')
-      _ASSERT(nn == 5, 'Expecting 5 water species') ! Q, QLCN, QLLS, QICN, QILS
-    end select
-    endif !nwat > 0
 
- ! Include any additional tracers
-
-    select case (FV_Atm(1)%flagstruct%nwat)
-    case (0)
-       do n=1,STATE%GRID%NQ
-         if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
-         nn = nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
-         else
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
-         endif
-       enddo
-    case (1)
-       do n=1,STATE%GRID%NQ
-         if ( (TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
-           if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
-           nn=nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       enddo
-    case (3:4)
-       do n=1,STATE%GRID%NQ
-         if ( (TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'CLCN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'CLLS'    ) ) then
-           if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
-           nn=nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       enddo
-    case (6:7)
-       do n=1,STATE%GRID%NQ
-         if ( (TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'CLCN'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'CLLS'    ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QRAIN'   ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QSNOW'   ) .and. &
-              (TRIM(state%vars%tracer(n)%tname) /= 'QGRAUPEL') ) then
-           if (fv_first_run) call WRITE_PARALLEL( trim('--'//STATE%VARS%TRACER(n)%TNAME) )
-           nn=nn+1
-           if (state%vars%tracer(n)%is_r4) then
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
-           else
-              FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
-           endif
-         endif
-       enddo
-    end select
     write (STRING, "(I3.3,' /= ',I3.3)") nn, FV_Atm(1)%ncnst
     _ASSERT(nn == FV_Atm(1)%ncnst, 'nn /= ncnst: '//trim(STRING))
 
   else
-
+    ! Adiabatic Fallback
     if (fv_first_run .and. (mpp_pe()==0)) print*, 'Running In Adiabatic Mode'
-
-   ! Report total number and names of advected tracers
-      if (fv_first_run .and. STATE%GRID%NQ > 0) then
-         write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", STATE%GRID%NQ, " tracers:"
-         call WRITE_PARALLEL( trim(STRING)   )
-      endif
-   ! Advect all tracers
-      do n=1,STATE%GRID%NQ
-         if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
-         nn = nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
-         else
-            FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
-         endif
-      enddo
-      _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
-
+    if (fv_first_run .and. STATE%GRID%NQ > 0) then
+       write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", STATE%GRID%NQ, " tracers:"
+       call WRITE_PARALLEL( trim(STRING) )
+    endif
+    nn = 0
+    do n=1,STATE%GRID%NQ
+       if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
+       nn = nn+1
+       if (state%vars%tracer(n)%is_r4) then
+          FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:)
+       else
+          FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:)
+       endif
+    enddo
+    _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
   endif
   call MAPL_GridCompTimerStop(gc, "pull_tracers")
 
@@ -2077,305 +1888,199 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     endif
     call MAPL_GridCompTimerStop(gc, "fv_dynamics", _RC)
 
-  SPHU_FILLED = .FALSE.
-  QLIQ_FILLED = .FALSE.
-  QICE_FILLED = .FALSE.
-  RAIN_FILLED = .FALSE.
-  SNOW_FILLED = .FALSE.
-  GRPL_FILLED = .FALSE.
-  QCLD_FILLED = .FALSE.
-  QLLS_FILLED = .FALSE.
-  QLCN_FILLED = .FALSE.
-  QILS_FILLED = .FALSE.
-  QICN_FILLED = .FALSE.
-  CLLS_FILLED = .FALSE.
-  CLCN_FILLED = .FALSE.
-
- ! Push Tracers
+ ! ------------------------------------------------------------------
+ ! Push Tracers (Dynamic Mass Separation for Option A)
+ ! ------------------------------------------------------------------
   call MAPL_GridCompTimerStart(gc, "push_tracers", _RC)
-  nn = 0
+
   if (.not. ADIABATIC) then
+    ! --- Eulerian Monotonicity Safegaurds ---
+    ! Ensure advected CN does not exceed Total, preventing negative LS
+    if (qliq /= -1 .and. idx_qlcn /= -1) then
+       FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qlcn) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qlcn), FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq))
+    endif
+    if (qice /= -1 .and. idx_qicn /= -1) then
+       FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qicn) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qicn), FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice))
+    endif
+    if (qcld /= -1 .and. idx_clcn /= -1) then
+       FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_clcn) = MIN(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_clcn), FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld))
+    endif
 
-     do n=1,STATE%GRID%NQ
-
-       if ((sphu /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'Q')) then
-          SPHU_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
-          else
-             state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
-          endif
-       endif
-    ! QLIQ
-       if (qliq /= -1) then
-         if (TRIM(state%vars%tracer(n)%tname) == 'QLCN') then
-            QLCN_FILLED = .TRUE.
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * cnvfrc
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * cnvfrc
-            endif
-         endif
-         if (TRIM(state%vars%tracer(n)%tname) == 'QLLS') then
-            QLLS_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * (1.0-cnvfrc)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) * (1.0-cnvfrc)
-            endif
-         endif
-       else
-         if ((qlcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLCN')) then
-            QLCN_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
-            endif
-         endif
-         if ((qlls /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QLLS')) then
-            QLLS_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
-            endif
-          endif
-       endif
-    ! QICE
-       if (qice /= -1) then
-         if (TRIM(state%vars%tracer(n)%tname) == 'QICN') then
-            QICN_FILLED = .TRUE.
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * cnvfrc
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * cnvfrc
-            endif
-       endif
-         if (TRIM(state%vars%tracer(n)%tname) == 'QILS') then
-            QILS_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * (1.0-cnvfrc)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) * (1.0-cnvfrc)
-            endif
-         endif
-       else
-         if (TRIM(state%vars%tracer(n)%tname) == 'QICN') then
-            QICN_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
-            endif
-         endif
-         if (TRIM(state%vars%tracer(n)%tname) == 'QILS') then
-            QILS_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
-            endif
-         endif
-       endif
-    ! QCLD
-       if (qcld /= -1) then
-         if (TRIM(state%vars%tracer(n)%tname) == 'CLCN') then
-            CLCN_FILLED = .TRUE.
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * cnvfrc
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * cnvfrc
-            endif
-         endif
-         if (TRIM(state%vars%tracer(n)%tname) == 'CLLS') then
-            CLLS_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * (1.0-cnvfrc)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) * (1.0-cnvfrc)
-            endif
-         endif
-       else
-         if ((clcn /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLCN')) then
-            CLCN_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
-            endif
-         endif
-         if ((clls /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'CLLS')) then
-            CLLS_FILLED = .TRUE.
-            nn = nn+1
-            if (state%vars%tracer(n)%is_r4) then
-               state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
-            else
-                  state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
-            endif
-         endif
-       endif
-    ! RAIN
-       if ((rain /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QRAIN')) then
-          RAIN_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain)
-          endif
-       endif
-    ! SNOW
-       if ((snow /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QSNOW')) then
-          SNOW_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow)
-          endif
-       endif
-     ! GRPL
-       if ((grpl /= -1) .and. (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL')) then
-          GRPL_FILLED = .TRUE.
-          nn = nn+1
-          if (state%vars%tracer(n)%is_r4) then
-             state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl)
-          else
-                state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl)
-          endif
-       endif
-
-     enddo
-
-   ! Verify
-    deallocate ( cnvfrc )
+    ! Reset dynamic offset
     select case (FV_Atm(1)%flagstruct%nwat)
-    case (6:7)
-       _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
-       _ASSERT(RAIN_FILLED, 'RAIN Not Filled Out')
-       _ASSERT(SNOW_FILLED, 'SNOW Not Filled Out')
-       _ASSERT(GRPL_FILLED, 'GRPL Not Filled Out')
-       _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
-       _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
-       _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
-       _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
-       _ASSERT(CLCN_FILLED, 'CLCN Not Filled Out')
-       _ASSERT(CLLS_FILLED, 'CLLS Not Filled Out')
-       _ASSERT(nn == 7, 'Expecting 7 water species Out') ! Q, QLIQ, QICE, QCLD, QRAIN, QSNOW, QGRAUPEL
-     case (3:4)
-       _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
-       _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
-       _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
-       _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
-       _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
-       _ASSERT(CLCN_FILLED, 'CLCN Not Filled Out')
-       _ASSERT(CLLS_FILLED, 'CLLS Not Filled Out')
-       _ASSERT(nn == 4, 'Expecting 4 water species Out') ! Q, QLIQ, QICE
-    case (1)
-      _ASSERT(SPHU_FILLED, 'SPHU Not Filled Out')
-      _ASSERT(QLCN_FILLED, 'QLCN Not Filled Out')
-      _ASSERT(QLLS_FILLED, 'QLLS Not Filled Out')
-      _ASSERT(QICN_FILLED, 'QICN Not Filled Out')
-      _ASSERT(QILS_FILLED, 'QILS Not Filled Out')
-      _ASSERT(nn == 5, 'Expecting 5 water species Out') ! Q, QLCN, QLLS, QICN, QILS
+       case (6:7); nn = 7
+       case (3:4); nn = 4
+       case (1);   nn = 7
+       case (0);   nn = 0
     end select
 
-! Include additional tracers
+    do n=1, STATE%GRID%NQ
+       select case (TRIM(state%vars%tracer(n)%tname))
+          case ('Q')
+             if (sphu /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
+                 else
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,sphu)
+                 endif
+             endif
 
-    select case(FV_Atm(1)%flagstruct%nwat)
-      case (0)
-       do n=1,STATE%GRID%NQ
-         nn=nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         else
-            state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         endif
-       enddo
-      case (1)
-       do n=1,STATE%GRID%NQ
-        if ((TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) ) then
-         nn=nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         else
-            state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         endif
-        endif
-       enddo
-      case (3:4)
-       do n=1,STATE%GRID%NQ
-        if ((TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'CLCN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'CLLS'    ) ) then
-         nn=nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         else
-            state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         endif
-        endif
-       enddo
-      case (6:7)
-       do n=1,STATE%GRID%NQ
-        if ((TRIM(state%vars%tracer(n)%tname) /= 'Q'       ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QLCN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QLLS'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QICN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QILS'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'CLCN'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'CLLS'    ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QRAIN'   ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QSNOW'   ) .and. &
-            (TRIM(state%vars%tracer(n)%tname) /= 'QGRAUPEL') ) then
-         nn=nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         else
-            state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         endif
-        endif
-       enddo
-      end select
-      write (STRING, "(I3.3,' /= ',I3.3)") nn, FV_Atm(1)%ncnst
-      _ASSERT(nn == FV_Atm(1)%ncnst, 'nn /= ncnst: '//trim(STRING))
+          ! -- LIQUID --
+          case ('QLCN')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qliq /= -1 .and. qlcn == -1) then
+                     nn = nn + 1; state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qlcn)
+                 elseif (qlcn /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
+                 endif
+                 state%vars%tracer(n)%content_r4(:,:,:) = MAX(state%vars%tracer(n)%content_r4(:,:,:), 0.0_REAL4)
+             else
+                 if (qliq /= -1 .and. qlcn == -1) then
+                     nn = nn + 1; state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qlcn)
+                 elseif (qlcn /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn)
+                 endif
+                 state%vars%tracer(n)%content(:,:,:) = MAX(state%vars%tracer(n)%content(:,:,:), 0.0_FVPRC)
+             endif
 
+          case ('QLLS')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qliq /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) - FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qlcn)
+                 elseif (qlls /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
+                 endif
+                 state%vars%tracer(n)%content_r4(:,:,:) = MAX(state%vars%tracer(n)%content_r4(:,:,:), 0.0_REAL4)
+             else
+                 if (qliq /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) - FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qlcn)
+                 elseif (qlls /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlls)
+                 endif
+                 state%vars%tracer(n)%content(:,:,:) = MAX(state%vars%tracer(n)%content(:,:,:), 0.0_FVPRC)
+             endif
+
+          ! -- ICE --
+          case ('QICN')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qice /= -1 .and. qicn == -1) then
+                     nn = nn + 1; state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qicn)
+                 elseif (qicn /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
+                 endif
+                 state%vars%tracer(n)%content_r4(:,:,:) = MAX(state%vars%tracer(n)%content_r4(:,:,:), 0.0_REAL4)
+             else
+                 if (qice /= -1 .and. qicn == -1) then
+                     nn = nn + 1; state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qicn)
+                 elseif (qicn /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn)
+                 endif
+                 state%vars%tracer(n)%content(:,:,:) = MAX(state%vars%tracer(n)%content(:,:,:), 0.0_FVPRC)
+             endif
+
+          case ('QILS')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qice /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) - FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qicn)
+                 elseif (qils /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
+                 endif
+                 state%vars%tracer(n)%content_r4(:,:,:) = MAX(state%vars%tracer(n)%content_r4(:,:,:), 0.0_REAL4)
+             else
+                 if (qice /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) - FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_qicn)
+                 elseif (qils /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qils)
+                 endif
+                 state%vars%tracer(n)%content(:,:,:) = MAX(state%vars%tracer(n)%content(:,:,:), 0.0_FVPRC)
+             endif
+
+          ! -- CLOUD FRACTION --
+          case ('CLCN')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qcld /= -1 .and. clcn == -1) then
+                     nn = nn + 1; state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_clcn)
+                 elseif (clcn /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
+                 endif
+                 state%vars%tracer(n)%content_r4(:,:,:) = MAX(state%vars%tracer(n)%content_r4(:,:,:), 0.0_REAL4)
+             else
+                 if (qcld /= -1 .and. clcn == -1) then
+                     nn = nn + 1; state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_clcn)
+                 elseif (clcn /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn)
+                 endif
+                 state%vars%tracer(n)%content(:,:,:) = MAX(state%vars%tracer(n)%content(:,:,:), 0.0_FVPRC)
+             endif
+
+          case ('CLLS')
+             if (state%vars%tracer(n)%is_r4) then
+                 if (qcld /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) - FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_clcn)
+                 elseif (clls /= -1) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
+                 endif
+                 state%vars%tracer(n)%content_r4(:,:,:) = MAX(state%vars%tracer(n)%content_r4(:,:,:), 0.0_REAL4)
+             else
+                 if (qcld /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) - FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,idx_clcn)
+                 elseif (clls /= -1) then
+                     state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clls)
+                 endif
+                 state%vars%tracer(n)%content(:,:,:) = MAX(state%vars%tracer(n)%content(:,:,:), 0.0_FVPRC)
+             endif
+
+          ! -- MICROPHYSICS --
+          case ('QRAIN')
+             if (rain /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = MAX(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain), 0.0_REAL4)
+                 else
+                     state%vars%tracer(n)%content(:,:,:) = MAX(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,rain), 0.0_FVPRC)
+                 endif
+             endif
+          case ('QSNOW')
+             if (snow /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = MAX(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow), 0.0_REAL4)
+                 else
+                     state%vars%tracer(n)%content(:,:,:) = MAX(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,snow), 0.0_FVPRC)
+                 endif
+             endif
+          case ('QGRAUPEL')
+             if (grpl /= -1) then
+                 if (state%vars%tracer(n)%is_r4) then
+                     state%vars%tracer(n)%content_r4(:,:,:) = MAX(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl), 0.0_REAL4)
+                 else
+                     state%vars%tracer(n)%content(:,:,:) = MAX(FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,grpl), 0.0_FVPRC)
+                 endif
+             endif
+
+          ! -- PASSIVE TRACERS --
+          case default
+             nn = nn + 1
+             if (state%vars%tracer(n)%is_r4) then
+                 state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+             else
+                 state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+             endif
+       end select
+    enddo
   else
-
-    ! Include all tracers
-      do n=1,STATE%GRID%NQ
-         nn=nn+1
-         if (state%vars%tracer(n)%is_r4) then
-            state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         else
-            state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
-         endif
-      enddo
-      _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
-
+    nn = 0
+    do n=1,STATE%GRID%NQ
+       nn=nn+1
+       if (state%vars%tracer(n)%is_r4) then
+          state%vars%tracer(n)%content_r4(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+       else
+          state%vars%tracer(n)%content(:,:,:) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn)
+       endif
+    enddo
   endif
 
  ! Clean negative tracers and check
   if (DEBUG_ADV) then
-    prt_minmax     = DEBUG_ADV
+    prt_minmax = DEBUG_ADV
     if (mpp_pe()==0) print*,''
     if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
     allocate( DEBUG_ARRAY(isc:iec,jsc:jec,npz) )
@@ -2390,7 +2095,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     deallocate ( DEBUG_ARRAY )
     if (mpp_pe()==0) print*,'-------------- FV3 Tracer Debug After DYN --------------'
     if (mpp_pe()==0) print*,''
-    prt_minmax     = .false.
+    prt_minmax = .false.
   endif
   call MAPL_GridCompTimerStop(gc, "push_tracers", _RC)
 
@@ -2808,6 +2513,114 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
     call mp_bcst(state%q_split)
 
 end subroutine adjust_fv3_splits
+
+subroutine fv_getGradT_2D(t_in, ps_in, mag_grad_t)
+  ! INPUT: 2D Temp (REAL4) interpolated to pressure level (with halo bounds)
+  real(REAL4), intent(INOUT) :: t_in(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied, &
+                                     FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed)
+  real(REAL4), intent(INOUT) :: ps_in(FV_Atm(1)%bd%isd:FV_Atm(1)%bd%ied, &
+                                      FV_Atm(1)%bd%jsd:FV_Atm(1)%bd%jed)
+
+  ! OUTPUT: MAPL Pointer (REAL4) (Assumed shape, 1-based indexing: 1:im, 1:jm)
+  real(REAL4), intent(OUT)   :: mag_grad_t(:,:)
+
+  integer :: isc, iec, jsc, jec
+  integer :: i, j, ii, jj
+  real(REAL4) :: dTdx, dTdy, p_surf_min
+  real(REAL8) :: dx, dy
+
+  isc = FV_Atm(1)%bd%isc ; iec = FV_Atm(1)%bd%iec
+  jsc = FV_Atm(1)%bd%jsc ; jec = FV_Atm(1)%bd%jec
+
+  ! 1. Update halos. FV3 mpp_update_domains natively supports REAL4 arrays.
+  call mpp_update_domains(ps_in, FV_Atm(1)%domain, complete=.false.)
+  call mpp_update_domains( t_in, FV_Atm(1)%domain, complete=.true.)
+
+  ! 2. Calculate gradient, avoid UNDEF, and map to 1-based MAPL array
+  !$OMP PARALLEL DO DEFAULT(NONE) &
+  !$OMP SHARED(FV_Atm, t_in, ps_in, mag_grad_t, isc, iec, jsc, jec) &
+  !$OMP PRIVATE(i, j, ii, jj, dx, dy, dTdx, dTdy, p_surf_min)
+  do j = jsc, jec
+     jj = j - jsc + 1   ! Map to MAPL pointer index
+
+     do i = isc, iec
+        ii = i - isc + 1  ! Map to MAPL pointer index
+
+        ! Find the highest terrain in the 5-point stencil
+        p_surf_min = MIN(ps_in(i,j), ps_in(i-1,j), ps_in(i+1,j), ps_in(i,j-1), ps_in(i,j+1))
+
+        ! SHIELD: Only calculate if the whole stencil is safely > 700 hPa
+        ! (Keeps the 600 hPa level well out of the mountain boundary layer)
+        if ( p_surf_min > 70000.0_REAL4 .and. &
+             t_in(i,j)   /= real(MAPL_UNDEFINED_REAL, REAL4) .and. &
+             t_in(i-1,j) /= real(MAPL_UNDEFINED_REAL, REAL4) .and. &
+             t_in(i+1,j) /= real(MAPL_UNDEFINED_REAL, REAL4) .and. &
+             t_in(i,j-1) /= real(MAPL_UNDEFINED_REAL, REAL4) .and. &
+             t_in(i,j+1) /= real(MAPL_UNDEFINED_REAL, REAL4) ) then
+
+           dx = FV_Atm(1)%gridstruct%dxa(i,j)
+           dy = FV_Atm(1)%gridstruct%dya(i,j)
+
+           ! Centered difference
+           dTdx = (t_in(i+1,j) - t_in(i-1,j)) / real(2.0_REAL8 * dx, REAL4)
+           dTdy = (t_in(i,j+1) - t_in(i,j-1)) / real(2.0_REAL8 * dy, REAL4)
+
+           mag_grad_t(ii,jj) = SQRT(dTdx**2 + dTdy**2)
+
+        else
+           ! Stencil hits topography or uninitialized data
+           mag_grad_t(ii,jj) = 0.0_REAL4
+        endif
+
+     enddo
+  enddo
+  !$OMP END PARALLEL DO
+
+return
+end subroutine fv_getGradT_2D
+
+subroutine fv_getGradT_3D(mag_grad_t)
+  ! OUTPUT: Magnitude of the horizontal temperature gradient
+  real(REAL8), intent(OUT) :: mag_grad_t(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec, &
+                                         FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec, &
+                                         1:FV_Atm(1)%npz)
+
+  integer :: isc, iec, jsc, jec
+  integer :: i, j, k
+  real(REAL8) :: dTdx, dTdy
+  real(REAL8) :: dx, dy
+
+  isc = FV_Atm(1)%bd%isc ; iec = FV_Atm(1)%bd%iec
+  jsc = FV_Atm(1)%bd%jsc ; jec = FV_Atm(1)%bd%jec
+
+  call mpp_update_domains(FV_Atm(1)%pt, FV_Atm(1)%domain, complete=.true.)
+
+  !$OMP PARALLEL DO DEFAULT(NONE) &
+  !$OMP SHARED(FV_Atm, mag_grad_t, isc, iec, jsc, jec) &
+  !$OMP PRIVATE(i, j, k, dx, dy, dTdx, dTdy)
+  do k = 1, FV_Atm(1)%npz
+     do j = jsc, jec
+        do i = isc, iec
+
+           ! Note: Replace dxa/dya with your exact FV3 metric arrays for cell-center distances.
+           ! (Often found in FV_Atm(1)%gridstruct%dxa or similar)
+           dx = FV_Atm(1)%gridstruct%dxa(i,j)
+           dy = FV_Atm(1)%gridstruct%dya(i,j)
+
+           ! Assuming pt is Absolute Temperature (if it's Potential T, multiply by pkz here)
+           dTdx = (FV_Atm(1)%pt(i+1,j,k) - FV_Atm(1)%pt(i-1,j,k)) / (2.0_REAL8 * dx)
+           dTdy = (FV_Atm(1)%pt(i,j+1,k) - FV_Atm(1)%pt(i,j-1,k)) / (2.0_REAL8 * dy)
+
+           ! Magnitude in K/m
+           mag_grad_t(i,j,k) = SQRT(dTdx**2 + dTdy**2)
+
+        enddo
+     enddo
+  enddo
+  !$OMP END PARALLEL DO
+
+return
+end subroutine fv_getGradT_3D
 
 subroutine fv_getDELZ(delz,temp,pe)
   real(REAL8), intent(OUT) :: delz(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec,1:FV_Atm(1)%npz)
