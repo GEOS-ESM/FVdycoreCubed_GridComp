@@ -1,0 +1,67 @@
+---
+mapl:
+
+  setServices:
+    sharedObj: libconfigurable_gridcomp
+
+  states: {}
+
+  geometry:
+    kind: from_child
+    provider: ADV
+
+  children:
+    ADV:
+      config_file: adv.yaml
+      dso: libFVdycoreCubed_GridComp
+      setservices: advcore_setservices_
+
+    DataForAdv:
+      config_file: data-for-adv.yaml
+      dso: libconfigurable_gridcomp
+
+    DataTracers:
+      config_file: data-tracers.yaml
+      dso: libconfigurable_gridcomp
+
+  connections:
+    - src_name: TRADV
+      dst_name: TRADV
+      src_comp: ADV
+      dst_comp: DataTracers
+
+    - src_name: MFX
+      src_intent: internal
+      src_comp: DataForAdv
+      dst_name: MFX
+      dst_comp: ADV
+
+    - src_name: MFY
+      src_intent: internal
+      src_comp: DataForAdv
+      dst_name: MFY
+      dst_comp: ADV
+
+    - src_name: CX
+      src_intent: internal
+      src_comp: DataForAdv
+      dst_name: CX
+      dst_comp: ADV
+
+    - src_name: CY
+      src_intent: internal
+      src_comp: DataForAdv
+      dst_name: CY
+      dst_comp: ADV
+
+    - src_name: PLE0
+      src_intent: internal
+      src_comp: DataForAdv
+      dst_name: PLE0
+      dst_comp: ADV
+
+    - src_name: PLE1
+      src_intent: internal
+      src_comp: DataForAdv
+      dst_name: PLE1
+      dst_comp: ADV

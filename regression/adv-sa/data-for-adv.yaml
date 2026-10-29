@@ -1,0 +1,41 @@
+mapl:
+
+  setServices:
+    sharedObj: libconfigurable_gridcomp
+
+  misc:
+    restart:
+      internal: true
+
+  states:
+    internal:
+      MFX:
+        standard_name: "pressure_weighted_eastward_mass_flux"
+        units: "Pa m+2"
+        typekind: R8
+        vertical_dim_spec: "c"
+      MFY:
+        standard_name: "pressure_weighted_northward_mass_flux"
+        units: "Pa m+2"
+        typekind: R8
+        vertical_dim_spec: "c"
+      CX:
+        standard_name: "eastward_accumulated_courant_number"
+        units: "1"
+        typekind: R8
+        vertical_dim_spec: "c"
+      CY:
+        standard_name: "northward_accumulated_courant_number"
+        units: "1"
+        typekind: R8
+        vertical_dim_spec: "c"
+      PLE0:
+        standard_name: "pressure_at_layer_edges_before_advection"
+        units: "Pa"
+        typekind: R8
+        vertical_dim_spec: "e"
+      PLE1:
+        standard_name: "pressure_at_layer_edges_after_advection"
+        units: "Pa"
+        typekind: R8
+        vertical_dim_spec: "e"
