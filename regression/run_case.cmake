@@ -7,9 +7,11 @@ function(run_case case_name regression_data_dir)
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/${case_name} ${expdir}
   )
 
+  set(root_dir ${regression_data_dir}/${case_name})
   set(num_procs "6")
-  set(checkpoints_dir ${regression_data_dir}/${case_name}/checkpoints/last)
+  set(checkpoints_dir ${root_dir}/checkpoints/last)
 
+  copy_restarts(${root_dir} ${expdir}) # no-op for cold-start cases
   run_geos(${num_procs} ${case_name} ${expdir})
   if (NOT EXISTS ${checkpoints_dir})
     message(WARNING "Baseline directory [${checkpoints_dir}] not found. Skipping comparison.")

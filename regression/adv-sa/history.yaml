@@ -1,0 +1,9 @@
+# History is off (run_history: false in cap_gridcomp.yaml); the cap still
+# creates the History child, so it needs a config. The baseline comparison
+# uses the ADV export checkpoint instead.
+active_collections: []
+
+mapl:
+
+  setServices:
+    sharedObj: libMAPL.history

@@ -28,6 +28,26 @@ Coupled advection + dynamics test.
 - `data-ana.yaml`
 - `input.nml`
 
+### `adv-sa`
+
+Standalone advection (AdvCore only) test. `DYCORE` is unset, so AdvCore runs
+`fv_setup` itself. The mass fluxes, Courant numbers and edge pressures
+(`MFX`, `MFY`, `CX`, `CY`, `PLE0`, `PLE1`) are read from the `DataForAdv`
+internal restart, which is a symlink to the `adv-dyn` baseline's
+`checkpoints/last/DYN_export.nc` (MAPL reads only the fields it declares).
+
+ Key files:
+- `mapl.yaml`, `cap_driver.yaml`, `cap_gridcomp.yaml`, `cap_restart.yaml`
+- `root.yaml`
+- `adv.yaml`
+- `data-for-adv.yaml` — `DataForAdv` component; provides the advection inputs from its internal restart
+- `data-tracers.yaml` — `DataTracers` component; owns synthetic tracers `Q001`, `Q002`, that are advected by ADV
+- `input.nml`
+
+Regression data: `checkpoints/1891-03-02T00:00:00/DataForAdv_internal.nc`
+(input restart, symlink; copied into the run directory) and `checkpoints/last/`
+(baseline).
+
 ### `dyn-sa`
 
 Held-Suarez style standalone dynamics test.
@@ -55,6 +75,7 @@ ctest -L REGRESSION -j8 --output-on-failure
 
 # Run one test case
 ctest -R '^adv-dyn$' -j8 --output-on-failure
+ctest -R '^adv-sa$' -j8 --output-on-failure
 ctest -R '^dyn-sa$' -j8 --output-on-failure
 ```
 
