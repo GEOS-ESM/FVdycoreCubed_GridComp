@@ -68,7 +68,6 @@ module AdvCore_GridCompMod
    use fv_grid_utils_mod, only: g_sum_r8
    use fv_diagnostics_mod, only: prt_maxmin, prt_minmax
    use FV_StateMod, only: FV_Atm, setup_fv_dimensions_and_topology
-   use FV_StateMod, only: get_geometry_subsection
    use FV_StateMod, only: AdvCoreTracers => T_TRACERS
    use fv_shared, only: field_is_cloud_water_species
    use fv_shared, only: get_short_name, is_name_in_list
@@ -547,10 +546,10 @@ contains
       integer, intent(out) :: rc
 
       type(ESMF_VM) :: vm
-      type(ESMF_HConfig) :: hconfig, vertical_grid_cfg
+      type(ESMF_HConfig) :: hconfig, geom_parent_cfg
       integer :: p_split = 1
       integer :: comm, num_levels, status
-      logical :: has_num_levels
+      logical :: has_mapl_section, use_mapl_section
 
       call ESMF_VMGetCurrent(vm, _RC)
       call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
@@ -558,15 +557,22 @@ contains
 
       call fv_init1(FV_Atm, dt, grids_on_my_pe, p_split)
 
-      call MAPL_GridCompGet(gc, hconfig=hconfig, _RC)
-      vertical_grid_cfg = get_geometry_subsection(hconfig, "vertical_grid", _RC)
-      has_num_levels = &
-           ESMF_HConfigIsDefined(vertical_grid_cfg, keyString="num_levels", _RC)
-      _ASSERT(has_num_levels, 'num_levels not specified in geometry:vertical_grid')
-      num_levels = ESMF_HConfigAsI4(vertical_grid_cfg, keyString="num_levels", _RC)
-      call ESMF_HConfigDestroy(vertical_grid_cfg, _RC)
+      call MAPL_GridCompGet(gc, hconfig=hconfig, num_levels=num_levels, _RC)
 
-      call setup_fv_dimensions_and_topology(hconfig, num_levels, FV_Atm(1)%flagstruct, FV_Atm(1)%layout, _RC)
+      ! setup_fv_dimensions_and_topology reads geometry:esmf_geom from the
+      ! config it is given; pass the mapl section if the geometry lives there
+      use_mapl_section = .false.
+      has_mapl_section = ESMF_HConfigIsDefined(hconfig, keyString="mapl", _RC)
+      if (has_mapl_section) then
+         geom_parent_cfg = ESMF_HConfigCreateAt(hconfig, keyString="mapl", _RC)
+         use_mapl_section = ESMF_HConfigIsDefined(geom_parent_cfg, keyString="geometry", _RC)
+         if (.not. use_mapl_section) call ESMF_HConfigDestroy(geom_parent_cfg, _RC)
+      end if
+      if (.not. use_mapl_section) geom_parent_cfg = hconfig
+
+      call setup_fv_dimensions_and_topology(geom_parent_cfg, num_levels, FV_Atm(1)%flagstruct, FV_Atm(1)%layout, _RC)
+      if (use_mapl_section) call ESMF_HConfigDestroy(geom_parent_cfg, _RC)
+
       call fv_init2(FV_Atm, dt, grids_on_my_pe, p_split)
 
       _RETURN(_SUCCESS)
