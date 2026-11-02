@@ -2366,7 +2366,10 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
     real, parameter :: TARGET_ADV_CFL = 0.90 ! Advection step target CFL
     real, parameter :: TARGET_HRZ_CFL = 0.75 ! Acoustic subcycle target CFL
     real, parameter :: TARGET_VRT_CFL = 3.75 ! Vertical stability limit
-    real, parameter :: K_HYSTERESIS_FACTOR = 1.1  ! 10% hysteresis buffer
+    
+    ! Asymmetric hysteresis: easier to increase k_split, harder to decrease
+    real, parameter :: K_INCREASE_FACTOR = 1.05  ! 5% buffer to increase k_split (more sensitive)
+    real, parameter :: K_DECREASE_FACTOR = 1.25  ! 25% buffer to decrease k_split (less sensitive)
     
     integer :: new_k_split, new_n_split, new_q_split
     integer :: target_k_split
@@ -2422,21 +2425,22 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
        ! Therefore: k >= max_cfl_z / TARGET_VRT_CFL
        target_k_split = max(1, ceiling(max_cfl_z / TARGET_VRT_CFL))
        
-       ! Apply hysteresis to prevent toggling
-       ! Only change k_split if CFL significantly exceeds threshold
+       ! Apply asymmetric hysteresis to favor stability
        if (target_k_split > state%k_split) then
-           ! Increasing k_split: only if CFL exceeds upper hysteresis threshold
-           if (max_cfl_z > real(state%k_split) * TARGET_VRT_CFL * K_HYSTERESIS_FACTOR) then
+           ! Increasing k_split: use smaller threshold (more sensitive to instability)
+           ! Only increase if CFL exceeds upper hysteresis threshold
+           if (max_cfl_z > real(state%k_split) * TARGET_VRT_CFL * K_INCREASE_FACTOR) then
                new_k_split = target_k_split
            else
                new_k_split = state%k_split  ! Stay at current value
            endif
        elseif (target_k_split < state%k_split) then
-           ! Decreasing k_split: only if CFL drops below lower hysteresis threshold
-           if (max_cfl_z < real(target_k_split) * TARGET_VRT_CFL / K_HYSTERESIS_FACTOR) then
+           ! Decreasing k_split: use larger threshold (less sensitive, favor stability)
+           ! Only decrease if CFL drops well below lower hysteresis threshold
+           if (max_cfl_z < real(target_k_split) * TARGET_VRT_CFL / K_DECREASE_FACTOR) then
                new_k_split = target_k_split
            else
-               new_k_split = state%k_split  ! Stay at current value
+               new_k_split = state%k_split  ! Stay at current value (maintain higher k_split)
            endif
        else
            new_k_split = state%k_split  ! Target equals current
