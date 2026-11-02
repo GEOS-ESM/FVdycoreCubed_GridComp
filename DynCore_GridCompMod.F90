@@ -2608,22 +2608,23 @@ contains
 
     call MAPL_GetResource(MAPL, adjust_splits, 'ADJUST_SPLITS:', default=.false., rc=status)
     VERIFY_(STATUS)
+    ! MAPL's DEFAULT argument is R4 regardless of the field or dycore precision.
     if (adjust_splits) then
        call MAPL_AddInternalSpec(gc, SHORT_NAME='K_SPLIT', LONG_NAME='remapping_splits', &
             UNITS='1', PRECISION=ESMF_KIND_R8, DIMS=MAPL_DimsNone, UNGRIDDED_DIMS=[1], &
-            VLOCATION=MAPL_VLocationNone, DEFAULT=-1.0, RESTART=MAPL_RestartOptional, RC=STATUS)
+            VLOCATION=MAPL_VLocationNone, DEFAULT=-1.0_REAL4, RESTART=MAPL_RestartOptional, RC=STATUS)
        VERIFY_(STATUS)
        call MAPL_AddInternalSpec(gc, SHORT_NAME='N_SPLIT', LONG_NAME='acoustic_splits', &
             UNITS='1', PRECISION=ESMF_KIND_R8, DIMS=MAPL_DimsNone, UNGRIDDED_DIMS=[1], &
-            VLOCATION=MAPL_VLocationNone, DEFAULT=-1.0, RESTART=MAPL_RestartOptional, RC=STATUS)
+            VLOCATION=MAPL_VLocationNone, DEFAULT=-1.0_REAL4, RESTART=MAPL_RestartOptional, RC=STATUS)
        VERIFY_(STATUS)
        call MAPL_AddInternalSpec(gc, SHORT_NAME='Q_SPLIT', LONG_NAME='tracer_advection_splits', &
             UNITS='1', PRECISION=ESMF_KIND_R8, DIMS=MAPL_DimsNone, UNGRIDDED_DIMS=[1], &
-            VLOCATION=MAPL_VLocationNone, DEFAULT=-1.0, RESTART=MAPL_RestartOptional, RC=STATUS)
+            VLOCATION=MAPL_VLocationNone, DEFAULT=-1.0_REAL4, RESTART=MAPL_RestartOptional, RC=STATUS)
        VERIFY_(STATUS)
        call MAPL_AddInternalSpec(gc, SHORT_NAME='BASE_ACOUSTIC_DT', LONG_NAME='baseline_acoustic_timestep', &
             UNITS='s', PRECISION=ESMF_KIND_R8, DIMS=MAPL_DimsNone, UNGRIDDED_DIMS=[1], &
-            VLOCATION=MAPL_VLocationNone, DEFAULT=-1.0, RESTART=MAPL_RestartOptional, RC=STATUS)
+            VLOCATION=MAPL_VLocationNone, DEFAULT=-1.0_REAL4, RESTART=MAPL_RestartOptional, RC=STATUS)
        VERIFY_(STATUS)
     endif
 

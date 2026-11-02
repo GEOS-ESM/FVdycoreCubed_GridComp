@@ -22,11 +22,23 @@ initialization.
 With `ADJUST_SPLITS: .false.`, the additional fields are not registered or read,
 and configured splitting and the existing restart layout are unchanged.
 
-The focused split-restart tests require Python 3 and `gfortran` and can be run
-with `python3 -m unittest discover -s tests -p 'test_restart_splits.py' -v`.
-They exercise the production split routines with stubbed MAPL storage and
-single-process collectives in both default-real precisions; full prognostic
-start/stop regression still requires the GEOSgcm fixture.
+The focused split-restart tests use pFUnit and the CMake-configured Fortran
+compiler, like MAPL's tests. In a GEOSgcm build with pFUnit available, run:
+
+```sh
+cmake --build <build-dir> --target build-tests
+ctest --test-dir <build-dir> -R FVdycoreCubed.adaptive_split_restart --output-on-failure
+```
+
+The tests exercise the production state declaration and split routines with
+stubbed MAPL storage and single-process collectives in both default-real
+precisions. Source-wiring checks run at CMake configuration time. Full MAPL
+restart I/O and prognostic start/stop regression still require the GEOSgcm fixture.
+
+CI runs the `ESSENTIAL` tests in the existing `build_gcm` build tree via the
+shared workflow's `run-tests: true` input (default: `false` for other callers).
+The `tests` target builds test executables incrementally and runs only tests
+labeled `ESSENTIAL`; it does not configure a second model build.
 
 ## License
 
