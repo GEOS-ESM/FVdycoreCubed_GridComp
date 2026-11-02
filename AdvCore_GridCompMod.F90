@@ -546,9 +546,10 @@ contains
       integer, intent(out) :: rc
 
       type(ESMF_VM) :: vm
-      type(ESMF_HConfig) :: hconfig
+      type(ESMF_HConfig) :: hconfig, geom_parent_cfg
       integer :: p_split = 1
-      integer :: comm, im_world, topology(2), num_levels, status
+      integer :: comm, num_levels, status
+      logical :: has_mapl_section, use_mapl_section
 
       call ESMF_VMGetCurrent(vm, _RC)
       call ESMF_VMGet(vm, mpiCommunicator=comm, _RC)
@@ -557,7 +558,21 @@ contains
       call fv_init1(FV_Atm, dt, grids_on_my_pe, p_split)
 
       call MAPL_GridCompGet(gc, hconfig=hconfig, num_levels=num_levels, _RC)
-      call setup_fv_dimensions_and_topology(hconfig, num_levels, FV_Atm(1)%flagstruct, FV_Atm(1)%layout, _RC)
+
+      ! setup_fv_dimensions_and_topology reads geometry:esmf_geom from the
+      ! config it is given; pass the mapl section if the geometry lives there
+      use_mapl_section = .false.
+      has_mapl_section = ESMF_HConfigIsDefined(hconfig, keyString="mapl", _RC)
+      if (has_mapl_section) then
+         geom_parent_cfg = ESMF_HConfigCreateAt(hconfig, keyString="mapl", _RC)
+         use_mapl_section = ESMF_HConfigIsDefined(geom_parent_cfg, keyString="geometry", _RC)
+         if (.not. use_mapl_section) call ESMF_HConfigDestroy(geom_parent_cfg, _RC)
+      end if
+      if (.not. use_mapl_section) geom_parent_cfg = hconfig
+
+      call setup_fv_dimensions_and_topology(geom_parent_cfg, num_levels, FV_Atm(1)%flagstruct, FV_Atm(1)%layout, _RC)
+      if (use_mapl_section) call ESMF_HConfigDestroy(geom_parent_cfg, _RC)
+
       call fv_init2(FV_Atm, dt, grids_on_my_pe, p_split)
 
       _RETURN(_SUCCESS)
