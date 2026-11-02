@@ -2455,11 +2455,7 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
        ! Calculate q_split from advection CFL
        ! advection_dt = DT / k
        ! We need: (max_cfl_h / k) <= TARGET_ADV_CFL
-       if (state%base_q_split == 0) then
-           new_q_split = 0
-       else
-           new_q_split = max(1, ceiling((max_cfl_h / real(new_k_split)) / TARGET_ADV_CFL))
-       endif
+       new_q_split = max(1, ceiling((max_cfl_h / real(new_k_split)) / TARGET_ADV_CFL))
        
        ! Calculate actual timesteps for reporting
        target_acoustic_dt = state%DT / real(new_k_split * new_n_split)
