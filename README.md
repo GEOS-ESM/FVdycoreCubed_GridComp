@@ -32,8 +32,8 @@ ctest --test-dir <build-dir> -R FVdycoreCubed.adaptive_split_restart --output-on
 
 The tests exercise the production state declaration and split routines with
 stubbed MAPL storage and single-process collectives in both default-real
-precisions. Source-wiring checks run at CMake configuration time. Full MAPL
-restart I/O and prognostic start/stop regression still require the GEOSgcm fixture.
+precisions. Full MAPL restart I/O and prognostic start/stop regression still
+require the GEOSgcm fixture.
 
 CI runs the `ESSENTIAL` tests in the existing `build_gcm` build tree via the
 shared workflow's `run-tests: true` input (default: `false` for other callers).

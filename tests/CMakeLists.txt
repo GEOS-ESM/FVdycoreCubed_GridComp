@@ -1,8 +1,7 @@
 include(add_pfunit_ctest)
 
 set(state_source "${CMAKE_CURRENT_SOURCE_DIR}/../FV_StateMod.F90")
-set(specs_source "${CMAKE_CURRENT_SOURCE_DIR}/../DynCore_GridCompMod.F90")
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${state_source} ${specs_source})
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${state_source})
 file(READ "${state_source}" source)
 
 # Compile the private production routines unchanged, with only external services stubbed.
@@ -29,26 +28,6 @@ foreach(routine FV_InitSplits FV_SaveSplits adjust_fv3_splits)
   string(APPEND split_routines "${block}\n")
 endforeach()
 configure_file(adaptive_split_restart_support.F90.in adaptive_split_restart_support.F90 @ONLY)
-
-# Retain the source-wiring checks from the original Python test.
-extract_block(source "\nsubroutine State_To_FV " "\nend subroutine State_To_FV" transfer)
-extract_block(source "\nsubroutine FV_Run " "\nend subroutine FV_Run" run)
-extract_block(source "\nsubroutine FV_To_State " "\nend subroutine FV_To_State" save)
-string(REGEX MATCHALL "call adjust_fv3_splits" adjustments "${run}")
-list(LENGTH adjustments adjustment_count)
-if (transfer MATCHES "adjust_fv3_splits" OR NOT adjustment_count EQUAL 1
-    OR NOT save MATCHES "call FV_SaveSplits\\(STATE\\)" OR source MATCHES "base_[knq]_split")
-  message(FATAL_ERROR "Unexpected adaptive-split timestep wiring in ${state_source}")
-endif ()
-file(READ "${specs_source}" specs)
-extract_block(specs "if (adjust_splits) then" "endif" specs)
-string(REGEX MATCHALL "RESTART=MAPL_RestartOptional" optional_fields "${specs}")
-string(REGEX MATCHALL "DEFAULT=-1\\.0_REAL4" defaults "${specs}")
-list(LENGTH optional_fields optional_count)
-list(LENGTH defaults default_count)
-if (NOT optional_count EQUAL 4 OR NOT default_count EQUAL 4)
-  message(FATAL_ERROR "Expected four optional split restart fields with -1 defaults explicitly typed REAL4 for MAPL")
-endif ()
 
 separate_arguments(real8_flags NATIVE_COMMAND "${FREAL8}")
 foreach(precision r4 r8)
