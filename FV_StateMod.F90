@@ -728,8 +728,8 @@ contains
       FV_Atm(1)%flagstruct%n_sponge = 3
       FV_Atm(1)%flagstruct%d2_bg_k1 = 0.20
       FV_Atm(1)%flagstruct%d2_bg_k2 = 0.13
-      FV_Atm(1)%flagstruct%n_zfilter = 0
-      FV_Atm(1)%flagstruct%fv_sg_adj = 0
+      FV_Atm(1)%flagstruct%n_zfilter = 45
+      FV_Atm(1)%flagstruct%fv_sg_adj = 450
       FV_Atm(1)%flagstruct%convert_ke = .true.
       FV_Atm(1)%flagstruct%d_con = 1.0
       FV_Atm(1)%flagstruct%consv_te = 0.0
@@ -747,13 +747,13 @@ contains
       FV_Atm(1)%flagstruct%geos_mlt_thermcond_limit = .false.
       FV_Atm(1)%flagstruct%geos_mlt_thermcond_zero_top_flux = .false.
       FV_Atm(1)%flagstruct%geos_mlt_thermcond_ghost_dz_factor = 1.0
-      FV_Atm(1)%flagstruct%geos_mlt_thermcond_top_flux_scale = 0.15
+      FV_Atm(1)%flagstruct%geos_mlt_thermcond_top_flux_scale = 1.0
       FV_Atm(1)%flagstruct%geos_mlt_momdiff_enable = .true.
       FV_Atm(1)%flagstruct%geos_mlt_momdiff_heat = .true.
       FV_Atm(1)%flagstruct%geos_mlt_momdiff_pr = 1.0
       FV_Atm(1)%flagstruct%geos_mlt_momdiff_pmax_pa = 1.0
-      FV_Atm(1)%flagstruct%RF_fast = .true.
-      FV_Atm(1)%flagstruct%tau = 0.28
+      FV_Atm(1)%flagstruct%RF_fast = .False.
+      FV_Atm(1)%flagstruct%tau = 0
       FV_Atm(1)%flagstruct%rf_cutoff = 35.0
    endif
 
