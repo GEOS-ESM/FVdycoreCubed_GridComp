@@ -54,9 +54,12 @@
                            ADIABATIC, SW_DYNAMICS, AdvCore_Advection, &
                            fv_getGradT_2D
    use m_topo_remap, only: dyn_topo_remap
+!============ GEOS-LAM Update Start =============
+! Construct bounded MAPL state, tracer schema and restart clock in the dry host.
    use FV_StateMod, only: FV_LamClock_Init,FV_LamClock_Save
    use LamGridMod, only: create_lam_grid
    use LamPassiveBoundaryMod, only: lam_passive_initial
+!============ GEOS-LAM Update End =============
    use CubeGridPrototype, only: register_grid_and_regridders
 
 ! !PUBLIC MEMBER FUNCTIONS:
@@ -2608,6 +2611,8 @@ contains
     call DynSetup(GC, LAYOUT_FILE, rc=status)
     VERIFY_(STATUS)
 
+!============ GEOS-LAM Update Start =============
+! Carry bounded passive-tracer schema, boundary values and test restart state.
     if (FV_Atm(1)%neststruct%regional) then
         call MAPL_AddInternalSpec(gc,SHORT_NAME='LAM_Q001',LONG_NAME='physical_lam_passive_q001_restart', &
              UNITS='kg kg-1',PRECISION=ESMF_KIND_R4,DIMS=MAPL_DimsHorzVert, &
@@ -2631,6 +2636,7 @@ contains
         VERIFY_(STATUS)
     endif
 
+!============ GEOS-LAM Update End =============
 ! Register prototype of cubed sphere grid and associated regridders
 !------------------------------------------------------------------
     call register_grid_and_regridders()
@@ -2640,11 +2646,14 @@ contains
     call ESMF_ConfigGetAttribute ( CF, FV3_STANDALONE, Label="FV3_STANDALONE:", default=0, RC=STATUS)
     VERIFY_(STATUS)
     if (FV3_STANDALONE /=0) then
+!============ GEOS-LAM Update Start =============
+! Construct bounded MAPL state, tracer schema and restart clock in the dry host.
         if (FV_Atm(1)%neststruct%regional) then
            call create_lam_grid(GC,status)
         else
            call MAPL_GridCreate(GC, rc=status)
         endif
+!============ GEOS-LAM Update End =============
         VERIFY_(STATUS)
         call MAPL_AddExportSpec( gc,                              &
             SHORT_NAME = 'TRADVEX',                                    &
@@ -2740,6 +2749,8 @@ contains
   integer                            :: km
   type(ESMF_FieldBundle)             :: tradv, tradvex
   integer                            :: i,numTracers,fv3_standalone
+!============ GEOS-LAM Update Start =============
+! Construct bounded MAPL state, tracer schema and restart clock in the dry host.
   ! Dry host-slice restart probe only.  The source record supplies the
   ! stopped CASE_TRACERS=0 value; no production restart path uses this.
   character(len=ESMF_MAXSTR)         :: dry_q_file, dry_q_name
@@ -2755,6 +2766,7 @@ contains
   character(len=4)                 :: lam_saved_name
   type(ESMF_VM)                     :: lam_vm
   real(r4), pointer                 :: lam_saved_q1(:,:,:),lam_saved_q2(:,:,:)
+!============ GEOS-LAM Update End =============
 
 ! Begin
 !------
@@ -2810,6 +2822,8 @@ contains
     if (ColdRestart /=0 ) then
       call Coldstart( gc, import, export, clock, rc=STATUS )
       VERIFY_(STATUS)
+!============ GEOS-LAM Update Start =============
+! Carry bounded passive-tracer schema, boundary values and test restart state.
     else
       call MAPL_GetResource(MAPL, dry_q_file, 'DRY_HARNESS_Q_RESTART:', default='', rc=status)
       VERIFY_(STATUS)
@@ -2927,6 +2941,7 @@ contains
         VERIFY_(STATUS)
         if(dry_q_count/=3) error stop 'LAM passive restart schema count'
       endif
+!============ GEOS-LAM Update End =============
     endif
 
 ! Set Private Internal State from Restart File
@@ -2938,6 +2953,8 @@ contains
     call MAPL_TimerOn(MAPL,"-DYN_INIT")
     call DynInit ( STATE, CLOCK, INTERNAL, IMPORT, GC, status)
     VERIFY_(STATUS)
+!============ GEOS-LAM Update Start =============
+! Carry bounded passive-tracer schema, boundary values and test restart state.
     if(FV_Atm(1)%neststruct%regional)then
       call ESMF_StateGet(import,'TRADV',dry_q_bundle,rc=status)
       VERIFY_(STATUS)
@@ -2982,6 +2999,7 @@ contains
     endif
     call MAPL_TimerOff(MAPL,"-DYN_INIT")
     call FV_LamClock_Init(GC,CLOCK,INTERNAL)
+!============ GEOS-LAM Update End =============
 
 ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
 ! ------------------------------------------------------------------------
@@ -3188,9 +3206,12 @@ subroutine Run(gc, import, export, clock, rc)
     type (ESMF_Config)                               :: cf
     type (ESMF_Alarm)                                :: Alarm
     type (ESMF_Grid)                                 :: ESMFGRID
+!============ GEOS-LAM Update Start =============
+! Construct bounded MAPL state, tracer schema and restart clock in the dry host.
     type (ESMF_State)                                :: lam_q_internal
     real(r4), pointer                                :: lam_q_save1(:,:,:),lam_q_save2(:,:,:)
     real(r4), pointer                                :: lam_q_out1(:,:,:),lam_q_out2(:,:,:)
+!============ GEOS-LAM Update End =============
     type (ESMF_Grid)                                 :: ANAgrid
     type (ESMF_Time)                                 :: currentTime
     type (ESMF_Time)                                 :: RefTime
@@ -3402,7 +3423,10 @@ subroutine Run(gc, import, export, clock, rc)
 
     integer :: FV3_STANDALONE
 
+!============ GEOS-LAM Update Start =============
+! Construct bounded MAPL state, tracer schema and restart clock in the dry host.
   real(r4),pointer::lam_dryq(:,:,:)
+!============ GEOS-LAM Update End =============
   Iam = "Run"
   call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
   VERIFY_(STATUS)
@@ -3537,6 +3561,8 @@ subroutine Run(gc, import, export, clock, rc)
 
       call ESMF_StateGet ( IMPORT, 'TRADV' , BUNDLE,   RC=STATUS )
       VERIFY_(STATUS)
+!============ GEOS-LAM Update Start =============
+! Construct bounded MAPL state, tracer schema and restart clock in the dry host.
       ! Recreate the dry standalone host's zero-Q bundle on warm start.
       if(FV_Atm(1)%neststruct%regional)then
          call ESMF_FieldBundleGet(BUNDLE,fieldCount=nqt,rc=status)
@@ -3550,6 +3576,7 @@ subroutine Run(gc, import, export, clock, rc)
          endif
       endif
 
+!============ GEOS-LAM Update End =============
 
       !-------------------------------------------------------------------
       ! ALT: this section attempts to limit the amount of advected tracers
@@ -4686,6 +4713,8 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_TimerOn(MAPL,"-DYN_CORE")
       t1 = MPI_Wtime(status)
       call DynRun (STATE, EXPORT, CLOCK, GC, PLE0=pe0, RC=STATUS)
+!============ GEOS-LAM Update Start =============
+! Carry bounded passive-tracer schema, boundary values and test restart state.
       call FV_LamClock_Save(GC)
       VERIFY_(STATUS)
       if (FV_Atm(1)%neststruct%regional) then
@@ -4706,6 +4735,7 @@ subroutine Run(gc, import, export, clock, rc)
          lam_q_out2=lam_q_save2
          print *, 'LAM_MAPL_Q_SAVED',sum(dble(lam_q_save1)),sum(dble(lam_q_save2))
       endif
+!============ GEOS-LAM Update End =============
       t2 = MPI_Wtime(status)
       dyn_run_timer = t2-t1
       call MAPL_TimerOff(MAPL,"-DYN_CORE")

@@ -28,10 +28,13 @@ module FV_StateMod
    use fv_grid_utils_mod,  only: inner_prod, mid_pt_sphere, cubed_to_latlon, &
                            ptop_min, g_sum
    use fv_grid_tools_mod,  only: get_unit_vector
+!============ GEOS-LAM Update Start =============
+! Trace dry-harness state for validation; not a production interface.
 #ifdef LAM_VALIDATION
    use LamAuditMod, only:lam_audit_before,lam_audit_after
 #endif
    use fv_lam_provider_mod, only: lam_prepare, lam_initial_state
+!============ GEOS-LAM Update End =============
    use fv_control_mod, only: fv_init1, fv_init2
    use fv_arrays_mod , only: fv_atmos_type, FVPRC, REAL4, REAL8
    use init_hydro_mod, only: p_var
@@ -82,7 +85,10 @@ private
   character(LEN=ESMF_MAXSTR) :: FV3_CONFIG
 
   public FV_Atm
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
   public FV_LamClock_Init, FV_LamClock_Save
+!============ GEOS-LAM Update End =============
   public FV_Setup, FV_InitState, FV_Run, FV_Finalize, FV_DA_Incs
   public FV_HYDROSTATIC, ADIABATIC, DEBUG, DEBUG_DYN, DEBUG_ADV, COLDSTART, CASE_ID, SW_DYNAMICS, AdvCore_Advection
   public FV_RESET_CONSTANTS
@@ -353,7 +359,10 @@ contains
   type (MAPL_MetaComp),          pointer :: MAPL  => NULL()
 
   integer :: comm
+!============ GEOS-LAM Update Start =============
+! Apply regional boundary data at the selected model time and dynamics stage.
   integer :: p_split=1, lam_mode, lam_split, lam_interval, lam_met_file_split
+!============ GEOS-LAM Update End =============
 
   real :: temp_real
   real :: imsize, sigma
@@ -386,6 +395,8 @@ contains
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
+!============ GEOS-LAM Update Start =============
+! Apply regional boundary data at the selected model time and dynamics stage.
       call MAPL_GetResource(MAPL,lam_mode,'LAM_MODE:',default=0,RC=STATUS)
       VERIFY_(STATUS)
       if (lam_mode/=0) then
@@ -405,6 +416,7 @@ contains
          FV_Atm(1)%neststruct%lam_p_split=lam_split
          FV_Atm(1)%neststruct%nsponge=1
       endif
+!============ GEOS-LAM Update End =============
 ! FV grid dimensions setup from MAPL
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'AGCM_IM:', default= 32, RC=STATUS )
       VERIFY_(STATUS)
@@ -439,7 +451,10 @@ contains
       FV_Atm(1)%layout(1) = nx
       call MAPL_GetResource( MAPL, ny, 'NY:', default=0, RC=STATUS )
       VERIFY_(STATUS)
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
       if (FV_Atm(1)%flagstruct%grid_type == 4 .or. FV_Atm(1)%neststruct%regional) then
+!============ GEOS-LAM Update End =============
          FV_Atm(1)%layout(2) = ny
       else
          FV_Atm(1)%layout(2) = ny / 6
@@ -801,6 +816,8 @@ contains
 
 !! Start up FV
     call MAPL_TimerOn(MAPL,"--FV_INIT")
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
     if (FV_Atm(1)%neststruct%regional) then
        FV_Atm(1)%flagstruct%k_split=1
        FV_Atm(1)%flagstruct%n_split=2
@@ -830,6 +847,7 @@ contains
        _ASSERT(.not.FV_Atm(1)%flagstruct%hydrostatic,'LAM first unit qualified for nonhydrostatic dry dynamics')
        _ASSERT(FV_Atm(1)%npz>=17,'LAM timing restart needs at least 17 levels')
     endif
+!============ GEOS-LAM Update End =============
     call MAPL_TimerOff(MAPL,"--FV_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
@@ -964,7 +982,10 @@ contains
   GRID%NPY    = FV_Atm(1)%flagstruct%NPY-1
   GRID%NPZ    = FV_Atm(1)%flagstruct%NPZ
   GRID%NPZ_P1 = FV_Atm(1)%flagstruct%NPZ+1
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
   GRID%NTILES = FV_Atm(1)%flagstruct%ntiles
+!============ GEOS-LAM Update End =============
   GRID%NQ     = MAX(1,FV_Atm(1)%flagstruct%ncnst)
 
   masterproc = mpp_root_pe()
@@ -1001,7 +1022,10 @@ contains
                      1, FV_Atm(1)%flagstruct%npz, FV_Atm(1)%flagstruct%npz+1,            &
                      U, V, PT, PE, PKZ, DZ, W, &
                      STATE%VARS )
+!============ GEOS-LAM Update Start =============
+! Trace dry-harness state for validation; not a production interface.
   call restart_trace('LOAD', STATE, CLOCK, .false.)
+!============ GEOS-LAM Update End =============
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: CREATE_VARS', RC=STATUS )
   VERIFY_(STATUS)
 
@@ -1123,7 +1147,10 @@ contains
 
   call MAPL_GetPointer ( import, phis, 'PHIS', RC=STATUS )
   VERIFY_(STATUS)
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
   if(FV_Atm(1)%neststruct%regional)phis=0.
+!============ GEOS-LAM Update End =============
 
  ! Set FV3 surface geopotential
   FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=REAL8)
@@ -1140,12 +1167,15 @@ contains
 
   if (COLDSTART) then
 
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
    if (FV_Atm(1)%neststruct%regional) then
        call lam_initial_state(FV_Atm(1))
        ak=FV_Atm(1)%ak
        bk=FV_Atm(1)%bk
        call FV_To_State(MAPL,STATE)
    else if (FV_Atm(1)%flagstruct%grid_type == 4) then
+!============ GEOS-LAM Update End =============
        if ( FV_Atm(1)%flagstruct%make_hybrid_z ) then
          hybrid = .false.
        else
@@ -1200,7 +1230,10 @@ contains
   endif
 
   if ( (gid==0)                              ) print*, ' '
+!============ GEOS-LAM Update Start =============
+! Trace dry-harness state for validation; not a production interface.
   call restart_trace('INIT', STATE, CLOCK, .true.)
+!============ GEOS-LAM Update End =============
   if ( (gid==0) .and. (COLDSTART)            ) print*, 'COLDSTARTING FV3'
   if ( (gid==0) .and. (ADIABATIC)            ) print*, 'FV3 being run Adiabatically'
   if ( (gid==0) .and. (.not. FV_HYDROSTATIC) ) print*, 'FV3 being run Non-Hydrostatic'
@@ -1270,6 +1303,8 @@ contains
 
 end subroutine FV_InitState
 
+!============ GEOS-LAM Update Start =============
+! Apply regional boundary data at the selected model time and dynamics stage.
 subroutine FV_LamClock_Init(GC,CLOCK,INTERNAL)
  type(ESMF_GridComp),intent(inout)::GC
  type(ESMF_Clock),intent(in)::CLOCK
@@ -1336,6 +1371,7 @@ subroutine FV_LamClock_Save(GC)
  meta(16)=FV_Atm(1)%npy;meta(17)=FV_Atm(1)%npz
 end subroutine
 
+!============ GEOS-LAM Update End =============
 subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
   type (T_FVDYCORE_STATE),pointer              :: STATE
@@ -1353,8 +1389,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   integer  :: days, seconds
   real(FVPRC) :: time_total, massD
 
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
   integer :: i,j,k,n,nn,lam_substep
   real :: lam_outer_dt
+!============ GEOS-LAM Update End =============
   integer :: isc,iec,jsc,jec,ng
   integer :: isd,ied,jsd,jed
   integer :: npx,npy,npz
@@ -1439,7 +1478,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   VERIFY_(STATUS)
 
   time_total = days*86400. + seconds
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
   if (FV_Atm(1)%neststruct%regional) call FV_LamClock_Run(CLOCK)
+!============ GEOS-LAM Update End =============
 
   isc = FV_Atm(1)%bd%isc
   iec = FV_Atm(1)%bd%iec
@@ -1698,10 +1740,13 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   myDT = state%dt
   elapsed_time = elapsed_time + myDT
 
+!============ GEOS-LAM Update Start =============
+! Trace dry-harness state for validation; not a production interface.
   call restart_trace('PRE', STATE, CLOCK, .true.)
   if (DEBUG) call debug_fv_state('Before Dynamics Execution',STATE)
   call State_To_FV( MAPL, STATE )
   call restart_trace('PULL', STATE, CLOCK, .true.)
+!============ GEOS-LAM Update End =============
 
   call MAPL_GetResource( MAPL, massD0, 'PSDRY:', default=MAPL_PSDRY, RC=STATUS )
   VERIFY_(STATUS)
@@ -1845,6 +1890,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   if (run_gtfv3 == 0) then
      call cpu_time(start)
 #endif
+!============ GEOS-LAM Update Start =============
+! Trace dry-harness state for validation; not a production interface.
      lam_outer_dt=myDT
      do lam_substep=1,merge(abs(FV_Atm(1)%neststruct%lam_p_split),1,FV_Atm(1)%neststruct%regional)
      if (FV_Atm(1)%neststruct%regional) then
@@ -1854,6 +1901,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
         call lam_audit_before(FV_Atm(1))
 #endif
      endif
+!============ GEOS-LAM Update End =============
      call fv_dynamics( &
           FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
           FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, &
@@ -1871,6 +1919,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
           FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
           FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
           FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, time_total)
+!============ GEOS-LAM Update Start =============
+! Trace dry-harness state for validation; not a production interface.
 #ifdef LAM_VALIDATION
      if(FV_Atm(1)%neststruct%regional) call lam_audit_after(FV_Atm(1), &
        FV_Atm(1)%neststruct%lam_elapsed+lam_substep*myDT)
@@ -1879,6 +1929,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
      call restart_trace('POSTDYN', STATE, CLOCK, .true.)
      myDT=lam_outer_dt
      if (FV_Atm(1)%neststruct%regional) FV_Atm(1)%neststruct%lam_elapsed=FV_Atm(1)%neststruct%lam_elapsed+myDT
+!============ GEOS-LAM Update End =============
 #ifdef RUN_GTFV3
      call cpu_time(finish)
      if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
@@ -2150,7 +2201,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
 ! Copy FV to internal State
    call FV_To_State ( MAPL, STATE )
+!============ GEOS-LAM Update Start =============
+! Trace dry-harness state for validation; not a production interface.
    call restart_trace('PUSH', STATE, CLOCK, .true.)
+!============ GEOS-LAM Update End =============
    if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
 
    RETURN_(ESMF_SUCCESS)
@@ -2257,6 +2311,8 @@ subroutine State_To_FV ( MAPL, STATE )
 ! D-Grid
   FV_Atm(1)%u(:,:,:) = tiny_number
   FV_Atm(1)%v(:,:,:) = tiny_number
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
   if (FV_Atm(1)%neststruct%regional) then
     ! MAPL stores the lower staggered edge. Scalar halo exchange retrieves
     ! duplicate upper edges from neighboring DEs even without tile contacts.
@@ -2268,6 +2324,7 @@ subroutine State_To_FV ( MAPL, STATE )
     FV_Atm(1)%u(isc:iec,jsc:jec+1,:)=uatemp(isc:iec,jsc:jec+1,:)
     FV_Atm(1)%v(isc:iec+1,jsc:jec,:)=vatemp(isc:iec+1,jsc:jec,:)
   else if (FV_Atm(1)%flagstruct%grid_type>=4) then
+!============ GEOS-LAM Update End =============
   ! Doubly Periodic
     uatemp(isc:iec,jsc:jec,:) = STATE%VARS%U
     vatemp(isc:iec,jsc:jec,:) = STATE%VARS%V
@@ -3697,6 +3754,8 @@ subroutine compute_utvt(isd,ied, jsd,jed, uc, vc, ut, vt, dt)
   ut = 0.0
   vt = 0.0
 
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
   ! Bounded grids have no cubed-sphere seam. Native C-grid covariant
   ! components use the general metric transform at every physical edge.
   if (FV_Atm(1)%neststruct%regional) then
@@ -3715,6 +3774,7 @@ subroutine compute_utvt(isd,ied, jsd,jed, uc, vc, ut, vt, dt)
      return
   endif
 
+!============ GEOS-LAM Update End =============
   if ( FV_Atm(1)%flagstruct%grid_type < 3 ) then
 
 ! Center of Cube Faces
@@ -3954,10 +4014,13 @@ subroutine fv_getVorticity(u, v, vort)
 
   utemp  = 0d0
   vtemp  = 0d0
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
   if (FV_Atm(1)%neststruct%regional) then
     utemp=FV_Atm(1)%u
     vtemp=FV_Atm(1)%v
   else if (FV_Atm(1)%flagstruct%grid_type>=4) then
+!============ GEOS-LAM Update End =============
   ! Doubly Periodic
     uatemp(isc:iec,jsc:jec,:) = u
     vatemp(isc:iec,jsc:jec,:) = v
@@ -4027,10 +4090,13 @@ subroutine fv_getDivergence(uc, vc, divg)
 
   uctemp  = 0d0
   vctemp  = 0d0
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
   if (FV_Atm(1)%neststruct%regional) then
     uctemp=FV_Atm(1)%uc
     vctemp=FV_Atm(1)%vc
   else if (FV_Atm(1)%flagstruct%grid_type>=4) then
+!============ GEOS-LAM Update End =============
   ! Doubly Periodic
     uatemp(isc:iec,jsc:jec,:) = uc
     vatemp(isc:iec,jsc:jec,:) = vc
@@ -4222,10 +4288,13 @@ subroutine fv_getEPV(pt, vort, ua, va, epv)
    enddo
 
    if (.not. FV_HYDROSTATIC) then
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
       if (FV_Atm(1)%neststruct%regional) then
          dz_g=FV_Atm(1)%delz
          pt_g=FV_Atm(1)%pt
       endif
+!============ GEOS-LAM Update End =============
       dz_g(isc:iec,jsc:jec,:) = FV_Atm(1)%delz(isc:iec,jsc:jec,:)
       pt_g(isc:iec,jsc:jec,:) = pt(isc:iec,jsc:jec,:)
       call mpp_update_domains(pt_g, FV_Atm(1)%domain, complete=.false.)
@@ -4366,6 +4435,8 @@ subroutine fv_getAllWinds_3D_R4(u, v, ua, va, uc, vc, ur, vr)
   vatemp = 0
   uctemp = 0
   vctemp = 0
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
   if (FV_Atm(1)%neststruct%regional) then
     utemp=FV_Atm(1)%u
     vtemp=FV_Atm(1)%v
@@ -4375,6 +4446,7 @@ subroutine fv_getAllWinds_3D_R4(u, v, ua, va, uc, vc, ur, vr)
     utemp(isc:iec,jsc:jec,:)=u
     vtemp(isc:iec,jsc:jec,:)=v
   else if (FV_Atm(1)%flagstruct%grid_type>=4) then
+!============ GEOS-LAM Update End =============
   ! Doubly Periodic
     uatemp(isc:iec,jsc:jec,:) = u
     vatemp(isc:iec,jsc:jec,:) = v
@@ -4489,6 +4561,8 @@ subroutine fv_getAllWinds_3D(u, v, ua, va, uc, vc, ur, vr)
   vatemp = 0
   uctemp = 0
   vctemp = 0
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
   if (FV_Atm(1)%neststruct%regional) then
     utemp=FV_Atm(1)%u
     vtemp=FV_Atm(1)%v
@@ -4498,6 +4572,7 @@ subroutine fv_getAllWinds_3D(u, v, ua, va, uc, vc, ur, vr)
     utemp(isc:iec,jsc:jec,:)=u
     vtemp(isc:iec,jsc:jec,:)=v
   else if (FV_Atm(1)%flagstruct%grid_type>=4) then
+!============ GEOS-LAM Update End =============
   ! Doubly Periodic
     uatemp(isc:iec,jsc:jec,:) = u
     vatemp(isc:iec,jsc:jec,:) = v
@@ -5045,7 +5120,10 @@ subroutine echo_fv3_setup()
 
 end subroutine echo_fv3_setup
 
+!============ GEOS-LAM Update Start =============
+! Initialize and advance the regional FV3 state through the GEOS wrapper.
 subroutine adiabatic_init(myDT,DEBUG_ARRAY,fac1)
+!============ GEOS-LAM Update End =============
    use fv_nwp_nudge_mod,    only: do_adiabatic_init
    real(FVPRC), intent(IN   ) :: myDT
    real(FVPRC), intent(INOUT) :: DEBUG_ARRAY(:,:,:)
@@ -5296,6 +5374,8 @@ subroutine WRITE_PARALLEL_L ( field, format )
   endif
 end subroutine WRITE_PARALLEL_L
 
+!============ GEOS-LAM Update Start =============
+! Trace dry-harness state for validation; not a production interface.
 
 ! Isolated read-only restart-state dump; absent from all baseline/repair sources.
 subroutine restart_trace(stage, state, clock, include_aux)
@@ -5369,5 +5449,6 @@ contains
   end subroutine trace4
 end subroutine restart_trace
 
+!============ GEOS-LAM Update End =============
 end module FV_StateMod
 

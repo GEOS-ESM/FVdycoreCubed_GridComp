@@ -1,3 +1,5 @@
+!============ GEOS-LAM Update Start =============
+! Construct the one-tile bounded MAPL grid and staggering.
 module LamGridMod
  use ESMF
  use MAPL
@@ -86,3 +88,4 @@ contains
  call ESMF_GridCompSet(gc,grid=grid,rc=rc)
  end subroutine
 end module
+!============ GEOS-LAM Update End =============

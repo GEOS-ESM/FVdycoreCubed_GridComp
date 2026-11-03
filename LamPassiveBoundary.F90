@@ -1,3 +1,5 @@
+!============ GEOS-LAM Update Start =============
+! Provide passive tracers in the dry test harness; not production restart.
 ! Isolated manufactured-passive contract probe for the dry standalone host.
 module LamPassiveBoundaryMod
   use ESMF
@@ -172,3 +174,4 @@ contains
     enddo
   end subroutine
 end module
+!============ GEOS-LAM Update End =============
