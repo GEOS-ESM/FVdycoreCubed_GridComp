@@ -21,7 +21,9 @@ set (srcs
   fv_regrid_c2c_bin.F90
   fv_regridding_utils.F90
   rs_scaleMod.F90
-  )
+  
+  LamGrid.F90
+)
 if (BUILD_GEOS_GTFV3_INTERFACE)
   list (APPEND srcs
   geos-gtfv3/geos_gtfv3_interface.f90

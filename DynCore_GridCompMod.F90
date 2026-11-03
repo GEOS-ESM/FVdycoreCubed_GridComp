@@ -54,6 +54,9 @@
                            ADIABATIC, SW_DYNAMICS, AdvCore_Advection, &
                            fv_getGradT_2D
    use m_topo_remap, only: dyn_topo_remap
+   use FV_StateMod, only: FV_LamClock_Init,FV_LamClock_Save
+   use LamGridMod, only: create_lam_grid
+   use LamPassiveBoundaryMod, only: lam_passive_initial
    use CubeGridPrototype, only: register_grid_and_regridders
 
 ! !PUBLIC MEMBER FUNCTIONS:
@@ -2605,6 +2608,29 @@ contains
     call DynSetup(GC, LAYOUT_FILE, rc=status)
     VERIFY_(STATUS)
 
+    if (FV_Atm(1)%neststruct%regional) then
+        call MAPL_AddInternalSpec(gc,SHORT_NAME='LAM_Q001',LONG_NAME='physical_lam_passive_q001_restart', &
+             UNITS='kg kg-1',PRECISION=ESMF_KIND_R4,DIMS=MAPL_DimsHorzVert, &
+             VLOCATION=MAPL_VLocationCenter,RESTART=MAPL_RestartRequired,RC=STATUS)
+        VERIFY_(STATUS)
+        call MAPL_AddInternalSpec(gc,SHORT_NAME='LAM_Q002',LONG_NAME='physical_lam_passive_q002_restart', &
+             UNITS='kg kg-1',PRECISION=ESMF_KIND_R4,DIMS=MAPL_DimsHorzVert, &
+             VLOCATION=MAPL_VLocationCenter,RESTART=MAPL_RestartRequired,RC=STATUS)
+        VERIFY_(STATUS)
+        call MAPL_AddExportSpec(gc,SHORT_NAME='LAM_Q001',LONG_NAME='physical_lam_passive_q001', &
+             UNITS='kg kg-1',PRECISION=ESMF_KIND_R4,DIMS=MAPL_DimsHorzVert, &
+             VLOCATION=MAPL_VLocationCenter,RC=STATUS)
+        VERIFY_(STATUS)
+        call MAPL_AddExportSpec(gc,SHORT_NAME='LAM_Q002',LONG_NAME='physical_lam_passive_q002', &
+             UNITS='kg kg-1',PRECISION=ESMF_KIND_R4,DIMS=MAPL_DimsHorzVert, &
+             VLOCATION=MAPL_VLocationCenter,RC=STATUS)
+        VERIFY_(STATUS)
+        call MAPL_AddInternalSpec(gc,SHORT_NAME='LAM_CLOCK',LONG_NAME='file_boundary_restart_clock_v1', &
+             UNITS='1',PRECISION=ESMF_KIND_R8,DIMS=MAPL_DimsVertOnly,VLOCATION=MAPL_VLocationCenter, &
+             RESTART=MAPL_RestartRequired,RC=STATUS)
+        VERIFY_(STATUS)
+    endif
+
 ! Register prototype of cubed sphere grid and associated regridders
 !------------------------------------------------------------------
     call register_grid_and_regridders()
@@ -2614,7 +2640,11 @@ contains
     call ESMF_ConfigGetAttribute ( CF, FV3_STANDALONE, Label="FV3_STANDALONE:", default=0, RC=STATUS)
     VERIFY_(STATUS)
     if (FV3_STANDALONE /=0) then
-        call MAPL_GridCreate(GC, rc=status)
+        if (FV_Atm(1)%neststruct%regional) then
+           call create_lam_grid(GC,status)
+        else
+           call MAPL_GridCreate(GC, rc=status)
+        endif
         VERIFY_(STATUS)
         call MAPL_AddExportSpec( gc,                              &
             SHORT_NAME = 'TRADVEX',                                    &
@@ -2710,6 +2740,21 @@ contains
   integer                            :: km
   type(ESMF_FieldBundle)             :: tradv, tradvex
   integer                            :: i,numTracers,fv3_standalone
+  ! Dry host-slice restart probe only.  The source record supplies the
+  ! stopped CASE_TRACERS=0 value; no production restart path uses this.
+  character(len=ESMF_MAXSTR)         :: dry_q_file, dry_q_name
+  type(ESMF_Grid)                    :: dry_q_grid
+  type(ESMF_FieldBundle)             :: dry_q_bundle
+  real(r4), pointer                  :: dry_q(:,:,:)
+  real(r4)                           :: dry_q_value
+  integer                            :: dry_q_unit, dry_q_kind, dry_q_count, dry_case_tracers
+  ! Isolated passive-tracer sidecar restart contract (not a production MAPL restart).
+  integer                            :: lam_restart_seconds, lam_rank, lam_magic, lam_saved_seconds
+  integer                            :: lam_nq, lam_shape(3), lam_n, lam_restart_unit
+  character(len=256)               :: lam_restart_file
+  character(len=4)                 :: lam_saved_name
+  type(ESMF_VM)                     :: lam_vm
+  real(r4), pointer                 :: lam_saved_q1(:,:,:),lam_saved_q2(:,:,:)
 
 ! Begin
 !------
@@ -2765,6 +2810,123 @@ contains
     if (ColdRestart /=0 ) then
       call Coldstart( gc, import, export, clock, rc=STATUS )
       VERIFY_(STATUS)
+    else
+      call MAPL_GetResource(MAPL, dry_q_file, 'DRY_HARNESS_Q_RESTART:', default='', rc=status)
+      VERIFY_(STATUS)
+      if (len_trim(dry_q_file) /= 0) then
+        call ESMF_ConfigGetAttribute(cf, dry_case_tracers, label='CASE_TRACERS:', default=-1, rc=status)
+        VERIFY_(STATUS)
+        if (dry_case_tracers /= 0) error stop 'dry Q restore requires CASE_TRACERS=0'
+        call ESMF_StateGet(import, 'TRADV', dry_q_bundle, rc=status)
+        VERIFY_(STATUS)
+        call ESMF_FieldBundleGet(dry_q_bundle, fieldCount=dry_q_count, rc=status)
+        VERIFY_(STATUS)
+        if (dry_q_count /= 0) error stop 'dry Q restore requires empty TRADV'
+        open(newunit=dry_q_unit, file=trim(dry_q_file), status='old', action='read', iostat=status)
+        if (status /= 0) error stop 'dry Q restart source missing'
+        read(dry_q_unit, *, iostat=status) dry_q_name, dry_q_kind, dry_q_value
+        close(dry_q_unit)
+        if (status /= 0) error stop 'dry Q restart source invalid'
+        if (trim(dry_q_name) /= 'Q' .or. dry_q_kind /= 4) &
+          error stop 'dry Q restart schema mismatch'
+        call MAPL_Get(MAPL, INTERNAL_ESMF_STATE=INTERNAL, rc=status)
+        VERIFY_(STATUS)
+        call MAPL_GetPointer(INTERNAL, ud, 'U', rc=status)
+        VERIFY_(STATUS)
+        call ESMF_GridCompGet(gc, grid=dry_q_grid, rc=status)
+        VERIFY_(STATUS)
+        allocate(dry_q(lbound(ud,1):ubound(ud,1),lbound(ud,2):ubound(ud,2),lbound(ud,3):ubound(ud,3)))
+        dry_q = dry_q_value
+        dry_q_name = 'Q'
+        call addTracer(state, dry_q_bundle, dry_q, dry_q_grid, dry_q_name)
+        deallocate(dry_q)
+        call ESMF_FieldBundleGet(dry_q_bundle, fieldCount=dry_q_count, rc=status)
+        VERIFY_(STATUS)
+        if (dry_q_count /= 1 .or. state%grid%NQ /= 1 .or. &
+            .not. state%vars%tracer(1)%is_r4) error stop 'dry Q restore postcondition failed'
+        if (any(state%vars%tracer(1)%content_r4 /= dry_q_value)) &
+          error stop 'dry Q restore value mismatch'
+        print *, 'DRY_HARNESS_Q_RESTORED', dry_q_count, trim(dry_q_name), dry_q_kind, dry_q_value
+      endif
+      call MAPL_GetResource(MAPL,lam_restart_seconds,'LAM_PASSIVE_RESTART_SECONDS:',default=-1,rc=status)
+      VERIFY_(STATUS)
+      if(FV_Atm(1)%neststruct%regional.and.lam_restart_seconds<0.and.len_trim(dry_q_file)==0)then
+        call ESMF_StateGet(import,'TRADV',dry_q_bundle,rc=status)
+        VERIFY_(STATUS)
+        call ESMF_FieldBundleGet(dry_q_bundle,fieldCount=dry_q_count,rc=status)
+        VERIFY_(STATUS)
+        if(dry_q_count/=0) error stop 'LAM MAPL Q restart requires empty TRADV'
+        call MAPL_Get(MAPL,INTERNAL_ESMF_STATE=INTERNAL,rc=status)
+        VERIFY_(STATUS)
+        call MAPL_GetPointer(INTERNAL,lam_saved_q1,'LAM_Q001',rc=status)
+        VERIFY_(STATUS)
+        call MAPL_GetPointer(INTERNAL,lam_saved_q2,'LAM_Q002',rc=status)
+        VERIFY_(STATUS)
+        if(any(shape(lam_saved_q1)/=shape(lam_saved_q2))) error stop 'LAM MAPL Q restart shape'
+        if(any(lam_saved_q1<0.).or.any(lam_saved_q2<0.)) error stop 'LAM MAPL Q restart negative'
+        if(any(lam_saved_q1/=lam_saved_q1).or.any(lam_saved_q2/=lam_saved_q2)) &
+             error stop 'LAM MAPL Q restart nonfinite'
+        call ESMF_GridCompGet(gc,grid=dry_q_grid,rc=status)
+        VERIFY_(STATUS)
+        allocate(dry_q(lbound(lam_saved_q1,1):ubound(lam_saved_q1,1), &
+             lbound(lam_saved_q1,2):ubound(lam_saved_q1,2), &
+             lbound(lam_saved_q1,3):ubound(lam_saved_q1,3)))
+        dry_q=0.;dry_q_name='Q'
+        call addTracer(state,dry_q_bundle,dry_q,dry_q_grid,dry_q_name)
+        deallocate(dry_q)
+        dry_q_name='Q001'
+        call addTracer(state,dry_q_bundle,lam_saved_q1,dry_q_grid,dry_q_name)
+        dry_q_name='Q002'
+        call addTracer(state,dry_q_bundle,lam_saved_q2,dry_q_grid,dry_q_name)
+        print *, 'LAM_MAPL_Q_RESTORED',sum(dble(lam_saved_q1)),sum(dble(lam_saved_q2))
+      endif
+      if(lam_restart_seconds>=0)then
+        if(len_trim(dry_q_file)/=0) error stop 'LAM passive and zero-Q restart conflict'
+        call ESMF_ConfigGetAttribute(cf,dry_case_tracers,label='CASE_TRACERS:',default=-1,rc=status)
+        VERIFY_(STATUS)
+        if(dry_case_tracers/=2) error stop 'LAM passive restart requires two passives'
+        call ESMF_StateGet(import,'TRADV',dry_q_bundle,rc=status)
+        VERIFY_(STATUS)
+        call ESMF_FieldBundleGet(dry_q_bundle,fieldCount=dry_q_count,rc=status)
+        VERIFY_(STATUS)
+        if(dry_q_count/=0) error stop 'LAM passive restart requires empty TRADV'
+        call MAPL_Get(MAPL,INTERNAL_ESMF_STATE=INTERNAL,rc=status)
+        VERIFY_(STATUS)
+        call MAPL_GetPointer(INTERNAL,ud,'U',rc=status)
+        VERIFY_(STATUS)
+        call ESMF_GridCompGet(gc,grid=dry_q_grid,rc=status)
+        VERIFY_(STATUS)
+        call ESMF_VMGetGlobal(lam_vm,rc=status)
+        VERIFY_(STATUS)
+        call ESMF_VMGet(lam_vm,localPet=lam_rank,rc=status)
+        VERIFY_(STATUS)
+        write(lam_restart_file,'("INPUT/lam-passive-",I6.6,"-p",I4.4,".bin")')lam_restart_seconds,lam_rank
+        open(newunit=lam_restart_unit,file=trim(lam_restart_file),status='old', &
+             access='stream',form='unformatted',action='read',iostat=status)
+        if(status/=0) error stop 'LAM passive restart sidecar missing'
+        read(lam_restart_unit,iostat=status)lam_magic,lam_saved_seconds,lam_nq
+        if(status/=0.or.lam_magic/=440314.or.lam_saved_seconds/=lam_restart_seconds.or.lam_nq/=3) &
+             error stop 'LAM passive restart header'
+        do lam_n=1,3
+          read(lam_restart_unit,iostat=status)lam_saved_name,lam_shape
+          if(status/=0.or.any(lam_shape/=shape(ud))) error stop 'LAM passive restart shape'
+          if(lam_n==1.and.lam_saved_name/='Q   ') error stop 'LAM passive restart Q schema'
+          if(lam_n==2.and.lam_saved_name/='Q001') error stop 'LAM passive restart Q001 schema'
+          if(lam_n==3.and.lam_saved_name/='Q002') error stop 'LAM passive restart Q002 schema'
+          allocate(dry_q(lbound(ud,1):ubound(ud,1),lbound(ud,2):ubound(ud,2),lbound(ud,3):ubound(ud,3)))
+          read(lam_restart_unit,iostat=status)dry_q
+          if(status/=0) error stop 'LAM passive restart data'
+          dry_q_name=trim(lam_saved_name)
+          call addTracer(state,dry_q_bundle,dry_q,dry_q_grid,dry_q_name)
+          print *, 'LAM_PASSIVE_RESTORED',lam_restart_seconds,lam_rank,lam_n,trim(dry_q_name), &
+               minval(dry_q),maxval(dry_q),sum(dble(dry_q))
+          deallocate(dry_q)
+        enddo
+        close(lam_restart_unit)
+        call ESMF_FieldBundleGet(dry_q_bundle,fieldCount=dry_q_count,rc=status)
+        VERIFY_(STATUS)
+        if(dry_q_count/=3) error stop 'LAM passive restart schema count'
+      endif
     endif
 
 ! Set Private Internal State from Restart File
@@ -2776,7 +2938,50 @@ contains
     call MAPL_TimerOn(MAPL,"-DYN_INIT")
     call DynInit ( STATE, CLOCK, INTERNAL, IMPORT, GC, status)
     VERIFY_(STATUS)
+    if(FV_Atm(1)%neststruct%regional)then
+      call ESMF_StateGet(import,'TRADV',dry_q_bundle,rc=status)
+      VERIFY_(STATUS)
+      call ESMF_FieldBundleGet(dry_q_bundle,fieldCount=dry_q_count,rc=status)
+      VERIFY_(STATUS)
+      if(dry_q_count/=3) error stop 'LAM MAPL Q schema after DYN init'
+      call MAPL_GetPointer(INTERNAL,lam_saved_q1,'LAM_Q001',rc=status)
+      VERIFY_(STATUS)
+      call MAPL_GetPointer(INTERNAL,lam_saved_q2,'LAM_Q002',rc=status)
+      VERIFY_(STATUS)
+      call ESMF_FieldBundleGet(dry_q_bundle,fieldIndex=2,field=field,rc=status)
+      VERIFY_(STATUS)
+      call ESMF_FieldGet(field,name=dry_q_name,rc=status)
+      VERIFY_(STATUS)
+      call ESMF_FieldGet(field,farrayPtr=dry_q,rc=status)
+      VERIFY_(STATUS)
+      if(trim(dry_q_name)/='Q001'.or.any(shape(dry_q)/=shape(lam_saved_q1))) &
+           error stop 'LAM MAPL Q001 schema after DYN init'
+      if(ColdRestart/=0)then
+        lam_saved_q1=dry_q
+      else if(lam_restart_seconds<0.and.len_trim(dry_q_file)==0)then
+        if(any(lam_saved_q1/=dry_q)) error stop 'LAM MAPL Q001 altered during DYN init'
+      endif
+      call ESMF_FieldBundleGet(dry_q_bundle,fieldIndex=3,field=field,rc=status)
+      VERIFY_(STATUS)
+      call ESMF_FieldGet(field,name=dry_q_name,rc=status)
+      VERIFY_(STATUS)
+      call ESMF_FieldGet(field,farrayPtr=dry_q,rc=status)
+      VERIFY_(STATUS)
+      if(trim(dry_q_name)/='Q002'.or.any(shape(dry_q)/=shape(lam_saved_q2))) &
+           error stop 'LAM MAPL Q002 schema after DYN init'
+      if(ColdRestart/=0)then
+        lam_saved_q2=dry_q
+      else if(lam_restart_seconds<0.and.len_trim(dry_q_file)==0)then
+        if(any(lam_saved_q2/=dry_q)) error stop 'LAM MAPL Q002 altered during DYN init'
+      endif
+    endif
+    if (FV_Atm(1)%neststruct%regional .and. ColdRestart /= 0) then
+       call ESMF_StateGet(import,'TRADV',tradv,rc=status)
+       VERIFY_(STATUS)
+       call lam_passive_initial(tradv)
+    endif
     call MAPL_TimerOff(MAPL,"-DYN_INIT")
+    call FV_LamClock_Init(GC,CLOCK,INTERNAL)
 
 ! Create PLE and PREF EXPORT Coupling (Needs to be done only once per run)
 ! ------------------------------------------------------------------------
@@ -2983,6 +3188,9 @@ subroutine Run(gc, import, export, clock, rc)
     type (ESMF_Config)                               :: cf
     type (ESMF_Alarm)                                :: Alarm
     type (ESMF_Grid)                                 :: ESMFGRID
+    type (ESMF_State)                                :: lam_q_internal
+    real(r4), pointer                                :: lam_q_save1(:,:,:),lam_q_save2(:,:,:)
+    real(r4), pointer                                :: lam_q_out1(:,:,:),lam_q_out2(:,:,:)
     type (ESMF_Grid)                                 :: ANAgrid
     type (ESMF_Time)                                 :: currentTime
     type (ESMF_Time)                                 :: RefTime
@@ -3194,6 +3402,7 @@ subroutine Run(gc, import, export, clock, rc)
 
     integer :: FV3_STANDALONE
 
+  real(r4),pointer::lam_dryq(:,:,:)
   Iam = "Run"
   call ESMF_GridCompGet( GC, name=COMP_NAME, CONFIG=CF, grid=ESMFGRID, RC=STATUS )
   VERIFY_(STATUS)
@@ -3328,6 +3537,19 @@ subroutine Run(gc, import, export, clock, rc)
 
       call ESMF_StateGet ( IMPORT, 'TRADV' , BUNDLE,   RC=STATUS )
       VERIFY_(STATUS)
+      ! Recreate the dry standalone host's zero-Q bundle on warm start.
+      if(FV_Atm(1)%neststruct%regional)then
+         call ESMF_FieldBundleGet(BUNDLE,fieldCount=nqt,rc=status)
+         VERIFY_(STATUS)
+         if(nqt==0)then
+            call freeTracers(state)
+            allocate(lam_dryq(ifirstxy:ilastxy,jfirstxy:jlastxy,km))
+            lam_dryq=0.;fieldname='Q'
+            call addTracer(state,BUNDLE,lam_dryq,esmfGRID,fieldname)
+            deallocate(lam_dryq)
+         endif
+      endif
+
 
       !-------------------------------------------------------------------
       ! ALT: this section attempts to limit the amount of advected tracers
@@ -4464,7 +4686,26 @@ subroutine Run(gc, import, export, clock, rc)
       call MAPL_TimerOn(MAPL,"-DYN_CORE")
       t1 = MPI_Wtime(status)
       call DynRun (STATE, EXPORT, CLOCK, GC, PLE0=pe0, RC=STATUS)
+      call FV_LamClock_Save(GC)
       VERIFY_(STATUS)
+      if (FV_Atm(1)%neststruct%regional) then
+         if(state%grid%nq/=3) error stop 'LAM MAPL Q schema after DYN run'
+         call MAPL_Get(MAPL,INTERNAL_ESMF_STATE=lam_q_internal,rc=status)
+         VERIFY_(STATUS)
+         call MAPL_GetPointer(lam_q_internal,lam_q_save1,'LAM_Q001',rc=status)
+         VERIFY_(STATUS)
+         call MAPL_GetPointer(lam_q_internal,lam_q_save2,'LAM_Q002',rc=status)
+         VERIFY_(STATUS)
+         call MAPL_GetPointer(export,lam_q_out1,'LAM_Q001',alloc=.true.,rc=status)
+         VERIFY_(STATUS)
+         call MAPL_GetPointer(export,lam_q_out2,'LAM_Q002',alloc=.true.,rc=status)
+         VERIFY_(STATUS)
+         lam_q_save1=state%vars%tracer(2)%content_r4
+         lam_q_save2=state%vars%tracer(3)%content_r4
+         lam_q_out1=lam_q_save1
+         lam_q_out2=lam_q_save2
+         print *, 'LAM_MAPL_Q_SAVED',sum(dble(lam_q_save1)),sum(dble(lam_q_save2))
+      endif
       t2 = MPI_Wtime(status)
       dyn_run_timer = t2-t1
       call MAPL_TimerOff(MAPL,"-DYN_CORE")

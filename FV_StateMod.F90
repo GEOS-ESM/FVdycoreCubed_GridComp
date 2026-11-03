@@ -28,6 +28,10 @@ module FV_StateMod
    use fv_grid_utils_mod,  only: inner_prod, mid_pt_sphere, cubed_to_latlon, &
                            ptop_min, g_sum
    use fv_grid_tools_mod,  only: get_unit_vector
+#ifdef LAM_VALIDATION
+   use LamAuditMod, only:lam_audit_before,lam_audit_after
+#endif
+   use fv_lam_provider_mod, only: lam_prepare, lam_initial_state
    use fv_control_mod, only: fv_init1, fv_init2
    use fv_arrays_mod , only: fv_atmos_type, FVPRC, REAL4, REAL8
    use init_hydro_mod, only: p_var
@@ -78,6 +82,7 @@ private
   character(LEN=ESMF_MAXSTR) :: FV3_CONFIG
 
   public FV_Atm
+  public FV_LamClock_Init, FV_LamClock_Save
   public FV_Setup, FV_InitState, FV_Run, FV_Finalize, FV_DA_Incs
   public FV_HYDROSTATIC, ADIABATIC, DEBUG, DEBUG_DYN, DEBUG_ADV, COLDSTART, CASE_ID, SW_DYNAMICS, AdvCore_Advection
   public FV_RESET_CONSTANTS
@@ -348,7 +353,7 @@ contains
   type (MAPL_MetaComp),          pointer :: MAPL  => NULL()
 
   integer :: comm
-  integer :: p_split=1
+  integer :: p_split=1, lam_mode, lam_split, lam_interval, lam_met_file_split
 
   real :: temp_real
   real :: imsize, sigma
@@ -381,6 +386,25 @@ contains
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
+      call MAPL_GetResource(MAPL,lam_mode,'LAM_MODE:',default=0,RC=STATUS)
+      VERIFY_(STATUS)
+      if (lam_mode/=0) then
+         FV_Atm(1)%neststruct%regional=.true.
+         call MAPL_GetResource(MAPL,lam_met_file_split,'LAM_MET_FILE_SPLIT:',default=0,RC=STATUS)
+         VERIFY_(STATUS)
+         if(lam_met_file_split/=0.and.lam_met_file_split/=1) &
+              error stop 'LAM_MET_FILE_SPLIT must be 0 or 1'
+         FV_Atm(1)%neststruct%lam_met_file_split=lam_met_file_split==1
+         call MAPL_GetResource(MAPL,lam_interval,'LAM_INTERVAL_HOURS:',default=3,RC=STATUS)
+         VERIFY_(STATUS)
+         call MAPL_GetResource(MAPL,lam_split,'LAM_P_SPLIT:',default=1,RC=STATUS)
+         VERIFY_(STATUS)
+         _ASSERT(lam_interval>0 .and. lam_interval<=24,'LAM interval must be 1..24 hours')
+         _ASSERT(abs(lam_split)==1 .or. abs(lam_split)==2,'LAM p_split must be +/-1 or +/-2')
+         FV_Atm(1)%neststruct%lam_interval=lam_interval
+         FV_Atm(1)%neststruct%lam_p_split=lam_split
+         FV_Atm(1)%neststruct%nsponge=1
+      endif
 ! FV grid dimensions setup from MAPL
       call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'AGCM_IM:', default= 32, RC=STATUS )
       VERIFY_(STATUS)
@@ -415,7 +439,7 @@ contains
       FV_Atm(1)%layout(1) = nx
       call MAPL_GetResource( MAPL, ny, 'NY:', default=0, RC=STATUS )
       VERIFY_(STATUS)
-      if (FV_Atm(1)%flagstruct%grid_type == 4) then
+      if (FV_Atm(1)%flagstruct%grid_type == 4 .or. FV_Atm(1)%neststruct%regional) then
          FV_Atm(1)%layout(2) = ny
       else
          FV_Atm(1)%layout(2) = ny / 6
@@ -777,7 +801,35 @@ contains
 
 !! Start up FV
     call MAPL_TimerOn(MAPL,"--FV_INIT")
+    if (FV_Atm(1)%neststruct%regional) then
+       FV_Atm(1)%flagstruct%k_split=1
+       FV_Atm(1)%flagstruct%n_split=2
+       FV_Atm(1)%flagstruct%nord=1
+       FV_Atm(1)%flagstruct%d2_bg=0.
+       FV_Atm(1)%flagstruct%d4_bg_top=0.12
+       FV_Atm(1)%flagstruct%d4_bg_bot=0.12
+#ifdef LAM_VALIDATION
+       call MAPL_GetResource(MAPL,FV_Atm(1)%flagstruct%d4_bg_top,'SCIENCE_D4:',default=0.12_FVPRC,RC=STATUS)
+       VERIFY_(STATUS)
+       FV_Atm(1)%flagstruct%d4_bg_bot=FV_Atm(1)%flagstruct%d4_bg_top
+#endif
+
+       FV_Atm(1)%flagstruct%d2_bg_k1=0.
+       FV_Atm(1)%flagstruct%d2_bg_k2=0.
+       FV_Atm(1)%flagstruct%n_sponge=0
+       FV_Atm(1)%flagstruct%consv_te=0.
+       FV_Atm(1)%flagstruct%tau=0.
+       FV_Atm(1)%flagstruct%make_nh=.false.
+       FV_Atm(1)%flagstruct%na_init=0
+       _ASSERT(.not.fix_mass .and. ADIABATIC,"LAM requires adiabatic mode and fix_mass=0")
+       FV_Atm(1)%flagstruct%fv_sg_adj=-1
+    endif
     call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
+    if(FV_Atm(1)%neststruct%regional)then
+       _ASSERT(FV_Atm(1)%flagstruct%k_split==1,'LAM first unit requires k_split=1')
+       _ASSERT(.not.FV_Atm(1)%flagstruct%hydrostatic,'LAM first unit qualified for nonhydrostatic dry dynamics')
+       _ASSERT(FV_Atm(1)%npz>=17,'LAM timing restart needs at least 17 levels')
+    endif
     call MAPL_TimerOff(MAPL,"--FV_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
@@ -912,7 +964,7 @@ contains
   GRID%NPY    = FV_Atm(1)%flagstruct%NPY-1
   GRID%NPZ    = FV_Atm(1)%flagstruct%NPZ
   GRID%NPZ_P1 = FV_Atm(1)%flagstruct%NPZ+1
-  GRID%NTILES = 6
+  GRID%NTILES = FV_Atm(1)%flagstruct%ntiles
   GRID%NQ     = MAX(1,FV_Atm(1)%flagstruct%ncnst)
 
   masterproc = mpp_root_pe()
@@ -949,6 +1001,7 @@ contains
                      1, FV_Atm(1)%flagstruct%npz, FV_Atm(1)%flagstruct%npz+1,            &
                      U, V, PT, PE, PKZ, DZ, W, &
                      STATE%VARS )
+  call restart_trace('LOAD', STATE, CLOCK, .false.)
   call MAPL_MemUtilsWrite(VM, 'FV_StateMod: CREATE_VARS', RC=STATUS )
   VERIFY_(STATUS)
 
@@ -1070,6 +1123,7 @@ contains
 
   call MAPL_GetPointer ( import, phis, 'PHIS', RC=STATUS )
   VERIFY_(STATUS)
+  if(FV_Atm(1)%neststruct%regional)phis=0.
 
  ! Set FV3 surface geopotential
   FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=REAL8)
@@ -1086,7 +1140,12 @@ contains
 
   if (COLDSTART) then
 
-   if (FV_Atm(1)%flagstruct%grid_type == 4) then
+   if (FV_Atm(1)%neststruct%regional) then
+       call lam_initial_state(FV_Atm(1))
+       ak=FV_Atm(1)%ak
+       bk=FV_Atm(1)%bk
+       call FV_To_State(MAPL,STATE)
+   else if (FV_Atm(1)%flagstruct%grid_type == 4) then
        if ( FV_Atm(1)%flagstruct%make_hybrid_z ) then
          hybrid = .false.
        else
@@ -1141,6 +1200,7 @@ contains
   endif
 
   if ( (gid==0)                              ) print*, ' '
+  call restart_trace('INIT', STATE, CLOCK, .true.)
   if ( (gid==0) .and. (COLDSTART)            ) print*, 'COLDSTARTING FV3'
   if ( (gid==0) .and. (ADIABATIC)            ) print*, 'FV3 being run Adiabatically'
   if ( (gid==0) .and. (.not. FV_HYDROSTATIC) ) print*, 'FV3 being run Non-Hydrostatic'
@@ -1210,6 +1270,72 @@ contains
 
 end subroutine FV_InitState
 
+subroutine FV_LamClock_Init(GC,CLOCK,INTERNAL)
+ type(ESMF_GridComp),intent(inout)::GC
+ type(ESMF_Clock),intent(in)::CLOCK
+ type(ESMF_State),intent(inout)::INTERNAL
+ real(REAL8),pointer::meta(:)
+ type(ESMF_Time)::now,origin
+ type(ESMF_TimeInterval)::gap
+ integer::status,year,month,day,hour,minute,second
+ real(REAL8)::seconds
+ if(.not.FV_Atm(1)%neststruct%regional)return
+ call MAPL_GetPointer(INTERNAL,meta,'LAM_CLOCK',rc=status)
+ if(status/=ESMF_SUCCESS.or.size(meta)<17) error stop 'LAM clock state missing'
+ call ESMF_ClockGet(CLOCK,currTime=now,rc=status)
+ if(COLDSTART) then
+ call ESMF_TimeGet(now,yy=year,mm=month,dd=day,h=hour,m=minute,s=second,rc=status)
+ FV_Atm(1)%neststruct%lam_origin=[year,month,day,hour,minute,second]
+ FV_Atm(1)%neststruct%lam_elapsed=0.
+ else
+ if(meta(10)/=2..or.meta(8)/=FV_Atm(1)%neststruct%lam_interval) error stop 'LAM restart version/interval mismatch'
+ if(meta(12)/=FV_Atm(1)%neststruct%lam_p_split.or.meta(15)/=FV_Atm(1)%npx.or.meta(16)/=FV_Atm(1)%npy.or.meta(17)/=FV_Atm(1)%npz) error stop 'LAM restart configuration mismatch'
+ if(meta(7)<0..or.meta(9)/=floor(meta(7)/(meta(8)*3600.))*meta(8)*3600..or.meta(11)/=meta(9)+meta(8)*3600.) error stop 'LAM restart bracket mismatch'
+ FV_Atm(1)%neststruct%lam_origin=nint(meta(1:6))
+ FV_Atm(1)%neststruct%lam_elapsed=meta(7)
+ call FV_LamClock_Run(CLOCK)
+ endif
+ call lam_prepare(FV_Atm(1),FV_Atm(1)%neststruct%lam_elapsed,0.)
+ call FV_LamClock_Save(GC)
+end subroutine
+
+subroutine FV_LamClock_Run(CLOCK)
+ type(ESMF_Clock),intent(in)::CLOCK
+ type(ESMF_Time)::now,origin
+ type(ESMF_TimeInterval)::gap
+ integer::status
+ real(REAL8)::seconds
+ associate(o=>FV_Atm(1)%neststruct%lam_origin)
+ call ESMF_TimeSet(origin,yy=o(1),mm=o(2),dd=o(3),h=o(4),m=o(5),s=o(6),rc=status)
+ end associate
+ if(status/=ESMF_SUCCESS) error stop 'LAM restart origin invalid'
+ call ESMF_ClockGet(CLOCK,currTime=now,rc=status)
+ gap=now-origin
+ call ESMF_TimeIntervalGet(gap,s_r8=seconds,rc=status)
+ if(abs(seconds-FV_Atm(1)%neststruct%lam_elapsed)>1.e-8) then
+ write(*,*)'LAM clock mismatch',seconds,FV_Atm(1)%neststruct%lam_elapsed
+ error stop 'LAM model clock discontinuity'
+ endif
+end subroutine
+
+subroutine FV_LamClock_Save(GC)
+ type(ESMF_GridComp),intent(inout)::GC
+ type(MAPL_MetaComp),pointer::MAPL
+ type(ESMF_State)::INTERNAL
+ real(REAL8),pointer::meta(:)
+ integer::status
+ if(.not.FV_Atm(1)%neststruct%regional)return
+ call MAPL_GetObjectFromGC(GC,MAPL,rc=status)
+ call MAPL_Get(MAPL,INTERNAL_ESMF_STATE=INTERNAL,rc=status)
+ call MAPL_GetPointer(INTERNAL,meta,'LAM_CLOCK',rc=status)
+ meta=0.;meta(1:6)=FV_Atm(1)%neststruct%lam_origin
+ meta(7)=FV_Atm(1)%neststruct%lam_elapsed;meta(8)=FV_Atm(1)%neststruct%lam_interval
+ meta(9)=floor(meta(7)/(meta(8)*3600.))*meta(8)*3600.;meta(10)=2.
+ meta(11)=meta(9)+meta(8)*3600.;meta(12)=FV_Atm(1)%neststruct%lam_p_split
+ meta(13)=1.;meta(14)=FV_Atm(1)%ptop;meta(15)=FV_Atm(1)%npx
+ meta(16)=FV_Atm(1)%npy;meta(17)=FV_Atm(1)%npz
+end subroutine
+
 subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
   type (T_FVDYCORE_STATE),pointer              :: STATE
@@ -1227,7 +1353,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   integer  :: days, seconds
   real(FVPRC) :: time_total, massD
 
-  integer :: i,j,k,n,nn
+  integer :: i,j,k,n,nn,lam_substep
+  real :: lam_outer_dt
   integer :: isc,iec,jsc,jec,ng
   integer :: isd,ied,jsd,jed
   integer :: npx,npy,npz
@@ -1312,6 +1439,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   VERIFY_(STATUS)
 
   time_total = days*86400. + seconds
+  if (FV_Atm(1)%neststruct%regional) call FV_LamClock_Run(CLOCK)
 
   isc = FV_Atm(1)%bd%isc
   iec = FV_Atm(1)%bd%iec
@@ -1570,8 +1698,10 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   myDT = state%dt
   elapsed_time = elapsed_time + myDT
 
+  call restart_trace('PRE', STATE, CLOCK, .true.)
   if (DEBUG) call debug_fv_state('Before Dynamics Execution',STATE)
   call State_To_FV( MAPL, STATE )
+  call restart_trace('PULL', STATE, CLOCK, .true.)
 
   call MAPL_GetResource( MAPL, massD0, 'PSDRY:', default=MAPL_PSDRY, RC=STATUS )
   VERIFY_(STATUS)
@@ -1715,6 +1845,15 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   if (run_gtfv3 == 0) then
      call cpu_time(start)
 #endif
+     lam_outer_dt=myDT
+     do lam_substep=1,merge(abs(FV_Atm(1)%neststruct%lam_p_split),1,FV_Atm(1)%neststruct%regional)
+     if (FV_Atm(1)%neststruct%regional) then
+        myDT=lam_outer_dt/abs(FV_Atm(1)%neststruct%lam_p_split)
+        call lam_prepare(FV_Atm(1),FV_Atm(1)%neststruct%lam_elapsed+(lam_substep-1)*myDT,myDT)
+#ifdef LAM_VALIDATION
+        call lam_audit_before(FV_Atm(1))
+#endif
+     endif
      call fv_dynamics( &
           FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
           FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, &
@@ -1732,6 +1871,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
           FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
           FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
           FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, time_total)
+#ifdef LAM_VALIDATION
+     if(FV_Atm(1)%neststruct%regional) call lam_audit_after(FV_Atm(1), &
+       FV_Atm(1)%neststruct%lam_elapsed+lam_substep*myDT)
+#endif
+     enddo
+     call restart_trace('POSTDYN', STATE, CLOCK, .true.)
+     myDT=lam_outer_dt
+     if (FV_Atm(1)%neststruct%regional) FV_Atm(1)%neststruct%lam_elapsed=FV_Atm(1)%neststruct%lam_elapsed+myDT
 #ifdef RUN_GTFV3
      call cpu_time(finish)
      if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
@@ -2003,6 +2150,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
 ! Copy FV to internal State
    call FV_To_State ( MAPL, STATE )
+   call restart_trace('PUSH', STATE, CLOCK, .true.)
    if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
 
    RETURN_(ESMF_SUCCESS)
@@ -2109,7 +2257,17 @@ subroutine State_To_FV ( MAPL, STATE )
 ! D-Grid
   FV_Atm(1)%u(:,:,:) = tiny_number
   FV_Atm(1)%v(:,:,:) = tiny_number
-  if (FV_Atm(1)%flagstruct%grid_type>=4) then
+  if (FV_Atm(1)%neststruct%regional) then
+    ! MAPL stores the lower staggered edge. Scalar halo exchange retrieves
+    ! duplicate upper edges from neighboring DEs even without tile contacts.
+    uatemp=0.;vatemp=0.
+    uatemp(isc:iec,jsc:jec,:)=STATE%VARS%U
+    vatemp(isc:iec,jsc:jec,:)=STATE%VARS%V
+    call mpp_update_domains(uatemp,FV_Atm(1)%domain,whalo=1,ehalo=1,shalo=1,nhalo=1,complete=.false.)
+    call mpp_update_domains(vatemp,FV_Atm(1)%domain,whalo=1,ehalo=1,shalo=1,nhalo=1,complete=.true.)
+    FV_Atm(1)%u(isc:iec,jsc:jec+1,:)=uatemp(isc:iec,jsc:jec+1,:)
+    FV_Atm(1)%v(isc:iec+1,jsc:jec,:)=vatemp(isc:iec+1,jsc:jec,:)
+  else if (FV_Atm(1)%flagstruct%grid_type>=4) then
   ! Doubly Periodic
     uatemp(isc:iec,jsc:jec,:) = STATE%VARS%U
     vatemp(isc:iec,jsc:jec,:) = STATE%VARS%V
@@ -3539,6 +3697,24 @@ subroutine compute_utvt(isd,ied, jsd,jed, uc, vc, ut, vt, dt)
   ut = 0.0
   vt = 0.0
 
+  ! Bounded grids have no cubed-sphere seam. Native C-grid covariant
+  ! components use the general metric transform at every physical edge.
+  if (FV_Atm(1)%neststruct%regional) then
+     do j=jsd,jed
+        do i=is,ie+1
+           ut(i,j)=(uc(i,j)-0.25*FV_Atm(1)%gridstruct%cosa_u(i,j)* &
+             (vc(i-1,j)+vc(i,j)+vc(i-1,j+1)+vc(i,j+1)))*FV_Atm(1)%gridstruct%rsin_u(i,j)
+        enddo
+     enddo
+     do j=js,je+1
+        do i=isd,ied
+           vt(i,j)=(vc(i,j)-0.25*FV_Atm(1)%gridstruct%cosa_v(i,j)* &
+             (uc(i,j-1)+uc(i+1,j-1)+uc(i,j)+uc(i+1,j)))*FV_Atm(1)%gridstruct%rsin_v(i,j)
+        enddo
+     enddo
+     return
+  endif
+
   if ( FV_Atm(1)%flagstruct%grid_type < 3 ) then
 
 ! Center of Cube Faces
@@ -3778,7 +3954,10 @@ subroutine fv_getVorticity(u, v, vort)
 
   utemp  = 0d0
   vtemp  = 0d0
-  if (FV_Atm(1)%flagstruct%grid_type>=4) then
+  if (FV_Atm(1)%neststruct%regional) then
+    utemp=FV_Atm(1)%u
+    vtemp=FV_Atm(1)%v
+  else if (FV_Atm(1)%flagstruct%grid_type>=4) then
   ! Doubly Periodic
     uatemp(isc:iec,jsc:jec,:) = u
     vatemp(isc:iec,jsc:jec,:) = v
@@ -3848,7 +4027,10 @@ subroutine fv_getDivergence(uc, vc, divg)
 
   uctemp  = 0d0
   vctemp  = 0d0
-  if (FV_Atm(1)%flagstruct%grid_type>=4) then
+  if (FV_Atm(1)%neststruct%regional) then
+    uctemp=FV_Atm(1)%uc
+    vctemp=FV_Atm(1)%vc
+  else if (FV_Atm(1)%flagstruct%grid_type>=4) then
   ! Doubly Periodic
     uatemp(isc:iec,jsc:jec,:) = uc
     vatemp(isc:iec,jsc:jec,:) = vc
@@ -4040,6 +4222,10 @@ subroutine fv_getEPV(pt, vort, ua, va, epv)
    enddo
 
    if (.not. FV_HYDROSTATIC) then
+      if (FV_Atm(1)%neststruct%regional) then
+         dz_g=FV_Atm(1)%delz
+         pt_g=FV_Atm(1)%pt
+      endif
       dz_g(isc:iec,jsc:jec,:) = FV_Atm(1)%delz(isc:iec,jsc:jec,:)
       pt_g(isc:iec,jsc:jec,:) = pt(isc:iec,jsc:jec,:)
       call mpp_update_domains(pt_g, FV_Atm(1)%domain, complete=.false.)
@@ -4180,7 +4366,15 @@ subroutine fv_getAllWinds_3D_R4(u, v, ua, va, uc, vc, ur, vr)
   vatemp = 0
   uctemp = 0
   vctemp = 0
-  if (FV_Atm(1)%flagstruct%grid_type>=4) then
+  if (FV_Atm(1)%neststruct%regional) then
+    utemp=FV_Atm(1)%u
+    vtemp=FV_Atm(1)%v
+    if(all(u==0.).and.all(v==0.))then
+       utemp=0.;vtemp=0.
+    endif
+    utemp(isc:iec,jsc:jec,:)=u
+    vtemp(isc:iec,jsc:jec,:)=v
+  else if (FV_Atm(1)%flagstruct%grid_type>=4) then
   ! Doubly Periodic
     uatemp(isc:iec,jsc:jec,:) = u
     vatemp(isc:iec,jsc:jec,:) = v
@@ -4295,7 +4489,15 @@ subroutine fv_getAllWinds_3D(u, v, ua, va, uc, vc, ur, vr)
   vatemp = 0
   uctemp = 0
   vctemp = 0
-  if (FV_Atm(1)%flagstruct%grid_type>=4) then
+  if (FV_Atm(1)%neststruct%regional) then
+    utemp=FV_Atm(1)%u
+    vtemp=FV_Atm(1)%v
+    if(all(u==0.).and.all(v==0.))then
+       utemp=0.;vtemp=0.
+    endif
+    utemp(isc:iec,jsc:jec,:)=u
+    vtemp(isc:iec,jsc:jec,:)=v
+  else if (FV_Atm(1)%flagstruct%grid_type>=4) then
   ! Doubly Periodic
     uatemp(isc:iec,jsc:jec,:) = u
     vatemp(isc:iec,jsc:jec,:) = v
@@ -4843,7 +5045,7 @@ subroutine echo_fv3_setup()
 
 end subroutine echo_fv3_setup
 
- subroutine adiabatic_init(myDT,DEBUG_ARRAY,fac1)
+subroutine adiabatic_init(myDT,DEBUG_ARRAY,fac1)
    use fv_nwp_nudge_mod,    only: do_adiabatic_init
    real(FVPRC), intent(IN   ) :: myDT
    real(FVPRC), intent(INOUT) :: DEBUG_ARRAY(:,:,:)
@@ -5093,6 +5295,79 @@ subroutine WRITE_PARALLEL_L ( field, format )
    call WRITE_PARALLEL ( 'F' ,format=format )
   endif
 end subroutine WRITE_PARALLEL_L
+
+
+! Isolated read-only restart-state dump; absent from all baseline/repair sources.
+subroutine restart_trace(stage, state, clock, include_aux)
+  character(len=*), intent(in) :: stage
+  type(T_FVDYCORE_STATE), pointer :: state
+  type(ESMF_Clock), intent(in) :: clock
+  logical, intent(in) :: include_aux
+  type(ESMF_Time) :: now
+  integer :: h, mi, sec, status, unit
+  character(len=200) :: name
+  character(len=8) :: trace_enabled
+  call get_environment_variable('LAM_HOST_RESTART_TRACE',trace_enabled,status=status)
+  if (status /= 0) return
+  if (trim(trace_enabled) /= '1') return
+  call ESMF_ClockGet(clock, currTime=now, rc=status)
+  if(status/=ESMF_SUCCESS) stop 'trace clock get failed'
+  call ESMF_TimeGet(now, h=h, m=mi, s=sec, rc=status)
+  if(status/=ESMF_SUCCESS) stop 'trace time get failed'
+  if(mi<28 .or. mi>32 .or. sec/=0) return
+  write(name,'("trace-",i2.2,"-",i2.2,"-",i2.2,"-",a,"-r",i2.2,".txt")') &
+       h,mi,sec,trim(stage),mpp_pe()
+  open(newunit=unit,file=trim(name),status='new',action='write')
+  write(unit,*) 'time',h,mi,sec,'rank',mpp_pe(),'stage',trim(stage)
+  write(unit,*) 'cold',COLDSTART,'first',fv_first_run,'q/k/n',state%q_split,state%k_split,state%n_split
+  write(unit,*) 'make_nh',FV_Atm(1)%flagstruct%make_nh,'na_init',FV_Atm(1)%flagstruct%na_init
+  close(unit)
+  call trace3('U',state%vars%u)
+  call trace3('V',state%vars%v)
+  call trace3('PT',state%vars%pt)
+  call trace3('PE',state%vars%pe)
+  call trace3('PKZ',state%vars%pkz)
+  call trace3('DZ',state%vars%dz)
+  call trace3('W',state%vars%w)
+  if(include_aux) then
+     call trace3('FVu',FV_Atm(1)%u)
+     call trace3('FVv',FV_Atm(1)%v)
+     call trace3('FVpt',FV_Atm(1)%pt)
+     call trace3('FVdelp',FV_Atm(1)%delp)
+     call trace3('FVdelz',FV_Atm(1)%delz)
+     call trace3('FVw',FV_Atm(1)%w)
+     call trace3('FVua',FV_Atm(1)%ua)
+     call trace3('FVva',FV_Atm(1)%va)
+     call trace3('FVuc',FV_Atm(1)%uc)
+     call trace3('FVvc',FV_Atm(1)%vc)
+     call trace3('FVze0',FV_Atm(1)%ze0)
+     call trace3('FVqcon',FV_Atm(1)%q_con)
+     call trace4('FVq',FV_Atm(1)%q)
+  endif
+contains
+  subroutine trace3(field,a)
+    character(len=*), intent(in) :: field
+    real(REAL8), intent(in) :: a(:,:,:)
+    integer :: u2
+    character(len=200) :: fname
+    write(fname,'("trace-",i2.2,"-",i2.2,"-",a,"-r",i2.2,"-",a,".bin")') &
+         mi,sec,trim(stage),mpp_pe(),trim(field)
+    open(newunit=u2,file=trim(fname),status='new',access='stream',form='unformatted',action='write')
+    write(u2) a
+    close(u2)
+  end subroutine trace3
+  subroutine trace4(field,a)
+    character(len=*), intent(in) :: field
+    real(REAL8), intent(in) :: a(:,:,:,:)
+    integer :: u2
+    character(len=200) :: fname
+    write(fname,'("trace-",i2.2,"-",i2.2,"-",a,"-r",i2.2,"-",a,".bin")') &
+         mi,sec,trim(stage),mpp_pe(),trim(field)
+    open(newunit=u2,file=trim(fname),status='new',access='stream',form='unformatted',action='write')
+    write(u2) a
+    close(u2)
+  end subroutine trace4
+end subroutine restart_trace
 
 end module FV_StateMod
 
