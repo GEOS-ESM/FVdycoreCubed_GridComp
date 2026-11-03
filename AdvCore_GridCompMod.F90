@@ -760,10 +760,20 @@ contains
 
          ! Run FV3 advection
          !------------------
-         call offline_tracer_advection(TRACERS, PLE0, PLE1, MFX, MFY, CX, CY, &
-                                       FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, FV_Atm(1)%bd, &
-                                       FV_Atm(1)%domain, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz,   &
-                                       NQ, dt, QSPLIT)
+!============ GEOS-LAM Update Start =============
+! Handle regional mass-flux values used at dynamics and tracer stages.
+         if (FV_Atm(1)%neststruct%regional) then
+            call offline_tracer_advection(TRACERS, PLE0, PLE1, MFX, MFY, CX, CY, &
+                                          FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, FV_Atm(1)%bd, &
+                                          FV_Atm(1)%domain, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, &
+                                          NQ, dt, QSPLIT, bounded_lam=.true.)
+         else
+            call offline_tracer_advection(TRACERS, PLE0, PLE1, MFX, MFY, CX, CY, &
+                                          FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, FV_Atm(1)%bd, &
+                                          FV_Atm(1)%domain, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, &
+                                          NQ, dt, QSPLIT, bounded_lam=.false.)
+         endif
+!============ GEOS-LAM Update End =============
 
          ! Get Tracer Mass after advection
          !--------------------------------
