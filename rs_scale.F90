@@ -61,8 +61,8 @@
       real*8, parameter   :: eps = epsilon(1.0d-10)
       real                :: kappa
 
-      type(Netcdf4_FileFormatter) :: InDyn,OutDyn,InMoist,OutMoist
-      type(FileMetadata) :: InCfgDyn,OutCfgDyn,InCfgMoist,OutCfgMoist
+      type(mapl_Netcdf4_FileFormatter) :: InDyn,OutDyn,InMoist,OutMoist
+      type(mapl_FileMetadata) :: InCfgDyn,OutCfgDyn,InCfgMoist,OutCfgMoist
       integer         :: filetypeDyn, filetypeMoist, nVars,nVarsMoist
 
       kappa = 2.0/7.0
@@ -91,13 +91,13 @@
 
      if (filetypeDyn == 0) then
 
-        call InDyn%open(dynrst,pFIO_READ,rc=rc)
+        call InDyn%open(dynrst,MAPL_PFIO_READ,rc=rc)
         InCfgDyn=InDyn%read(rc=rc)
         im = InCfgDyn%get_dimension('lon',rc=rc)
         jm = InCfgDyn%get_dimension('lat',rc=rc)
         lm = InCfgDyn%get_dimension('lev',rc=rc)
         call MAPL_IOCountNonDimVars(InCfgDyn,nVars)
-        call InMoist%open(mstrst,pFIO_READ,rc=rc)
+        call InMoist%open(mstrst,MAPL_PFIO_READ,rc=rc)
         InCfgMoist = InMoist%read(rc=rc)
         call MAPL_IOCountNonDimVars(InCfgMoist,nVarsMoist)
 

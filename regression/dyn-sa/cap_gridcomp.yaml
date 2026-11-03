@@ -1,0 +1,15 @@
+run_extdata: false
+run_history: true
+history_name: History
+root_name: Root
+
+mapl:
+  setServices:
+    sharedObj: libMAPL.cap
+  children:
+    Root:
+      dso: libconfigurable_gridcomp
+      config_file: root.yaml
+    History:
+      dso: libMAPL.history
+      config_file: history.yaml

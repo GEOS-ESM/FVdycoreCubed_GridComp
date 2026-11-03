@@ -12,8 +12,8 @@ module fv_regrid_c2c
    use field_manager_mod,  only: MODEL_ATMOS
 
    use MAPL
-   use gFTL_StringVector
-   use gFTL_StringIntegerMap
+   use gFTL2_StringVector
+   use gFTL2_StringIntegerMap
    use, intrinsic :: iso_fortran_env, only: REAL64, REAL32
 
    use fv_arrays_mod,     only: fv_atmos_type, fv_grid_type, R_GRID, FVPRC
@@ -58,20 +58,23 @@ module fv_regrid_c2c
 
 contains
 
-   subroutine read_topo_file_r4(fname,output,grid,rc)
+   subroutine read_topo_file_r4(fname,output,geom,rc)
       character(len=*), intent(in) :: fname
-      type(ESMF_Grid), intent(in) :: grid
+      type(ESMF_Geom), intent(in) :: geom
       real(REAL32), intent(inout) :: output(:,:)
       integer, intent(out), optional :: rc
 
-      integer :: status,dims(3),funit
+      integer :: status,funit
+      integer, allocatable :: dims(:)
       integer :: rank
       type(ESMF_VM) :: vm
+      type(ESMF_Grid) :: grid
       real(REAL32), allocatable :: input(:,:)
 
+      call ESMF_GeomGet(geom, grid=grid, _RC)
       call ESMF_VMGetCurrent(vm,_RC)
       call ESMF_VMGet(vm,localPet=rank,_RC)
-      call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
+      call mapl_GridGetGlobalCellCountPerDim(grid,globalCellCountPerDim=dims,_RC)
       if (rank ==0) then
          allocate(input(dims(1),dims(2)))
          open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
@@ -80,25 +83,28 @@ contains
       else
          allocate(input(0,0))
       end if
-      call ArrayScatter(local_array=output,global_array=input,grid=grid,_RC)
+      call mapl_ArrayScatter(local_array=output,global_array=input,grid=grid,_RC)
       _RETURN(_SUCCESS)
    end subroutine read_topo_file_r4
 
-   subroutine read_topo_file_r8(fname,output,grid,rc)
+   subroutine read_topo_file_r8(fname,output,geom,rc)
       character(len=*), intent(in) :: fname
-      type(ESMF_Grid), intent(in) :: grid
+      type(ESMF_Geom), intent(in) :: geom
       real(REAL64), intent(inout) :: output(:,:)
       integer, intent(out), optional :: rc
 
-      integer :: status,dims(3),funit
+      integer :: status,funit
       real, allocatable :: input(:,:)
       integer :: rank
       type(ESMF_VM) :: vm
+      type(ESMF_Grid) :: grid
+      integer, allocatable :: dims(:)
       real(REAL64), allocatable :: input_r8(:,:)
 
+      call ESMF_GeomGet(geom, grid=grid, _RC)
       call ESMF_VMGetCurrent(vm,_RC)
       call ESMF_VMGet(vm,localPet=rank,_RC)
-      call MAPL_GridGet(grid,globalCellCountPerDim=dims,_RC)
+      call mapl_GridGetGlobalCellCountPerDim(grid,globalCellCountPerDim=dims,_RC)
       if (rank ==0) then
          allocate(input(dims(1),dims(2)),input_r8(dims(2),dims(2)))
          open(newunit=funit,file=trim(fname),form='unformatted',iostat=status)
@@ -108,14 +114,14 @@ contains
       else
          allocate(input(0,0),input_r8(0,0))
       end if
-      call ArrayScatter(local_array=output,global_array=input_r8,grid=grid,_RC)
+      call mapl_ArrayScatter(local_array=output,global_array=input_r8,grid=grid,_RC)
       _RETURN(_SUCCESS)
    end subroutine read_topo_file_r8
 
-   subroutine get_geos_ic( Atm_i, Atm, grid_i, grid, Arrdes_i, extra_rst )
+   subroutine get_geos_ic( Atm_i, Atm, geom_in, geom_out, Arrdes_i, extra_rst )
 
       type(fv_atmos_type), intent(inout) :: Atm_i(:), Atm(:)
-      type(ESMF_Grid), intent(inout) :: grid_i, grid
+      type(ESMF_Geom), intent(in) :: geom_in, geom_out
       type(ArrDescr), intent(inout) :: ArrDes_i
       type(fv_rst), pointer, intent(inout) :: extra_rst(:)
       integer i,j
@@ -126,7 +132,7 @@ contains
          enddo
       enddo
 
-      call get_geos_cubed_ic( Atm_i, Atm, grid_i, grid, Arrdes_i, extra_rst)
+      call get_geos_cubed_ic( Atm_i, Atm, geom_in, geom_out, Arrdes_i, extra_rst)
 
       Atm(1)%flagstruct%dry_mass = MAPL_PSDRY
       Atm(1)%flagstruct%adjust_dry_mass = .true.
@@ -143,9 +149,9 @@ contains
 
    end subroutine get_geos_ic
 
-   subroutine get_geos_cubed_ic( Atm_i, Atm, grid_i, grid, Arrdes_i, extra_rst )
+   subroutine get_geos_cubed_ic( Atm_i, Atm, geom_in, geom_out, Arrdes_i, extra_rst )
       type(fv_atmos_type), intent(inout) :: Atm_i(:), Atm(:)
-      type(ESMF_Grid), intent(inout) :: grid_i, grid
+      type(ESMF_Geom), intent(in) :: geom_in, geom_out
       type(ArrDescr), intent(inout) :: ArrDes_i
       type(fv_rst), pointer, intent(inout) :: extra_rst(:)
 
@@ -178,8 +184,8 @@ contains
       real(FVPRC), allocatable :: sbuffer(:,:)
 
       integer            :: filetype
-      type(Netcdf4_Fileformatter) :: formatter
-      type(FileMetadata), allocatable :: cfg(:)
+      type(mapl_Netcdf4_Fileformatter) :: formatter
+      type(mapl_FileMetadata), allocatable :: cfg(:)
       integer            :: nDims, nVars, ivar, n_ungrid
       character(len=128) :: vname
       integer            :: lvar_cnt,ifile,nlev
@@ -187,8 +193,8 @@ contains
 
 !bma added
       character(len=:), pointer :: var_name
-      type(StringVariableMap), pointer :: variables
-      type(Variable), pointer :: myVariable
+      type(mapl_StringVariableMap), pointer :: variables
+      type(mapl_Variable), pointer :: myVariable
       type(StringVector) :: all_moist_vars
       type(StringVector), pointer :: var_dimensions
       type(StringVectorIterator) :: siter
@@ -198,12 +204,16 @@ contains
       character(len=:), pointer :: cptr
       type(StringIntegerMapIterator) :: iter
       type(ESMF_Grid) :: gridIn
-      class(AbstractRegridder), pointer :: regridder=>null()
+      class(mapl_Regridder), pointer :: regridder=>null()
+      type(mapl_RegridderManager), pointer :: regr_mgr
 
 !--------------------------------------------------------------------!
 ! create ESMF regridder
 !--------------------------------------------------------------------!
-      regridder => new_regridder_manager%make_regridder(grid_i,grid,REGRID_METHOD_BILINEAR,rc=status)
+      regr_mgr => mapl_get_regridder_manager()
+      regridder => regr_mgr%get_regridder( &
+           mapl_RegridderSpec(mapl_generate_esmf_regrid_param(MAPL_REGRID_METHOD_BILINEAR, ESMF_TYPEKIND_R4, rc=status), &
+                         geom_in, geom_out), rc=status)
 
 !--------------------------------------------------------------------!
 ! initialize cubed sphere grid: in                                   !
@@ -242,7 +252,7 @@ contains
       if( file_exist(fname) ) then
 
          allocate(cfg(1))
-         call formatter%open(fname,pFIO_READ,rc=status)
+         call formatter%open(fname,MAPL_PFIO_READ,rc=status)
          cfg(1) = formatter%read(rc=status)
          im =cfg(1)%get_dimension('lon',rc=status)
          jm =cfg(1)%get_dimension('lat',rc=status)
@@ -432,7 +442,7 @@ contains
          endif
          allocate ( gz0(is_i:ie_i,js_i:je_i) )
          call print_memuse_stats('get_geos_cubed_ic: '//TRIM(fname1)//' being read')
-         call read_topo_file(fname1,gz0(is_i:ie_i,js_i:je_i),grid_i)
+         call read_topo_file(fname1,gz0(is_i:ie_i,js_i:je_i),geom_in)
          gz0 = gz0*grav
 
 ! Horiz Interp for surface pressure
@@ -466,13 +476,13 @@ contains
 
             lvar_cnt = 0
             allocate(cfg(1))
-            call formatter%open("moist_internal_restart_in",pFIO_READ,rc=status)
+            call formatter%open("moist_internal_restart_in",MAPL_PFIO_READ,rc=status)
             cfg(1) = formatter%read(rc=status)
             all_moist_vars = MAPL_IOGetNonDimVars(cfg(1))
             siter = all_moist_vars%begin()
             Variables => cfg(1)%get_variables()
             do while(siter /= all_moist_vars%end())
-               var_name => siter%get()
+               var_name => siter%of()
                myVariable => variables%at(var_name)
                var_dimensions => myVariable%get_dimensions()
                ndims = var_dimensions%size()
@@ -565,7 +575,7 @@ contains
             if (is_master()) print*, 'Regridding: ',trim(tracer_bundles(ifile)%file_name)
 
             allocate(cfg(1))
-            call formatter%open(trim(tracer_bundles(ifile)%file_name),pFIO_READ,rc=status)
+            call formatter%open(trim(tracer_bundles(ifile)%file_name),MAPL_PFIO_READ,rc=status)
             cfg(1) = formatter%read(rc=status)
             call MAPL_IOCountNonDimVars(cfg(1),nvars,rc=status)
 
@@ -609,7 +619,7 @@ contains
          if (is_master()) print*, ''
          if (is_master()) print*, 'Vertical Remapping: '
 ! Vert remap for scalars
-         call read_topo_file('topo_dynave.data',Atm(1)%phis(is:ie,js:je),grid)
+         call read_topo_file('topo_dynave.data',Atm(1)%phis(is:ie,js:je),geom_out)
          call mpp_update_domains(Atm(1)%phis, Atm(1)%domain)
          Atm(1)%phis = Atm(1)%phis*grav
          call remap_scalar(im, jm, km, npz, Atm(1)%ncnst, Atm(1)%ncnst, ak0, bk0, psc, gzc, &
@@ -654,8 +664,8 @@ contains
 
       iter = moist_tracers%begin()
       do while (iter /= moist_tracers%end())
-         iptr => iter%value()
-         cptr => iter%key()
+         iptr => iter%second()
+         cptr => iter%first()
          if (.not.match(cptr)) then
             do k=1,npz
                do j=js,je
@@ -958,12 +968,12 @@ subroutine xyz_to_dgrid(v3, ud, vd, npx, npy, is, ie, js, je, isd, ied, jsd, jed
 
 end subroutine xyz_to_dgrid
 
-  subroutine d2a2d(ui, vi, uo, vo, Atm_i, Atm, regridder)
+  subroutine d2a2d(ui, vi, uo, vo, Atm_i, Atm, regrdr)
     !------------------------------------------------------------------!
 
     type(fv_atmos_type), intent(inout) :: Atm_i, Atm
 
-    class(AbstractRegridder), pointer :: regridder
+    class(mapl_Regridder), pointer :: regrdr
 
     real(FVPRC), dimension(Atm_i%bd%isd:Atm_i%bd%ied  ,Atm_i%bd%jsd:Atm_i%bd%jed+1), intent(in) :: ui
     real(FVPRC), dimension(Atm_i%bd%isd:Atm_i%bd%ied+1,Atm_i%bd%jsd:Atm_i%bd%jed  ), intent(in) :: vi
@@ -1038,7 +1048,7 @@ end subroutine xyz_to_dgrid
 !------------------------------------------------------------!
        do n=1,3
           tmp_i = va_xyz_i(n,:,:)
-          call regridder%regrid(tmp_i(       is:       ie,       js:       je), &
+           call regrdr%regrid(tmp_i(       is:       ie,       js:       je), &
                                 tmp_o(Atm%bd%is:Atm%bd%ie,Atm%bd%js:Atm%bd%je), rc=status)
           call mpp_update_domains(tmp_o, Atm%domain)
           va_xyz_o(n,:,:) = tmp_o

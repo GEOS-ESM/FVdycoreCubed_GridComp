@@ -1,4 +1,4 @@
-#include "MAPL_Generic.h"
+#include "MAPL.h"
 
 module FV_StateMod
 !BOP
@@ -8,11 +8,15 @@ module FV_StateMod
 ! !USES:
 #if defined( MAPL_MODE )
    use ESMF                ! ESMF base class
-   use MAPL                ! MAPL base class
+   use MAPL, only: MAPL_Verify, MAPL_Assert, MAPL_Return
+   use MAPL, only: WRITE_PARALLEL, MAPL_GridCompGetResource, MAPL_GridCompGet
+   use MAPL, only: MAPL_GridCompGetInternalState, MAPL_GridCompTimerStart, MAPL_GridCompTimerStop
+   use MAPL, only: MAPL_GridGet, MAPL_StateGetPointer, MAPL_FieldBundleGetPointer, MAPL_MemInfoWrite
 #endif
 
-   use MAPL_ConstantsMod, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS, &
-                                MAPL_KAPPA, MAPL_PI_R8, MAPL_ALHL, MAPL_PSDRY
+   use MAPL_Constants, only: MAPL_CP, MAPL_RGAS, MAPL_RVAP, MAPL_GRAV, MAPL_RADIUS
+   use MAPL_Constants, only: MAPL_KAPPA, MAPL_PI_R8, MAPL_ALHL, MAPL_PSDRY, MAPL_OMEGA
+   use MAPL_Constants, only: MAPL_UNDEFINED_REAL
 
    use fv_mp_mod,         only: start_group_halo_update, complete_group_halo_update
    use fv_mp_mod,         only: group_halo_update_type
@@ -43,6 +47,7 @@ module FV_StateMod
    use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f
    use geos_gtfv3_interface_mod, only: geos_gtfv3_interface_f_init, geos_gtfv3_interface_f_finalize
 #endif
+   use pflogger, only: logger_t => logger
 
 implicit none
 private
@@ -59,23 +64,19 @@ private
 ! !PUBLIC DATA MEMBERS:
 
   logical :: FV_OFF = .false.
-  integer :: INT_FV_OFF = 0
   logical :: ADJUST_SPLITS = .false.
   logical :: DEBUG = .false.
   logical :: DEBUG_DYN = .false.
   logical :: DEBUG_ADV = .false.
   logical :: COLDSTART = .false.
   logical :: SW_DYNAMICS = .false.
-  integer :: INT_ADIABATIC = 0
   logical :: ADIABATIC = .false.
   logical :: FV_HYDROSTATIC = .true.
-  integer :: INT_check_mass = 0
   logical :: check_mass = .false.
-  integer :: INT_fix_mass = 1
   logical :: fix_mass = .true.
   integer :: CASE_ID = 11
   integer :: AdvCore_Advection = 0
-  character(LEN=ESMF_MAXSTR) :: FV3_CONFIG
+  character(len=:), allocatable :: FV3_CONFIG
 
   public FV_Atm
   public FV_Setup, FV_InitState, FV_Run, FV_Finalize, FV_DA_Incs
@@ -101,6 +102,7 @@ private
 
   public fv_getAllWinds
   public INTERP_AGRID_TO_DGRID
+  public setup_fv_dimensions_and_topology
 
   interface fv_computeMassFluxes
      module procedure fv_computeMassFluxes_r4
@@ -155,7 +157,6 @@ private
   type T_FVDYCORE_GRID
 !
 #if defined( MAPL_MODE )
-    type (MAPL_MetaComp),   pointer :: FVgenstate
     type (ESMF_Grid)                :: GRID           ! The 'horizontal' grid (2D decomp only)
 #endif
 
@@ -326,109 +327,74 @@ contains
  end subroutine FV_RESET_CONSTANTS
 !
 !-----------------------------------------------------------------------
- subroutine FV_Setup(GC,LAYOUT_FILE, RC)
+ subroutine FV_Setup(GC, RC)
 
   use test_cases_mod, only : test_case
 
   type (ESMF_GridComp)         , intent(INOUT) :: GC
-  character(LEN=*)             , intent(IN   ) :: LAYOUT_FILE
   integer, optional            , intent(OUT  ) :: RC
 ! Local
    character(len=ESMF_MAXSTR)       :: IAm='FV_StateMod:FV_Setup'
 ! Local variables
-   character(len=ESMF_MAXSTR)       :: DYCORE
+   character(len=:), allocatable :: DYCORE
 
-  type (ESMF_Config)           :: cf
   type (ESMF_VM)               :: VM
+  type(ESMF_HConfig) :: hconfig
   integer              :: status
   real(FVPRC) :: DT
-
-  integer   :: ndt,nx,ny
-
-  type (MAPL_MetaComp),          pointer :: MAPL  => NULL()
-
-  integer :: comm
+  integer   :: ndt,nx,ny, num_levels
+  integer :: comm, im_world, topology(2)
   integer :: p_split=1
-
   real :: temp_real
+  class(logger_t), pointer :: logger
   real :: imsize, sigma
 
 ! BEGIN
 
+  call MAPL_GridCompGet(gc, logger=logger, _RC)
   call ESMF_VMGetCurrent(VM, rc=STATUS)
   VERIFY_(STATUS)
+  call ESMF_VMGet(VM, mpiCommunicator=comm, _RC)
 
-    call MAPL_MemUtilsWrite(VM, trim(IAm), RC=STATUS )
+    call MAPL_MemInfoWrite(comm, logger, trim(IAm), RC=STATUS )
     VERIFY_(STATUS)
 
-! Retrieve the pointer to the state
-! ---------------------------------
-
-  call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-  VERIFY_(STATUS)
-
-    call MAPL_TimerOn(MAPL,"--FMS_INIT")
+    call MAPL_GridCompTimerStart(gc, "fms_init", _RC)
     call ESMF_VMGet(VM,mpiCommunicator=comm,rc=status)
     VERIFY_(STATUS)
     call fms_init(comm)
-    call MAPL_TimerOff(MAPL,"--FMS_INIT")
-    call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FMS_INIT', RC=STATUS )
+    call MAPL_GridCompTimerStop(gc, "fms_init", _RC)
+    call MAPL_MemInfoWrite(comm, logger, 'FV_StateMod: FMS_INIT', RC=STATUS )
     VERIFY_(STATUS)
 ! Start up FV
-    call MAPL_TimerOn(MAPL,"--FV_INIT")
+    call MAPL_GridCompTimerStart(gc, "fv_init1", _RC)
     call fv_init1(FV_Atm, DT, grids_on_this_pe, p_split)
-    call MAPL_TimerOff(MAPL,"--FV_INIT")
-    call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
+    call MAPL_GridCompTimerStop(gc, "fv_init1", _RC)
+    call MAPL_MemInfoWrite(comm, logger, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
 ! FV grid dimensions setup from MAPL
-      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npx, 'AGCM_IM:', default= 32, RC=STATUS )
-      VERIFY_(STATUS)
-      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npy, 'AGCM_JM:', default=192, RC=STATUS )
-      VERIFY_(STATUS)
-      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%npz, 'AGCM_LM:', default= 72, RC=STATUS )
-      VERIFY_(STATUS)
+      call MAPL_GridCompGet(gc, hconfig=hconfig, num_levels=num_levels, _RC)
+      call setup_fv_dimensions_and_topology(hconfig, num_levels, FV_Atm(1)%flagstruct, FV_Atm(1)%layout, _RC)
       if (FV_Atm(1)%flagstruct%npz == 1) SW_DYNAMICS = .true.
       ! stretch_fac is kind(R_GRID) in FV, so to prevent a MAPL failure on RC check, we pull
       ! AGCM.STRETCH_FACTOR: as a REAL32 and then cast it to REAL64. This is because
       ! FV_Atm(1)%flagstruct%stretch_fac is R_GRID => REAL64, and the MAPL_GetResource call
       ! is getting a REAL32
-      call MAPL_GetResource( MAPL, temp_real, 'AGCM.STRETCH_FACTOR:', default=1.0, RC=STATUS )
+      call MAPL_GridCompGetResource(gc, 'AGCM.STRETCH_FACTOR', temp_real, default=1.0, RC=STATUS)
       VERIFY_(STATUS)
       FV_Atm(1)%flagstruct%stretch_fac = temp_real
-! FV likes npx;npy in terms of cell vertices
-      if (FV_Atm(1)%flagstruct%npy == 6*FV_Atm(1)%flagstruct%npx) then
-         FV_Atm(1)%flagstruct%ntiles = 6
-         FV_Atm(1)%flagstruct%npy    = FV_Atm(1)%flagstruct%npx+1
-         FV_Atm(1)%flagstruct%npx    = FV_Atm(1)%flagstruct%npx+1
-      else
-         FV_Atm(1)%flagstruct%ntiles = 1
-         FV_Atm(1)%flagstruct%npy    = FV_Atm(1)%flagstruct%npy+1
-         FV_Atm(1)%flagstruct%npx    = FV_Atm(1)%flagstruct%npx+1
-      endif
 ! Check for Doubly Periodic Domain Info
-      call MAPL_GetResource( MAPL, FV_Atm(1)%flagstruct%deglat, label='FIXED_LATS:', default=FV_Atm(1)%flagstruct%deglat, rc=status )
+      call MAPL_GridCompGetResource( gc, 'FIXED_LATS', FV_Atm(1)%flagstruct%deglat, default=FV_Atm(1)%flagstruct%deglat, rc=status )
       VERIFY_(STATUS)
-! MPI decomp setup
-      call MAPL_GetResource( MAPL, nx, 'NX:', default=0, RC=STATUS )
-      VERIFY_(STATUS)
-      FV_Atm(1)%layout(1) = nx
-      call MAPL_GetResource( MAPL, ny, 'NY:', default=0, RC=STATUS )
-      VERIFY_(STATUS)
-      if (FV_Atm(1)%flagstruct%grid_type == 4) then
-         FV_Atm(1)%layout(2) = ny
-      else
-         FV_Atm(1)%layout(2) = ny / 6
-      end if
 
 ! Get other scalars
 ! -----------------
-
-  call MAPL_GetResource( MAPL, ndt, 'RUN_DT:', default=0, RC=STATUS )
+  call MAPL_GridCompGetResource(gc, 'RUN_DT', ndt, default=0, RC=STATUS )
   VERIFY_(STATUS)
   DT = ndt
 
-  call MAPL_GetResource(MAPL, DYCORE, 'DYCORE:', default="", RC=STATUS )
+  call MAPL_GridCompGetResource(gc, 'DYCORE', DYCORE, default="", RC=STATUS )
   VERIFY_(STATUS)
 
   if(adjustl(DYCORE)=="FV3") then
@@ -440,46 +406,19 @@ contains
 
 ! Advect tracers within DynCore(AdvCore_Advection=.false.)
 !             or within AdvCore(AdvCore_Advection=.true.)
-  call MAPL_GetResource( MAPL, AdvCore_Advection, label='AdvCore_Advection:', default=AdvCore_Advection, rc=status )
+  call MAPL_GridCompGetResource( gc, 'AdvCore_Advection', AdvCore_Advection, default=AdvCore_Advection, RC=STATUS )
   VERIFY_(STATUS)
 
-  call MAPL_GetResource( MAPL, ADJUST_SPLITS,   label='ADJUST_SPLITS:', default=ADJUST_SPLITS, rc=status )
+  call MAPL_GridCompGetResource( gc, 'ADJUST_SPLITS', ADJUST_SPLITS, default=ADJUST_SPLITS, RC=STATUS )
   VERIFY_(STATUS)
-  call MAPL_GetResource( MAPL, INT_fix_mass,    label='fix_mass:'    , default=INT_fix_mass, rc=status )
+  call MAPL_GridCompGetResource( gc, 'fix_mass', fix_mass, default=fix_mass, RC=STATUS )
   VERIFY_(STATUS)
-  call MAPL_GetResource( MAPL, INT_check_mass,  label='check_mass:'  , default=INT_check_mass, rc=status )
+  call MAPL_GridCompGetResource( gc, 'check_mass', check_mass, default=check_mass, RC=STATUS )
   VERIFY_(STATUS)
-  call MAPL_GetResource( MAPL, INT_ADIABATIC,   label='ADIABATIC:'   , default=INT_adiabatic, rc=status )
+  call MAPL_GridCompGetResource( gc, 'ADIABATIC', ADIABATIC, default=ADIABATIC, RC=STATUS )
   VERIFY_(STATUS)
-  call MAPL_GetResource( MAPL, INT_FV_OFF,      label='FV_OFF:'      , default=INT_FV_OFF, rc=status )
+  call MAPL_GridCompGetResource( gc, 'FV_OFF', FV_OFF, default=FV_OFF, RC=STATUS )
   VERIFY_(STATUS)
-
-  ! MAT The Fortran Standard, and thus gfortran, *does not allow* the use
-  !     of if (integer). So, we must convert integer resources to logicals
-
-  if (INT_fix_mass == 0) then
-     fix_mass = .FALSE.
-  else
-     fix_mass = .TRUE.
-  end if
-
-  if (INT_check_mass == 0) then
-     check_mass = .FALSE.
-  else
-     check_mass = .TRUE.
-  end if
-
-  if (INT_ADIABATIC == 0) then
-     ADIABATIC = .FALSE.
-  else
-     ADIABATIC = .TRUE.
-  end if
-
-  if (INT_FV_OFF == 0) then
-     FV_OFF = .FALSE.
-  else
-     FV_OFF = .TRUE.
-  end if
 
 ! Constants
 !
@@ -495,7 +434,7 @@ contains
     zvir   = MAPL_RVAP/MAPL_RGAS - 1.   ! RWV/RAIR-1
 
    ! option to enable different configurations for FV3
-    call MAPL_GetResource( MAPL, FV3_CONFIG, label='FV3_CONFIG:', default='STOCK', rc=status )
+    call MAPL_GridCompGetResource( gc, 'FV3_CONFIG', FV3_CONFIG, default='STOCK', RC=STATUS )
     VERIFY_(STATUS)
 
 !
@@ -776,10 +715,10 @@ contains
    endif
 
 !! Start up FV
-    call MAPL_TimerOn(MAPL,"--FV_INIT")
+    call MAPL_GridCompTimerStart(gc, "fv_init2", _RC)
     call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
-    call MAPL_TimerOff(MAPL,"--FV_INIT")
-    call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
+    call MAPL_GridCompTimerStop(gc, "fv_init2", _RC)
+    call MAPL_MemInfoWrite(comm, logger, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
 
 !! Force compatibility of gmao_remap and n_zfilter
@@ -800,21 +739,83 @@ contains
 
   FV_HYDROSTATIC = FV_Atm(1)%flagstruct%hydrostatic
   DEBUG          = FV_Atm(1)%flagstruct%fv_debug
-  call MAPL_GetResource(MAPL, DEBUG, 'DEBUG_STATE:', default=DEBUG, RC=STATUS)
+  call MAPL_GridCompGetResource(gc, 'DEBUG_STATE', DEBUG, default=DEBUG, RC=STATUS)
 
-  call MAPL_MemUtilsWrite(VM, trim(Iam), RC=STATUS )
+  call MAPL_MemInfoWrite(comm, logger, trim(Iam), RC=STATUS )
   VERIFY_(STATUS)
 
 #ifdef RUN_GTFV3
-  call MAPL_GetResource(MAPL, run_gtfv3, 'RUN_GTFV3:', default=0, RC=STATUS)
+  call MAPL_GridCompGetResource(gc, 'RUN_GTFV3', run_gtfv3, default=0, RC=STATUS)
   VERIFY_(STATUS)
 #endif
 
-  RETURN_(ESMF_SUCCESS)
+  _RETURN(_SUCCESS)
 
 contains
 
  end subroutine FV_Setup
+
+   subroutine setup_fv_dimensions_and_topology(hconfig, num_levels, flags, layout, rc)
+      use fv_arrays_mod, only: fv_flags_type
+      type(ESMF_HConfig), intent(in) :: hconfig
+      integer, intent(in) :: num_levels
+      type(FV_Flags_Type), intent(inout) :: flags
+      integer, intent(inout) :: layout(2)
+      integer, optional, intent(out) :: rc
+
+      integer :: im_world, topology(2), status
+
+      call get_im_world_and_topology(hconfig, im_world, topology, _RC)
+      flags%npx = im_world
+      flags%npy = im_world * 6
+      flags%npz = num_levels
+      ! FV likes npx;npy in terms of cell vertices
+      ! TODO: pchakrab - check this! npy is always set to 6*npx, so the if
+      ! statement is always true and the else branch is never taken. Is this intentional?
+      if (flags%npy == 6*flags%npx) then
+         flags%npy = flags%npx+1
+         flags%npx = flags%npx+1
+         flags%ntiles = 6
+      else
+         flags%npy = flags%npy+1
+         flags%npx = flags%npx+1
+         flags%ntiles = 1
+      endif
+      layout = topology
+      if (FV_Atm(1)%flagstruct%grid_type == 4) then
+         layout(2) = layout(2) * 6
+      end if
+
+      _RETURN(_SUCCESS)
+   end subroutine setup_fv_dimensions_and_topology
+
+   subroutine get_im_world_and_topology(hconfig, im_world, topology, rc)
+      type(ESMF_HConfig), intent(in) :: hconfig
+      integer, intent(out) :: im_world
+      integer, intent(out) :: topology(2)
+      integer, optional, intent(out) :: rc
+
+      type(ESMF_HConfig) :: geometry_cfg, geom_cfg
+      logical :: has_section
+      integer :: nx_face, ny_face, status
+
+      has_section = ESMF_HConfigIsDefined(hconfig, keyString="geometry", _RC)
+      _ASSERT(has_section, "hconfig is missing geometry section")
+      geometry_cfg = ESMF_HConfigCreateAt(hconfig, keyString="geometry", _RC)
+      has_section = ESMF_HConfigIsDefined(geometry_cfg, keyString="esmf_geom", _RC)
+      _ASSERT(has_section, "geometry is missing esmf_geom section")
+      geom_cfg = ESMF_HConfigCreateAt(geometry_cfg, keyString="esmf_geom", _RC)
+
+      im_world = ESMF_HConfigAsI4(geom_cfg, keyString="im_world", _RC)
+      nx_face = ESMF_HConfigAsI4(geom_cfg, keyString="nx_face", _RC)
+      ny_face = ESMF_HConfigAsI4(geom_cfg, keyString="ny_face", _RC)
+      topology = [nx_face, ny_face]
+
+      call ESMF_HConfigDestroy(geometry_cfg, _RC)
+      call ESMF_HConfigDestroy(geom_cfg, _RC)
+
+      _RETURN(_SUCCESS)
+   end subroutine get_im_world_and_topology
 
  subroutine FV_InitState (STATE, CLOCK, INTERNAL, IMPORT, GC, RC)
 
@@ -857,8 +858,8 @@ contains
 
   character(len=ESMF_MAXSTR)       :: IAm='FV:FV_InitState'
 
-  real(REAL8), pointer                   :: AK(:) => NULL()
-  real(REAL8), pointer                   :: BK(:) => NULL()
+  real(REAL8), pointer                   :: AK(:) => NULL(), AK1(:) => NULL()
+  real(REAL8), pointer                   :: BK(:) => NULL(), BK1(:) => NULL()
   real(REAL8), dimension(:,:,:), pointer :: U     => NULL()
   real(REAL8), dimension(:,:,:), pointer :: V     => NULL()
   real(REAL8), dimension(:,:,:), pointer :: PT    => NULL()
@@ -866,7 +867,6 @@ contains
   real(REAL8), dimension(:,:,:), pointer :: PKZ   => NULL()
   real(REAL8), dimension(:,:,:), pointer :: DZ    => NULL()
   real(REAL8), dimension(:,:,:), pointer :: W     => NULL()
-  type (MAPL_MetaComp),          pointer :: mapl  => NULL()
 
   real(REAL8), ALLOCATABLE :: UA(:,:,:)
   real(REAL8), ALLOCATABLE :: VA(:,:,:)
@@ -879,22 +879,16 @@ contains
 
 #ifdef RUN_GTFV3
   logical :: halting_mode(5)
-  integer :: comm
 #endif
+  integer :: comm
+  class(logger_t), pointer :: logger
 
 ! BEGIN
 
-! Retrieve the pointer to the state
-! ---------------------------------
-
-  call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-  VERIFY_(STATUS)
-
-  call MAPL_GetResource( MAPL, ndt, 'RUN_DT:', default=0, RC=STATUS )
+  call MAPL_GridCompGetResource( gc, 'RUN_DT', ndt, default=0, RC=STATUS )
   VERIFY_(STATUS)
   DT = ndt
 
-  STATE%GRID%FVgenstate => MAPL
   GRID => STATE%GRID     ! For convenience
 
   STATE%DT      = DT
@@ -918,38 +912,47 @@ contains
   masterproc = mpp_root_pe()
   gid = mpp_pe()
 
-  call ESMF_GridCompGet(gc, grid=GRID%GRID, VM=VM, rc=STATUS)
-    VERIFY_(STATUS)
+  call ESMF_VMGetCurrent(VM, _RC)
+  call ESMF_VMGet(VM, mpiCommunicator=comm, _RC)
+  call MAPL_GridCompGet(gc, logger=logger, grid=GRID%GRID, _RC)
 
   call WRITE_PARALLEL(' ')
   call WRITE_PARALLEL(STATE%DT,format='("Dynamics time step : ",(F10.4))')
   call WRITE_PARALLEL(' ')
 
 ! Get pointers to internal state vars
-  call MAPL_GetPointer(internal, ak, "AK",rc=status)
+  call MAPL_StateGetPointer(internal, ak1, "AK",rc=status)
   VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, bk, "BK",rc=status)
+  call MAPL_StateGetPointer(internal, bk1, "BK",rc=status)
   VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, u, "U",rc=status)
+  call MAPL_StateGetPointer(internal, u, "U",rc=status)
   VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, v, "V",rc=status)
+  call MAPL_StateGetPointer(internal, v, "V",rc=status)
   VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, pt, "PT",rc=status)
+  call MAPL_StateGetPointer(internal, pt, "PT",rc=status)
   VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, pe, "PE",rc=status)
+  call MAPL_StateGetPointer(internal, pe, "PE",rc=status)
   VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, pkz, "PKZ",rc=status)
+  call MAPL_StateGetPointer(internal, pkz, "PKZ",rc=status)
   VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, dz, "DZ",rc=status)
+  call MAPL_StateGetPointer(internal, dz, "DZ",rc=status)
   VERIFY_(STATUS)
-  call MAPL_GetPointer(internal, w, "W",rc=status)
+  call MAPL_StateGetPointer(internal, w, "W",rc=status)
   VERIFY_(STATUS)
+
+  ! AK and BK are expected to be 0-based
+  block
+     integer :: km
+     km = size(ak1) - 1
+     ak(0:km) => ak1(1:km+1)
+     bk(0:km) => bk1(1:km+1)
+  end block
 
   call CREATE_VARS ( FV_Atm(1)%bd%isc, FV_Atm(1)%bd%iec, FV_Atm(1)%bd%jsc, FV_Atm(1)%bd%jec,     &
                      1, FV_Atm(1)%flagstruct%npz, FV_Atm(1)%flagstruct%npz+1,            &
                      U, V, PT, PE, PKZ, DZ, W, &
                      STATE%VARS )
-  call MAPL_MemUtilsWrite(VM, 'FV_StateMod: CREATE_VARS', RC=STATUS )
+  call MAPL_MemInfoWrite(comm, logger, 'FV_StateMod: CREATE_VARS', RC=STATUS )
   VERIFY_(STATUS)
 
   GRID%IS     = FV_Atm(1)%bd%isc
@@ -1017,15 +1020,6 @@ contains
    endif
   endif
 
-! Check coordinate information from MAPL_MetaComp
-!--------------------------------------------
-    call MAPL_Get(MAPL,                &
-       LATS          = LATS,           & ! These are in radians
-       LONS          = LONS,           & ! These are in radians
-       INTERNAL_ESMF_STATE=INTERNAL,   &
-                             RC=STATUS )
-    VERIFY_(STATUS)
-
   STATE%CLOCK => CLOCK
   call ESMF_TimeIntervalSet(Time2Run, &
                             S=nint(STATE%DT), rc=status)
@@ -1068,14 +1062,14 @@ contains
      RC           = STATUS                    )
   VERIFY_(STATUS)
 
-  call MAPL_GetPointer ( import, phis, 'PHIS', RC=STATUS )
+  call MAPL_StateGetPointer ( import, phis, 'PHIS', RC=STATUS )
   VERIFY_(STATUS)
 
  ! Set FV3 surface geopotential
   FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=REAL8)
   call mpp_update_domains(FV_Atm(1)%phis, FV_Atm(1)%domain, complete=.true.)
 
-  call MAPL_GetPointer ( import, varflt, 'VARFLT', RC=STATUS )
+  call MAPL_StateGetPointer ( import, varflt, 'VARFLT', RC=STATUS )
   VERIFY_(STATUS)
   FV_Atm(1)%varflt(isc:iec,jsc:jec) = varflt
 
@@ -1101,7 +1095,9 @@ contains
                                  FV_Atm(1)%flagstruct%moist_phys, FV_Atm(1)%flagstruct%hydrostatic, hybrid, FV_Atm(1)%delz, FV_Atm(1)%ze0, &
                                  FV_Atm(1)%ks, FV_Atm(1)%ptop, FV_Atm(1)%domain, tile_in, FV_Atm(1)%bd)
      ! Copy FV to internal State
-       call FV_To_State ( MAPL, STATE )
+       call MAPL_GridCompTimerStart(gc, "fv_to_state", _RC)
+       call FV_To_State ( STATE )
+       call MAPL_GridCompTimerStop(gc, "fv_to_state", _RC)
        if( gid==masterproc ) write(*,*) 'Doubly Periodic IC generated LAT:', FV_Atm(1)%flagstruct%deglat
    else
      ALLOCATE( UA(isc:iec  ,jsc:jec  ,1:FV_Atm(1)%npz) )
@@ -1124,7 +1120,9 @@ contains
         call fv_getDELZ(DZ,PT,PE)
         PT = PT/PKZ
      endif
-     call State_To_FV( MAPL, STATE )
+     call MAPL_GridCompTimerStart(gc, "state_to_fv", _RC)
+     call State_To_FV( STATE )
+     call MAPL_GridCompTimerStop(gc, "state_to_fv", _RC)
    endif ! doubly-periodic
 
   else ! COLDSTART
@@ -1136,7 +1134,9 @@ contains
     !   call fv_getDELZ(DZ,PT,PE)
     !   PT = PT/PKZ
     !endif
-     call State_To_FV( MAPL, STATE )
+     call MAPL_GridCompTimerStart(gc, "state_to_fv", _RC)
+     call State_To_FV( STATE )
+     call MAPL_GridCompTimerStop(gc, "state_to_fv", _RC)
 
   endif
 
@@ -1187,7 +1187,7 @@ contains
 300     format(A1,A1,A1,2x,i5,2x,f10.6,2x,f8.4,2x,f10.4,3x,f8.4)
   endif
 
-  call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV Initialize', RC=STATUS )
+  call MAPL_MemInfoWrite(comm, logger, 'FV_StateMod: FV Initialize', RC=STATUS )
   VERIFY_(STATUS)
 
 #ifdef RUN_GTFV3
@@ -1206,7 +1206,7 @@ contains
   end if
 #endif
 
-  RETURN_(ESMF_SUCCESS)
+  _RETURN(_SUCCESS)
 
 end subroutine FV_InitState
 
@@ -1249,6 +1249,9 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   real(FVPRC) :: FQC
 
   real(REAL4), pointer     :: PTR3D(:,:,:)
+  real(REAL4), pointer     :: dudt_ray(:,:,:), dvdt_ray(:,:,:)
+  type(ESMF_FieldBundle)   :: ray_bundle
+  integer                  :: ray_field_count
 
   real(FVPRC), allocatable :: DEBUG_ARRAY(:,:,:)
   real(FVPRC) :: fac1    = 1.0
@@ -1283,7 +1286,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   integer :: grpl = -1
 
   type(domain2D) :: domain
-  type (MAPL_MetaComp),          pointer :: mapl  => NULL()
+
   character(len=ESMF_MAXSTR) :: STRING
 
   logical :: NWAT_TEST
@@ -1294,6 +1297,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   real :: start, finish
 #endif
 
+  type(ESMF_VM) :: vm_
+
 ! Begin
 
 #ifdef RUN_GTFV3
@@ -1301,10 +1306,6 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   call ESMF_VMGet(vm, mpiCommunicator=comm)
   call MPI_Comm_rank(comm, rank, mpierr)
 #endif
-
-! Retrieve the pointer to the state
-  call MAPL_GetObjectFromGC (GC, MAPL,  RC=STATUS )
-  VERIFY_(STATUS)
 
   call ESMF_ClockGet( CLOCK, currTime=fv_time, rc=STATUS )
   VERIFY_(STATUS)
@@ -1347,32 +1348,79 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
          if (TRIM(state%vars%tracer(n)%tname) == 'QGRAUPEL') nwat_tracers = nwat_tracers + 1
        enddo
        if (FV_Atm(1)%flagstruct%nwat == 0) then
-         if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 1 
+         if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 1
          if (.not. FV_Atm(1)%flagstruct%hydrostatic) then
-           if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3 
+           if (nwat_tracers >=  5) FV_Atm(1)%flagstruct%nwat = 3
          endif
-         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6 
+         if (nwat_tracers >= 10) FV_Atm(1)%flagstruct%nwat = 6
        endif
        STATE%VARS%nwat = FV_Atm(1)%flagstruct%nwat
      endif
-
+#ifdef VERIFY_GRID
+    ! Verify Grid Coordinates
+    ! ------- ESMF ------
+     allocate ( griddiffs(isc:iec,jsc:jec) )
+     call ESMF_GridCompGet( GC, grid=ESMFGRID, RC=STATUS )
+     call ESMF_GridGetCoord(ESMFGRID,localDE=0,coordDim=1,&
+                        staggerloc=ESMF_STAGGERLOC_CENTER,&
+                            farrayPtr=lonptr,rc=status)
+     griddiffs = REAL(lonptr)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,1))
+     do j=jsc,jec
+        do i=isc,iec
+           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LONS discprepency FV3 : ESMF ', &
+                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,1)*180.0/MAPL_PI), &
+                                REAL(           lonptr(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
+        enddo
+     enddo
+     call ESMF_GridGetCoord(ESMFGRID,localDE=0,coordDim=2,&
+                        staggerloc=ESMF_STAGGERLOC_CENTER,&
+                                    farrayPtr=latptr,rc=status)
+     griddiffs = REAL(latptr)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,2))
+     do j=jsc,jec
+        do i=isc,iec
+           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LATS discprepency FV3 : ESMF ', &
+                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,2)*180.0/MAPL_PI), &
+                                REAL(           latptr(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
+        enddo
+     enddo
+    ! ------- MAPL ------
+     call MAPL_GridGet(esmfgrid, latitudes=LATS, longitudes=LONS, RC=STATUS)  ! These are in radians
+     griddiffs = REAL(LONS)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,1))
+     do j=jsc,jec
+        do i=isc,iec
+           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LONS discprepency FV3 : MAPL ', &
+                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,1)*180.0/MAPL_PI), &
+                                REAL(             LONS(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
+        enddo
+     enddo
+     griddiffs = REAL(LATS)-REAL(FV_Atm(1)%gridstruct%agrid(isc:iec,jsc:jec,2))
+     do j=jsc,jec
+        do i=isc,iec
+           if (ABS(griddiffs(i,j)) >= tiny_number) print*, 'LATS discprepency FV3 : MAPL ', &
+                                REAL( FV_Atm(1)%gridstruct%agrid(i,j,2)*180.0/MAPL_PI), &
+                                REAL(             LATS(i-isc+1,j-jsc+1)*180.0/MAPL_PI)
+        enddo
+     enddo
+     deallocate ( griddiffs )
+#endif
     ! Set FV3 surface geopotential
      FV_Atm(1)%phis = 0.0
      FV_Atm(1)%phis(isc:iec,jsc:jec) = real(phis,kind=FVPRC)
      FV_Atm(1)%varflt(isc:iec,jsc:jec) = real(varflt,kind=FVPRC)
      call mpp_update_domains(FV_Atm(1)%phis, FV_Atm(1)%domain, complete=.true.)
-     
+
      NWAT_TEST = ( (FV_Atm(1)%flagstruct%nwat == 0) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 1) .OR. &
                    (FV_Atm(1)%flagstruct%nwat == 3) .OR. &
                    (FV_Atm(1)%flagstruct%nwat >= 6) )
      _ASSERT( NWAT_TEST , 'NWAT must be either 0, 1, 3 or 6')
-     
+
      ! OPTION A: We keep ALL tracers, no subtracting CN species.
      FV_Atm(1)%ncnst = STATE%GRID%NQ
-     
+
      deallocate( FV_Atm(1)%q )
-     allocate  ( FV_Atm(1)%q(isd:ied  ,jsd:jed  ,npz, FV_Atm(1)%ncnst) )
+     allocate  ( FV_Atm(1)%q(isd:ied  ,jsd:jed  ,npz, FV_Atm(1)%ncnst) , source=0.0 )
+    ! Echo FV3 setup
      call echo_fv3_setup()
    endif
 
@@ -1388,8 +1436,8 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
  ! ------------------------------------------------------------------
  ! Pull Tracers (Dynamic Mapping for Mass Conservation Option A)
  ! ------------------------------------------------------------------
-  call MAPL_TimerOn(MAPL,"--PULL_TRACERS")
-  
+  call MAPL_GridCompTimerStart(gc, "pull_tracers" , _RC)
+  nn = 0
   if (.not. ADIABATIC) then
     if (fv_first_run .and. FV_Atm(1)%ncnst > 0) then
        write(STRING,'(A,I5,A)') "FV3 is Advecting the following ", FV_Atm(1)%ncnst, " tracers:"
@@ -1406,7 +1454,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     end select
 
     do n=1, STATE%GRID%NQ
-       
+
        select case (TRIM(state%vars%tracer(n)%tname))
           case ('Q')
              if (sphu /= -1) then
@@ -1423,14 +1471,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              if (state%vars%tracer(n)%is_r4) then
                  if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content_r4(:,:,:)
                  if (qlcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content_r4(:,:,:)
-                 if (qliq /= -1 .and. qlcn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qlcn = nn 
+                 if (qliq /= -1 .and. qlcn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qlcn = nn
                  endif
              else
                  if (qliq /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qliq) + state%vars%tracer(n)%content(:,:,:)
                  if (qlcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qlcn) = state%vars%tracer(n)%content(:,:,:)
-                 if (qliq /= -1 .and. qlcn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qlcn = nn 
+                 if (qliq /= -1 .and. qlcn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qlcn = nn
                  endif
              endif
              if ((qlcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
@@ -1451,14 +1499,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              if (state%vars%tracer(n)%is_r4) then
                  if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content_r4(:,:,:)
                  if (qicn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content_r4(:,:,:)
-                 if (qice /= -1 .and. qicn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qicn = nn 
+                 if (qice /= -1 .and. qicn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_qicn = nn
                  endif
              else
                  if (qice /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qice) + state%vars%tracer(n)%content(:,:,:)
                  if (qicn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qicn) = state%vars%tracer(n)%content(:,:,:)
-                 if (qice /= -1 .and. qicn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qicn = nn 
+                 if (qice /= -1 .and. qicn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_qicn = nn
                  endif
              endif
              if ((qicn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
@@ -1479,14 +1527,14 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              if (state%vars%tracer(n)%is_r4) then
                  if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content_r4(:,:,:)
                  if (clcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content_r4(:,:,:)
-                 if (qcld /= -1 .and. clcn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_clcn = nn 
+                 if (qcld /= -1 .and. clcn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content_r4(:,:,:); idx_clcn = nn
                  endif
              else
                  if (qcld /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) = FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,qcld) + state%vars%tracer(n)%content(:,:,:)
                  if (clcn /= -1) FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,clcn) = state%vars%tracer(n)%content(:,:,:)
-                 if (qcld /= -1 .and. clcn == -1) then 
-                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_clcn = nn 
+                 if (qcld /= -1 .and. clcn == -1) then
+                     nn = nn + 1; FV_Atm(1)%q(isc:iec,jsc:jec,1:npz,nn) = state%vars%tracer(n)%content(:,:,:); idx_clcn = nn
                  endif
              endif
              if ((clcn /= -1) .and. fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
@@ -1542,7 +1590,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
              if (fv_first_run) call WRITE_PARALLEL( trim(STATE%VARS%TRACER(n)%TNAME) )
        end select
     enddo
-    
+
     write (STRING, "(I3.3,' /= ',I3.3)") nn, FV_Atm(1)%ncnst
     _ASSERT(nn == FV_Atm(1)%ncnst, 'nn /= ncnst: '//trim(STRING))
 
@@ -1565,236 +1613,286 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     enddo
     _ASSERT(nn == FV_Atm(1)%ncnst, 'needs informative message')
   endif
-  call MAPL_TimerOff(MAPL,"--PULL_TRACERS")
+  call MAPL_GridCompTimerStop(gc, "pull_tracers")
 
-  myDT = state%dt
-  elapsed_time = elapsed_time + myDT
+    myDT = state%dt
 
-  if (DEBUG) call debug_fv_state('Before Dynamics Execution',STATE)
-  call State_To_FV( MAPL, STATE )
+    elapsed_time = elapsed_time + myDT
 
-  call MAPL_GetResource( MAPL, massD0, 'PSDRY:', default=MAPL_PSDRY, RC=STATUS )
-  VERIFY_(STATUS)
-  FV_Atm(1)%flagstruct%dry_mass = massD0
+    if (DEBUG) call debug_fv_state('Before Dynamics Execution',STATE)
 
-  if (fv_first_run) then
-    if ( .not. FV_Atm(1)%flagstruct%hydrostatic ) then
-      if ( FV_Atm(1)%flagstruct%Make_NH ) then
-        if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT)) 
-        if (mpp_pe()==0) print*, 'fv_first_run: FV3 is making Non-Hydrostatic W and DZ'
-        FV_Atm(1)%w = 0.0
-        call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
-                   FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
-                   FV_Atm(1)%pk,   FV_Atm(1)%pkz, kappa, FV_Atm(1)%q, FV_Atm(1)%ng, &
-                   FV_Atm(1)%ncnst, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%flagstruct%dry_mass,  &
-                   FV_Atm(1)%flagstruct%adjust_dry_mass,  FV_Atm(1)%flagstruct%mountain, &
-                   FV_Atm(1)%flagstruct%moist_phys,  FV_Atm(1)%flagstruct%hydrostatic, &
-                   FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%domain, FV_Atm(1)%flagstruct%make_nh)
-        FV_Atm(1)%flagstruct%Make_NH=.false.
+! Update FV with Internal State
+    call State_To_FV( STATE )
+
+    ! Query for PSDRY from AGCM.rc and set to MAPL_PSDRY if not found
+    call MAPL_GridCompGetResource(gc, 'PSDRY', massD0, default=MAPL_PSDRY, RC=STATUS )
+    VERIFY_(STATUS)
+    FV_Atm(1)%flagstruct%dry_mass = massD0
+
+    if (fv_first_run) then
+     ! Make_NH
+      if ( .not. FV_Atm(1)%flagstruct%hydrostatic ) then
+        if ( FV_Atm(1)%flagstruct%Make_NH ) then
+          if (FV_Atm(1)%flagstruct%na_init == 0) FV_Atm(1)%flagstruct%na_init = max(1,CEILING(900/myDT)) ! Default to 15 min if not set, but ensure at least 1 step
+          if (mpp_pe()==0) print*, 'fv_first_run: FV3 is making Non-Hydrostatic W and DZ'
+          FV_Atm(1)%w = 0.0
+          call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
+                     FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
+                     FV_Atm(1)%pk,   FV_Atm(1)%pkz, kappa, FV_Atm(1)%q, FV_Atm(1)%ng, &
+                     FV_Atm(1)%ncnst, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%flagstruct%dry_mass,  &
+                     FV_Atm(1)%flagstruct%adjust_dry_mass,  FV_Atm(1)%flagstruct%mountain, &
+                     FV_Atm(1)%flagstruct%moist_phys,  FV_Atm(1)%flagstruct%hydrostatic, &
+                     FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%domain, FV_Atm(1)%flagstruct%make_nh)
+          FV_Atm(1)%flagstruct%Make_NH=.false.
+        endif
       endif
+     ! Mark FV setup complete
+      fv_first_run = .false.
     endif
-    fv_first_run = .false.
-  endif
 
-! Check Dry Mass
-  if ( check_mass .OR. fix_mass ) then
-     call MAPL_TimerOn(MAPL,"--MASS_FIX")
-     if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. FV_Atm(1)%flagstruct%nwat > 1 ) then
-        call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
-                   FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
-                   FV_Atm(1)%pk,   FV_Atm(1)%pkz, kappa, FV_Atm(1)%q, FV_Atm(1)%ng, &
-                   FV_Atm(1)%ncnst, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%flagstruct%dry_mass,  &
-                   FV_Atm(1)%flagstruct%adjust_dry_mass,  FV_Atm(1)%flagstruct%mountain, &
-                   FV_Atm(1)%flagstruct%moist_phys,  FV_Atm(1)%flagstruct%hydrostatic, &
-                   FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%domain, FV_Atm(1)%flagstruct%make_nh)
-     else
-        allocate ( mass(isc:iec,jsc:jec))
-        allocate (tqtot(isc:iec,jsc:jec))
-        do j=jsc,jec
-           do i=isc,iec
-              mass(i,j) = FV_Atm(1)%pe(i,npz+1,j)
-           enddo
-        enddo
-        tqtot = 0.0
-        if ( (.not. ADIABATIC) .AND. (FV_Atm(1)%flagstruct%nwat /= 0) ) then
-         if (FV_Atm(1)%flagstruct%nwat >= 6) then
-           do k=1,npz
-              tqtot(:,:) = tqtot(:,:) + ( &
-              FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
-              FV_Atm(1)%q(isc:iec,jsc:jec,k,qice) + FV_Atm(1)%q(isc:iec,jsc:jec,k,rain) + &
-              FV_Atm(1)%q(isc:iec,jsc:jec,k,snow) + FV_Atm(1)%q(isc:iec,jsc:jec,k,grpl) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
-           enddo
-         elseif (FV_Atm(1)%flagstruct%nwat == 3) then
-           do k=1,npz
-              tqtot(:,:) = tqtot(:,:) + ( &
-              FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
-              FV_Atm(1)%q(isc:iec,jsc:jec,k,qice) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
-           enddo
-         else
-           do k=1,npz
-              tqtot(:,:) = tqtot(:,:) + ( &
-              FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + FV_Atm(1)%q(isc:iec,jsc:jec,k,qlcn) + &
-              FV_Atm(1)%q(isc:iec,jsc:jec,k,qlls) + FV_Atm(1)%q(isc:iec,jsc:jec,k,qicn) + &
-              FV_Atm(1)%q(isc:iec,jsc:jec,k,qils) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
-           enddo
-         endif
-        endif
-        massD = g_sum(FV_Atm(1)%domain, mass-tqtot, isc, iec, jsc, jec, state%grid%ng, &
-                      fv_atm(1)%gridstruct%area_64, 1, reproduce=FV_Atm(1)%flagstruct%exact_sum)
-        if (massD0 < 0.0d0) massD0 = massD
-        if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
-           if (ABS((massD-massD0)/massD0) >= epsilon(1.0_REAL4)) then
-              if (mpp_pe()==mpp_root_pe()) then
-                 write(6,126)
-                 write(6,127) massD0
-                 write(6,128) massD
-                 write(6,129) massD0/massD, (massD-massD0)/massD0
-                 126 format('Dry Mass Difference of > epsilon relative found!')
-                 127 format('Dry Mass Expected:'2x,g21.14)
-                 128 format('Dry Mass Calculated in FV3:'2x,g21.14)
-                 129 format('Dry Mass Scaling Factor and Relative Difference'2x,g21.14,2x,g21.14)
-              end if
-           end if
-        end if
+! Check Dry Mass (Apply fixer is option is enabled)
+    if ( check_mass .OR. fix_mass ) then
+      call MAPL_GridCompTimerStart(gc, "mass_fix", _RC)
 
-        if (fix_mass) then
-           if (ABS((massD-massD0)/massD0) >= epsilon(1.0_REAL4)) then
-              if (mpp_pe()==mpp_root_pe()) then
-                 write(6,119) massD0, massD, massD0/massD, (massD-massD0)/massD0
-                 119 format('Dry Mass Violation (epsilon relative)!'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
-              end if
-           end if
-           massADDED = massADDED + (massD-massD0)/massD0
-           FV_Atm(1)%pe = FV_Atm(1)%pe*massD0/massD
-           if (present(PLE0)) then
-              do k=1,npz
-                 PLE0(:,:,k) = FV_Atm(1)%pe(isc:iec,k,jsc:jec)
-              enddo
+       if ( FV_Atm(1)%flagstruct%adjust_dry_mass .AND. FV_Atm(1)%flagstruct%nwat > 1 ) then
+
+          call p_var(FV_Atm(1)%npz,         isc,         iec,       jsc,     jec,  FV_Atm(1)%ptop,     ptop_min,  &
+                     FV_Atm(1)%delp, FV_Atm(1)%delz, FV_Atm(1)%pt, FV_Atm(1)%ps, FV_Atm(1)%pe,  FV_Atm(1)%peln,   &
+                     FV_Atm(1)%pk,   FV_Atm(1)%pkz, kappa, FV_Atm(1)%q, FV_Atm(1)%ng, &
+                     FV_Atm(1)%ncnst, FV_Atm(1)%gridstruct%area_64, FV_Atm(1)%flagstruct%dry_mass,  &
+                     FV_Atm(1)%flagstruct%adjust_dry_mass,  FV_Atm(1)%flagstruct%mountain, &
+                     FV_Atm(1)%flagstruct%moist_phys,  FV_Atm(1)%flagstruct%hydrostatic, &
+                     FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%domain, FV_Atm(1)%flagstruct%make_nh)
+
+       else
+
+          allocate ( mass(isc:iec,jsc:jec))
+          allocate (tqtot(isc:iec,jsc:jec))
+          do j=jsc,jec
+             do i=isc,iec
+                mass(i,j) = FV_Atm(1)%pe(i,npz+1,j)
+             enddo
+          enddo
+          tqtot = 0.0
+          if ( (.not. ADIABATIC) .AND. (FV_Atm(1)%flagstruct%nwat /= 0) ) then
+           if (FV_Atm(1)%flagstruct%nwat >= 6) then
+             do k=1,npz
+                tqtot(:,:) = tqtot(:,:) + ( &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qice) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,rain) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,snow) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,grpl) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
+             enddo
+           elseif (FV_Atm(1)%flagstruct%nwat == 3) then
+             do k=1,npz
+                tqtot(:,:) = tqtot(:,:) + ( &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qliq) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qice) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
+             enddo
+           else
+             do k=1,npz
+                tqtot(:,:) = tqtot(:,:) + ( &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,sphu) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qlcn) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qlls) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qicn) + &
+                FV_Atm(1)%q(isc:iec,jsc:jec,k,qils) ) * FV_Atm(1)%delp(isc:iec,jsc:jec,k)
+             enddo
            endif
-           if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
-              if (mpp_pe()==mpp_root_pe()) then
-                 write(6,109) massD0, massD, massD0/massD, (massD-massD0)/massD0, massADDED
-                 109    format('Dry Mass Fixer'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
-              end if
-           end if
-        else
-           if(ESMF_AlarmIsRinging(MASSALARM) .AND. mpp_pe()==mpp_root_pe()) write(6,110) massD0, massD, massD0/massD, (massD-massD0)/massD0
-           110    format('Dry Mass Check'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
-        endif
-        deallocate (mass)
-        deallocate (tqtot)
-     endif
-     call MAPL_TimerOff(MAPL,"--MASS_FIX")
-  endif
+          endif
+          massD = g_sum(FV_Atm(1)%domain, mass-tqtot, isc, iec, jsc, jec, state%grid%ng, &
+                        fv_atm(1)%gridstruct%area_64, 1, reproduce=FV_Atm(1)%flagstruct%exact_sum)
+          ! If PSDRY is negative, set to use the incoming drymass.
+          ! NOTE: THIS WILL NOT TIME REGRESS
+          if (massD0 < 0.0d0) then
+             massD0 = massD
+          end if
+          if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
+             if (ABS((massD-massD0)/massD0) >= epsilon(1.0_REAL4)) then
+                if (mpp_pe()==mpp_root_pe()) then
+                   write(6,126)
+                   write(6,127) massD0
+                   write(6,128) massD
+                   write(6,129) massD0/massD, (massD-massD0)/massD0
+                   126 format('Dry Mass Difference of > epsilon relative found!')
+                   127 format('Dry Mass Expected:'2x,g21.14)
+                   128 format('Dry Mass Calculated in FV3:'2x,g21.14)
+                   129 format('Dry Mass Scaling Factor and Relative Difference'2x,g21.14,2x,g21.14)
+                end if
+             end if
+          end if
 
-  call MAPL_TimerOn(MAPL,"--NH_ADIABATIC_INIT")
-     if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
-        if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
-        allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
-        call nullify_domain ( )
-        DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
-        call prt_maxmin('Before adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
-        call adiabatic_init(myDT,DEBUG_ARRAY,fac1)
-        DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
-        call prt_maxmin('After adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
-        deallocate( DEBUG_ARRAY )
-        FV_Atm(1)%flagstruct%na_init=0
-     endif
-  call MAPL_TimerOff(MAPL,"--NH_ADIABATIC_INIT")
+          ! Apply the fixer if asked for
+          if (fix_mass) then
+             if (ABS((massD-massD0)/massD0) >= epsilon(1.0_REAL4)) then
+                if (mpp_pe()==mpp_root_pe()) then
+                   write(6,119) massD0, massD, massD0/massD, (massD-massD0)/massD0
+                   119 format('Dry Mass Violation (epsilon relative)!'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
+                end if
+             end if
+             ! Accumulate added dry mass from the fixer
+             massADDED = massADDED + (massD-massD0)/massD0
+             ! -----------------------------------------------
+             ! Fix Dry Mass after increments have been applied
+             ! -----------------------------------------------
+             FV_Atm(1)%pe = FV_Atm(1)%pe*massD0/massD
+             if (present(PLE0)) then
+                do k=1,npz
+                   PLE0(:,:,k) = FV_Atm(1)%pe(isc:iec,k,jsc:jec)
+                enddo
+             endif
+             if(ESMF_AlarmIsRinging(MASSALARM) .AND. check_mass) then
+                if (mpp_pe()==mpp_root_pe()) then
+                   write(6,109) massD0, massD, massD0/massD, (massD-massD0)/massD0, massADDED
+                   109    format('Dry Mass Fixer'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
+                end if
+             end if
+          else
+             ! Check Dry Mass Conservation and write to log
+             if(ESMF_AlarmIsRinging(MASSALARM) .AND. mpp_pe()==mpp_root_pe()) write(6,110) massD0, massD, massD0/massD, (massD-massD0)/massD0
+             110    format('Dry Mass Check'2x,g21.14,2x,g21.14,2x,g21.14,2x,g21.14)
+          endif
+          deallocate (mass)
+          deallocate (tqtot)
+       endif
 
-  call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
-  if (.not. FV_OFF) then
-  call set_domain(FV_Atm(1)%domain) 
-  allocate ( u_dt(isc:iec,jsc:jec,npz) )
-  allocate ( v_dt(isc:iec,jsc:jec,npz) )
-  allocate ( t_dt(isc:iec,jsc:jec,npz) )
-  allocate ( w_dt(isc:iec,jsc:jec,npz) )
-  u_dt(:,:,:) = 0.0; v_dt(:,:,:) = 0.0; t_dt(:,:,:) = 0.0; w_dt(:,:,:) = 0.0
+       call MAPL_GridCompTimerStop(gc, "mass_fix", _RC)
+    endif
+
+    call MAPL_GridCompTimerStart(gc, "nh_adiabatic_init", _RC)
+       if ((.not. FV_Atm(1)%flagstruct%hydrostatic) .and. (FV_Atm(1)%flagstruct%na_init>0)) then
+          if (mpp_pe()==0) print*, '              FV3 will run fwd-bck restart for NH spinup'
+          allocate( DEBUG_ARRAY(isc:iec,jsc:jec,NPZ) )
+          call nullify_domain ( )
+          DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
+          call prt_maxmin('Before adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
+          call adiabatic_init(myDT,DEBUG_ARRAY,fac1)
+          DEBUG_ARRAY(:,:,1:npz) = FV_Atm(1)%w(isc:iec,jsc:jec,:)
+          call prt_maxmin('After adiabatic_init W: ', DEBUG_ARRAY, isc, iec, jsc, jec, 0, npz, fac1   )
+          deallocate( DEBUG_ARRAY )
+          FV_Atm(1)%flagstruct%na_init=0
+       endif
+    call MAPL_GridCompTimerStop(gc, "nh_adiabatic_init", _RC)
+
+    call MAPL_GridCompTimerStart(gc, "fv_dynamics", _RC)
+    if (.not. FV_OFF) then
+    call set_domain(FV_Atm(1)%domain)  ! needed for diagnostic output done in fv_dynamics
+    allocate ( u_dt(isc:iec,jsc:jec,npz) )
+    allocate ( v_dt(isc:iec,jsc:jec,npz) )
+    allocate ( t_dt(isc:iec,jsc:jec,npz) )
+    allocate ( w_dt(isc:iec,jsc:jec,npz) )
+    u_dt(:,:,:) = 0.0
+    v_dt(:,:,:) = 0.0
+    t_dt(:,:,:) = 0.0
+    w_dt(:,:,:) = 0.0
 
 #ifdef RUN_GTFV3
-  if (run_gtfv3 == 0) then
-     call cpu_time(start)
+    if (run_gtfv3 == 0) then
+       call cpu_time(start)
 #endif
-     call fv_dynamics( &
-          FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
-          FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, &
-          kappa, cp, zvir, &
-          FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
-          STATE%k_split, STATE%n_split, STATE%q_split, &
-          FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-          FV_Atm(1)%flagstruct%hydrostatic, &
-          FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
-          FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
-          FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
-          FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
-          FV_Atm(1)%ak, FV_Atm(1)%bk, &
-          FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
-          FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
-          FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
-          FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, time_total)
+       call fv_dynamics( &
+            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%ncnst, FV_Atm(1)%ng, myDT, &
+            FV_Atm(1)%flagstruct%consv_te, FV_Atm(1)%flagstruct%fill, &
+            kappa, cp, zvir, &
+            FV_Atm(1)%ptop, FV_Atm(1)%ks, FV_Atm(1)%flagstruct%ncnst, &
+            STATE%k_split, STATE%n_split, STATE%q_split, &
+            FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
+            FV_Atm(1)%flagstruct%hydrostatic, &
+            FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q, &
+            FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
+            FV_Atm(1)%phis, FV_Atm(1)%varflt, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
+            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
+            FV_Atm(1)%ak, FV_Atm(1)%bk, &
+            FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, &
+            FV_Atm(1)%ze0, FV_Atm(1)%flagstruct%hybrid_z, FV_Atm(1)%gridstruct, FV_Atm(1)%flagstruct, &
+            FV_Atm(1)%neststruct, FV_Atm(1)%idiag, FV_Atm(1)%bd, FV_Atm(1)%parent_grid, FV_Atm(1)%domain, &
+            FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, &
+            time_total)
 #ifdef RUN_GTFV3
-     call cpu_time(finish)
-     if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
-  else
-     call cpu_time(start)
-     call geos_gtfv3_interface_f( &
-          comm, FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
-          FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, isd, ied, jsd, jed, &
-          myDT, 7, FV_Atm(1)%ng, FV_Atm(1)%ptop, FV_Atm(1)%ks, &
-          FV_Atm(1)%layout(1), FV_Atm(1)%layout(2), adiabatic, &
-          FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
-          FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,1:7), &
-          FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
-          FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
-          FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
-          FV_Atm(1)%ak, FV_Atm(1)%bk, FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
-     call cpu_time(finish)
-     print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
-  end if
+       call cpu_time(finish)
+       if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
+    else
+       call cpu_time(start)
+       call geos_gtfv3_interface_f( &
+            comm, &
+            FV_Atm(1)%npx, FV_Atm(1)%npy, FV_Atm(1)%npz, FV_Atm(1)%flagstruct%ntiles, &
+            FV_Atm(1)%bd%is, FV_Atm(1)%bd%ie, FV_Atm(1)%bd%js, FV_Atm(1)%bd%je, &
+            isd, ied, jsd, jed, &
+            myDT, 7, FV_Atm(1)%ng, FV_Atm(1)%ptop, FV_Atm(1)%ks, &
+            FV_Atm(1)%layout(1), FV_Atm(1)%layout(2), adiabatic, &
+            ! input/output
+            FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
+            FV_Atm(1)%pt, FV_Atm(1)%delp, FV_Atm(1)%q(:,:,:,1:7), &
+            FV_Atm(1)%ps, FV_Atm(1)%pe, FV_Atm(1)%pk, FV_Atm(1)%peln, FV_Atm(1)%pkz, &
+            FV_Atm(1)%phis, FV_Atm(1)%q_con, FV_Atm(1)%omga, &
+            FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%uc, FV_Atm(1)%vc, &
+            ! input
+            FV_Atm(1)%ak, FV_Atm(1)%bk, &
+            ! input/output
+            FV_Atm(1)%mfx, FV_Atm(1)%mfy, FV_Atm(1)%cx, FV_Atm(1)%cy, FV_Atm(1)%diss_est)
+       call cpu_time(finish)
+       print *, rank, ', geos_gtfv3_interface_f: time taken = ', finish - start, 's'
+    end if
 #endif
 
-  allocate ( udt(isc:iec,jsc:jec,npz) )
-  allocate ( vdt(isc:iec,jsc:jec,npz) )
-  call fv_getAllWinds(u_dt, v_dt, ur=udt, vr=vdt)
-  call MAPL_GetPointer ( export, PTR3D, 'DUDT_RAY', rc=status ); VERIFY_(STATUS)
-  if( associated(PTR3D) ) PTR3D = udt
-  call MAPL_GetPointer ( export, PTR3D, 'DVDT_RAY', rc=status ); VERIFY_(STATUS)
-  if( associated(PTR3D) ) PTR3D = vdt
-  deallocate ( udt ); deallocate ( vdt )
-  
-  call MAPL_GetPointer ( export, PTR3D, 'DTDT_RAY', rc=status ); VERIFY_(STATUS)
-  if( associated(PTR3D) ) PTR3D = t_dt
-  call MAPL_GetPointer ( export, PTR3D, 'DWDT_RAY', rc=status ); VERIFY_(STATUS)
-  if( associated(PTR3D) ) PTR3D = w_dt
+    allocate ( udt(isc:iec,jsc:jec,npz) )
+    allocate ( vdt(isc:iec,jsc:jec,npz) )
+    ! go from native D-Grid tendencies to A-grid rotated exports
+    call fv_getAllWinds(u_dt, v_dt, ur=udt, vr=vdt)
+    call ESMF_StateGet(export, 'D_UV_DT_RAY', ray_bundle, rc=status); VERIFY_(STATUS)
+    call ESMF_FieldBundleGet(ray_bundle, fieldCount=ray_field_count, rc=status); VERIFY_(STATUS)
+    if (ray_field_count == 2) then
+       call MAPL_FieldBundleGetPointer(ray_bundle, 1, dudt_ray, rc=status); VERIFY_(STATUS)
+       call MAPL_FieldBundleGetPointer(ray_bundle, 2, dvdt_ray, rc=status); VERIFY_(STATUS)
+       dudt_ray = udt
+       dvdt_ray = vdt
+    end if
+    deallocate ( udt )
+    deallocate ( vdt )
+    call MAPL_StateGetPointer ( export, PTR3D, 'DTDT_RAY', rc=status ); VERIFY_(STATUS)
+    if( associated(PTR3D) ) PTR3D = t_dt
+    call MAPL_StateGetPointer ( export, PTR3D, 'DWDT_RAY', rc=status ); VERIFY_(STATUS)
+    if( associated(PTR3D) ) PTR3D = w_dt
 
-  if ( FV_Atm(1)%flagstruct%fv_sg_adj > 0 ) then
-       u_dt(:,:,:) = 0.0; v_dt(:,:,:) = 0.0; t_dt(:,:,:) = 0.0; w_dt(:,:,:) = 0.0
-       call fv_subgrid_z(isd, ied, jsd, jed, isc, iec, jsc, jec, FV_Atm(1)%npz, &
-                         FV_Atm(1)%ncnst, myDT, FV_Atm(1)%flagstruct%fv_sg_adj,      &
-                         FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%delp, FV_Atm(1)%pe,     &
-                         FV_Atm(1)%peln, FV_Atm(1)%pkz, FV_Atm(1)%pt, FV_Atm(1)%q,       &
-                         FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%flagstruct%hydrostatic,&
-                         FV_Atm(1)%w, FV_Atm(1)%delz, u_dt, v_dt, t_dt, w_dt,          &
-                         FV_Atm(1)%flagstruct%n_zfilter)
-      call MAPL_GetPointer ( export, PTR3D, 'DUDTSUBZ', rc=status ); VERIFY_(STATUS)
-      if( associated(PTR3D) ) PTR3D = u_dt
-      call MAPL_GetPointer ( export, PTR3D, 'DVDTSUBZ', rc=status ); VERIFY_(STATUS)
-      if( associated(PTR3D) ) PTR3D = v_dt
-      call MAPL_GetPointer ( export, PTR3D, 'DTDTSUBZ', rc=status ); VERIFY_(STATUS)
-      if( associated(PTR3D) ) PTR3D = t_dt
-      call MAPL_GetPointer ( export, PTR3D, 'DWDTSUBZ', rc=status ); VERIFY_(STATUS)
-      if( associated(PTR3D) ) PTR3D = w_dt
-  endif
-  deallocate ( u_dt ); deallocate ( v_dt ); deallocate ( t_dt ); deallocate ( w_dt )
-  call nullify_domain()
-  endif
-  call MAPL_TimerOff(MAPL,"--FV_DYNAMICS")
+    if ( FV_Atm(1)%flagstruct%fv_sg_adj > 0 ) then
+         u_dt(:,:,:) = 0.0
+         v_dt(:,:,:) = 0.0
+         t_dt(:,:,:) = 0.0
+         w_dt(:,:,:) = 0.0
+         call fv_subgrid_z(isd, ied, jsd, jed, isc, iec, jsc, jec, FV_Atm(1)%npz, &
+                           FV_Atm(1)%ncnst, myDT, FV_Atm(1)%flagstruct%fv_sg_adj,      &
+                           FV_Atm(1)%flagstruct%nwat, FV_Atm(1)%delp, FV_Atm(1)%pe,     &
+                           FV_Atm(1)%peln, FV_Atm(1)%pkz, FV_Atm(1)%pt, FV_Atm(1)%q,       &
+                           FV_Atm(1)%ua, FV_Atm(1)%va, FV_Atm(1)%flagstruct%hydrostatic,&
+                           FV_Atm(1)%w, FV_Atm(1)%delz, u_dt, v_dt, t_dt, w_dt,          &
+                           FV_Atm(1)%flagstruct%n_zfilter)
+        call MAPL_StateGetPointer ( export, PTR3D, 'DUDTSUBZ', rc=status ); VERIFY_(STATUS)
+        if( associated(PTR3D) ) PTR3D = u_dt
+        call MAPL_StateGetPointer ( export, PTR3D, 'DVDTSUBZ', rc=status ); VERIFY_(STATUS)
+        if( associated(PTR3D) ) PTR3D = v_dt
+        call MAPL_StateGetPointer ( export, PTR3D, 'DTDTSUBZ', rc=status ); VERIFY_(STATUS)
+        if( associated(PTR3D) ) PTR3D = t_dt
+        call MAPL_StateGetPointer ( export, PTR3D, 'DWDTSUBZ', rc=status ); VERIFY_(STATUS)
+        if( associated(PTR3D) ) PTR3D = w_dt
+    endif
+    deallocate ( u_dt )
+    deallocate ( v_dt )
+    deallocate ( t_dt )
+    deallocate ( w_dt )
+
+    call nullify_domain()
+
+    endif
+    call MAPL_GridCompTimerStop(gc, "fv_dynamics", _RC)
 
  ! ------------------------------------------------------------------
  ! Push Tracers (Dynamic Mass Separation for Option A)
  ! ------------------------------------------------------------------
-  call MAPL_TimerOn(MAPL,"--PUSH_TRACERS")
-  
+  call MAPL_GridCompTimerStart(gc, "push_tracers", _RC)
+
   if (.not. ADIABATIC) then
     ! --- Eulerian Monotonicity Safegaurds ---
     ! Ensure advected CN does not exceed Total, preventing negative LS
@@ -1999,13 +2097,16 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
     if (mpp_pe()==0) print*,''
     prt_minmax = .false.
   endif
-  call MAPL_TimerOff(MAPL,"--PUSH_TRACERS")
+  call MAPL_GridCompTimerStop(gc, "push_tracers", _RC)
 
 ! Copy FV to internal State
-   call FV_To_State ( MAPL, STATE )
-   if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
+   call MAPL_GridCompTimerStart(gc, "fv_to_state", _RC)
+   call FV_To_State ( STATE )
+   call MAPL_GridCompTimerStop(gc, "fv_to_state", _RC)
 
-   RETURN_(ESMF_SUCCESS)
+    if (DEBUG) call debug_fv_state('After Dynamics Execution',STATE)
+
+    _RETURN(_SUCCESS)
 
 end subroutine FV_Run
 
@@ -2050,11 +2151,10 @@ end subroutine FV_Run
 
  end subroutine FV_Finalize
 
-subroutine State_To_FV ( MAPL, STATE )
+subroutine State_To_FV ( STATE )
 
 ! !INPUT PARAMETERS:
 
-   type(MAPL_MetaComp),         pointer   :: MAPL
    type(T_FVDYCORE_STATE),      pointer   :: STATE
 
     integer               :: ISC,IEC, JSC,JEC
@@ -2081,11 +2181,6 @@ subroutine State_To_FV ( MAPL, STATE )
     character(len=ESMF_MAXSTR)  :: IAm='FV_StateMod:State_To_FV'
     character(len=ESMF_MAXSTR)  :: ERRSTR
 
-    real(REAL4), pointer     :: LONS(:,:), LATS(:,:)
-
-    call MAPL_Get(MAPL, LATS=LATS, LONS=LONS, RC=STATUS)  ! These are in radians
-    VERIFY_(STATUS)
-
     ISC = state%grid%is
     IEC = state%grid%ie
     JSC = state%grid%js
@@ -2099,8 +2194,6 @@ subroutine State_To_FV ( MAPL, STATE )
 
     akap  = kappa
     if (SW_DYNAMICS) akap  = 1.
-
-    call MAPL_TimerOn(MAPL,"--State_To_FV")
 
 !------------
 ! Update Winds
@@ -2229,18 +2322,15 @@ subroutine State_To_FV ( MAPL, STATE )
                              FV_Atm(1)%gridstruct%dya)   ! Cell center dy (dya)
     endif
 
-    call MAPL_TimerOff(MAPL,"--State_To_FV")
-
    return
 
 end subroutine State_To_FV
 
-subroutine FV_To_State ( MAPL, STATE )
+subroutine FV_To_State ( STATE )
 
 !
 ! !INPUT PARAMETERS:
 
-   type(MAPL_MetaComp),         pointer   :: MAPL
    type(T_FVDYCORE_STATE),      pointer   :: STATE
 
     logical :: bad_range = .false.
@@ -2255,8 +2345,6 @@ subroutine FV_To_State ( MAPL, STATE )
     JEC = state%grid%je
     KM  = state%grid%npz
     NG  = state%grid%ng
-
-    call MAPL_TimerOn(MAPL,"--FV_To_State")
 
 ! Copy updated FV data to internal state
     STATE%VARS%U(:,:,:) = FV_Atm(1)%u(isc:iec,jsc:jec,:)
@@ -2307,8 +2395,6 @@ subroutine FV_To_State ( MAPL, STATE )
        STATE%VARS%PT  = STATE%VARS%PT/STATE%VARS%PKZ
     endif
 
-    call MAPL_TimerOff(MAPL,"--FV_To_State")
-
    return
 
 end subroutine FV_To_State
@@ -2331,12 +2417,12 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
     integer :: i, j, k
     real    :: u_c, v_c
     real    :: max_cfl_h, max_cfl_z
-    
+
     ! Updated constraints
     real, parameter    :: TARGET_CFL   = 1.05
     real, parameter    :: H_MULTIPLIER = 4.0  ! For acoustic speed scaling
     real, parameter    :: Z_MULTIPLIER = 0.25 ! Tune this to dictate max_cfl_z's impact
-    
+
     integer :: new_k_split, new_n_split, new_q_split
     integer :: target_k_split, base_tot
 
@@ -2349,7 +2435,7 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
           do i = isc, iec
              u_c = 0.5 * (u(i,j,k) + u(i,j+1,k))
              v_c = 0.5 * (v(i,j,k) + v(i+1,j,k))
-             
+
              max_cfl_h = max(max_cfl_h, abs((u_c/dx(i,j)) + (v_c/dy(i,j))) * state%DT)
              max_cfl_z = max(max_cfl_z, abs(w(i,j,k) / delz(i,j,k)) * state%DT)
           enddo
@@ -2362,15 +2448,15 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
 
     ! --- 3. DYNAMIC ADJUSTMENT ON ROOT PE ---
     if (mpp_pe() == 0) then
-       
+
        ! Calculate total baseline acoustic steps (e.g., 1 * 6 = 6)
        ! We want to keep (k_split * n_split) as close to this as possible
        base_tot = state%base_k_split * state%base_n_split
-       
+
        ! Calculate the strictly required k_split
        target_k_split = max(state%base_k_split, ceiling(max_cfl_z * Z_MULTIPLIER))
-       
-       ! b. RATE LIMITING VIA FACTORS: 
+
+       ! b. RATE LIMITING VIA FACTORS:
        ! Step to the next integer that cleanly divides base_tot
        if (target_k_split > state%k_split) then
            new_k_split = state%k_split + 1
@@ -2389,13 +2475,13 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
        else
            new_k_split = state%k_split
        endif
-       
+
        ! c. Calculate n_split
        ! Because new_k_split is guaranteed to be a factor, this division is exact!
        ! (Unless max_cfl_h independently forces it higher)
        new_n_split = ceiling(base_tot / real(new_k_split))
        new_n_split = max(new_n_split, ceiling(max_cfl_h * H_MULTIPLIER / real(new_k_split)))
-       
+
        ! d. Calculate q_split
        if (state%base_q_split == 0) then
            new_q_split = 0
@@ -2407,14 +2493,14 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
        if (state%k_split /= new_k_split .or. &
            state%n_split /= new_n_split .or. &
            state%q_split /= new_q_split) then
-           
+
            print *, "=== FV3 DYNAMIC SPLIT ADJUSTMENT ==="
            print *, "Max Horz CFL: ", max_cfl_h, " | Max Vert CFL: ", max_cfl_z
            print *, "FV3 k_split: ", new_k_split, " (was ", state%k_split, ", target was ", target_k_split, ")"
            print *, "FV3 n_split: ", new_n_split, " (was ", state%n_split, ")"
            print *, "FV3 q_split: ", new_q_split, " (was ", state%q_split, ")"
            print *, "===================================="
-           
+
            state%k_split = new_k_split
            state%n_split = new_n_split
            state%q_split = new_q_split
@@ -2456,22 +2542,22 @@ subroutine fv_getGradT_2D(t_in, ps_in, mag_grad_t)
   !$OMP PRIVATE(i, j, ii, jj, dx, dy, dTdx, dTdy, p_surf_min)
   do j = jsc, jec
      jj = j - jsc + 1   ! Map to MAPL pointer index
-     
+
      do i = isc, iec
         ii = i - isc + 1  ! Map to MAPL pointer index
-        
+
         ! Find the highest terrain in the 5-point stencil
         p_surf_min = MIN(ps_in(i,j), ps_in(i-1,j), ps_in(i+1,j), ps_in(i,j-1), ps_in(i,j+1))
 
         ! SHIELD: Only calculate if the whole stencil is safely > 700 hPa
         ! (Keeps the 600 hPa level well out of the mountain boundary layer)
         if ( p_surf_min > 70000.0_REAL4 .and. &
-             t_in(i,j)   /= real(MAPL_UNDEF, REAL4) .and. &
-             t_in(i-1,j) /= real(MAPL_UNDEF, REAL4) .and. &
-             t_in(i+1,j) /= real(MAPL_UNDEF, REAL4) .and. &
-             t_in(i,j-1) /= real(MAPL_UNDEF, REAL4) .and. &
-             t_in(i,j+1) /= real(MAPL_UNDEF, REAL4) ) then
-           
+             t_in(i,j)   /= real(MAPL_UNDEFINED_REAL, REAL4) .and. &
+             t_in(i-1,j) /= real(MAPL_UNDEFINED_REAL, REAL4) .and. &
+             t_in(i+1,j) /= real(MAPL_UNDEFINED_REAL, REAL4) .and. &
+             t_in(i,j-1) /= real(MAPL_UNDEFINED_REAL, REAL4) .and. &
+             t_in(i,j+1) /= real(MAPL_UNDEFINED_REAL, REAL4) ) then
+
            dx = FV_Atm(1)%gridstruct%dxa(i,j)
            dy = FV_Atm(1)%gridstruct%dya(i,j)
 
@@ -2480,7 +2566,7 @@ subroutine fv_getGradT_2D(t_in, ps_in, mag_grad_t)
            dTdy = (t_in(i,j+1) - t_in(i,j-1)) / real(2.0_REAL8 * dy, REAL4)
 
            mag_grad_t(ii,jj) = SQRT(dTdx**2 + dTdy**2)
-           
+
         else
            ! Stencil hits topography or uninitialized data
            mag_grad_t(ii,jj) = 0.0_REAL4
@@ -2498,7 +2584,7 @@ subroutine fv_getGradT_3D(mag_grad_t)
   real(REAL8), intent(OUT) :: mag_grad_t(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec, &
                                          FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec, &
                                          1:FV_Atm(1)%npz)
-  
+
   integer :: isc, iec, jsc, jec
   integer :: i, j, k
   real(REAL8) :: dTdx, dTdy
@@ -2515,7 +2601,7 @@ subroutine fv_getGradT_3D(mag_grad_t)
   do k = 1, FV_Atm(1)%npz
      do j = jsc, jec
         do i = isc, iec
-           
+
            ! Note: Replace dxa/dya with your exact FV3 metric arrays for cell-center distances.
            ! (Often found in FV_Atm(1)%gridstruct%dxa or similar)
            dx = FV_Atm(1)%gridstruct%dxa(i,j)
@@ -2524,10 +2610,10 @@ subroutine fv_getGradT_3D(mag_grad_t)
            ! Assuming pt is Absolute Temperature (if it's Potential T, multiply by pkz here)
            dTdx = (FV_Atm(1)%pt(i+1,j,k) - FV_Atm(1)%pt(i-1,j,k)) / (2.0_REAL8 * dx)
            dTdy = (FV_Atm(1)%pt(i,j+1,k) - FV_Atm(1)%pt(i,j-1,k)) / (2.0_REAL8 * dy)
-           
+
            ! Magnitude in K/m
            mag_grad_t(i,j,k) = SQRT(dTdx**2 + dTdy**2)
-           
+
         enddo
      enddo
   enddo
@@ -3079,8 +3165,8 @@ subroutine fv_computeMassFluxes_r4(ucI, vcI, ple, mfx, mfy, cx, cy, dt)
   integer     :: it, nsplt
 
 ! Fill Ghosted arrays and update halos
-  uc = MAPL_UNDEF
-  vc = MAPL_UNDEF
+  uc = MAPL_UNDEFINED_REAL
+  vc = MAPL_UNDEFINED_REAL
   uc(is:ie,js:je,:) = ucI
   vc(is:ie,js:je,:) = vcI
   call mpp_get_boundary(uc, vc, FV_Atm(1)%domain, &
@@ -3262,8 +3348,8 @@ subroutine fv_computeMassFluxes_r8(ucI, vcI, ple, mfx, mfy, cx, cy, dt)
   integer     :: it, nsplt
 
 ! Fill Ghosted arrays and update halos
-  uc = MAPL_UNDEF
-  vc = MAPL_UNDEF
+  uc = MAPL_UNDEFINED_REAL
+  vc = MAPL_UNDEFINED_REAL
   uc(is:ie,js:je,:) = ucI
   vc(is:ie,js:je,:) = vcI
   call mpp_get_boundary(uc, vc, FV_Atm(1)%domain, &
@@ -3909,12 +3995,12 @@ end subroutine fv_getDivergence
 subroutine fv_getUpdraftHelicity(uh25, uh03, srh01, srh03, srh25, shr06)
    use constants_mod, only: fms_grav=>grav
 ! made this REAL4
-   real(REAL4), intent(OUT) ::  uh25(:,:)
-   real(REAL4), intent(OUT) ::  uh03(:,:)
-   real(REAL4), intent(OUT) :: srh01(:,:)
-   real(REAL4), intent(OUT) :: srh03(:,:)
-   real(REAL4), intent(OUT) :: srh25(:,:)
-   real(REAL4), intent(OUT) :: shr06(:,:)
+   real(REAL4), allocatable, intent(OUT) ::  uh25(:,:)
+   real(REAL4), allocatable, intent(OUT) ::  uh03(:,:)
+   real(REAL4), allocatable, intent(OUT) :: srh01(:,:)
+   real(REAL4), allocatable, intent(OUT) :: srh03(:,:)
+   real(REAL4), allocatable, intent(OUT) :: srh25(:,:)
+   real(REAL4), allocatable, intent(OUT) :: shr06(:,:)
 
 ! made an intermediate output of FVPRC
    real(FVPRC) :: uh_tmp(FV_Atm(1)%bd%isc:FV_Atm(1)%bd%iec,FV_Atm(1)%bd%jsc:FV_Atm(1)%bd%jec)

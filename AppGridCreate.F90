@@ -4,8 +4,7 @@ subroutine AppCSEdgeCreateF(IM_WORLD, LonEdge,LatEdge, LonCenter, LatCenter, rc)
 #include "MAPL_Generic.h"
 
    use ESMF
-   use MAPL
-   use MAPL_ConstantsMod, only : pi=> MAPL_PI_R8
+   use MAPL, pi => MAPL_PI_R8
    use fv_arrays_mod,     only: REAL4, REAL8, R_GRID
    use fv_grid_utils_mod, only: gnomonic_grids, cell_center2, direct_transform
    use fv_grid_tools_mod, only: mirror_grid
@@ -126,7 +125,7 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
 #define DEALLOCGLOB_(A) if(associated(A))then;A=0;if(MAPL_ShmInitialized)then; call MAPL_DeAllocNodeArray(A,rc=STATUS);else; deallocate(A,stat=STATUS);endif;VERIFY_(STATUS);NULLIFY(A);endif
 
    use ESMF
-   use MAPL, pi=> MAPL_PI_R8
+   use MAPL, pi => MAPL_PI_R8
 
    use fv_arrays_mod,     only: REAL4, REAL8, R_GRID
    use fv_grid_utils_mod, only: gnomonic_grids, cell_center2, direct_transform
@@ -190,7 +189,7 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
 
    AppGridStandAlone = .false.
    call ESMF_VMGetCurrent(vm, rc=STATUS)
-   VERIFY_(STATUS)            
+   VERIFY_(STATUS)
 
    ! Check FV3 grid_type
    ! -------------------
@@ -260,7 +259,11 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
    NPES_Y = size(JMS)
    NPES = NPES_X+NPES_Y
 
- call MAPL_GRID_INTERIOR(esmfgrid,isg,ieg,jsg,jeg)
+  block
+    integer, allocatable :: interior_(:)
+    call mapl_GridGet(esmfgrid, interior=interior_)
+    isg=interior_(1); ieg=interior_(2); jsg=interior_(3); jeg=interior_(4)
+  end block
 
    npx = IM_WORLD
    npy = JM_WORLD
@@ -278,7 +281,7 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
    endif
    VERIFY_(STATUS)
 
-   if (.not.allocated(FV_Atm)) then 
+   if (.not.allocated(FV_Atm)) then
 
       AppGridStandAlone = .true.
       if(MAPL_ShmInitialized) then
@@ -382,7 +385,7 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
             gridCornerLons(idx) = grid_global(i, j, 1, myTile+1)
             gridCornerLats(idx) = grid_global(i, j, 2, myTile+1)
          else
-            gridCornerLons(idx) = FV_Atm(1)%gridstruct%grid(i,j,1) 
+            gridCornerLons(idx) = FV_Atm(1)%gridstruct%grid(i,j,1)
             gridCornerLats(idx) = FV_Atm(1)%gridstruct%grid(i,j,2)
          end if
       end do
@@ -430,90 +433,6 @@ function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc) result(esmfgrid)
 
    RETURN_(ESMF_SUCCESS)
 end function AppGridCreateF
-
-subroutine AppGridCreate (META, esmfgrid, RC)
-
-#include "MAPL_Generic.h"
-
-   use ESMF
-   use MAPL
-   use fv_arrays_mod,     only: REAL4, REAL8, R_GRID
-   implicit none
-
-   ! !ARGUMENTS:
-
-   type(MAPL_MetaComp), intent(INOUT) :: META
-   type (ESMF_Grid),    intent(  OUT) :: esmfgrid
-   integer, optional,   intent(  OUT) :: rc
-
-   ! ErrLog variables
-   !-----------------
-
-   integer                      :: STATUS
-   character(len=ESMF_MAXSTR), parameter :: Iam="AppGridCreate"
-
-   ! Local variables
-   !-----------------
-
-   integer                         :: IM_WORLD
-   integer                         :: JM_WORLD
-   integer                         :: LM
-   integer                         :: NX, NY
-   character(len=ESMF_MAXSTR)      :: tmpname, gridname
-   character(len=ESMF_MAXSTR)      :: FMT, FMTIM, FMTJM
-   real(REAL8) :: deglon=0.0
-
-   interface
-      function AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, rc)
-         use ESMF
-         implicit none
-         type(ESMF_Grid)                  :: AppGridCreateF
-         integer,           intent(IN)    :: IM_WORLD, JM_WORLD, LM
-         integer,           intent(IN)    :: NX, NY
-         integer, optional, intent(OUT)   :: rc
-      end function AppGridCreateF
-   end interface
-
-   ! Get Decomposition from CF
-   !--------------------------
-
-   ! !RESOURCE_ITEM: none :: Processing elements in 1st dimension
-   call MAPL_GetResource( META, NX,       label ='NX:', default=1, rc = status )
-   VERIFY_(STATUS)
-   ! !RESOURCE_ITEM: none :: Processing elements in 2nd dimension
-   call MAPL_GetResource( META, NY,       label ='NY:', default=1, rc = status )
-   VERIFY_(STATUS)
-
-   ! Get World problem size from CF
-   !-------------------------------
-
-   ! !RESOURCE_ITEM: none :: Grid size in 1st dimension
-   call MAPL_GetResource( META, IM_WORLD, 'AGCM_IM:',            rc = status )
-   VERIFY_(STATUS)
-   ! !RESOURCE_ITEM: none :: Grid size in 2nd dimension
-   call MAPL_GetResource( META, JM_WORLD, 'AGCM_JM:',            rc = status )
-   VERIFY_(STATUS)
-   ! !RESOURCE_ITEM: none :: Grid size in 3rd dimension
-   call MAPL_GetResource( META, LM,       'AGCM_LM:', default=1, rc = status )
-   VERIFY_(STATUS)
-
-   ! The grid's name is optional
-   !----------------------------
-
-   call GET_INT_FORMAT(IM_WORLD, FMTIM)
-   call GET_INT_FORMAT(JM_WORLD, FMTJM)
-   FMT = '(A,' // trim(FMTIM) //',A,' // trim(FMTJM) // ',A)'
-   write(tmpname,trim(FMT)) 'PE',IM_WORLD,'x',JM_WORLD,'-CF'
-   ! !RESOURCE_ITEM: none :: Optional grid name
-   call MAPL_GetResource( META, GRIDNAME, 'AGCM.GRIDNAME:', default=trim(tmpname), rc = status )
-   VERIFY_(STATUS)
-
-   esmfgrid = AppGridCreateF(IM_WORLD, JM_WORLD, LM, NX, NY, STATUS)
-   VERIFY_(STATUS)
-
-   RETURN_(ESMF_SUCCESS)
-
-end subroutine AppGridCreate
 
 subroutine GET_INT_FORMAT(N, FMT)
    integer          :: N

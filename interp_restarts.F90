@@ -19,8 +19,8 @@ program interp_restarts
    use m_set_eta,      only: set_eta
    use memutils_mod,   only: print_memuse_stats
    use pflogger, only: pfl_initialize => initialize
-   use gFTL_StringVector
-   use gFTL_StringIntegerMap
+   use gFTL2_StringVector
+   use gFTL2_StringIntegerMap
 
    implicit none
 
@@ -54,8 +54,8 @@ program interp_restarts
    integer :: status
 
    integer :: nmoist
-   type(Netcdf4_Fileformatter) :: InFmt,OutFmt
-   type(FileMetadata), allocatable :: InCfg(:),OutCfg(:)
+   type(mapl_Netcdf4_Fileformatter) :: InFmt,OutFmt
+   type(mapl_FileMetadata), allocatable :: InCfg(:),OutCfg(:)
    integer :: nVars,imc,jmc
    character(62) :: vname
    type(StringVector) :: moist_variables,all_moist_vars
@@ -70,16 +70,18 @@ program interp_restarts
    integer        :: info
    logical        :: amWriter
    integer :: isl,iel,jsl,jel,n_writers,n_readers
-   type(ESMF_Grid) :: grid_i, grid_o
+   type(ESMF_Geom) :: geom_in, geom_out
    logical :: in_hydrostatic, scale_rst
    character(len=:), pointer :: var_name
-   type(StringVariableMap), pointer :: variables
-   type(Variable), pointer :: myVariable
-   type(StringVariableMapIterator) :: var_iter
+   type(mapl_StringVariableMap), pointer :: variables
+   type(mapl_Variable), pointer :: myVariable
+   type(mapl_StringVariableMapIterator) :: var_iter
    type(StringVector), pointer :: var_dimensions
    character(len=:), pointer :: dname
    integer :: dim1,ndims
-   type(CubedSphereGridFactory) :: csfactory
+   type(mapl_CubedSphereGeomSpec) :: cs_spec
+   type(mapl_MaplGeom), pointer :: mapl_geom_ptr
+   type(mapl_GeomManager), pointer :: geom_mgr
    real, allocatable :: schmidt_parameters_out(:)
    real, allocatable :: schmidt_parameters_in(:)
 
@@ -220,7 +222,7 @@ program interp_restarts
 
 ! Need to get input grid and ak/bk
    if( file_exist("fvcore_internal_restart_in") ) then
-      call InFmt%open("fvcore_internal_restart_in",pFIO_READ,rc=status)
+      call InFmt%open("fvcore_internal_restart_in",MAPL_PFIO_READ,rc=status)
       allocate(InCfg(1))
       InCfg(1) = InFmt%read()
       im = InCfg(1)%get_dimension('lon')
@@ -260,7 +262,7 @@ program interp_restarts
 
    nmoist  = 0
    if( file_exist("moist_internal_restart_in") ) then
-      call InFmt%open("moist_internal_restart_in",pFIO_READ,rc=status)
+      call InFmt%open("moist_internal_restart_in",MAPL_PFIO_READ,rc=status)
       allocate(InCfg(1))
       InCfg(1) = InFmt%read()
       call MAPL_IOCountLevels(InCfg(1),nmoist)
@@ -269,7 +271,7 @@ program interp_restarts
       variables => InCfg(1)%get_variables()
       lcnt_var=2
       do while (siter /= all_moist_vars%end())
-         var_name => siter%get()
+         var_name => siter%of()
          myVariable => variables%at(var_name)
          var_dimensions => myVariable%get_dimensions()
          ndims = var_dimensions%size()
@@ -333,7 +335,7 @@ program interp_restarts
       if (file_exist(trim(extra_files(i)))) then
          rst_files(i)%file_name=trim(extra_files(i))
 
-         call InFmt%open(trim(extra_files(i)),pFIO_READ,rc=status)
+         call InFmt%open(trim(extra_files(i)),MAPL_PFIO_READ,rc=status)
          allocate(InCfg(1))
          InCfg(1) = InFmt%read()
          call MAPL_IOCountNonDimVars(InCfg(1),nVars)
@@ -348,12 +350,13 @@ program interp_restarts
          allocate(rst_files(i)%vars(nVars))
 
          variables => InCfg(1)%get_variables()
-         var_iter = variables%begin()
+         var_iter = variables%ftn_begin()
          n=0
-         do while (var_iter /= variables%end())
+         do while (var_iter /= variables%ftn_end())
+            call var_iter%next()
 
-            var_name => var_iter%key()
-            myVariable => var_iter%value()
+            var_name => var_iter%first()
+            myVariable => var_iter%second()
             if (.not.InCfg(1)%is_coordinate_variable(var_name)) then
                n=n+1
                var_dimensions => myVariable%get_dimensions()
@@ -390,7 +393,6 @@ program interp_restarts
                   rst_files(i)%vars(n)%n_ungrid = InCfg(1)%get_dimension(dname)
                end if
             end if
-            call var_iter%next()
          enddo
 
          rst_files(i)%have_descriptor=.true.
@@ -405,17 +407,30 @@ program interp_restarts
    call print_memuse_stats('interp_restarts: begining get_external_ic')
 
 
-! Input Grid
+! Input Geom
+   geom_mgr => mapl_get_geom_manager()
    if (allocated(schmidt_parameters_in)) then
-      csfactory = CubedSphereGridFactory(nx=Atm_i(1)%layout(1),ny=Atm_i(1)%layout(2),im_world=im,lm=km, &
-                        stretch_factor=schmidt_parameters_in(3), &
-                            target_lon=schmidt_parameters_in(1),&
-                            target_lat=schmidt_parameters_in(2))
+      cs_spec = mapl_CubedSphereGeomSpec( &
+           im_world=im, &
+           schmidt_parameters=ESMF_CubedSphereTransform_Args( &
+                target_lon=dble(schmidt_parameters_in(1)), &
+                target_lat=dble(schmidt_parameters_in(2)), &
+                stretch_factor=dble(schmidt_parameters_in(3))), &
+           decomposition=mapl_CubedSphereDecomposition( &
+                dims=[Atm_i(1)%layout(1), Atm_i(1)%layout(2)*6], &
+                topology=[Atm_i(1)%layout(1), Atm_i(1)%layout(2)]))
    else
-      csfactory = CubedSphereGridFactory(nx=Atm_i(1)%layout(1),ny=Atm_i(1)%layout(2),im_world=im,lm=km)
+      cs_spec = mapl_CubedSphereGeomSpec( &
+           im_world=im, &
+           schmidt_parameters=ESMF_CubedSphereTransform_Args( &
+                target_lon=0d0, target_lat=0d0, stretch_factor=1d0), &
+           decomposition=mapl_CubedSphereDecomposition( &
+                dims=[Atm_i(1)%layout(1), Atm_i(1)%layout(2)*6], &
+                topology=[Atm_i(1)%layout(1), Atm_i(1)%layout(2)]))
    end if
-   grid_i = grid_manager%make_grid(csfactory,rc=status)
-   call ESMF_AttributeSet(grid_i,name="num_reader",value=n_readers)
+   mapl_geom_ptr => geom_mgr%get_mapl_geom(cs_spec, rc=status)
+   VERIFY_(status)
+   geom_in = mapl_geom_ptr%get_geom()
 ! Input Arrdes_i
    is = Atm_i(1)%bd%isc
    ie = Atm_i(1)%bd%iec
@@ -429,17 +444,29 @@ program interp_restarts
                      n_readers,n_writers,isl,iel,jsl,jel,rc=status)
    call ArrDescrSet(Arrdes_i,offset=0_MPI_OFFSET_KIND)
 
-! Output Grid
+! Output Geom
    if (allocated(schmidt_parameters_out)) then
-      csfactory = CubedSphereGridFactory(nx=Atm(1)%layout(1),ny=Atm(1)%layout(2),im_world=npx-1,lm=npz, &
-                        stretch_factor=schmidt_parameters_out(3), &
-                            target_lon=schmidt_parameters_out(1),&
-                            target_lat=schmidt_parameters_out(2))
+      cs_spec = mapl_CubedSphereGeomSpec( &
+           im_world=npx-1, &
+           schmidt_parameters=ESMF_CubedSphereTransform_Args( &
+                target_lon=dble(schmidt_parameters_out(1)), &
+                target_lat=dble(schmidt_parameters_out(2)), &
+                stretch_factor=dble(schmidt_parameters_out(3))), &
+           decomposition=mapl_CubedSphereDecomposition( &
+                dims=[Atm(1)%layout(1), Atm(1)%layout(2)*6], &
+                topology=[Atm(1)%layout(1), Atm(1)%layout(2)]))
    else
-      csfactory = CubedSphereGridFactory(nx=Atm(1)%layout(1),ny=Atm(1)%layout(2),im_world=npx-1,lm=npz)
+      cs_spec = mapl_CubedSphereGeomSpec( &
+           im_world=npx-1, &
+           schmidt_parameters=ESMF_CubedSphereTransform_Args( &
+                target_lon=0d0, target_lat=0d0, stretch_factor=1d0), &
+           decomposition=mapl_CubedSphereDecomposition( &
+                dims=[Atm(1)%layout(1), Atm(1)%layout(2)*6], &
+                topology=[Atm(1)%layout(1), Atm(1)%layout(2)]))
    end if
-   grid_o = grid_manager%make_grid(csfactory,rc=status)
-   call ESMF_AttributeSet(grid_o,name="num_writer",value=n_writers)
+   mapl_geom_ptr => geom_mgr%get_mapl_geom(cs_spec, rc=status)
+   VERIFY_(status)
+   geom_out = mapl_geom_ptr%get_geom()
 ! Output Arrdes
    is = Atm(1)%bd%isc
    ie = Atm(1)%bd%iec
@@ -454,7 +481,7 @@ program interp_restarts
    call ArrDescrSet(Arrdes,offset=0_MPI_OFFSET_KIND)
    amWriter = arrdes%writers_comm/=MPI_COMM_NULL
 
-   call get_geos_ic( Atm_i, Atm, grid_i, grid_o, Arrdes_i, rst_files )
+   call get_geos_ic( Atm_i, Atm, geom_in, geom_out, Arrdes_i, rst_files )
 
    call MPI_Info_create(info,status)
 
@@ -473,7 +500,7 @@ program interp_restarts
       write(fname1, "('fvcore_internal_rst_c',i4.4,'_',i3.3,'L')") npx-1,npz
       if (is_master()) print*, 'Writing : ', TRIM(fname1)
 
-      call InFmt%open("fvcore_internal_restart_in",pFIO_READ,rc=status)
+      call InFmt%open("fvcore_internal_restart_in",MAPL_PFIO_READ,rc=status)
       allocate(InCfg(1),OutCfg(1))
       InCfg(1)=InFmt%read(rc=status)
       call MAPL_IOCountNonDimVars(InCfg(1),nVars)
@@ -582,7 +609,7 @@ program interp_restarts
          if (is_master()) print*, 'Writing : ', TRIM(fname1)
          imc = npx-1
          jmc = imc*6
-         call InFmt%open("moist_internal_restart_in",pFIO_READ,rc=status)
+         call InFmt%open("moist_internal_restart_in",MAPL_PFIO_READ,rc=status)
          allocate(InCfg(1),OutCfg(1))
          InCfg(1)=InFmt%read(rc=status)
          call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev'/),(/imc,jmc,npz/),rc=status)
@@ -604,7 +631,7 @@ program interp_restarts
       iwat=0
       do while (siter /= all_moist_vars%end())
          ivar=ivar+1
-         var_name => siter%get()
+         var_name => siter%of()
          myVariable => variables%at(var_name)
          var_dimensions => myVariable%get_dimensions()
          ndims = var_dimensions%size()
@@ -664,7 +691,7 @@ program interp_restarts
          if (AmWriter) then
             imc = npx-1
             jmc = imc*6
-            call InFmt%open(trim(rst_files(ifile)%file_name),pFIO_READ,rc=status)
+            call InFmt%open(trim(rst_files(ifile)%file_name),MAPL_PFIO_READ,rc=status)
             allocate(InCfg(1),OutCfg(1))
             InCfg(1)=InFmt%read(rc=status)
 
@@ -756,7 +783,7 @@ contains
    end subroutine rs_count
 
    subroutine add_stretch_params(meta,stretch_parameters)
-      type(FileMetadata), intent(inout) :: meta
+      type(mapl_FileMetadata), intent(inout) :: meta
       real, intent(in) :: stretch_parameters(3)
 
       call meta%add_attribute('TARGET_LON',stretch_parameters(1))
@@ -766,7 +793,7 @@ contains
    end subroutine add_stretch_params
 
    subroutine reset_stretch_params(meta)
-      type(FileMetadata), intent(inout) :: meta
+      type(mapl_FileMetadata), intent(inout) :: meta
 
       logical :: has_attr
       has_attr = meta%has_attribute('TARGET_LON')
