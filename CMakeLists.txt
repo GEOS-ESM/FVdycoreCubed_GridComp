@@ -243,3 +243,7 @@ if (BUILD_GEOS_GTFV3_INTERFACE)
 endif ()
 
 add_subdirectory(scripts)
+
+if (PFUNIT_FOUND)
+  add_subdirectory(tests EXCLUDE_FROM_ALL)
+endif ()
