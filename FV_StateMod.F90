@@ -61,6 +61,7 @@ private
   logical :: FV_OFF = .false.
   integer :: INT_FV_OFF = 0
   logical :: ADJUST_SPLITS = .false.
+  real :: setup_base_acoustic_dt = -1.0
   logical :: DEBUG = .false.
   logical :: DEBUG_DYN = .false.
   logical :: DEBUG_ADV = .false.
@@ -216,10 +217,12 @@ private
     integer                              :: k_split
     integer                              :: n_split
     integer                              :: q_split
-    ! Original namelist baselines (never change)
-    integer                              :: base_k_split
-    integer                              :: base_n_split
-    integer                              :: base_q_split
+    real                                 :: base_acoustic_dt = -1.0
+    ! MAPL restart fields are real, one-element ungridded arrays.
+    real(REAL8), pointer                 :: restart_k_split(:) => NULL()
+    real(REAL8), pointer                 :: restart_n_split(:) => NULL()
+    real(REAL8), pointer                 :: restart_q_split(:) => NULL()
+    real(REAL8), pointer                 :: restart_base_acoustic_dt(:) => NULL()
   end type T_FVDYCORE_STATE
 
 ! Constants used by fvcore
@@ -779,6 +782,11 @@ contains
 !! Start up FV
     call MAPL_TimerOn(MAPL,"--FV_INIT")
     call fv_init2(FV_Atm, DT, grids_on_this_pe, p_split)
+    if (ADJUST_SPLITS) then
+       _ASSERT(FV_Atm(1)%flagstruct%k_split > 0, 'Initial k_split must be positive')
+       _ASSERT(FV_Atm(1)%flagstruct%n_split > 0, 'FV_Setup must resolve automatic n_split')
+       setup_base_acoustic_dt = DT / real(FV_Atm(1)%flagstruct%k_split * FV_Atm(1)%flagstruct%n_split)
+    endif
     call MAPL_TimerOff(MAPL,"--FV_INIT")
     call MAPL_MemUtilsWrite(VM, 'FV_StateMod: FV_INIT', RC=STATUS )
     VERIFY_(STATUS)
@@ -900,13 +908,8 @@ contains
 
   STATE%DT      = DT
 
-  STATE%q_split = FV_Atm(1)%flagstruct%q_split
-  STATE%k_split = FV_Atm(1)%flagstruct%k_split
-  STATE%n_split = FV_Atm(1)%flagstruct%n_split
-
-  STATE%base_q_split = FV_Atm(1)%flagstruct%q_split
-  STATE%base_k_split = FV_Atm(1)%flagstruct%k_split
-  STATE%base_n_split = FV_Atm(1)%flagstruct%n_split
+  call FV_InitSplits(STATE, INTERNAL, RC=STATUS)
+  VERIFY_(STATUS)
 
   GRID%NG     = 3 ; ng = 3
   GRID%NPX    = FV_Atm(1)%flagstruct%NPX-1
@@ -1210,6 +1213,70 @@ contains
   RETURN_(ESMF_SUCCESS)
 
 end subroutine FV_InitState
+
+subroutine FV_InitSplits(state, internal, rc)
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+
+  type(T_FVDYCORE_STATE), intent(inout) :: state
+  type(ESMF_State), intent(inout) :: internal
+  integer, intent(out) :: rc
+
+  real(REAL8) :: splits(3), baseline
+  integer :: status
+  character(len=*), parameter :: IAm='FV_InitSplits'
+
+  state%k_split = FV_Atm(1)%flagstruct%k_split
+  state%n_split = FV_Atm(1)%flagstruct%n_split
+  state%q_split = FV_Atm(1)%flagstruct%q_split
+
+  if (ADJUST_SPLITS) then
+     call MAPL_GetPointer(internal, state%restart_k_split, 'K_SPLIT', RC=STATUS)
+     VERIFY_(STATUS)
+     call MAPL_GetPointer(internal, state%restart_n_split, 'N_SPLIT', RC=STATUS)
+     VERIFY_(STATUS)
+     call MAPL_GetPointer(internal, state%restart_q_split, 'Q_SPLIT', RC=STATUS)
+     VERIFY_(STATUS)
+     call MAPL_GetPointer(internal, state%restart_base_acoustic_dt, 'BASE_ACOUSTIC_DT', RC=STATUS)
+     VERIFY_(STATUS)
+
+     splits = [state%restart_k_split(1), state%restart_n_split(1), state%restart_q_split(1)]
+     _ASSERT(all(ieee_is_finite(splits)), 'Restart splits must be finite')
+     _ASSERT(all(splits >= -1.0_REAL8), 'Invalid negative restart split')
+     _ASSERT(all(splits <= real(huge(0), REAL8)), 'Restart split exceeds integer range')
+     _ASSERT(all(splits == anint(splits)), 'Restart splits must be integers')
+     _ASSERT(splits(1) /= 0.0_REAL8, 'Restart k_split must be positive')
+
+     if (splits(1) /= -1.0_REAL8) state%k_split = nint(splits(1))
+     if (splits(2) /= -1.0_REAL8) state%n_split = nint(splits(2))
+     if (splits(3) /= -1.0_REAL8) state%q_split = nint(splits(3))
+
+     baseline = state%restart_base_acoustic_dt(1)
+     _ASSERT(ieee_is_finite(baseline), 'Restart base_acoustic_dt must be finite')
+     _ASSERT(baseline == -1.0_REAL8 .or. baseline > 0.0_REAL8, 'Invalid restart base_acoustic_dt')
+     _ASSERT(baseline <= real(huge(state%base_acoustic_dt), REAL8), 'Restart base_acoustic_dt is too large')
+     state%base_acoustic_dt = setup_base_acoustic_dt
+     if (baseline /= -1.0_REAL8) state%base_acoustic_dt = baseline
+     _ASSERT(state%base_acoustic_dt > 0.0, 'Baseline acoustic timestep must be positive')
+
+     if (any(splits == -1.0_REAL8) .or. baseline == -1.0_REAL8) then
+        call WRITE_PARALLEL('Initializing missing FV3 split restart values from FV_Setup')
+     endif
+     call FV_SaveSplits(state)
+  endif
+
+  RETURN_(ESMF_SUCCESS)
+end subroutine FV_InitSplits
+
+subroutine FV_SaveSplits(state)
+  type(T_FVDYCORE_STATE), intent(inout) :: state
+
+  if (ADJUST_SPLITS) then
+     state%restart_k_split(1) = state%k_split
+     state%restart_n_split(1) = state%n_split
+     state%restart_q_split(1) = state%q_split
+     state%restart_base_acoustic_dt(1) = state%base_acoustic_dt
+  endif
+end subroutine FV_SaveSplits
 
 subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
@@ -1713,6 +1780,11 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
 
   call MAPL_TimerOn(MAPL,"--FV_DYNAMICS")
   if (.not. FV_OFF) then
+  if (ADJUST_SPLITS) then
+     call adjust_fv3_splits(STATE, isc, iec, jsc, jec, isd, ied, jsd, jed, npz, &
+          FV_Atm(1)%u, FV_Atm(1)%v, FV_Atm(1)%w, FV_Atm(1)%delz, &
+          FV_Atm(1)%gridstruct%dxa, FV_Atm(1)%gridstruct%dya)
+  endif
   call set_domain(FV_Atm(1)%domain) 
   allocate ( u_dt(isc:iec,jsc:jec,npz) )
   allocate ( v_dt(isc:iec,jsc:jec,npz) )
@@ -2240,19 +2312,6 @@ subroutine State_To_FV ( MAPL, STATE )
 
     endif
 
-    if ( ADJUST_SPLITS ) then
-      call adjust_fv3_splits(STATE, &
-                             isc, iec, jsc, jec, &       ! Compute domain bounds
-                             isd, ied, jsd, jed, &       ! Data/Memory domain bounds
-                             km, &                       ! Number of vertical levels
-                             FV_Atm(1)%u, &              ! D-grid U-wind
-                             FV_Atm(1)%v, &              ! D-grid V-wind
-                             FV_Atm(1)%w, &              ! W-wind
-                             FV_Atm(1)%delz, &           ! Layer thickness
-                             FV_Atm(1)%gridstruct%dxa, & ! Cell center dx (dxa)
-                             FV_Atm(1)%gridstruct%dya)   ! Cell center dy (dya)
-    endif
-
     call MAPL_TimerOff(MAPL,"--State_To_FV")
 
    return
@@ -2331,6 +2390,7 @@ subroutine FV_To_State ( MAPL, STATE )
        STATE%VARS%PT  = STATE%VARS%PT/STATE%VARS%PKZ
     endif
 
+    call FV_SaveSplits(STATE)
     call MAPL_TimerOff(MAPL,"--FV_To_State")
 
    return
@@ -2358,7 +2418,6 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
     real    :: local_cfl_h, local_cfl_z
     
     ! Physical timestep constraints
-    real    :: base_acoustic_dt      ! Baseline acoustic timestep (DT / k / n)
     real    :: target_acoustic_dt    ! Required acoustic dt for stability
     real    :: target_advection_dt   ! Required advection dt for stability
     
@@ -2377,9 +2436,6 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
 
     max_cfl_h = 0.0
     max_cfl_z = 0.0
-
-    ! Calculate baseline acoustic timestep
-    base_acoustic_dt = state%DT / real(state%base_k_split * state%base_n_split)
 
     ! --- 1. FIND LOCAL MAXIMUMS ---
     do k = 1, npz
@@ -2418,7 +2474,7 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
        ! DT / (k*n) <= base_acoustic_dt
        ! k*n >= DT / base_acoustic_dt
        min_kn_product = max(min_kn_product, &
-                           ceiling(state%DT / base_acoustic_dt))
+                           ceiling(state%DT / state%base_acoustic_dt))
        
        ! Calculate target k_split from vertical CFL
        ! We need: (max_cfl_z / k) <= TARGET_VRT_CFL
@@ -2471,7 +2527,7 @@ subroutine adjust_fv3_splits(state, isc, iec, jsc, jec, isd, ied, jsd, jed, npz,
            print '(A,I2,A,I2,A)', " FV3 k_split: ", new_k_split, " (was ", state%k_split, ")"
            print '(A,I2,A,I2,A)', " FV3 n_split: ", new_n_split, " (was ", state%n_split, ")"
            print '(A,I2,A,I2,A)', " FV3 q_split: ", new_q_split, " (was ", state%q_split, ")"
-           print '(A,F6.3,A,F6.3,A)', " Acoustic dt: ", target_acoustic_dt, "s (baseline: ", base_acoustic_dt, "s)"
+           print '(A,F6.3,A,F6.3,A)', " Acoustic dt: ", target_acoustic_dt, "s (baseline: ", state%base_acoustic_dt, "s)"
            print '(A,F6.2,A)', " Advection dt: ", target_advection_dt, "s"
            print *, "===================================="
            

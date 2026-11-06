@@ -1,0 +1,140 @@
+module test_AdaptiveSplitRestart
+  use funit
+  use split_test
+  use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
+  implicit none
+
+  type(T_FVDYCORE_STATE) :: state
+  type(ESMF_State) :: internal
+
+contains
+
+  @before
+  subroutine setUp()
+    ADJUST_SPLITS=.true.
+    setup_base_acoustic_dt=50.0
+    pointer_calls=0
+    assertion_message=''
+    state%DT=600.0_REAL8
+    allocate(internal%values(4))
+    internal%values=-1.0_REAL8
+  end subroutine
+
+  @after
+  subroutine tearDown()
+    deallocate(internal%values)
+  end subroutine
+
+  @test
+  subroutine missing_fields_use_setup()
+    integer :: rc
+    call FV_InitSplits(state,internal,rc)
+    @assertEqual(0, rc)
+    @assertEqual([2.0_REAL8,6.0_REAL8,0.0_REAL8,50.0_REAL8], internal%values)
+  end subroutine
+
+  @test
+  subroutine partial_restart_uses_original_baseline()
+    integer :: rc
+    internal%values=[4.0_REAL8,-1.0_REAL8,0.0_REAL8,-1.0_REAL8]
+    call FV_InitSplits(state,internal,rc)
+    @assertEqual(0, rc)
+    @assertEqual([4.0_REAL8,6.0_REAL8,0.0_REAL8,50.0_REAL8], internal%values)
+  end subroutine
+
+  @test
+  subroutine restored_values_retain_zeros_and_baseline()
+    integer :: rc
+    internal%values=[3.0_REAL8,0.0_REAL8,0.0_REAL8,25.0_REAL8]
+    call FV_InitSplits(state,internal,rc)
+    @assertEqual(0, rc)
+    @assertEqual([3,0,0], [state%k_split,state%n_split,state%q_split])
+    @assertEqual(25.0_REAL8, real(state%base_acoustic_dt,REAL8))
+    @assertEqual([3.0_REAL8,0.0_REAL8,0.0_REAL8,25.0_REAL8], internal%values)
+  end subroutine
+
+  @test
+  subroutine disabled_adjustment_does_not_access_restart()
+    type(ESMF_State) :: empty_restart
+    real(REAL8) :: checkpoint(4)
+    integer :: rc
+    call FV_InitSplits(state,internal,rc)
+    @assertEqual(0, rc)
+    checkpoint=internal%values
+    ADJUST_SPLITS=.false.
+    pointer_calls=0
+    call FV_InitSplits(state,empty_restart,rc)
+    call FV_SaveSplits(state)
+    @assertEqual(0, rc)
+    @assertEqual(0, pointer_calls)
+    @assertEqual(checkpoint, internal%values)
+    @assertEqual([2,6,0], [state%k_split,state%n_split,state%q_split])
+  end subroutine
+
+  @test
+  subroutine malformed_restart_is_rejected()
+    integer :: mode, rc
+    do mode=1,7
+      internal%values=-1.0_REAL8
+      assertion_message=''
+      select case(mode)
+      case(1)
+        internal%values(1)=0.0_REAL8
+      case(2)
+        internal%values(2)=-2.0_REAL8
+      case(3)
+        internal%values(3)=1.5_REAL8
+      case(4)
+        internal%values(4)=0.0_REAL8
+      case(5)
+        internal%values(1)=ieee_value(0.0_REAL8,ieee_quiet_nan)
+      case(6)
+        internal%values(1)=real(huge(0),REAL8)+1.0_REAL8
+      case(7)
+        internal%values(4)=ieee_value(0.0_REAL8,ieee_quiet_nan)
+      end select
+      call FV_InitSplits(state,internal,rc)
+      @assertNotEqual(0, rc)
+      @assertTrue(index(assertion_message,'Restart') > 0 .or. index(assertion_message,'restart') > 0)
+    enddo
+  end subroutine
+
+  @test
+  subroutine start_stop_preserves_split_history()
+    type(T_FVDYCORE_STATE) :: resumed
+    type(ESMF_State) :: segment_restart
+    real(REAL8) :: history(4,8), checkpoint(4)
+    integer :: rc, index
+
+    call FV_InitSplits(state,internal,rc)
+    @assertEqual(0, rc)
+    do index=1,8
+      call step(state,index)
+      history(:,index)=internal%values
+    enddo
+    @assertFalse(all(history(1:3,4) == [2.0_REAL8,6.0_REAL8,0.0_REAL8]))
+
+    allocate(segment_restart%values(4))
+    segment_restart%values=-1.0_REAL8
+    resumed%DT=600.0_REAL8
+    call FV_InitSplits(resumed,segment_restart,rc)
+    @assertEqual(0, rc)
+    do index=1,4
+      call step(resumed,index)
+    enddo
+    checkpoint=segment_restart%values
+    deallocate(segment_restart%values)
+    allocate(segment_restart%values(4))
+    segment_restart%values=checkpoint
+    setup_base_acoustic_dt=100.0
+    call FV_InitSplits(resumed,segment_restart,rc)
+    @assertEqual(0, rc)
+    @assertEqual(checkpoint, segment_restart%values)
+    do index=5,8
+      call step(resumed,index)
+      @assertEqual(history(:,index), segment_restart%values)
+    enddo
+    deallocate(segment_restart%values)
+  end subroutine
+
+end module test_AdaptiveSplitRestart
