@@ -24,7 +24,7 @@ Read `docs/ARCHITECTURE.md` first.
 |---|---|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The `DYN` component (SetServices, Initialize, Run phases 1 and 2), `FV_StateMod`, state and restarts, tracers (`TRADV`), `ADV`, configuration keys, `@fvdycore`, `geos-gtfv3`, `scripts`, build, traps |
 | [`docs/decisions.md`](docs/decisions.md) | Previous architectural decisions (pattern, likely reason) |
-| [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) | Parent: Agcm and Superdyn run order (in `GEOSgcm_GridComp`) |
+| `../../ARCHITECTURE.md` | Parent: Agcm and Superdyn run order (in `GEOSgcm_GridComp`) |
 | `README.md`, `CONTRIBUTING.md` | Project basics, contribution rules |
 
 ## Where things are
