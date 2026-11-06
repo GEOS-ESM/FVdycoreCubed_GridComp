@@ -9,9 +9,9 @@ elsewhere; paths inside this repository do not change.
 
 Paths are relative to the `FVdycoreCubed_GridComp` repository root. Parent
 composite (who calls this component, in which order):
-[`GEOSagcm_GridComp/ARCHITECTURE.md`](../../../ARCHITECTURE.md), section on
+`GEOSagcm_GridComp/ARCHITECTURE.md` (`../../../ARCHITECTURE.md` in the fixture), section on
 Superdyn. Repository overview one level up:
-[`GEOSgcm_GridComp/docs/ARCHITECTURE.md`](../../../../docs/ARCHITECTURE.md).
+`GEOSgcm_GridComp/docs/ARCHITECTURE.md` (`../../../../docs/ARCHITECTURE.md` in the fixture).
 
 "Agcm" is `GEOS_AgcmGridComp` (the atmosphere composite); "Superdyn" is
 `GEOS_SuperdynGridComp`. A `(file, routine)` citation means the statement was
@@ -322,7 +322,7 @@ core with GEOS modifications (`components.yaml`, key `fvdycore`, tag `geos/v3.1.
 Its `CMakeLists.txt` builds a library `fvdycore` from `model/`, `tools/` and
 `geos_utils/`, added here as a sub-component. It is not part of this repository
 (`.gitignore` ignores `/@fvdycore`) and is not documented here; see
-[`@fvdycore/README.md`](../@fvdycore/README.md) (the upstream GFDL README).
+`@fvdycore/README.md` (`../@fvdycore/README.md` in the fixture) (the upstream GFDL README).
 
 ## 10. Standalone drivers and tools
 
