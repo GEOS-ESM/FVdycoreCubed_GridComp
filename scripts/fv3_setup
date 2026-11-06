@@ -255,7 +255,6 @@ if ( $SITE == 'NCCS' ) then
 
    echo "Enter the ${C1}Processor Type${CN} you wish to run on:"
    echo "   ${C2}mil  (Milan)${CN} (default)"
-   echo "   ${C2}cas  (Cascade Lake)${CN}"
    echo " "
    set MODEL = `echo $<`
    set MODEL = `echo $MODEL | tr "[:upper:]" "[:lower:]"`
@@ -263,14 +262,11 @@ if ( $SITE == 'NCCS' ) then
       set MODEL = 'mil'
    endif
 
-   if( $MODEL != 'mil' & \
-       $MODEL != 'cas' ) goto ASKPROC
+   if( $MODEL != 'mil' ) goto ASKPROC
 
    if ($MODEL == 'mil') then
       # We save a couple processes for the kernel
       set NCPUS_PER_NODE = 120
-   else if ($MODEL == 'cas') then
-      set NCPUS_PER_NODE = 40
    endif
 
 else if ( $SITE == 'NAS' ) then
@@ -386,10 +382,10 @@ set HIST_IM  = `expr $AGCM_IM \* 4`
 set HIST_JM  = `expr $AGCM_IM \* 2 + 1`
 
 if( $AGCM_IM <=  12 ) then
-   set DT = 3600
+   set DT = 1200
    set FV_NX = 2
 else if( $AGCM_IM <=  24 ) then
-   set DT = 1800
+   set DT = 1200
    set FV_NX = 4
 else if( $AGCM_IM <=  48 ) then
    set DT = 1200
@@ -444,6 +440,9 @@ else
    set USE_SHMEM = 1
    set DEF_IOS_NDS = 5
 endif
+
+# Match the GCM's default L72/BACM timestep.
+if ( $AGCM_LM == 72 ) set DT = 450
 
 # On SITE == GMAO.desktop, we default to 6 processes
 # Must be set here due to MODEL_NPES calc below
