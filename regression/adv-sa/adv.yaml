@@ -1,0 +1,33 @@
+---
+# AdvCore only: DYCORE unset, so AdvCore runs fv_setup itself.
+# Geometry is needed in two places:
+# - under mapl: so MAPL sets ADV's geometry in its GEOM phases, before
+#   connections are made (AdvCore calls MAPL_GridCompSetGeometry only in
+#   Initialize, i.e. INIT_USER, which is too late)
+# - top-level, because fv_setup reads im_world/nx_face/ny_face from there
+geometry: &geometry
+  esmf_geom:
+    class: CubedSphere
+    im_world: 12
+    nx_face: 1
+    ny_face: 1
+  vertical_grid:
+    grid_type: model
+    fields: {pressure: PLE1}
+    num_levels: 91
+
+EXCLUDE_ADVECTION_TRACERS_LIST: []
+ADV_CORE_REPORT_TRACER_MASS: true
+RUN_DT: 1800
+
+mapl:
+  setServices:
+    sharedObj: libFVdycoreCubed_GridComp
+    userRoutine: advcore_setservices_
+
+  geometry: *geometry
+
+  misc:
+    activate_all_exports: true
+    checkpoint:
+      export: true
