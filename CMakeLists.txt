@@ -2,6 +2,8 @@ esma_set_this ()
 
 option(BUILD_GEOS_GTFV3_INTERFACE "Build GEOS-gtFV3 interface" OFF)
 
+#============ GEOS-LAM Update Start =============
+# Build the bounded GEOS grid adapter.
 set (srcs
   sw.f90 jw.f90 testcases_3_4_5_6_stand_alone.f90
   GetWeightsC2C.F90
@@ -21,7 +23,10 @@ set (srcs
   fv_regrid_c2c_bin.F90
   fv_regridding_utils.F90
   rs_scaleMod.F90
-  )
+  
+  LamGrid.F90
+)
+#============ GEOS-LAM Update End =============
 if (BUILD_GEOS_GTFV3_INTERFACE)
   list (APPEND srcs
   geos-gtfv3/geos_gtfv3_interface.f90
