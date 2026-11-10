@@ -55,6 +55,7 @@ only there.
 - `DYN` and `ADV` share the module array `FV_Atm`.
 - Files not in `CMakeLists.txt` are not compiled (architecture document,
   section 2). `FV_PRECISION` is set by the fixture build.
+- Error handling in code you write or touch uses the MAPL3 macros (`@MAPL/include/MAPL_ErrLog.h`): `_RC` on calls, `_STAT` on `allocate`, `_ASSERT(cond, msg)` with a message, and `_RETURN(_SUCCESS)` at every successful exit. Convert `RC=STATUS`/`VERIFY_`/`ASSERT_`/`RETURN_` in any routine you change. `_RC` expands to two statements (`rc=status);_VERIFY(status`), so it cannot end a one-line `if`; use a block `if`. Do not add decorative `!----` separator lines.
 
 ## Build and test
 
