@@ -21,7 +21,6 @@
 - Every regression case is `ADIABATIC: true` and cold-started (`COLDSTART: true`, `CASE_ID: 1`): the water-tracer packing in `FV_Run`, `add_incs` and restart reading are not exercised.
 - `run` asserts that the import and export `TRADV` bundles share data (`MAPL_FieldBundleSameData`), because MAPL3 has no coupling for a service bundle yet.
 - Not ported or not built: `Coldstart` as an entry point (it is called from `Initialize` instead), the `StandAlone_*.F90` drivers and several other tools (`CMakeLists.txt` lists what is built); `scripts/fv3.j` still writes MAPL2 `.rc` files for the unbuilt `StandAlone_FV3_Dycore.x`.
-- `regression/README.md` mentions a `cmpchk.py` per case; there is none.
 
 ## Known traps
 
