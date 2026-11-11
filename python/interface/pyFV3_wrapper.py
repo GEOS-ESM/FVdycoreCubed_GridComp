@@ -131,7 +131,7 @@ class GeosDycoreWrapper:
                 f"pyFV3 requires 6 or 0 water tracers to be advected, {fv_flags.nwat} given. Abort."
             )
         comm = MPIComm()
-        comm.comm_ = fortran_comm
+        comm._comm = fortran_comm
 
         # Make a custom performance collector for the GEOS wrapper
         self.do_time_core = "PYFV3_TIME_CORE" in os .environ and os.environ["PYFV3_TIME_CORE"].lower() == "true"
