@@ -1104,7 +1104,7 @@ contains
          ! Add Analysis Tendencies
          delpold = delp ! Old Pressure Thickness
 
-         call ADD_INCS(esmfgrid, self, import, dt, is_weighted=is_weighted)
+         call ADD_INCS(esmfgrid, self, import, dt, is_weighted=is_weighted, _RC)
 
          if (DYN_DEBUG) call DEBUG_FV_STATE("ANA ADD_INCS", self)
 
@@ -2871,7 +2871,7 @@ contains
 
          ! Add Diabatic Forcing to State Variables
          call MAPL_GridCompTimerStart(gc, "PHYS_ADD_INCS", _RC)
-         call ADD_INCS(esmfgrid, self, import, dt)
+         call ADD_INCS(esmfgrid, self, import, dt, _RC)
          call MAPL_GridCompTimerStop(gc, "PHYS_ADD_INCS", _RC)
 
          if (DYN_DEBUG) call DEBUG_FV_STATE('PHYSICS ADD_INCS', self)
@@ -3420,7 +3420,7 @@ contains
          allocate(Q(is:ie, js:je, 1:km, nwat))
          allocate(CVM(is:ie, js:je, 1:km))
          Q(:, :, :, :) = 0.0
-         call PULL_Q(self, import, qqq, NXQ, in_field_name='Q', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='Q', _RC)
          if (DYN_COLDSTART .and. overwrite_Q .and. (.not. ADIABATIC)) then
             ! USE Q computed by FV3
             call getQ(Q(:, :, :, sphum), 'Q')
@@ -3444,14 +3444,14 @@ contains
       end if
       if (nwat >= 3) then
          ! Grab QLIQ from imports
-         call PULL_Q(self, import, qqq, NXQ, in_field_name='QLLS', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QLLS', _RC)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, liq_wat)) == size(qqq%content_r4)) Q(:, :, :, liq_wat) = Q(:, :, :, liq_wat) &
                  + qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:, :, :, liq_wat)) == size(qqq%content)) Q(:, :, :, liq_wat) = Q(:, :, :, liq_wat) + qqq%content
          end if
-         call PULL_Q(self, import, qqq, NXQ, in_field_name='QLCN', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QLCN', _RC)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, liq_wat)) == size(qqq%content_r4)) Q(:, :, :, liq_wat) = Q(:, :, :, liq_wat) &
                  + qqq%content_r4
@@ -3459,14 +3459,14 @@ contains
             if (size(Q(:, :, :, liq_wat)) == size(qqq%content)) Q(:, :, :, liq_wat) = Q(:, :, :, liq_wat) + qqq%content
          end if
          ! Grab QICE from imports
-         call PULL_Q(self, import, qqq, NXQ, in_field_name='QILS', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QILS', _RC)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, ice_wat)) == size(qqq%content_r4)) Q(:, :, :, ice_wat) = Q(:, :, :, ice_wat) &
                  + qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:, :, :, ice_wat)) == size(qqq%content)) Q(:, :, :, ice_wat) = Q(:, :, :, ice_wat) + qqq%content
          end if
-         call PULL_Q(self, import, qqq, NXQ, in_field_name='QICN', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QICN', _RC)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, ice_wat)) == size(qqq%content_r4)) Q(:, :, :, ice_wat) = Q(:, :, :, ice_wat) &
                  + qqq%content_r4
@@ -3476,21 +3476,21 @@ contains
       end if
       if (nwat >= 6) then
          ! Grab RAIN from imports
-         call PULL_Q(self, import, qqq, NXQ, in_field_name='QRAIN', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QRAIN', _RC)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, rainwat)) == size(qqq%content_r4)) Q(:, :, :, rainwat) = qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:, :, :, rainwat)) == size(qqq%content)) Q(:, :, :, rainwat) = qqq%content
          end if
          ! Grab SNOW from imports
-         call PULL_Q(self, import, qqq, NXQ, in_field_name='QSNOW', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QSNOW', _RC)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, snowwat)) == size(qqq%content_r4)) Q(:, :, :, snowwat) = qqq%content_r4
          elseif (associated(qqq%content)) then
             if (size(Q(:, :, :, snowwat)) == size(qqq%content)) Q(:, :, :, snowwat) = qqq%content
          end if
          ! Grab GRAUPEL from imports
-         call PULL_Q(self, import, qqq, NXQ, in_field_name='QGRAUPEL', rc=rc)
+         call PULL_Q(self, import, qqq, NXQ, in_field_name='QGRAUPEL', _RC)
          if ((qqq%is_r4) .and. (associated(qqq%content_r4))) then
             if (size(Q(:, :, :, graupel)) == size(qqq%content_r4)) Q(:, :, :, graupel) = qqq%content_r4
          elseif (associated(qqq%content)) then
