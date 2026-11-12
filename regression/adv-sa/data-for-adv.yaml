@@ -39,3 +39,46 @@ mapl:
         units: "Pa"
         typekind: R8
         vertical_dim_spec: "e"
+
+  connections:
+    - src_comp: <self>
+      src_name: MFX
+      src_intent: internal
+      dst_comp: <self>
+      dst_name: MFX
+      dst_intent: export
+
+    - src_comp: <self>
+      src_name: MFY
+      src_intent: internal
+      dst_comp: <self>
+      dst_name: MFY
+      dst_intent: export
+
+    - src_comp: <self>
+      src_name: CX
+      src_intent: internal
+      dst_comp: <self>
+      dst_name: CX
+      dst_intent: export
+
+    - src_comp: <self>
+      src_name: CY
+      src_intent: internal
+      dst_comp: <self>
+      dst_name: CY
+      dst_intent: export
+
+    - src_comp: <self>
+      src_name: PLE0
+      src_intent: internal
+      dst_comp: <self>
+      dst_name: PLE0
+      dst_intent: export
+
+    - src_comp: <self>
+      src_name: PLE1
+      src_intent: internal
+      dst_comp: <self>
+      dst_name: PLE1
+      dst_intent: export

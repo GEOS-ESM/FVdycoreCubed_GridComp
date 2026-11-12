@@ -15,3 +15,18 @@ mapl:
         units: "m+2"
         vertical_dim_spec: "n"
         fill_value: 0.0
+
+  connections:
+    - src_comp: <self>
+      src_name: PHIS
+      src_intent: internal
+      dst_comp: <self>
+      dst_name: PHIS
+      dst_intent: export
+
+    - src_comp: <self>
+      src_name: VARFLT
+      src_intent: internal
+      dst_comp: <self>
+      dst_name: VARFLT
+      dst_intent: export
