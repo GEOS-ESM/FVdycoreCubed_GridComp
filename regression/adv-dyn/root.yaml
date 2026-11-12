@@ -59,13 +59,11 @@ mapl:
       dst_comp: DataTracers
 
     - src_name: PHIS
-      src_intent: internal
       src_comp: DataPhisVarflt
       dst_name: PHIS
       dst_comp: DYN
 
     - src_name: VARFLT
-      src_intent: internal
       src_comp: DataPhisVarflt
       dst_name: VARFLT
       dst_comp: DYN
@@ -101,37 +99,31 @@ mapl:
       dst_comp: ADV
 
     - src_name: DQVANA
-      src_intent: internal
       src_comp: DataAna
       dst_name: DQVANA
       dst_comp: DYN
 
     - src_name: DQLANA
-      src_intent: internal
       src_comp: DataAna
       dst_name: DQLANA
       dst_comp: DYN
 
     - src_name: DQIANA
-      src_intent: internal
       src_comp: DataAna
       dst_name: DQIANA
       dst_comp: DYN
 
     - src_name: DQRANA
-      src_intent: internal
       src_comp: DataAna
       dst_name: DQRANA
       dst_comp: DYN
 
     - src_name: DQSANA
-      src_intent: internal
       src_comp: DataAna
       dst_name: DQSANA
       dst_comp: DYN
 
     - src_name: DQGANA
-      src_intent: internal
       src_comp: DataAna
       dst_name: DQGANA
       dst_comp: DYN
