@@ -1748,7 +1748,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
             FV_Atm(1)%diss_est, u_dt, v_dt, w_dt, t_dt, time_total)
 #ifdef BUILD_PYFV3
       call cpu_time(finish)
-      if (rank == 0) print *, '0: fv_dynamics: time taken = ', finish - start, 's'
+      if (rank == 0) print *, 'Fortran FV3 time taken = ', finish - start, 's'
    else
       call cpu_time(start)
       ! workaround to handle single precision requirements for pyFV3 
@@ -1793,7 +1793,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
       deallocate(cx_r4)
       deallocate(cy_r4)
       call cpu_time(finish)
-      if (rank == 0) print *, rank, ', pyfv3_interface_f_run: time taken = ', finish - start, 's'
+      if (rank == 0) print *, 'Python FV3 time taken (with interface) = ', finish - start, 's'
    end if
 #endif
 
