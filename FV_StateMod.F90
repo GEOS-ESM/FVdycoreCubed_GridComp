@@ -1793,7 +1793,7 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
       deallocate(cx_r4)
       deallocate(cy_r4)
       call cpu_time(finish)
-      if (rank == 0) print *, 'Python FV3 time taken (with interface) = ', finish - start, 's'
+      if (rank == 0) print *, 'NDSL FV3 time taken (with interface) = ', finish - start, 's'
    end if
 #endif
 
