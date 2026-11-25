@@ -4,7 +4,8 @@ Working notes for cleaning up `interp_restarts.F90` (the program behind
 `interp_restarts.x`, built by `CMakeLists.txt`). It is run by
 `GEOS_Util/pre/remap_restart/remap_upper.py`.
 
-- Base: `@FVdycoreCubed_GridComp` @ `69a5503` (tag `v3.1.1`, detached HEAD).
+- Base: `@FVdycoreCubed_GridComp` @ `69a5503` (tag `v3.1.1`). Work branch:
+  `feature/bmauer/cleanup_interp_restarts`.
 - Line numbers below refer to the **original** file at that commit unless
   stated otherwise.
 - Related code read: `fv_regrid_c2c.F90` (`get_geos_ic`,
@@ -15,15 +16,15 @@ Working notes for cleaning up `interp_restarts.F90` (the program behind
 
 | Step | Description | Status |
 |---|---|---|
-| 1 | Remove unused code and dead paths (no behaviour change) | Done, not yet built or tested |
+| 1 | Remove unused code and dead paths (no behaviour change) | Done; output verified unchanged; committed `02cf161` on `feature/bmauer/cleanup_interp_restarts` |
 | 2 | Decide on `-scalers` | Open |
-| 3 | Small, contained bug fixes | Open |
+| 3 | Small, contained bug fixes | Done, not yet built or tested |
 | 4 | Readability refactors | Open |
 | 5 | Moist tracer index clash | Open, needs investigation |
 | 6 | Same cleanup for `interp_restarts_bin.F90` | Open |
 | 7 | Record remaining bugs under Observations in `docs/ARCHITECTURE.md` | Open |
 
-## Step 1: done (uncommitted)
+## Step 1: done (output verified unchanged)
 
 With whitespace ignored, the diff is 7 lines added and 65 removed; the rest is
 re-indentation.
@@ -84,7 +85,30 @@ Options:
 
 This is a scientific decision; check with the `remap_restart` owners first.
 
-## Step 3: small, contained bug fixes (proposed)
+## Step 3: small, contained bug fixes (done, not yet built or tested)
+
+What was changed:
+
+- `VERIFY_` now calls `MPI_Abort(MPI_COMM_WORLD, A, ierror)`; `ierror` is
+  declared next to `status`.
+- `deallocate(r4_local)` moved inside the per-variable loop of the extra-file
+  write. This also avoids deallocating an unassociated pointer for a file with
+  no variables.
+- After argument parsing, `extra_files` and `extra_output` are allocated with
+  size 0 if the option was not given, and `rst_files` is always allocated
+  (`allocate(rst_files(n_files))`, size 0 when there are no extra files).
+  Every `size(...)` call, including those in `get_geos_ic` and
+  `copy_fv_rst`, is now well-defined. As a side effect, giving
+  `-input_files` without `-output_files` now stops with the existing
+  "same size" error instead of undefined behaviour.
+- `vname` is now `character(128)`.
+- The two bare `stop`s now call `mpp_error(FATAL, ...)` with the variable name,
+  the file name, and "has a vertical dimension that is neither lev nor edge".
+
+Expected effect on normal runs: none. Verify with the same before/after
+comparison as step 1.
+
+Original problems:
 
 - `VERIFY_` (line 1) calls `MPI_Abort(A)` with one argument; the MPI interface
   is `MPI_Abort(comm, errorcode, ierror)`. It compiles only because `mpif.h`
