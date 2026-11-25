@@ -32,6 +32,8 @@ module FV_StateMod
    use fv_arrays_mod , only: fv_atmos_type, FVPRC, REAL4, REAL8
    use init_hydro_mod, only: p_var
    use fv_dynamics_mod, only: fv_dynamics
+   use fv_mapz_mod, only: rmd_config, rmd_reset, rmd_on, rmd_nc, rmd_dT, rmd_err, rmd_sp0, rmd_sp1, rmd_lim, &
+                          rmd_du, rmd_dv, rmd_eu, rmd_ev, rmd_cds, rmd_cdl, rmd_gapN, rmd_gapL, rmd_gthN, rmd_gthL, rmd_fix
    use fv_update_phys_mod, only: fv_update_phys
    use sw_core_mod, only: d2a2c_vect
    use fv_sg_mod, only: fv_subgrid_z
@@ -1258,6 +1260,13 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   real(REAL4), allocatable :: griddiffs(:,:)
   type (ESMF_Grid)         :: ESMFGRID
 
+! Vertical-remap diagnostics (REMAP_DIAG)
+  logical, save              :: rmd_cfg_done = .false.
+  logical                    :: rmd_flag
+  integer                    :: rmd_nd, rmd_ps, rmd_ij, rmd_st, rmd_fix_def
+  character(len=ESMF_MAXSTR) :: rmd_dir
+  real(REAL4), pointer       :: PTR2D(:,:)
+
 ! Splitting for Pure Advection
   real(FVPRC) :: myDT, lnp, rdg, pek, ak1
 
@@ -1711,6 +1720,24 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   allocate ( w_dt(isc:iec,jsc:jec,npz) )
   u_dt(:,:,:) = 0.0; v_dt(:,:,:) = 0.0; t_dt(:,:,:) = 0.0; w_dt(:,:,:) = 0.0
 
+  if (.not. rmd_cfg_done) then
+     call MAPL_GetResource(MAPL, rmd_flag, 'REMAP_DIAG:',             default=.false., RC=STATUS); VERIFY_(STATUS)
+     call MAPL_GetResource(MAPL, rmd_nd,   'REMAP_DUMP_NCALL:',       default=0,       RC=STATUS); VERIFY_(STATUS)
+     call MAPL_GetResource(MAPL, rmd_ps,   'REMAP_DUMP_PESTRIDE:',    default=20,      RC=STATUS); VERIFY_(STATUS)
+     call MAPL_GetResource(MAPL, rmd_ij,   'REMAP_DUMP_IJSTRIDE:',    default=4,       RC=STATUS); VERIFY_(STATUS)
+     call MAPL_GetResource(MAPL, rmd_dir,  'REMAP_DUMP_DIR:',         default='.',     RC=STATUS); VERIFY_(STATUS)
+     call MAPL_GetResource(MAPL, rmd_st,   'REMAP_DUMP_START:',        default=0,       RC=STATUS); VERIFY_(STATUS)
+     call rmd_config(rmd_flag, rmd_nd, rmd_ps, rmd_ij, trim(rmd_dir), rmd_st)
+     ! Default: the remap fix is on except at 72 levels (L72 keeps the original remap, zero-diff)
+     rmd_fix_def = 3
+     if (FV_Atm(1)%flagstruct%npz == 72) rmd_fix_def = 0
+     call MAPL_GetResource(MAPL, rmd_fix,  'REMAP_FIX:',               default=rmd_fix_def, RC=STATUS); VERIFY_(STATUS)
+     if (MAPL_AM_I_ROOT()) print *, 'REMAP_FIX = ', rmd_fix
+     rmd_cfg_done = .true.
+     if (rmd_flag .and. MAPL_AM_I_ROOT()) print *, 'REMAP_DIAG on: dump_ncall, pestride, ijstride = ', rmd_nd, rmd_ps, rmd_ij
+  endif
+  call rmd_reset()
+
 #ifdef RUN_GTFV3
   if (run_gtfv3 == 0) then
      call cpu_time(start)
@@ -1766,6 +1793,40 @@ subroutine FV_Run (STATE, EXPORT, CLOCK, GC, PLE0, RC)
   if( associated(PTR3D) ) PTR3D = t_dt
   call MAPL_GetPointer ( export, PTR3D, 'DWDT_RAY', rc=status ); VERIFY_(STATUS)
   if( associated(PTR3D) ) PTR3D = w_dt
+
+  if ( rmd_on .and. rmd_nc > 0 ) then
+     ! vertical-remap diagnostics: tendencies are sums over the k_split remaps divided by the step; others are means per remap
+     call MAPL_GetPointer ( export, PTR3D, 'DTDTRMP', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_dT(isc:iec,jsc:jec,:)/myDT
+     call MAPL_GetPointer ( export, PTR3D, 'RMPERRT', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_err(isc:iec,jsc:jec,:)/rmd_nc
+     call MAPL_GetPointer ( export, PTR3D, 'STRPPRE', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_sp0(isc:iec,jsc:jec,:)/rmd_nc
+     call MAPL_GetPointer ( export, PTR3D, 'STRPPOST', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_sp1(isc:iec,jsc:jec,:)/rmd_nc
+     call MAPL_GetPointer ( export, PTR3D, 'RMPLIM', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_lim(isc:iec,jsc:jec,:)/rmd_nc
+     call MAPL_GetPointer ( export, PTR3D, 'DUDTRMP', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_du(isc:iec,jsc:jec,:)/myDT
+     call MAPL_GetPointer ( export, PTR3D, 'DVDTRMP', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_dv(isc:iec,jsc:jec,:)/myDT
+     call MAPL_GetPointer ( export, PTR3D, 'RMPERRU', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_eu(isc:iec,jsc:jec,:)/rmd_nc
+     call MAPL_GetPointer ( export, PTR3D, 'RMPERRV', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_ev(isc:iec,jsc:jec,:)/rmd_nc
+     call MAPL_GetPointer ( export, PTR3D, 'DTDTGAPN', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_gapN(isc:iec,jsc:jec,:)/myDT
+     call MAPL_GetPointer ( export, PTR3D, 'DTDTGAPL', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_gapL(isc:iec,jsc:jec,:)/myDT
+     call MAPL_GetPointer ( export, PTR3D, 'DTDTGTHN', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_gthN(isc:iec,jsc:jec,:)/myDT
+     call MAPL_GetPointer ( export, PTR3D, 'DTDTGTHL', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR3D) ) PTR3D = rmd_gthL(isc:iec,jsc:jec,:)/myDT
+     call MAPL_GetPointer ( export, PTR2D, 'RMPCONSD', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR2D) ) PTR2D = rmd_cds(isc:iec,jsc:jec)/rmd_nc
+     call MAPL_GetPointer ( export, PTR2D, 'RMPCONSL', rc=status ); VERIFY_(STATUS)
+     if( associated(PTR2D) ) PTR2D = rmd_cdl(isc:iec,jsc:jec)/rmd_nc
+  endif
 
   if ( FV_Atm(1)%flagstruct%fv_sg_adj > 0 ) then
        u_dt(:,:,:) = 0.0; v_dt(:,:,:) = 0.0; t_dt(:,:,:) = 0.0; w_dt(:,:,:) = 0.0

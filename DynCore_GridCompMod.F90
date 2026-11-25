@@ -1156,6 +1156,126 @@ contains
      VERIFY_(STATUS)
 
      call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DTDTRMP',                                  &
+        LONG_NAME  = 'air_temperature_tendency_due_to_vertical_remap',        &
+        UNITS      = 'K s-1',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'RMPERRT',                                  &
+        LONG_NAME  = 'air_temperature_remap_minus_first_order_remap',        &
+        UNITS      = 'K',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'STRPPRE',                                  &
+        LONG_NAME  = 'layer_scale_temperature_departure_before_vertical_remap',        &
+        UNITS      = 'K',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'STRPPOST',                                  &
+        LONG_NAME  = 'layer_scale_temperature_departure_after_vertical_remap',        &
+        UNITS      = 'K',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'RMPLIM',                                  &
+        LONG_NAME  = 'fraction_of_vertical_remap_calls_with_limiter_active',        &
+        UNITS      = '1',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DUDTRMP',                                  &
+        LONG_NAME  = 'eastward_wind_tendency_due_to_vertical_remap',        &
+        UNITS      = 'm s-2',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DVDTRMP',                                  &
+        LONG_NAME  = 'northward_wind_tendency_due_to_vertical_remap',        &
+        UNITS      = 'm s-2',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'RMPERRU',                                  &
+        LONG_NAME  = 'eastward_wind_remap_minus_first_order_remap',        &
+        UNITS      = 'm s-1',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'RMPERRV',                                  &
+        LONG_NAME  = 'northward_wind_remap_minus_first_order_remap',        &
+        UNITS      = 'm s-1',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'RMPCONSD',                                  &
+        LONG_NAME  = 'relative_change_of_column_sum_delp_T_in_vertical_remap',        &
+        UNITS      = '1',                                  &
+        DIMS       = MAPL_DimsHorzOnly,                           &
+        RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'RMPCONSL',                                  &
+        LONG_NAME  = 'relative_change_of_column_sum_dlnp_T_in_vertical_remap',        &
+        UNITS      = '1',                                  &
+        DIMS       = MAPL_DimsHorzOnly,                           &
+        RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DTDTGAPN',                                  &
+        LONG_NAME  = 'air_temperature_change_between_remaps_after_a_non_final_remap',        &
+        UNITS      = 'K s-1',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DTDTGAPL',                                  &
+        LONG_NAME  = 'air_temperature_change_between_remaps_after_the_last_remap_of_a_step',        &
+        UNITS      = 'K s-1',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DTDTGTHN',                                  &
+        LONG_NAME  = 'temperature_equivalent_change_of_scaled_potential_temperature_after_a_non_final_remap',        &
+        UNITS      = 'K s-1',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
+        SHORT_NAME = 'DTDTGTHL',                                  &
+        LONG_NAME  = 'temperature_equivalent_change_of_scaled_potential_temperature_after_the_last_remap',        &
+        UNITS      = 'K s-1',                                  &
+        DIMS       = MAPL_DimsHorzVert,                           &
+        VLOCATION  = MAPL_VLocationCenter,             RC=STATUS  )
+     VERIFY_(STATUS)
+
+     call MAPL_AddExportSpec(GC,                             &
         SHORT_NAME = 'DUDT_RAY',                                  &
         LONG_NAME  = 'tendency_of_eastward_wind_due_to_Rayleigh_friction',       &
         UNITS      = 'm s-2',                                     &
