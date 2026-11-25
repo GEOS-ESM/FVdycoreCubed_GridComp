@@ -8,7 +8,7 @@ program interp_restarts
 !--------------------------------------------------------------------!
    use ESMF
    use MAPL
-   use mpp_mod,        only: mpp_error, FATAL, NOTE, mpp_root_pe, mpp_broadcast
+   use mpp_mod,        only: mpp_error, FATAL, mpp_root_pe, mpp_broadcast
    use fms_mod,        only: print_memory_usage, fms_init, fms_end, file_exist
    use fv_control_mod, only: fv_init1, fv_init2, fv_end
    use fv_arrays_mod,  only: fv_atmos_type, FVPRC
@@ -20,7 +20,6 @@ program interp_restarts
    use memutils_mod,   only: print_memuse_stats
    use pflogger, only: pfl_initialize => initialize
    use gFTL_StringVector
-   use gFTL_StringIntegerMap
 
    implicit none
 
@@ -31,10 +30,6 @@ program interp_restarts
    logical, allocatable, save             :: grids_on_this_pe(:)
 
    character(ESMF_MAXSTR) :: fname1, str, astr
-#ifndef __GFORTRAN__
-   external :: getarg, iargc
-   integer iargc
-#endif
    real(FVPRC) :: dt
 
    real(ESMF_KIND_R8), allocatable :: r8_ak(:)
@@ -58,9 +53,8 @@ program interp_restarts
    type(FileMetadata), allocatable :: InCfg(:),OutCfg(:)
    integer :: nVars,imc,jmc
    character(62) :: vname
-   type(StringVector) :: moist_variables,all_moist_vars
+   type(StringVector) :: all_moist_vars
    type(StringVectorIterator) :: siter
-   type(StringIntegerMap) :: tracer_names
    ! bma added
    integer :: p_split, npx, npy, npz, iwat, ivar, lcnt_var, iq0
    integer :: n_args,n_files,ifile,nlev,n_output
@@ -123,10 +117,8 @@ program interp_restarts
            n_files=n_files+1
         enddo
         allocate(extra_files(n_files))
-        nq = 0
-        do j=i+1,i+n_files
-           nq=nq+1
-           call get_command_argument(j,extra_files(nq))
+        do j=1,n_files
+           call get_command_argument(i+j,extra_files(j))
         enddo
      case('-output_files')
         do j=i+1,n_args
@@ -137,10 +129,8 @@ program interp_restarts
            n_output=n_output+1
         enddo
         allocate(extra_output(n_output))
-        nq = 0
-        do j=i+1,i+n_output
-           nq=nq+1
-           call get_command_argument(j,extra_output(nq))
+        do j=1,n_output
+           call get_command_argument(i+j,extra_output(j))
         enddo
      case('-nreader')
         call get_command_argument(i+1,astr)
@@ -267,24 +257,12 @@ program interp_restarts
       all_moist_vars = MAPL_IOGetNonDimVars(InCfg(1),rc=status)
       siter = all_moist_vars%begin()
       variables => InCfg(1)%get_variables()
-      lcnt_var=2
       do while (siter /= all_moist_vars%end())
          var_name => siter%get()
          myVariable => variables%at(var_name)
          var_dimensions => myVariable%get_dimensions()
          ndims = var_dimensions%size()
          if (ndims==2) nmoist=nmoist-1
-         if (ndims==3) then
-            call moist_variables%push_back(trim(var_name))
-            if (trim(var_name)=='Q') then
-               iq0=1
-               call tracer_names%insert(trim(var_name),iq0)
-            else
-               iq0=lcnt_var
-               call tracer_names%insert(trim(var_name),iq0)
-               lcnt_var=lcnt_var+1
-            end if
-         end if
          call siter%next()
       end do
       call InFmt%close()
@@ -293,7 +271,7 @@ program interp_restarts
       call mpp_error(FATAL, 'ABORT: moist_internal_restart_in does not exist')
    endif
 
-   call print_memuse_stats('interp_restarts: rs_count')
+   call print_memuse_stats('interp_restarts: moist count')
    call mpp_broadcast(nmoist, mpp_root_pe())
 
    allocate ( r8_ak(npz+1) )
@@ -468,135 +446,120 @@ program interp_restarts
    call print_memuse_stats('interp_restarts: going to write restarts')
 
 ! write fvcore_internal_rst
-   if( file_exist("fvcore_internal_restart_in") ) then
+   write(fname1, "('fvcore_internal_rst_c',i4.4,'_',i3.3,'L')") npx-1,npz
+   if (is_master()) print*, 'Writing : ', TRIM(fname1)
 
-      write(fname1, "('fvcore_internal_rst_c',i4.4,'_',i3.3,'L')") npx-1,npz
-      if (is_master()) print*, 'Writing : ', TRIM(fname1)
+   call InFmt%open("fvcore_internal_restart_in",pFIO_READ,rc=status)
+   allocate(InCfg(1),OutCfg(1))
+   InCfg(1)=InFmt%read(rc=status)
+   call MAPL_IOCountNonDimVars(InCfg(1),nVars)
 
-      call InFmt%open("fvcore_internal_restart_in",pFIO_READ,rc=status)
-      allocate(InCfg(1),OutCfg(1))
-      InCfg(1)=InFmt%read(rc=status)
-      call MAPL_IOCountNonDimVars(InCfg(1),nVars)
-
-      if (AmWriter) then
-         imc = npx-1
-         jmc = imc*6
-         call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon ','lat ','lev ','edge'/),(/imc,jmc,npz,npz+1/),rc=status)
-         call reset_stretch_params(OutCfg(1))
-         if (allocated(schmidt_parameters_out)) then
-             call add_stretch_params(OutCfg(1),schmidt_parameters_out)
-         end if
-
-         ! if dz and w were not in the original file add them
-         ! they need to be in there for the restart
-
-         if (.not.Atm(1)%flagstruct%hydrostatic) then
-            ! fix thic
-            !call MAPL_NCIOAddVar(ncioOut,"DZ",(/lonid,latid,levid/),6,units="m",long_name="height_thickness",rc=status)
-            !call MAPL_NCIOAddVar(ncioOut,"W",(/lonid,latid,levid/),6,units="m s-1",long_name="vertical_velocity",rc=status)
-         endif
-         call OutFmt%create_par(fname1,comm=arrdes%writers_comm,info=info,rc=status)
-         call OutFmt%write(OutCfg(1),rc=status)
+   if (AmWriter) then
+      imc = npx-1
+      jmc = imc*6
+      call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon ','lat ','lev ','edge'/),(/imc,jmc,npz,npz+1/),rc=status)
+      call reset_stretch_params(OutCfg(1))
+      if (allocated(schmidt_parameters_out)) then
+          call add_stretch_params(OutCfg(1),schmidt_parameters_out)
       end if
+      call OutFmt%create_par(fname1,comm=arrdes%writers_comm,info=info,rc=status)
+      call OutFmt%write(OutCfg(1),rc=status)
+   end if
 
 
 ! AK and BK
-      if (AmWriter) call MAPL_VarWrite(OutFmt,"AK",r8_ak)
-      if (AmWriter) call MAPL_VarWrite(OutFmt,"BK",r8_bk)
+   if (AmWriter) call MAPL_VarWrite(OutFmt,"AK",r8_ak)
+   if (AmWriter) call MAPL_VarWrite(OutFmt,"BK",r8_bk)
 
-      allocate(r4_local(is:ie,js:je,npz+1))
-      allocate(r8_local(is:ie,js:je,npz+1))
+   allocate(r4_local(is:ie,js:je,npz+1))
+   allocate(r8_local(is:ie,js:je,npz+1))
 
 ! U
-      if (is_master()) print*, 'Writing : ', TRIM(fname1), ' U'
-      call prt_mxm('U', Atm(1)%u, is, ie, js, je, Atm(1)%ng, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
-      r8_local(is:ie,js:je,1:npz) = Atm(1)%u(is:ie,js:je,1:npz)
-      call MAPL_VarWrite(OutFmt,"U",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-      VERIFY_(status)
+   if (is_master()) print*, 'Writing : ', TRIM(fname1), ' U'
+   call prt_mxm('U', Atm(1)%u, is, ie, js, je, Atm(1)%ng, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+   r8_local(is:ie,js:je,1:npz) = Atm(1)%u(is:ie,js:je,1:npz)
+   call MAPL_VarWrite(OutFmt,"U",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
+   VERIFY_(status)
 ! V
-      if (is_master()) print*, 'Writing : ', TRIM(fname1), ' V'
-      call prt_mxm('V', Atm(1)%v, is, ie, js, je, Atm(1)%ng, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
-      r8_local(is:ie,js:je,1:npz) = Atm(1)%v(is:ie,js:je,1:npz)
-      call MAPL_VarWrite(OutFmt,"V",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-      VERIFY_(status)
+   if (is_master()) print*, 'Writing : ', TRIM(fname1), ' V'
+   call prt_mxm('V', Atm(1)%v, is, ie, js, je, Atm(1)%ng, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+   r8_local(is:ie,js:je,1:npz) = Atm(1)%v(is:ie,js:je,1:npz)
+   call MAPL_VarWrite(OutFmt,"V",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
+   VERIFY_(status)
 ! PT
-      if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PT'
-      r4_local(is:ie,js:je,1:npz) = pt_local
-      call prt_mxm('PT', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
-      call MAPL_VarWrite(OutFmt,"PT",pt_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-       VERIFY_(status)
+   if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PT'
+   r4_local(is:ie,js:je,1:npz) = pt_local
+   call prt_mxm('PT', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+   call MAPL_VarWrite(OutFmt,"PT",pt_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
+    VERIFY_(status)
 
 ! PE
-      if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PE'
-      do k=1,npz+1
-         r4_local(is:ie,js:je,k)= Atm(1)%pe(is:ie,k,js:je)
-      enddo
-      call prt_mxm('PE', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz+1, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
-      do k=1,npz+1
-         r8_local(is:ie,js:je,k) = Atm(1)%pe(is:ie,k,js:je)
-      enddo
-      call MAPL_VarWrite(OutFmt,"PE",r8_local(is:ie,js:je,1:npz+1),arrdes=arrdes,rc=status)
-      VERIFY_(status)
+   if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PE'
+   do k=1,npz+1
+      r4_local(is:ie,js:je,k)= Atm(1)%pe(is:ie,k,js:je)
+   enddo
+   call prt_mxm('PE', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz+1, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+   do k=1,npz+1
+      r8_local(is:ie,js:je,k) = Atm(1)%pe(is:ie,k,js:je)
+   enddo
+   call MAPL_VarWrite(OutFmt,"PE",r8_local(is:ie,js:je,1:npz+1),arrdes=arrdes,rc=status)
+   VERIFY_(status)
 ! PKZ
-      if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PKZ'
-      r4_local(is:ie,js:je,1:npz) = Atm(1)%pkz(is:ie,js:je,1:npz)
-      call prt_mxm('PKZ', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
-      r8_local(is:ie,js:je,1:npz) = Atm(1)%pkz(is:ie,js:je,1:npz)
-      call MAPL_VarWrite(OutFmt,"PKZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-      VERIFY_(status)
+   if (is_master()) print*, 'Writing : ', TRIM(fname1), ' PKZ'
+   r4_local(is:ie,js:je,1:npz) = Atm(1)%pkz(is:ie,js:je,1:npz)
+   call prt_mxm('PKZ', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+   r8_local(is:ie,js:je,1:npz) = Atm(1)%pkz(is:ie,js:je,1:npz)
+   call MAPL_VarWrite(OutFmt,"PKZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
+   VERIFY_(status)
 
-      if (.not. Atm(1)%flagstruct%hydrostatic) then
+   if (.not. Atm(1)%flagstruct%hydrostatic) then
 ! DZ
-         if (is_master()) print*, 'Writing : ', TRIM(fname1), ' DZ'
-         r4_local(is:ie,js:je,1:npz) = Atm(1)%delz(is:ie,js:je,1:npz)
-         call prt_mxm('DZ', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
-         r8_local(is:ie,js:je,1:npz) = Atm(1)%delz(is:ie,js:je,1:npz)
-         call MAPL_VarWrite(OutFmt,"DZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-         VERIFY_(status)
+      if (is_master()) print*, 'Writing : ', TRIM(fname1), ' DZ'
+      r4_local(is:ie,js:je,1:npz) = Atm(1)%delz(is:ie,js:je,1:npz)
+      call prt_mxm('DZ', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+      r8_local(is:ie,js:je,1:npz) = Atm(1)%delz(is:ie,js:je,1:npz)
+      call MAPL_VarWrite(OutFmt,"DZ",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
+      VERIFY_(status)
 
 ! W
-         if (is_master()) print*, 'Writing : ', TRIM(fname1), ' W'
-         r4_local(is:ie,js:je,1:npz) = Atm(1)%w(is:ie,js:je,1:npz)
-         call prt_mxm('W', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
-         r8_local(is:ie,js:je,1:npz) = Atm(1)%w(is:ie,js:je,1:npz)
-         call MAPL_VarWrite(OutFmt,"W",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
-         VERIFY_(status)
-      endif
-
-      if (AmWriter) call OutFmt%close()
-      deallocate(InCfg,OutCfg)
-
-      deallocate (r4_local)
-      deallocate (r8_local)
-      deallocate (pt_local)
-
+      if (is_master()) print*, 'Writing : ', TRIM(fname1), ' W'
+      r4_local(is:ie,js:je,1:npz) = Atm(1)%w(is:ie,js:je,1:npz)
+      call prt_mxm('W', real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
+      r8_local(is:ie,js:je,1:npz) = Atm(1)%w(is:ie,js:je,1:npz)
+      call MAPL_VarWrite(OutFmt,"W",r8_local(is:ie,js:je,1:npz),arrdes=arrdes,rc=status)
+      VERIFY_(status)
    endif
+
+   if (AmWriter) call OutFmt%close()
+   deallocate(InCfg,OutCfg)
+
+   deallocate (r4_local)
+   deallocate (r8_local)
+   deallocate (pt_local)
 
 ! MOIST
 !
       allocate(r4_local(is:ie,js:je,npz+1))
       allocate(r4_local2D(is:ie,js:je))
 
-      if( file_exist("moist_internal_restart_in") ) then
-         write(fname1, "('moist_internal_rst_c',i4.4,'_',i3.3,'L')") npx-1,npz
-         if (is_master()) print*, 'Writing : ', TRIM(fname1)
-         imc = npx-1
-         jmc = imc*6
-         call InFmt%open("moist_internal_restart_in",pFIO_READ,rc=status)
-         allocate(InCfg(1),OutCfg(1))
-         InCfg(1)=InFmt%read(rc=status)
-         call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev'/),(/imc,jmc,npz/),rc=status)
-         call reset_stretch_params(OutCfg(1))
-         if (allocated(schmidt_parameters_out)) then
-             call add_stretch_params(OutCfg(1),schmidt_parameters_out)
-         end if
-         if (AmWriter) then
-            call OutFmt%create_par(fname1,comm=arrdes%writers_comm,info=info,rc=status)
-            call OutFmt%write(OutCfg(1),rc=status)
-         end if
-         deallocate(InCfg)
-         call InFmt%close()
+      write(fname1, "('moist_internal_rst_c',i4.4,'_',i3.3,'L')") npx-1,npz
+      if (is_master()) print*, 'Writing : ', TRIM(fname1)
+      imc = npx-1
+      jmc = imc*6
+      call InFmt%open("moist_internal_restart_in",pFIO_READ,rc=status)
+      allocate(InCfg(1),OutCfg(1))
+      InCfg(1)=InFmt%read(rc=status)
+      call MAPL_IOChangeRes(InCfg(1),OutCfg(1),(/'lon','lat','lev'/),(/imc,jmc,npz/),rc=status)
+      call reset_stretch_params(OutCfg(1))
+      if (allocated(schmidt_parameters_out)) then
+          call add_stretch_params(OutCfg(1),schmidt_parameters_out)
       end if
+      if (AmWriter) then
+         call OutFmt%create_par(fname1,comm=arrdes%writers_comm,info=info,rc=status)
+         call OutFmt%write(OutCfg(1),rc=status)
+      end if
+      deallocate(InCfg)
+      call InFmt%close()
       siter = all_moist_Vars%begin()
       Variables => OutCfg(1)%get_variables()
       lcnt_var=Atm(1)%flagstruct%nwat+1
@@ -738,23 +701,6 @@ program interp_restarts
 
 contains
 
-   subroutine rs_count( filename,nrecs )
-      implicit none
-      integer        nrecs,rc
-      character(*)   filename
-
-      open  (55,file=trim(filename),form='unformatted',access='sequential')
-      nrecs =  0
-      rc =  0
-      do while (rc.eq.0)
-         read (55,iostat=rc)
-         if( rc.eq.0 ) nrecs = nrecs + 1
-      enddo
-      close (55)
-
-      return
-   end subroutine rs_count
-
    subroutine add_stretch_params(meta,stretch_parameters)
       type(FileMetadata), intent(inout) :: meta
       real, intent(in) :: stretch_parameters(3)
@@ -768,12 +714,8 @@ contains
    subroutine reset_stretch_params(meta)
       type(FileMetadata), intent(inout) :: meta
 
-      logical :: has_attr
-      has_attr = meta%has_attribute('TARGET_LON')
       call meta%remove_attribute('TARGET_LON')
-      has_attr = meta%has_attribute('TARGET_LAT')
       call meta%remove_attribute('TARGET_LAT')
-      has_attr = meta%has_attribute('STRETCH_FACTOR')
       call meta%remove_attribute('STRETCH_FACTOR')
 
    end subroutine reset_stretch_params
