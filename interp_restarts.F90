@@ -196,15 +196,12 @@ program interp_restarts
    Atm(1)%flagstruct%ntiles = 6
    Atm(1)%flagstruct%hydrostatic = .false.
    Atm(1)%flagstruct%Make_NH = in_hydrostatic
+   Atm(1)%flagstruct%do_schmidt = .false.
    if (allocated(schmidt_parameters_out)) then
-     if (schmidt_parameters_out(3) > 1.0) then
       Atm(1)%flagstruct%target_lon=schmidt_parameters_out(1)
       Atm(1)%flagstruct%target_lat=schmidt_parameters_out(2)
       Atm(1)%flagstruct%stretch_fac=schmidt_parameters_out(3)
       Atm(1)%flagstruct%do_schmidt = .true.
-     else
-      Atm(1)%flagstruct%do_schmidt = .false.
-     endif
    end if
    Atm(1)%flagstruct%grid_file = 'NULL'
    call fv_init2(Atm, dt, grids_on_this_pe, p_split)
@@ -240,15 +237,12 @@ program interp_restarts
    Atm_i(1)%flagstruct%ntiles = 6
    Atm_i(1)%flagstruct%hydrostatic = in_hydrostatic
    Atm_i(1)%flagstruct%Make_NH = in_hydrostatic
+   Atm_i(1)%flagstruct%do_schmidt = .false.
    if (allocated(schmidt_parameters_in)) then
-     if (schmidt_parameters_in(3) > 1.0) then
       Atm_i(1)%flagstruct%target_lon=schmidt_parameters_in(1)
       Atm_i(1)%flagstruct%target_lat=schmidt_parameters_in(2)
       Atm_i(1)%flagstruct%stretch_fac=schmidt_parameters_in(3)
       Atm_i(1)%flagstruct%do_schmidt = .true.
-     else
-      Atm_i(1)%flagstruct%do_schmidt = .false.
-     endif
    end if
    Atm_i(1)%flagstruct%grid_file = 'NULL'
    call fv_init2(Atm_i, dt, grids_on_this_pe, p_split)
