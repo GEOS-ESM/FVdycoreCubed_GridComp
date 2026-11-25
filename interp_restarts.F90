@@ -1,4 +1,4 @@
-#define VERIFY_(A)   if((A)/=0) then; PRINT *, 'Interp_restarts.x', __LINE__; call MPI_Abort(A); endif
+#define VERIFY_(A)   if((A)/=0) then; PRINT *, 'Interp_restarts.x', __LINE__; call MPI_Abort(MPI_COMM_WORLD, A, ierror); endif
 
 program interp_restarts
 
@@ -46,13 +46,13 @@ program interp_restarts
 
    integer :: is,ie, js,je
    integer :: ks
-   integer :: status
+   integer :: status, ierror
 
    integer :: nmoist
    type(Netcdf4_Fileformatter) :: InFmt,OutFmt
    type(FileMetadata), allocatable :: InCfg(:),OutCfg(:)
    integer :: nVars,imc,jmc
-   character(62) :: vname
+   character(128) :: vname
    type(StringVector) :: all_moist_vars
    type(StringVectorIterator) :: siter
    ! bma added
@@ -166,7 +166,9 @@ program interp_restarts
      end select
    end do
 
-   if (n_files > 0) allocate(rst_files(n_files))
+   if (.not. allocated(extra_files)) allocate(extra_files(0))
+   if (.not. allocated(extra_output)) allocate(extra_output(0))
+   allocate(rst_files(n_files))
 
 ! Initialize SHMEM in MAPL
    call pfl_initialize()
@@ -350,7 +352,8 @@ program interp_restarts
                   else if (dim1 == km+1) then
                       rst_files(i)%vars(n)%nlev=npz+1
                   else
-                      stop
+                      call mpp_error(FATAL, 'ABORT: '//trim(var_name)//' in '//trim(extra_files(i))// &
+                                            ' has a vertical dimension that is neither lev nor edge')
                   end if
                else if (ndims==4) then
                   rst_files(i)%vars(n)%rank=4
@@ -361,7 +364,8 @@ program interp_restarts
                   else if (dim1 == km+1) then
                       rst_files(i)%vars(n)%nlev=npz+1
                   else
-                      stop
+                      call mpp_error(FATAL, 'ABORT: '//trim(var_name)//' in '//trim(extra_files(i))// &
+                                            ' has a vertical dimension that is neither lev nor edge')
                   end if
 
                   dname => myVariable%get_ith_dimension(4)
@@ -682,8 +686,8 @@ program interp_restarts
                   call prt_mxm(trim(vname), real(r4_local, kind=FVPRC), is, ie, js, je, 0, npz, 1.0_FVPRC, Atm(1)%gridstruct%area_64, Atm(1)%domain)
                enddo
             end if
+            deallocate(r4_local)
          end do
-         deallocate(r4_local)
          if (AmWriter) then
             call OutFmt%close()
          end if
